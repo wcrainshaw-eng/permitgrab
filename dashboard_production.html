@@ -791,7 +791,7 @@ footer a:hover { color: white; }
 <!-- HERO -->
 <section class="hero">
   <div class="hero-top">
-    <div class="logo">Permit<span>Flow</span></div>
+    <div class="logo">Permit<span>Grab</span></div>
     <nav class="hero-nav">
       <a href="#dashboard">Dashboard</a>
       <a href="#pricing">Pricing</a>
@@ -949,7 +949,7 @@ footer a:hover { color: white; }
           <li>Export to CSV</li>
           <li>Priority support</li>
         </ul>
-        <a href="#" class="pricing-btn primary" onclick="showAlertModal(); return false;">Start 14-Day Trial</a>
+        <a href="#" class="pricing-btn primary" onclick="startStripeCheckout(); return false;">Start 14-Day Trial</a>
       </div>
       <div class="pricing-card">
         <div class="pricing-name">Enterprise</div>
@@ -1380,9 +1380,41 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+async function startStripeCheckout() {
+  try {
+    const resp = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await resp.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else if (data.error) {
+      showToast('Error: ' + data.error);
+    }
+  } catch (e) {
+    showToast('Failed to start checkout. Please try again.');
+    console.error('Checkout error:', e);
+  }
+}
+
 // ===========================
 // INIT
 // ===========================
+
+// Check for payment status in URL
+const urlParams = new URLSearchParams(window.location.search);
+const paymentStatus = urlParams.get('payment');
+if (paymentStatus === 'success') {
+  setTimeout(() => showToast('Payment successful! Welcome to Professional.'), 500);
+  // Clean up URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+} else if (paymentStatus === 'cancelled') {
+  setTimeout(() => showToast('Payment cancelled. Feel free to try again when ready.'), 500);
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
 loadData();
 </script>
 </body>

@@ -10,6 +10,8 @@ venv/
 .env
 SENDGRID_API_KEY.txt
 TWILIO_RECOVERY_CODE.txt
+STRIPE_BACKUP_CODE.txt
+STRIPE_KEYS.txt
 
 # Node
 node_modules/

@@ -10,6 +10,7 @@ import os
 import threading
 import time
 from datetime import datetime
+import stripe
 
 app = Flask(__name__, static_folder='static')
 
@@ -207,6 +208,107 @@ def api_export():
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename=permitgrab_export_{datetime.now().strftime("%Y%m%d")}.csv'}
     )
+
+
+# ===========================
+# STRIPE PAYMENT ENDPOINTS
+# ===========================
+
+# Stripe configuration from environment variables
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:5000')
+
+@app.route('/api/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    """Create a Stripe Checkout Session for Professional plan ($149/mo)."""
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        return jsonify({'error': 'Stripe not configured'}), 500
+
+    stripe.api_key = STRIPE_SECRET_KEY
+
+    data = request.get_json() or {}
+    customer_email = data.get('email')
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price': STRIPE_PRICE_ID,
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=f'{SITE_URL}/?payment=success',
+            cancel_url=f'{SITE_URL}/?payment=cancelled',
+            customer_email=customer_email,
+            metadata={
+                'plan': 'professional',
+            },
+        )
+        return jsonify({'url': checkout_session.url})
+    except stripe.error.StripeError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/stripe-webhook', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhook events."""
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+
+    if not STRIPE_SECRET_KEY:
+        return jsonify({'error': 'Stripe not configured'}), 500
+
+    stripe.api_key = STRIPE_SECRET_KEY
+
+    try:
+        if STRIPE_WEBHOOK_SECRET:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, STRIPE_WEBHOOK_SECRET
+            )
+        else:
+            # For testing without webhook signature verification
+            event = json.loads(payload)
+    except ValueError:
+        return jsonify({'error': 'Invalid payload'}), 400
+    except stripe.error.SignatureVerificationError:
+        return jsonify({'error': 'Invalid signature'}), 400
+
+    # Handle checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        customer_email = session.get('customer_email') or session.get('customer_details', {}).get('email')
+        plan = session.get('metadata', {}).get('plan', 'professional')
+
+        if customer_email:
+            # Create or update subscriber with professional plan
+            subs = load_subscribers()
+            existing = next((s for s in subs if s['email'] == customer_email), None)
+
+            if existing:
+                existing['plan'] = plan
+                existing['stripe_customer_id'] = session.get('customer')
+                existing['subscription_id'] = session.get('subscription')
+                existing['upgraded_at'] = datetime.now().isoformat()
+            else:
+                subs.append({
+                    'email': customer_email,
+                    'name': session.get('customer_details', {}).get('name', ''),
+                    'company': '',
+                    'city': '',
+                    'trade': '',
+                    'plan': plan,
+                    'subscribed_at': datetime.now().isoformat(),
+                    'active': True,
+                    'stripe_customer_id': session.get('customer'),
+                    'subscription_id': session.get('subscription'),
+                })
+
+            save_subscribers(subs)
+            print(f"[Stripe] Subscriber {customer_email} upgraded to {plan}")
+
+    return jsonify({'status': 'success'})
 
 
 # ===========================
