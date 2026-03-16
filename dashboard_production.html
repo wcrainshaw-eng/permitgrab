@@ -854,6 +854,117 @@ footer a:hover { color: white; }
   cursor: pointer;
   color: var(--gray-400);
 }
+
+/* Permit History Section */
+.permit-history {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-100);
+  display: none;
+}
+
+.permit-history.expanded {
+  display: block;
+}
+
+.permit-history-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  font-weight: 500;
+}
+
+.permit-history-toggle:hover {
+  text-decoration: underline;
+}
+
+.permit-history-content {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 8px;
+}
+
+.permit-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 13px;
+}
+
+.permit-history-item:last-child {
+  border-bottom: none;
+}
+
+.permit-history-item .date {
+  color: var(--gray-400);
+  font-size: 12px;
+}
+
+.permit-history-item .type {
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
+.permit-history-item .value {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.permit-history-item .contractor {
+  color: var(--gray-500);
+  font-size: 12px;
+}
+
+/* Repeat Renovator Badge */
+.badge-repeat-renovator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+  margin-left: 8px;
+}
+
+/* Violation Warning Icon */
+.violation-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fee2e2;
+  color: #991b1b;
+  margin-left: 8px;
+  cursor: help;
+}
+
+/* Pre-Lead Badge */
+.badge-pre-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1e40af;
+}
 </style>
 </head>
 <body>
@@ -992,6 +1103,20 @@ footer a:hover { color: white; }
     <div class="sidebar-card">
       <div class="sidebar-card-header">Leads by City</div>
       <div class="sidebar-card-body" id="city-breakdown"></div>
+    </div>
+
+    <!-- Code Violations (Pre-Leads) -->
+    <div class="sidebar-card" style="border-color: var(--red);">
+      <div class="sidebar-card-header" style="background: var(--red); color: white; display: flex; justify-content: space-between; align-items: center;">
+        <span>Code Violations</span>
+        <span class="badge-pre-lead" style="background: white; color: var(--red);">Pre-Leads</span>
+      </div>
+      <div class="sidebar-card-body" id="violations-list">
+        <div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">Loading violations...</div>
+      </div>
+      <div style="padding: 12px 20px; border-top: 1px solid var(--gray-100); text-align: center;">
+        <button onclick="loadMoreViolations()" style="font-size: 13px; color: var(--primary); background: none; border: none; cursor: pointer; font-weight: 500;">View All Violations →</button>
+      </div>
     </div>
 
     <!-- Alert Signup -->
@@ -1340,6 +1465,12 @@ function renderPermits() {
           ${p.contact_phone ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : ''}
           <button class="contact-btn" onclick="savePermit('${p.permit_number}')">Save Lead</button>
           <button class="contact-btn" onclick="exportPermit('${p.permit_number}')">Export</button>
+        </div>
+        <div style="margin-top: 8px;">
+          <button class="permit-history-toggle" id="history-toggle-${globalIdx}" onclick="togglePermitHistory('${escapeHtml(p.address)}', ${globalIdx})">&#128197; View Permit History</button>
+        </div>
+        <div class="permit-history" id="history-${globalIdx}">
+          <div class="permit-history-content" id="history-content-${globalIdx}"></div>
         </div>` : `
         <div class="permit-contact" style="filter: blur(5px);">
           <a class="contact-btn primary" href="#">(555) 123-4567</a>
@@ -1740,11 +1871,155 @@ document.getElementById('signup-modal')?.addEventListener('click', function(e) {
 });
 
 // ===========================
+// PERMIT HISTORY & VIOLATIONS
+// ===========================
+let permitHistoryCache = {};
+let violationsCache = {};
+let allViolations = [];
+
+async function loadViolations() {
+  try {
+    const resp = await fetch('/api/violations');
+    if (resp.ok) {
+      const data = await resp.json();
+      allViolations = data.violations || [];
+      renderViolationsSidebar();
+    }
+  } catch (e) {
+    console.error('Failed to load violations:', e);
+    document.getElementById('violations-list').innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">Unable to load violations</div>';
+  }
+}
+
+function renderViolationsSidebar() {
+  const container = document.getElementById('violations-list');
+
+  // Filter to pre-leads only (no matching permit)
+  const preLeads = allViolations.filter(v => v.is_pre_lead).slice(0, 5);
+
+  if (preLeads.length === 0) {
+    container.innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">No code violations found</div>';
+    return;
+  }
+
+  container.innerHTML = preLeads.map(v => `
+    <div style="padding: 10px 0; border-bottom: 1px solid var(--gray-100);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div style="font-size: 13px; font-weight: 600; color: var(--gray-800);">${escapeHtml(v.address)}</div>
+          <div style="font-size: 12px; color: var(--gray-500);">${v.city}, ${v.state}</div>
+          <div style="font-size: 12px; color: var(--gray-600); margin-top: 4px;">${escapeHtml((v.violation_type || '').substring(0, 60))}${v.violation_type && v.violation_type.length > 60 ? '...' : ''}</div>
+        </div>
+        <div style="text-align: right;">
+          <span class="badge-pre-lead">Pre-Lead</span>
+          <div style="font-size: 11px; color: var(--gray-400); margin-top: 4px;">${v.violation_date || 'N/A'}</div>
+        </div>
+      </div>
+    </div>
+  `).join('') + `
+    <div style="padding-top: 12px; font-size: 12px; color: var(--gray-500); text-align: center;">
+      ${allViolations.filter(v => v.is_pre_lead).length} total pre-leads available
+    </div>
+  `;
+}
+
+function loadMoreViolations() {
+  // This would open a modal or navigate to a violations page
+  showToast('Full violations view coming soon!');
+}
+
+async function fetchPermitHistory(address) {
+  if (permitHistoryCache[address]) {
+    return permitHistoryCache[address];
+  }
+
+  try {
+    const resp = await fetch(`/api/permit-history/${encodeURIComponent(address)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      permitHistoryCache[address] = data;
+      return data;
+    }
+  } catch (e) {
+    console.error('Failed to fetch permit history:', e);
+  }
+  return null;
+}
+
+async function fetchViolationsForAddress(address) {
+  if (violationsCache[address] !== undefined) {
+    return violationsCache[address];
+  }
+
+  try {
+    const resp = await fetch(`/api/violations/${encodeURIComponent(address)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      violationsCache[address] = data;
+      return data;
+    }
+  } catch (e) {
+    console.error('Failed to fetch violations:', e);
+  }
+  violationsCache[address] = { violations: [], has_active_violations: false };
+  return violationsCache[address];
+}
+
+async function togglePermitHistory(address, cardId) {
+  const container = document.getElementById(`history-${cardId}`);
+  const content = document.getElementById(`history-content-${cardId}`);
+  const toggle = document.getElementById(`history-toggle-${cardId}`);
+
+  if (container.classList.contains('expanded')) {
+    container.classList.remove('expanded');
+    toggle.innerHTML = '&#128197; View Permit History';
+    return;
+  }
+
+  // Fetch history if not already loaded
+  if (!content.innerHTML.trim()) {
+    content.innerHTML = '<div style="color: var(--gray-400); font-size: 13px;">Loading history...</div>';
+    container.classList.add('expanded');
+
+    const history = await fetchPermitHistory(address);
+
+    if (history && history.permits && history.permits.length > 0) {
+      content.innerHTML = `
+        <div style="margin-bottom: 8px; font-size: 12px; color: var(--gray-500);">
+          ${history.permit_count} permits at this address
+          ${history.is_repeat_renovator ? '<span class="badge-repeat-renovator">&#11088; Repeat Renovator</span>' : ''}
+        </div>
+        ${history.permits.slice(0, 10).map(p => `
+          <div class="permit-history-item">
+            <div>
+              <div class="type">${escapeHtml(p.permit_type || p.trade_category || 'Permit')}</div>
+              <div class="date">${p.filing_date || 'N/A'}</div>
+              ${p.contractor ? `<div class="contractor">${escapeHtml(p.contractor)}</div>` : ''}
+            </div>
+            <div class="value">${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A'}</div>
+          </div>
+        `).join('')}
+        ${history.permits.length > 10 ? `<div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">+ ${history.permits.length - 10} more permits</div>` : ''}
+      `;
+    } else {
+      content.innerHTML = '<div style="color: var(--gray-400); font-size: 13px;">No previous permits found at this address.</div>';
+    }
+  } else {
+    container.classList.add('expanded');
+  }
+
+  toggle.innerHTML = '&#128197; Hide Permit History';
+}
+
+// ===========================
 // INIT
 // ===========================
 
 // Check current user first
 checkCurrentUser();
+
+// Load violations for sidebar
+loadViolations();
 
 // Check for payment status in URL
 const urlParams = new URLSearchParams(window.location.search);

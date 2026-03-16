@@ -230,6 +230,211 @@ def score_value(cost):
     return "low"
 
 
+def normalize_address(address):
+    """Normalize an address for consistent indexing and matching."""
+    if not address:
+        return ""
+    # Lowercase, strip whitespace, normalize common abbreviations
+    addr = address.lower().strip()
+    # Remove extra whitespace
+    addr = re.sub(r'\s+', ' ', addr)
+    # Common abbreviations
+    replacements = [
+        (r'\bstreet\b', 'st'),
+        (r'\bavenue\b', 'ave'),
+        (r'\bboulevard\b', 'blvd'),
+        (r'\bdrive\b', 'dr'),
+        (r'\broad\b', 'rd'),
+        (r'\blane\b', 'ln'),
+        (r'\bcourt\b', 'ct'),
+        (r'\bplace\b', 'pl'),
+        (r'\bapartment\b', 'apt'),
+        (r'\bsuite\b', 'ste'),
+        (r'\bnorth\b', 'n'),
+        (r'\bsouth\b', 's'),
+        (r'\beast\b', 'e'),
+        (r'\bwest\b', 'w'),
+    ]
+    for pattern, replacement in replacements:
+        addr = re.sub(pattern, replacement, addr)
+    # Remove punctuation except for essential chars
+    addr = re.sub(r'[^\w\s#-]', '', addr)
+    return addr
+
+
+def fetch_permit_history_socrata(source, years_back=3):
+    """Fetch historical permits from a Socrata SODA API."""
+    endpoint = source["endpoint"]
+    date_field = source["date_field"]
+
+    # Calculate date filter - go back 3 years
+    since_date = (datetime.now() - timedelta(days=years_back * 365)).strftime("%Y-%m-%d")
+
+    params = {
+        "$limit": 5000,  # Higher limit for historical data
+        "$order": f"{date_field} DESC",
+        "$where": f"{date_field} > '{since_date}T00:00:00'",
+    }
+
+    resp = requests.get(endpoint, params=params, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_permit_history_arcgis(source, years_back=3):
+    """Fetch historical permits from an ArcGIS REST API FeatureServer."""
+    endpoint = source["endpoint"]
+    date_field = source["date_field"]
+    date_format = source.get("date_format", "date")
+
+    # Calculate date filter - go back 3 years
+    since_dt = datetime.now() - timedelta(days=years_back * 365)
+
+    if date_format == "epoch":
+        where_clause = f"{date_field} >= TIMESTAMP '{since_dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+    elif date_format == "none":
+        where_clause = "1=1"
+    else:
+        since_date = since_dt.strftime("%Y-%m-%d")
+        where_clause = f"{date_field} >= DATE '{since_date}'"
+
+    params = {
+        "where": where_clause,
+        "outFields": "*",
+        "resultRecordCount": 5000,
+        "orderByFields": f"{date_field} DESC",
+        "f": "json",
+    }
+
+    resp = requests.get(endpoint, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if "features" in data:
+        results = [f["attributes"] for f in data["features"]]
+        if date_format == "none" and date_field and results:
+            since_epoch = int(since_dt.timestamp() * 1000)
+            results = [r for r in results if r.get(date_field, 0) and r[date_field] >= since_epoch]
+        return results
+    return []
+
+
+def fetch_permit_history(city_key, years_back=3):
+    """Fetch historical permits for a city (last 3 years)."""
+    source = CITY_SOURCES.get(city_key)
+    if not source:
+        print(f"  [SKIP] Unknown city: {city_key}")
+        return []
+
+    api_type = source.get("api_type", "socrata")
+    print(f"  Fetching {source['name']} permit history (last {years_back} years)...")
+
+    try:
+        if api_type == "arcgis":
+            raw = fetch_permit_history_arcgis(source, years_back)
+        else:
+            raw = fetch_permit_history_socrata(source, years_back)
+
+        print(f"  ✓ Got {len(raw)} historical permits from {source['name']}")
+        return raw
+    except requests.exceptions.HTTPError as e:
+        print(f"  [ERROR] HTTP {e.response.status_code} for {source['name']}: {e}")
+        return []
+    except requests.exceptions.Timeout:
+        print(f"  [ERROR] Timeout for {source['name']} (history takes longer)")
+        return []
+    except Exception as e:
+        print(f"  [ERROR] {source['name']}: {e}")
+        return []
+
+
+def collect_permit_history(years_back=3):
+    """Collect permit history from all cities, indexed by normalized address."""
+    history_index = {}
+    stats = {}
+
+    print("=" * 60)
+    print("PermitGrab - Permit History Collection")
+    print(f"Pulling {years_back} years of history from {len(CITY_SOURCES)} cities")
+    print("=" * 60)
+
+    for city_key in CITY_SOURCES:
+        raw = fetch_permit_history(city_key, years_back)
+        city_count = 0
+
+        for record in raw:
+            try:
+                normalized = normalize_permit(record, city_key)
+                if not normalized["permit_number"]:
+                    continue
+
+                # Index by normalized address
+                addr_key = normalize_address(normalized["address"])
+                if not addr_key or addr_key == "address not provided":
+                    continue
+
+                if addr_key not in history_index:
+                    history_index[addr_key] = {
+                        "address": normalized["address"],
+                        "city": normalized["city"],
+                        "state": normalized["state"],
+                        "permits": []
+                    }
+
+                history_index[addr_key]["permits"].append({
+                    "permit_number": normalized["permit_number"],
+                    "permit_type": normalized["permit_type"],
+                    "work_type": normalized["work_type"],
+                    "trade_category": normalized["trade_category"],
+                    "filing_date": normalized["filing_date"],
+                    "estimated_cost": normalized["estimated_cost"],
+                    "description": normalized["description"][:200],
+                    "contractor": normalized["contact_name"],
+                })
+                city_count += 1
+
+            except Exception:
+                continue
+
+        stats[city_key] = {
+            "raw": len(raw),
+            "indexed": city_count,
+            "city_name": CITY_SOURCES[city_key]["name"],
+        }
+
+    # Sort permits by date for each address
+    for addr_key in history_index:
+        history_index[addr_key]["permits"].sort(
+            key=lambda x: x["filing_date"] or "0000-00-00",
+            reverse=True
+        )
+        history_index[addr_key]["permit_count"] = len(history_index[addr_key]["permits"])
+
+    # Save to JSON
+    output_file = os.path.join(DATA_DIR, "permit_history.json")
+    with open(output_file, "w") as f:
+        json.dump(history_index, f, indent=2, default=str)
+
+    # Calculate stats
+    total_addresses = len(history_index)
+    total_permits = sum(len(h["permits"]) for h in history_index.values())
+    repeat_renovators = sum(1 for h in history_index.values() if len(h["permits"]) >= 3)
+
+    # Print summary
+    print("\n" + "=" * 60)
+    print("PERMIT HISTORY COLLECTION COMPLETE")
+    print("=" * 60)
+    print(f"Total unique addresses: {total_addresses}")
+    print(f"Total historical permits: {total_permits}")
+    print(f"Repeat Renovators (3+ permits): {repeat_renovators}")
+    print(f"\nBy City:")
+    for key, s in sorted(stats.items(), key=lambda x: -x[1]["indexed"]):
+        print(f"  {s['city_name']}: {s['indexed']} permits indexed ({s['raw']} raw)")
+    print(f"\nData saved to: {output_file}")
+
+    return history_index, stats
+
+
 def collect_all(days_back=30):
     """Collect permits from all configured cities."""
     all_permits = []

@@ -171,6 +171,53 @@ def generate_unsubscribe_token():
 
 
 SAVED_LEADS_FILE = os.path.join(DATA_DIR, 'saved_leads.json')
+PERMIT_HISTORY_FILE = os.path.join(DATA_DIR, 'permit_history.json')
+VIOLATIONS_FILE = os.path.join(DATA_DIR, 'violations.json')
+
+
+def load_permit_history():
+    """Load permit history index from JSON file."""
+    if os.path.exists(PERMIT_HISTORY_FILE):
+        with open(PERMIT_HISTORY_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def load_violations():
+    """Load code violations from JSON file."""
+    if os.path.exists(VIOLATIONS_FILE):
+        with open(VIOLATIONS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def normalize_address_for_lookup(address):
+    """Normalize an address for lookup (matches collector.py logic)."""
+    import re
+    if not address:
+        return ""
+    addr = address.lower().strip()
+    addr = re.sub(r'\s+', ' ', addr)
+    replacements = [
+        (r'\bstreet\b', 'st'),
+        (r'\bavenue\b', 'ave'),
+        (r'\bboulevard\b', 'blvd'),
+        (r'\bdrive\b', 'dr'),
+        (r'\broad\b', 'rd'),
+        (r'\blane\b', 'ln'),
+        (r'\bcourt\b', 'ct'),
+        (r'\bplace\b', 'pl'),
+        (r'\bapartment\b', 'apt'),
+        (r'\bsuite\b', 'ste'),
+        (r'\bnorth\b', 'n'),
+        (r'\bsouth\b', 's'),
+        (r'\beast\b', 'e'),
+        (r'\bwest\b', 'w'),
+    ]
+    for pattern, replacement in replacements:
+        addr = re.sub(pattern, replacement, addr)
+    addr = re.sub(r'[^\w\s#-]', '', addr)
+    return addr
 
 
 def load_saved_leads():
@@ -554,6 +601,127 @@ def export_saved_leads():
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename=permitgrab_my_leads_{datetime.now().strftime("%Y%m%d")}.csv'}
     )
+
+
+# ===========================
+# PERMIT HISTORY API
+# ===========================
+
+@app.route('/api/permit-history/<path:address>')
+def api_permit_history(address):
+    """
+    GET /api/permit-history/<address>
+    Returns historical permits at the given address.
+    """
+    history = load_permit_history()
+
+    # Normalize the input address for lookup
+    normalized_addr = normalize_address_for_lookup(address)
+
+    if not normalized_addr:
+        return jsonify({'error': 'Address required'}), 400
+
+    # Look up in history index
+    entry = history.get(normalized_addr)
+
+    if not entry:
+        # Try partial match
+        for key, value in history.items():
+            if normalized_addr in key or key in normalized_addr:
+                entry = value
+                break
+
+    if not entry:
+        return jsonify({
+            'address': address,
+            'permits': [],
+            'permit_count': 0,
+            'is_repeat_renovator': False,
+        })
+
+    permit_count = len(entry.get('permits', []))
+
+    return jsonify({
+        'address': entry.get('address', address),
+        'city': entry.get('city', ''),
+        'state': entry.get('state', ''),
+        'permits': entry.get('permits', []),
+        'permit_count': permit_count,
+        'is_repeat_renovator': permit_count >= 3,
+    })
+
+
+# ===========================
+# CODE VIOLATIONS API
+# ===========================
+
+@app.route('/api/violations')
+def api_violations():
+    """
+    GET /api/violations
+    Query params: city
+    Returns recent code violations, flagged as pre-leads if no matching permit.
+    """
+    violations = load_violations()
+    permits = load_permits()
+
+    city = request.args.get('city', '')
+
+    if city:
+        violations = [v for v in violations if v.get('city') == city]
+
+    # Build set of permit addresses for cross-reference
+    permit_addresses = set()
+    for p in permits:
+        addr = normalize_address_for_lookup(p.get('address', ''))
+        if addr:
+            permit_addresses.add(addr)
+
+    # Mark violations as pre-leads if no matching permit
+    for v in violations:
+        v_addr = normalize_address_for_lookup(v.get('address', ''))
+        v['has_matching_permit'] = v_addr in permit_addresses
+        v['is_pre_lead'] = not v['has_matching_permit']
+
+    # Sort: pre-leads first, then by date
+    violations.sort(key=lambda x: (not x.get('is_pre_lead', False), x.get('violation_date', '') or ''), reverse=True)
+
+    # Stats
+    pre_lead_count = sum(1 for v in violations if v.get('is_pre_lead'))
+    cities = sorted(set(v.get('city', '') for v in load_violations() if v.get('city')))
+
+    return jsonify({
+        'violations': violations[:200],  # Limit response size
+        'total': len(violations),
+        'pre_lead_count': pre_lead_count,
+        'cities': cities,
+    })
+
+
+@app.route('/api/violations/<path:address>')
+def api_violations_by_address(address):
+    """
+    GET /api/violations/<address>
+    Returns violations at a specific address.
+    """
+    violations = load_violations()
+    normalized_addr = normalize_address_for_lookup(address)
+
+    if not normalized_addr:
+        return jsonify({'violations': [], 'count': 0})
+
+    # Find violations at this address
+    matching = []
+    for v in violations:
+        v_addr = normalize_address_for_lookup(v.get('address', ''))
+        if normalized_addr == v_addr or normalized_addr in v_addr or v_addr in normalized_addr:
+            matching.append(v)
+
+    return jsonify({
+        'violations': matching,
+        'count': len(matching),
+        'has_active_violations': any(v.get('status', '').lower() in ('open', 'active', 'pending') for v in matching),
+    })
 
 
 # ===========================
@@ -1258,17 +1426,69 @@ Sitemap: {SITE_URL}/sitemap.xml
 # ===========================
 def scheduled_collection():
     """Run data collection every 24 hours."""
+    # Track when we last ran permit history (run weekly)
+    last_history_run = None
+
     while True:
         try:
             print(f"[{datetime.now()}] Running scheduled data collection...")
-            from collector import collect_all
+
+            # Regular permit collection (daily)
+            from collector import collect_all, collect_permit_history
             collect_all(days_back=60)
-            print(f"[{datetime.now()}] Collection complete.")
+            print(f"[{datetime.now()}] Permit collection complete.")
+
+            # Violation collection (daily)
+            try:
+                from violation_collector import collect_all_violations
+                collect_all_violations(days_back=90)
+                print(f"[{datetime.now()}] Violation collection complete.")
+            except Exception as e:
+                print(f"[{datetime.now()}] Violation collection error: {e}")
+
+            # Permit history collection (weekly or first run)
+            now = datetime.now()
+            if last_history_run is None or (now - last_history_run).days >= 7:
+                try:
+                    collect_permit_history(years_back=3)
+                    last_history_run = now
+                    print(f"[{datetime.now()}] Permit history collection complete.")
+                except Exception as e:
+                    print(f"[{datetime.now()}] Permit history collection error: {e}")
+
+            print(f"[{datetime.now()}] All collection tasks complete.")
         except Exception as e:
             print(f"[{datetime.now()}] Collection error: {e}")
 
         # Sleep 24 hours
         time.sleep(86400)
+
+
+def run_initial_collection():
+    """Run initial data collection on startup."""
+    try:
+        print(f"[{datetime.now()}] Running initial data collection...")
+
+        # Regular permit collection
+        from collector import collect_all, collect_permit_history
+        collect_all(days_back=60)
+
+        # Violation collection
+        try:
+            from violation_collector import collect_all_violations
+            collect_all_violations(days_back=90)
+        except Exception as e:
+            print(f"[{datetime.now()}] Initial violation collection error: {e}")
+
+        # Permit history collection (first run)
+        try:
+            collect_permit_history(years_back=3)
+        except Exception as e:
+            print(f"[{datetime.now()}] Initial history collection error: {e}")
+
+        print(f"[{datetime.now()}] Initial collection complete.")
+    except Exception as e:
+        print(f"[{datetime.now()}] Initial collection error: {e}")
 
 
 # ===========================
@@ -1277,7 +1497,11 @@ def scheduled_collection():
 if __name__ == '__main__':
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # Start background data collection
+    # Run initial collection in a thread (won't block server startup)
+    initial_thread = threading.Thread(target=run_initial_collection, daemon=True)
+    initial_thread.start()
+
+    # Start background scheduled collection (daily)
     collector_thread = threading.Thread(target=scheduled_collection, daemon=True)
     collector_thread.start()
 
