@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Early Intel | PermitGrab Pro</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --green: #16a34a;
+  --red: #dc2626;
+  --purple: #8b5cf6;
+  --yellow: #eab308;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07);
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.5;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+  color: white;
+  padding: 16px 32px;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  text-decoration: none;
+  color: white;
+}
+
+.logo span { color: var(--accent); }
+
+.nav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+
+.nav a:hover { color: white; }
+.nav a.active { color: white; font-weight: 600; }
+
+.pro-badge {
+  font-size: 10px;
+  background: var(--accent);
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+.new-badge {
+  font-size: 10px;
+  background: var(--yellow);
+  color: var(--gray-900);
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+/* Page Header */
+.page-header {
+  background: linear-gradient(135deg, var(--purple) 0%, #6366f1 100%);
+  color: white;
+  padding: 32px;
+}
+
+.page-header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-header p {
+  color: rgba(255,255,255,.8);
+  font-size: 16px;
+  margin-top: 8px;
+  max-width: 600px;
+}
+
+/* Filters */
+.filters {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 16px 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.filters-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--gray-500);
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  min-width: 180px;
+}
+
+.results-count {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+.results-count strong {
+  color: var(--gray-800);
+}
+
+/* Stats Row */
+.stats-row {
+  max-width: 1400px;
+  margin: 24px auto;
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-card .value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.stat-card .label {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+/* Signals Grid */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 32px 32px;
+}
+
+.signals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.signal-card {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  padding: 20px;
+  transition: box-shadow .2s, border-color .2s;
+}
+
+.signal-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--purple);
+}
+
+.signal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.signal-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.signal-type-badge.zoning_application,
+.signal-type-badge.land_use_review {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.signal-type-badge.planning_approval {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.signal-type-badge.new_building_filing {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.signal-type-badge.demolition_filing {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.signal-type-badge.variance_request {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.denied {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge.withdrawn {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.signal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.signal-address {
+  font-size: 14px;
+  color: var(--gray-600);
+  margin-bottom: 8px;
+}
+
+.signal-description {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.signal-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 12px;
+}
+
+.signal-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.signal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-100);
+}
+
+.lead-potential {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lead-potential.high {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.lead-potential.medium {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.lead-potential.low {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+.permit-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.permit-link-badge.has-permit {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.permit-link-badge.pre-permit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 0;
+}
+
+.page-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-700);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.page-btn:hover, .page-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.page-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--gray-400);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .signals-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .filters-inner { flex-direction: column; align-items: stretch; }
+  .results-count { margin-left: 0; }
+  .stats-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <nav class="nav">
+      <a href="/">Dashboard</a>
+      <a href="/contractors">Contractors</a>
+      <a href="/early-intel" class="active">Early Intel <span class="new-badge">NEW</span></a>
+      <a href="/analytics">Analytics <span class="pro-badge">Pro</span></a>
+      <a href="/my-leads">My Leads</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      Early Intel
+    </h1>
+    <p>Pre-construction signals: zoning applications, planning approvals, and early-stage filings. Get ahead of permits before they're issued.</p>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filters-inner">
+    <div class="filter-group">
+      <label>City</label>
+      <select id="filter-city">
+        <option value="">All Cities</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Signal Type</label>
+      <select id="filter-type">
+        <option value="">All Types</option>
+        <option value="zoning_application">Zoning Application</option>
+        <option value="planning_approval">Planning Approval</option>
+        <option value="new_building_filing">New Building Filing</option>
+        <option value="demolition_filing">Demolition Filing</option>
+        <option value="variance_request">Variance Request</option>
+        <option value="land_use_review">Land Use Review</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <select id="filter-status">
+        <option value="">All Statuses</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="denied">Denied</option>
+      </select>
+    </div>
+    <div class="results-count">
+      <strong id="total-count">0</strong> signals found
+    </div>
+  </div>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="value" id="stat-total">—</div>
+    <div class="label">Total Signals</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="stat-high-potential">—</div>
+    <div class="label">High Potential</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="stat-pre-permit">—</div>
+    <div class="label">Pre-Permit</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="stat-linked">—</div>
+    <div class="label">Linked to Permits</div>
+  </div>
+</div>
+
+<!-- Signals Grid -->
+<div class="container">
+  <div class="signals-grid" id="signals-grid">
+    <div class="loading" style="grid-column: 1 / -1;">
+      <div class="spinner"></div>
+      Loading signals...
+    </div>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<script>
+let currentPage = 1;
+const perPage = 20;
+
+const signalTypeLabels = {
+  'zoning_application': 'Zoning Application',
+  'planning_approval': 'Planning Approval',
+  'new_building_filing': 'New Building Filing',
+  'demolition_filing': 'Demolition Filing',
+  'variance_request': 'Variance Request',
+  'land_use_review': 'Land Use Review',
+};
+
+async function loadSignals() {
+  const city = document.getElementById('filter-city').value;
+  const type = document.getElementById('filter-type').value;
+  const status = document.getElementById('filter-status').value;
+
+  const params = new URLSearchParams({
+    page: currentPage,
+    per_page: perPage,
+  });
+  if (city) params.append('city', city);
+  if (type) params.append('type', type);
+  if (status) params.append('status', status);
+
+  try {
+    const [signalsResp, statsResp] = await Promise.all([
+      fetch(`/api/signals?${params}`),
+      fetch(`/api/signals/stats?city=${city}`),
+    ]);
+
+    const signalsData = await signalsResp.json();
+    const statsData = await statsResp.json();
+
+    renderSignals(signalsData);
+    renderStats(statsData);
+    populateCities(signalsData.cities);
+
+    document.getElementById('total-count').textContent = signalsData.total.toLocaleString();
+  } catch (e) {
+    console.error('Failed to load signals:', e);
+    document.getElementById('signals-grid').innerHTML = '<div class="loading" style="grid-column: 1 / -1;">Failed to load signals</div>';
+  }
+}
+
+function renderStats(data) {
+  document.getElementById('stat-total').textContent = data.total.toLocaleString();
+  document.getElementById('stat-high-potential').textContent = (data.lead_potential_breakdown?.high || 0).toLocaleString();
+  document.getElementById('stat-pre-permit').textContent = data.unlinked.toLocaleString();
+  document.getElementById('stat-linked').textContent = data.linked_to_permits.toLocaleString();
+}
+
+function renderSignals(data) {
+  const grid = document.getElementById('signals-grid');
+
+  if (data.signals.length === 0) {
+    grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1; color: var(--gray-400);">No signals found matching your filters</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  grid.innerHTML = data.signals.map(s => `
+    <div class="signal-card">
+      <div class="signal-header">
+        <span class="signal-type-badge ${s.signal_type}">${signalTypeLabels[s.signal_type] || s.signal_type}</span>
+        <span class="status-badge ${s.status}">${s.status}</span>
+      </div>
+      <div class="signal-title">${escapeHtml(s.title)}</div>
+      <div class="signal-address">${escapeHtml(s.address)} - ${s.city}, ${s.state}</div>
+      ${s.description ? `<div class="signal-description">${escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</div>` : ''}
+      <div class="signal-meta">
+        ${s.applicant_name ? `<div class="signal-meta-item"><strong>Applicant:</strong> ${escapeHtml(s.applicant_name)}</div>` : ''}
+        ${s.date_filed ? `<div class="signal-meta-item"><strong>Filed:</strong> ${s.date_filed}</div>` : ''}
+        ${s.estimated_value ? `<div class="signal-meta-item"><strong>Est. Value:</strong> $${s.estimated_value.toLocaleString()}</div>` : ''}
+      </div>
+      <div class="signal-footer">
+        <span class="lead-potential ${s.lead_potential}">${s.lead_potential === 'high' ? '&#128293; HIGH' : s.lead_potential === 'medium' ? 'MEDIUM' : 'LOW'} Potential</span>
+        ${s.has_permit
+          ? `<span class="permit-link-badge has-permit">&#10003; Permit Filed</span>`
+          : `<span class="permit-link-badge pre-permit">&#128161; Pre-Permit</span>`
+        }
+      </div>
+    </div>
+  `).join('');
+
+  renderPagination(data);
+}
+
+function renderPagination(data) {
+  const pag = document.getElementById('pagination');
+  if (data.total_pages <= 1) {
+    pag.innerHTML = '';
+    return;
+  }
+
+  let html = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+
+  for (let i = Math.max(1, currentPage - 2); i <= Math.min(data.total_pages, currentPage + 2); i++) {
+    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  }
+
+  html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === data.total_pages ? 'disabled' : ''}>Next</button>`;
+  pag.innerHTML = html;
+}
+
+function goToPage(page) {
+  currentPage = page;
+  loadSignals();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function populateCities(cities) {
+  const select = document.getElementById('filter-city');
+  if (select.options.length <= 1 && cities) {
+    cities.forEach(c => {
+      if (!Array.from(select.options).some(o => o.value === c)) {
+        select.add(new Option(c, c));
+      }
+    });
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Filter listeners
+['filter-city', 'filter-type', 'filter-status'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    currentPage = 1;
+    loadSignals();
+  });
+});
+
+// Init
+loadSignals();
+</script>
+</body>
+</html>

@@ -173,6 +173,7 @@ def generate_unsubscribe_token():
 SAVED_LEADS_FILE = os.path.join(DATA_DIR, 'saved_leads.json')
 PERMIT_HISTORY_FILE = os.path.join(DATA_DIR, 'permit_history.json')
 VIOLATIONS_FILE = os.path.join(DATA_DIR, 'violations.json')
+SIGNALS_FILE = os.path.join(DATA_DIR, 'signals.json')
 
 
 def load_permit_history():
@@ -187,6 +188,14 @@ def load_violations():
     """Load code violations from JSON file."""
     if os.path.exists(VIOLATIONS_FILE):
         with open(VIOLATIONS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def load_signals():
+    """Load pre-construction signals from JSON file."""
+    if os.path.exists(SIGNALS_FILE):
+        with open(SIGNALS_FILE) as f:
             return json.load(f)
     return []
 
@@ -1107,6 +1116,256 @@ def analytics_page():
 
 
 # ===========================
+# PRE-CONSTRUCTION SIGNALS API
+# ===========================
+
+SIGNAL_TYPES = {
+    "zoning_application": {"label": "Zoning Application", "color": "purple"},
+    "planning_approval": {"label": "Planning Approval", "color": "blue"},
+    "variance_request": {"label": "Variance Request", "color": "orange"},
+    "demolition_filing": {"label": "Demolition Filing", "color": "red"},
+    "new_building_filing": {"label": "New Building Filing", "color": "green"},
+    "land_use_review": {"label": "Land Use Review", "color": "purple"},
+}
+
+
+def calculate_lead_potential(signal):
+    """Calculate lead potential for a signal."""
+    estimated_value = signal.get('estimated_value') or 0
+    signal_type = signal.get('signal_type', '')
+
+    if estimated_value >= 500000 or signal_type == 'new_building_filing':
+        return 'high'
+    elif signal_type in ('zoning_application', 'planning_approval', 'land_use_review'):
+        return 'medium'
+    else:
+        return 'low'
+
+
+@app.route('/api/signals')
+def api_signals():
+    """
+    GET /api/signals
+    Query params: city, type, status, page, per_page
+    Returns pre-construction signals.
+    """
+    signals = load_signals()
+
+    city = request.args.get('city', '')
+    signal_type = request.args.get('type', '')
+    status = request.args.get('status', '')
+
+    if city:
+        signals = [s for s in signals if s.get('city') == city]
+    if signal_type:
+        signals = [s for s in signals if s.get('signal_type') == signal_type]
+    if status:
+        signals = [s for s in signals if s.get('status') == status]
+
+    # Add lead potential
+    for s in signals:
+        s['lead_potential'] = calculate_lead_potential(s)
+        s['has_permit'] = len(s.get('linked_permits', [])) > 0
+
+    # Sort by date_filed desc
+    signals.sort(key=lambda x: x.get('date_filed', '') or '', reverse=True)
+
+    # Pagination
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    total = len(signals)
+    start = (page - 1) * per_page
+    page_signals = signals[start:start + per_page]
+
+    # Get available cities and types for filters
+    all_signals = load_signals()
+    cities = sorted(set(s.get('city', '') for s in all_signals if s.get('city')))
+    types = sorted(set(s.get('signal_type', '') for s in all_signals if s.get('signal_type')))
+
+    return jsonify({
+        'signals': page_signals,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page,
+        'cities': cities,
+        'types': types,
+    })
+
+
+@app.route('/api/signals/<signal_id>')
+def api_signal_detail(signal_id):
+    """
+    GET /api/signals/<signal_id>
+    Returns a single signal with linked permits.
+    """
+    signals = load_signals()
+    signal = next((s for s in signals if s.get('signal_id') == signal_id), None)
+
+    if not signal:
+        return jsonify({'error': 'Signal not found'}), 404
+
+    # Add lead potential
+    signal['lead_potential'] = calculate_lead_potential(signal)
+
+    # Load linked permits
+    linked_permits = []
+    if signal.get('linked_permits'):
+        all_permits = load_permits()
+        all_permits = add_lead_scores(all_permits)
+        permit_map = {p.get('permit_number'): p for p in all_permits}
+        for permit_id in signal['linked_permits']:
+            if permit_id in permit_map:
+                linked_permits.append(permit_map[permit_id])
+
+    return jsonify({
+        'signal': signal,
+        'linked_permits': linked_permits,
+    })
+
+
+@app.route('/api/signals/stats')
+def api_signal_stats():
+    """
+    GET /api/signals/stats
+    Query params: city
+    Returns signal counts by type and status.
+    """
+    signals = load_signals()
+
+    city = request.args.get('city', '')
+    if city:
+        signals = [s for s in signals if s.get('city') == city]
+
+    type_counts = {}
+    status_counts = {'pending': 0, 'approved': 0, 'denied': 0, 'withdrawn': 0}
+    lead_potential_counts = {'high': 0, 'medium': 0, 'low': 0}
+    linked_count = 0
+
+    for s in signals:
+        signal_type = s.get('signal_type', 'unknown')
+        type_counts[signal_type] = type_counts.get(signal_type, 0) + 1
+
+        status = s.get('status', 'pending')
+        if status in status_counts:
+            status_counts[status] += 1
+
+        potential = calculate_lead_potential(s)
+        lead_potential_counts[potential] += 1
+
+        if s.get('linked_permits'):
+            linked_count += 1
+
+    return jsonify({
+        'total': len(signals),
+        'type_breakdown': type_counts,
+        'status_breakdown': status_counts,
+        'lead_potential_breakdown': lead_potential_counts,
+        'linked_to_permits': linked_count,
+        'unlinked': len(signals) - linked_count,
+        'city': city or 'All Cities',
+    })
+
+
+@app.route('/api/address-intel/<path:address>')
+def api_address_intel(address):
+    """
+    GET /api/address-intel/<address>
+    Returns ALL intelligence for an address: permits, signals, violations, history.
+    """
+    normalized = normalize_address_for_lookup(address)
+
+    if not normalized:
+        return jsonify({'error': 'Address required'}), 400
+
+    # Load all data
+    permits = load_permits()
+    permits = add_lead_scores(permits)
+    signals = load_signals()
+    violations = load_violations()
+    history = load_permit_history()
+
+    # Find matching permits
+    matching_permits = []
+    for p in permits:
+        p_addr = normalize_address_for_lookup(p.get('address', ''))
+        if normalized in p_addr or p_addr in normalized:
+            matching_permits.append(p)
+
+    # Find matching signals
+    matching_signals = []
+    for s in signals:
+        s_addr = s.get('address_normalized', '')
+        if normalized in s_addr or s_addr in normalized:
+            s['lead_potential'] = calculate_lead_potential(s)
+            matching_signals.append(s)
+
+    # Find matching violations
+    matching_violations = []
+    for v in violations:
+        v_addr = normalize_address_for_lookup(v.get('address', ''))
+        if normalized in v_addr or v_addr in normalized:
+            matching_violations.append(v)
+
+    # Find permit history
+    history_entry = history.get(normalized, {})
+    if not history_entry:
+        # Try partial match
+        for key, value in history.items():
+            if normalized in key or key in normalized:
+                history_entry = value
+                break
+
+    return jsonify({
+        'address': address,
+        'address_normalized': normalized,
+        'permits': matching_permits,
+        'permit_count': len(matching_permits),
+        'signals': matching_signals,
+        'signal_count': len(matching_signals),
+        'violations': matching_violations,
+        'violation_count': len(matching_violations),
+        'has_active_violations': any(v.get('status', '').lower() in ('open', 'active', 'pending') for v in matching_violations),
+        'history': history_entry,
+        'historical_permit_count': history_entry.get('permit_count', 0),
+        'is_repeat_renovator': history_entry.get('permit_count', 0) >= 3,
+    })
+
+
+@app.route('/early-intel')
+def early_intel_page():
+    """Render the Early Intel page (Pro users only)."""
+    user = get_current_user()
+
+    # Check if user has Pro plan
+    if not user or user.get('plan') not in ('professional', 'enterprise'):
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html><head>
+                <title>Early Intel - PermitGrab</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 60px; text-align: center; background: #f3f4f6; }
+                    .card { background: white; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+                    h1 { margin-bottom: 16px; }
+                    p { color: #6b7280; margin-bottom: 24px; }
+                    .btn { display: inline-block; background: #2563eb; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+                    .btn:hover { background: #1d4ed8; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>Early Intel is a Pro Feature</h1>
+                    <p>Upgrade to Professional to access pre-construction signals, zoning applications, and early-stage filings before permits are issued.</p>
+                    <a href="/#pricing" class="btn">Upgrade to Pro</a>
+                    <p style="margin-top: 16px;"><a href="/" style="color: #6b7280;">Back to Dashboard</a></p>
+                </div>
+            </body></html>
+        ''')
+
+    return render_template('early_intel.html', user=user)
+
+
+# ===========================
 # STRIPE PAYMENT ENDPOINTS
 # ===========================
 
@@ -1828,6 +2087,14 @@ def scheduled_collection():
             except Exception as e:
                 print(f"[{datetime.now()}] Violation collection error: {e}")
 
+            # Signal collection (daily)
+            try:
+                from signal_collector import collect_all_signals
+                collect_all_signals(days_back=90)
+                print(f"[{datetime.now()}] Signal collection complete.")
+            except Exception as e:
+                print(f"[{datetime.now()}] Signal collection error: {e}")
+
             # Permit history collection (weekly or first run)
             now = datetime.now()
             if last_history_run is None or (now - last_history_run).days >= 7:
@@ -1861,6 +2128,13 @@ def run_initial_collection():
             collect_all_violations(days_back=90)
         except Exception as e:
             print(f"[{datetime.now()}] Initial violation collection error: {e}")
+
+        # Signal collection
+        try:
+            from signal_collector import collect_all_signals
+            collect_all_signals(days_back=90)
+        except Exception as e:
+            print(f"[{datetime.now()}] Initial signal collection error: {e}")
 
         # Permit history collection (first run)
         try:
