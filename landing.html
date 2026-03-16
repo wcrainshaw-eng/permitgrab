@@ -196,22 +196,51 @@ footer a { color: rgba(255,255,255,.6); text-decoration: none; }
 <!-- SOCIAL PROOF BAR -->
 <section class="social-proof">
   <div class="proof-item">
-    <div class="proof-value">15,000+</div>
+    <div class="proof-value" id="stat-permits">—</div>
     <div class="proof-label">Active Permits</div>
   </div>
   <div class="proof-item">
-    <div class="proof-value">85+</div>
+    <div class="proof-value" id="stat-cities">—</div>
     <div class="proof-label">Metro Areas</div>
   </div>
   <div class="proof-item">
-    <div class="proof-value">$3.4B+</div>
+    <div class="proof-value" id="stat-value">—</div>
     <div class="proof-label">Project Value Tracked</div>
   </div>
   <div class="proof-item">
-    <div class="proof-value">10+</div>
+    <div class="proof-value" id="stat-trades">—</div>
     <div class="proof-label">Trade Categories</div>
   </div>
 </section>
+
+<script>
+// Fetch live stats
+fetch('/api/stats')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('stat-permits').textContent = data.total_permits.toLocaleString();
+    const valueInBillions = data.total_value / 1000000000;
+    document.getElementById('stat-value').textContent = valueInBillions >= 1
+      ? '$' + valueInBillions.toFixed(1) + 'B+'
+      : '$' + (data.total_value / 1000000).toFixed(0) + 'M+';
+    const tradeCount = Object.keys(data.trade_breakdown || {}).length;
+    document.getElementById('stat-trades').textContent = tradeCount > 0 ? tradeCount : '12';
+  })
+  .catch(() => {
+    document.getElementById('stat-permits').textContent = '15,000+';
+    document.getElementById('stat-value').textContent = '$3.4B+';
+    document.getElementById('stat-trades').textContent = '12';
+  });
+
+fetch('/api/cities')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('stat-cities').textContent = data.count || '85+';
+  })
+  .catch(() => {
+    document.getElementById('stat-cities').textContent = '85+';
+  });
+</script>
 
 <!-- HOW IT WORKS -->
 <section class="section" id="how-it-works">
@@ -222,7 +251,7 @@ footer a { color: rgba(255,255,255,.6); text-decoration: none; }
       <div class="step">
         <div class="step-number">1</div>
         <h3>We Collect Permits</h3>
-        <p>Every day, we pull the latest building permits from 8+ major metro areas. New construction, renovations, roofing, HVAC — we capture it all from public municipal records.</p>
+        <p>Every day, we pull the latest building permits from 85+ metro areas. New construction, renovations, roofing, HVAC — we capture it all from public municipal records.</p>
       </div>
       <div class="step">
         <div class="step-number">2</div>
