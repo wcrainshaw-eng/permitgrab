@@ -83,6 +83,49 @@ body {
 
 .hero-nav a:hover { color: white; }
 
+/* Nav Dropdown */
+.nav-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.nav-dropdown .dropdown-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.nav-dropdown .dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.15);
+  min-width: 180px;
+  z-index: 1000;
+  margin-top: 12px;
+  padding: 8px 0;
+}
+
+.nav-dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+.nav-dropdown .dropdown-menu a {
+  display: block;
+  padding: 10px 16px;
+  color: var(--gray-700);
+  font-size: 14px;
+  transition: all .15s;
+}
+
+.nav-dropdown .dropdown-menu a:hover {
+  background: var(--gray-50);
+  color: var(--primary);
+}
+
 .btn-cta {
   background: var(--accent);
   color: white;
@@ -794,6 +837,22 @@ footer a:hover { color: white; }
     <div class="logo">Permit<span>Grab</span></div>
     <nav class="hero-nav">
       <a href="#dashboard">Dashboard</a>
+      <div class="nav-dropdown">
+        <a href="#" class="dropdown-toggle">Cities <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york">New York City</a>
+          <a href="/permits/los-angeles">Los Angeles</a>
+          <a href="/permits/chicago">Chicago</a>
+          <a href="/permits/san-francisco">San Francisco</a>
+          <a href="/permits/austin">Austin</a>
+          <a href="/permits/seattle">Seattle</a>
+          <a href="/permits/new-orleans">New Orleans</a>
+          <a href="/permits/baton-rouge">Baton Rouge</a>
+          <a href="/permits/nashville">Nashville</a>
+          <a href="/permits/atlanta">Atlanta</a>
+          <a href="/permits/cincinnati">Cincinnati</a>
+        </div>
+      </div>
       <a href="#pricing">Pricing</a>
       <a href="#" onclick="showAlertModal(); return false;">Get Alerts</a>
       <span id="auth-nav">
@@ -816,7 +875,7 @@ footer a:hover { color: white; }
       <div class="stat-label">Active Permits</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-cities">8</div>
+      <div class="stat-value" id="stat-cities">11</div>
       <div class="stat-label">Metro Areas</div>
     </div>
     <div class="stat-item">

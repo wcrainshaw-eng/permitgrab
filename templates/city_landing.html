@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta_title }}</title>
+<meta name="description" content="{{ meta_description }}">
+<link rel="canonical" href="{{ canonical_url }}">
+
+<!-- Open Graph -->
+<meta property="og:title" content="{{ meta_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PermitGrab">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ meta_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "PermitGrab - {{ city_name }} Building Permits",
+  "description": "{{ meta_description }}",
+  "url": "{{ canonical_url }}",
+  "areaServed": {
+    "@type": "City",
+    "name": "{{ city_name }}"
+  },
+  "serviceType": "Construction Permit Lead Generation"
+}
+</script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #dbeafe;
+  --accent: #f97316;
+  --accent-dark: #ea580c;
+  --green: #16a34a;
+  --green-light: #dcfce7;
+  --red: #dc2626;
+  --red-light: #fef2f2;
+  --yellow: #eab308;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.6;
+}
+
+/* NAV */
+.nav {
+  background: var(--gray-900);
+  padding: 16px 32px;
+}
+
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+}
+
+.logo span { color: var(--accent); }
+
+.nav-links {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav-links a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+
+.nav-links a:hover { color: white; }
+
+/* Dropdown */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-toggle {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.7);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dropdown-toggle:hover { color: white; }
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  z-index: 1000;
+  margin-top: 8px;
+  padding: 8px 0;
+}
+
+.dropdown:hover .dropdown-menu { display: block; }
+
+.dropdown-menu a {
+  display: block;
+  padding: 10px 16px;
+  color: var(--gray-700);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.dropdown-menu a:hover {
+  background: var(--gray-50);
+  color: var(--primary);
+}
+
+.btn-cta {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .2s;
+}
+
+.btn-cta:hover { background: var(--accent-dark); }
+
+/* HERO */
+.hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+  color: white;
+  padding: 60px 32px 80px;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 16px;
+  line-height: 1.1;
+}
+
+.hero h1 span { color: var(--accent); }
+
+.hero p {
+  font-size: 20px;
+  color: rgba(255,255,255,.7);
+  max-width: 700px;
+  margin: 0 auto 32px;
+}
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  margin-bottom: 32px;
+}
+
+.hero-stat {
+  text-align: center;
+}
+
+.hero-stat-value {
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.hero-stat-label {
+  font-size: 14px;
+  color: rgba(255,255,255,.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.hero-cta {
+  display: inline-flex;
+  gap: 16px;
+}
+
+.hero-cta .btn-primary {
+  background: var(--accent);
+  color: white;
+  padding: 16px 40px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all .2s;
+}
+
+.hero-cta .btn-primary:hover {
+  background: var(--accent-dark);
+  transform: translateY(-2px);
+}
+
+.hero-cta .btn-secondary {
+  background: transparent;
+  color: white;
+  padding: 16px 32px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all .2s;
+}
+
+.hero-cta .btn-secondary:hover {
+  border-color: white;
+  background: rgba(255,255,255,.1);
+}
+
+/* SECTIONS */
+.section {
+  padding: 80px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.section-header h2 {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 12px;
+}
+
+.section-header p {
+  font-size: 18px;
+  color: var(--gray-500);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* PERMITS PREVIEW */
+.permits-preview {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+
+.permits-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.permits-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.permits-header a {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.permit-row {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-100);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.permit-row:last-child { border-bottom: none; }
+
+.permit-row:hover { background: var(--gray-50); }
+
+.permit-info h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.permit-info p {
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+.permit-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.permit-value.high { color: var(--red); }
+.permit-value.medium { color: var(--accent); }
+.permit-value.low { color: var(--gray-500); }
+
+.permit-trade {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  margin-right: 8px;
+}
+
+/* ABOUT SECTION */
+.about-section {
+  background: white;
+  padding: 80px 32px;
+}
+
+.about-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.about-inner h2 {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 24px;
+}
+
+.about-inner p {
+  font-size: 17px;
+  color: var(--gray-600);
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+
+/* HOW IT WORKS */
+.how-it-works {
+  background: var(--gray-900);
+  color: white;
+  padding: 80px 32px;
+}
+
+.how-it-works .section-header h2 { color: white; }
+.how-it-works .section-header p { color: rgba(255,255,255,.6); }
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.step {
+  text-align: center;
+  padding: 32px;
+}
+
+.step-number {
+  width: 60px;
+  height: 60px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 auto 20px;
+}
+
+.step h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.step p {
+  font-size: 15px;
+  color: rgba(255,255,255,.6);
+  line-height: 1.6;
+}
+
+/* TRADES GRID */
+.trades-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.trade-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  transition: transform .2s, box-shadow .2s;
+}
+
+.trade-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.trade-card-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.trade-card h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 4px;
+}
+
+.trade-card p {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* CTA SECTION */
+.cta-section {
+  background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+  color: white;
+  padding: 80px 32px;
+  text-align: center;
+}
+
+.cta-section h2 {
+  font-size: 36px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.cta-section p {
+  font-size: 18px;
+  opacity: .8;
+  max-width: 600px;
+  margin: 0 auto 32px;
+}
+
+.cta-section .btn-cta {
+  background: white;
+  color: var(--primary);
+  padding: 16px 48px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cta-section .btn-cta:hover {
+  background: var(--gray-100);
+}
+
+/* FOOTER */
+.footer {
+  background: var(--gray-900);
+  color: white;
+  padding: 48px 32px;
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.footer-brand {
+  max-width: 300px;
+}
+
+.footer-brand .logo {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.footer-brand p {
+  font-size: 14px;
+  color: rgba(255,255,255,.5);
+  line-height: 1.6;
+}
+
+.footer-links h4 {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: rgba(255,255,255,.7);
+}
+
+.footer-links a {
+  display: block;
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 10px;
+  transition: color .2s;
+}
+
+.footer-links a:hover { color: white; }
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 32px;
+  margin-top: 32px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,.4);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 32px; }
+  .hero-stats { flex-direction: column; gap: 24px; }
+  .hero-cta { flex-direction: column; }
+  .steps-grid { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  .main-content { grid-template-columns: 1fr; }
+  .footer-inner { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <div class="dropdown">
+        <button class="dropdown-toggle">
+          Cities
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg>
+        </button>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york">New York City</a>
+          <a href="/permits/los-angeles">Los Angeles</a>
+          <a href="/permits/chicago">Chicago</a>
+          <a href="/permits/san-francisco">San Francisco</a>
+          <a href="/permits/austin">Austin</a>
+          <a href="/permits/seattle">Seattle</a>
+          <a href="/permits/new-orleans">New Orleans</a>
+          <a href="/permits/nashville">Nashville</a>
+        </div>
+      </div>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#features">Features</a>
+      <a href="/" class="btn-cta">Browse All Permits</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <h1>{{ city_name }} Building Permits<br>& <span>Contractor Leads</span></h1>
+  <p>Get real-time access to {{ permit_count }}+ active building permits in {{ city_name }}. Find contact info, project values, and job details before your competition.</p>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-value">{{ permit_count }}+</div>
+      <div class="hero-stat-label">Active Permits</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-value">${{ "{:,.0f}".format(total_value) }}</div>
+      <div class="hero-stat-label">Total Project Value</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-value">{{ high_value_count }}</div>
+      <div class="hero-stat-label">High-Value Leads</div>
+    </div>
+  </div>
+
+  <div class="hero-cta">
+    <a href="/?city={{ city_name }}" class="btn-primary">View {{ city_name }} Permits</a>
+    <a href="/#pricing" class="btn-secondary">See Pricing</a>
+  </div>
+</section>
+
+<!-- PERMITS PREVIEW -->
+<section class="section">
+  <div class="section-header">
+    <h2>Latest {{ city_name }} Building Permits</h2>
+    <p>Fresh contractor leads updated daily from official municipal sources</p>
+  </div>
+
+  <div class="permits-preview">
+    <div class="permits-header">
+      <h3>Recent High-Value Permits</h3>
+      <a href="/?city={{ city_name }}">View All {{ permit_count }}+ Permits &rarr;</a>
+    </div>
+    {% for permit in permits[:8] %}
+    <div class="permit-row">
+      <div class="permit-info">
+        <h4>
+          <span class="permit-trade">{{ permit.trade_category }}</span>
+          {{ permit.address }}
+        </h4>
+        <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; Filed: {{ permit.filing_date }}</p>
+      </div>
+      <div class="permit-value {{ permit.value_tier }}">
+        {% if permit.estimated_cost %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% else %}N/A{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ABOUT CITY -->
+<section class="about-section">
+  <div class="about-inner">
+    <h2>About {{ city_name }} Building Permits</h2>
+    {{ seo_content | safe }}
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works">
+  <div class="section-header">
+    <h2>How It Works</h2>
+    <p>Win more jobs in {{ city_name }} with fresh permit leads delivered daily</p>
+  </div>
+
+  <div class="steps-grid">
+    <div class="step">
+      <div class="step-number">1</div>
+      <h3>Browse Permits</h3>
+      <p>Search {{ city_name }} building permits by trade, value, or location. Filter to find the jobs that match your specialty.</p>
+    </div>
+    <div class="step">
+      <div class="step-number">2</div>
+      <h3>Get Contact Info</h3>
+      <p>Access property owner names, phone numbers, and project details. Reach out before the permit is even posted publicly.</p>
+    </div>
+    <div class="step">
+      <div class="step-number">3</div>
+      <h3>Win the Job</h3>
+      <p>Be the first contractor to connect. Early outreach means higher close rates and less competition.</p>
+    </div>
+  </div>
+</section>
+
+<!-- TRADES WE COVER -->
+<section class="section">
+  <div class="section-header">
+    <h2>Trades We Cover in {{ city_name }}</h2>
+    <p>Find permits for your specialty</p>
+  </div>
+
+  <div class="trades-grid">
+    {% for trade, count in trade_breakdown.items() %}
+    {% if count > 0 %}
+    <div class="trade-card">
+      <div class="trade-card-icon">
+        {% if trade == 'Roofing' %}&#127969;{% elif trade == 'HVAC' %}&#10052;{% elif trade == 'Electrical' %}&#9889;{% elif trade == 'Plumbing' %}&#128167;{% elif trade == 'General Construction' %}&#127959;{% elif trade == 'Demolition' %}&#128165;{% elif trade == 'Interior Renovation' %}&#128205;{% elif trade == 'Windows & Doors' %}&#128682;{% elif trade == 'Structural' %}&#9881;{% elif trade == 'Landscaping & Exterior' %}&#127793;{% else %}&#128295;{% endif %}
+      </div>
+      <h4>{{ trade }}</h4>
+      <p>{{ count }}</p>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2>Start Finding {{ city_name }} Leads Today</h2>
+  <p>Join thousands of contractors using PermitGrab to find new business. Browse permits free or upgrade for contact info.</p>
+  <a href="/?city={{ city_name }}" class="btn-cta">Browse {{ city_name }} Permits Free</a>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="/" class="logo">Permit<span>Grab</span></a>
+      <p>Real-time construction permit leads for contractors. Get the jobs before your competition.</p>
+    </div>
+
+    <div class="footer-links">
+      <h4>Cities</h4>
+      {% for city in other_cities %}
+      <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+      {% endfor %}
+    </div>
+
+    <div class="footer-links">
+      <h4>Company</h4>
+      <a href="/">Home</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#features">Features</a>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    &copy; {{ current_year }} PermitGrab. All rights reserved.
+  </div>
+</footer>
+
+</body>
+</html>

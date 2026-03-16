@@ -4,7 +4,7 @@ Flask app that serves the dashboard and API endpoints
 Deploy to any VPS (DigitalOcean, Railway, Render, etc.)
 """
 
-from flask import Flask, jsonify, request, send_from_directory, render_template_string, session
+from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response
 import json
 import os
 import threading
@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Rate limiter setup
@@ -696,6 +696,246 @@ def admin_page():
 def check_admin_logout():
     if request.path == '/admin' and request.args.get('logout'):
         session.pop('admin_authenticated', None)
+
+
+# ===========================
+# SEO CITY LANDING PAGES
+# ===========================
+
+# City configurations with SEO content
+CITY_SEO_CONFIG = {
+    "new-york": {
+        "name": "New York City",
+        "state": "NY",
+        "meta_title": "New York City Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 2000+ active building permits in New York City. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>New York City's construction market is one of the largest and most dynamic in the world. With constant development across all five boroughs, NYC building permits represent billions of dollars in annual construction activity. From luxury high-rise developments in Manhattan to residential renovations in Brooklyn and Queens, the opportunities for contractors are endless.</p>
+            <p>The NYC construction industry spans every trade imaginable—HVAC installations in commercial towers, electrical upgrades in historic brownstones, plumbing renovations in pre-war buildings, and roofing projects across thousands of residential properties. New York City construction permits are filed daily with the Department of Buildings, creating a steady stream of new contractor leads.</p>
+            <p>For contractors seeking NYC building permits and construction leads, timing is everything. PermitGrab delivers fresh New York City permit data daily, giving you the edge to connect with property owners before your competition even knows the project exists.</p>
+        """
+    },
+    "los-angeles": {
+        "name": "Los Angeles",
+        "state": "CA",
+        "meta_title": "Los Angeles Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 2000+ active building permits in Los Angeles. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Los Angeles is experiencing unprecedented construction growth, making it one of the hottest markets for contractor leads in the nation. From Santa Monica to Downtown LA to the Valley, LA building permits cover everything from ADU (Accessory Dwelling Unit) construction to major commercial developments and earthquake retrofit projects.</p>
+            <p>The LA construction market is unique in its diversity—solar panel installations are booming, pool construction remains strong year-round, and seismic retrofitting creates steady demand for structural contractors. Los Angeles construction permits also reflect the city's focus on sustainability, with green building projects and EV charger installations on the rise.</p>
+            <p>Contractors looking for Los Angeles building permits need fast access to new filings. PermitGrab pulls LA permit data directly from official city sources, delivering actionable contractor leads for every trade from roofing to HVAC to general construction.</p>
+        """
+    },
+    "chicago": {
+        "name": "Chicago",
+        "state": "IL",
+        "meta_title": "Chicago Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 2000+ active building permits in Chicago. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Chicago's construction industry is thriving, with billions invested in residential, commercial, and infrastructure projects each year. Chicago building permits cover everything from downtown high-rise construction to single-family renovations in neighborhoods across the city. The Windy City's harsh winters create strong seasonal demand for HVAC, roofing, and weatherization projects.</p>
+            <p>The Chicago contractor market benefits from the city's aging housing stock—thousands of greystone and brick buildings require ongoing maintenance, window replacements, tuckpointing, and interior renovations. Chicago construction permits also reflect the city's industrial heritage, with many warehouse-to-residential conversions creating opportunities for general contractors and specialty trades alike.</p>
+            <p>For contractors seeking Chicago building permits and construction leads, staying ahead of the competition means accessing permit data as soon as it's filed. PermitGrab delivers fresh Chicago permit leads daily, helping you find and win jobs across Cook County.</p>
+        """
+    },
+    "san-francisco": {
+        "name": "San Francisco",
+        "state": "CA",
+        "meta_title": "San Francisco Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 2000+ active building permits in San Francisco. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>San Francisco's construction market commands some of the highest project values in the nation. SF building permits range from tech company office buildouts to Victorian home renovations in Pacific Heights to seismic retrofitting in older buildings. The city's strict building codes and permitting requirements mean property owners actively seek qualified, reliable contractors.</p>
+            <p>The San Francisco construction industry reflects the city's unique character—historic preservation projects, ADU construction under California's housing laws, and high-end residential renovations drive steady permit activity. San Francisco construction permits also include significant solar and green building projects as the city pushes toward sustainability goals.</p>
+            <p>Contractors targeting San Francisco building permits face stiff competition in this premium market. PermitGrab gives you the advantage of seeing new SF permit filings first, so you can reach property owners while they're still evaluating contractors.</p>
+        """
+    },
+    "austin": {
+        "name": "Austin",
+        "state": "TX",
+        "meta_title": "Austin Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 2000+ active building permits in Austin. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Austin is one of America's fastest-growing cities, and the construction boom shows no signs of slowing. Austin building permits reflect the city's explosive growth—new residential developments, commercial construction, and infrastructure projects create constant demand for contractors of every trade. From Round Rock to South Austin, the permit pipeline is full.</p>
+            <p>The Austin construction market offers unique opportunities including new home construction in master-planned communities, office buildouts for tech companies relocating to Texas, and renovation projects in established neighborhoods like Hyde Park and Travis Heights. Austin construction permits span HVAC installations critical for Texas summers, pool construction, and outdoor living projects.</p>
+            <p>For contractors seeking Austin building permits, speed matters in this competitive market. PermitGrab delivers fresh Austin permit data daily, connecting you with property owners and builders who need quality contractors now.</p>
+        """
+    },
+    "seattle": {
+        "name": "Seattle",
+        "state": "WA",
+        "meta_title": "Seattle Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 900+ active building permits in Seattle. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Seattle's construction industry continues to boom, driven by tech industry growth and population influx. Seattle building permits cover high-rise development downtown, residential construction in neighborhoods like Capitol Hill and Ballard, and renovation projects across King County. The Pacific Northwest climate creates strong demand for roofing, weatherization, and moisture-control projects.</p>
+            <p>The Seattle construction market includes significant green building activity—the city leads in LEED-certified construction, solar installations, and energy-efficient upgrades. Seattle construction permits also reflect the region's seismic concerns, with retrofit and structural reinforcement projects common in older buildings.</p>
+            <p>Contractors pursuing Seattle building permits benefit from accessing new filings before they become public knowledge. PermitGrab pulls permit data from official Seattle sources daily, delivering contractor leads for every specialty from plumbing to electrical to general construction.</p>
+        """
+    },
+    "new-orleans": {
+        "name": "New Orleans",
+        "state": "LA",
+        "meta_title": "New Orleans Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 2000+ active building permits in New Orleans. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>New Orleans has a vibrant construction market shaped by the city's unique architecture, climate, and ongoing revitalization efforts. New Orleans building permits cover historic preservation in the French Quarter, residential renovations in the Garden District, and new construction in rapidly developing neighborhoods like the Bywater and Mid-City.</p>
+            <p>The New Orleans construction industry requires specialized knowledge—hurricane-resistant construction, moisture control, foundation work in challenging soil conditions, and historic preservation standards create demand for skilled contractors. NOLA construction permits reflect seasonal patterns, with roofing and exterior work concentrated outside hurricane season.</p>
+            <p>For contractors seeking New Orleans building permits and construction leads, local market knowledge combined with fast permit access creates winning opportunities. PermitGrab delivers fresh NOLA permit data to help you find and win jobs throughout the Crescent City.</p>
+        """
+    },
+    "baton-rouge": {
+        "name": "Baton Rouge",
+        "state": "LA",
+        "meta_title": "Baton Rouge Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 1200+ active building permits in Baton Rouge. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Baton Rouge's construction market benefits from Louisiana's capital city status and growing economy. Baton Rouge building permits cover residential construction in areas like Prairieville and Denham Springs, commercial development along I-10 and I-12 corridors, and renovation projects throughout East Baton Rouge Parish.</p>
+            <p>The Baton Rouge construction industry reflects regional priorities—flood mitigation, hurricane-resistant construction, and energy-efficient HVAC systems are common project types. BR construction permits also include significant industrial and petrochemical-related construction given the area's economic base.</p>
+            <p>Contractors pursuing Baton Rouge building permits find steady work in this growing market. PermitGrab delivers fresh EBR permit data daily, connecting contractors with property owners who need quality work done right.</p>
+        """
+    },
+    "nashville": {
+        "name": "Nashville",
+        "state": "TN",
+        "meta_title": "Nashville Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 900+ active building permits in Nashville. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Nashville is one of America's hottest construction markets, with unprecedented growth driving demand for every type of contractor. Nashville building permits reflect the city's transformation—luxury condo towers downtown, new residential developments in surrounding counties, and renovations in trendy neighborhoods like East Nashville and The Nations.</p>
+            <p>The Nashville construction industry benefits from the city's booming entertainment, healthcare, and corporate relocation activity. Music City construction permits include high-end residential work, commercial tenant improvements, and hospitality projects serving the tourism industry. HVAC installation is critical given Tennessee's hot summers.</p>
+            <p>For contractors seeking Nashville building permits, getting to leads first is essential in this competitive market. PermitGrab delivers fresh Nashville permit data daily, giving you the inside track on new construction projects throughout Davidson County.</p>
+        """
+    },
+    "atlanta": {
+        "name": "Atlanta",
+        "state": "GA",
+        "meta_title": "Atlanta Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 500+ active building permits in Atlanta. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Atlanta's construction market is booming, fueled by corporate relocations, population growth, and major infrastructure investments. Atlanta building permits span high-rise development in Midtown and Buckhead, residential construction in metro Atlanta suburbs, and renovation projects in historic neighborhoods like Virginia-Highland and Inman Park.</p>
+            <p>The Atlanta construction industry reflects the region's diversity—from luxury home construction in North Fulton to commercial buildouts in the Perimeter area to adaptive reuse projects in emerging neighborhoods. ATL construction permits include significant HVAC and electrical work given the hot Georgia summers and aging housing stock.</p>
+            <p>Contractors pursuing Atlanta building permits compete in a fast-moving market where early access to permits means more wins. PermitGrab delivers fresh Atlanta permit data daily, connecting you with property owners and developers who need quality contractors now.</p>
+        """
+    },
+    "cincinnati": {
+        "name": "Cincinnati",
+        "state": "OH",
+        "meta_title": "Cincinnati Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse 300+ active building permits in Cincinnati. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Cincinnati's construction market is experiencing a renaissance, with major investments in downtown development and neighborhood revitalization. Cincinnati building permits cover riverfront development projects, residential renovations in historic neighborhoods like Over-the-Rhine and Mount Adams, and commercial construction throughout Hamilton County.</p>
+            <p>The Cincinnati construction industry benefits from the city's aging housing stock—Victorian-era homes require ongoing maintenance, window replacements, roofing projects, and interior renovations. Cincy construction permits also reflect the region's industrial legacy with many warehouse-to-residential conversions and adaptive reuse projects.</p>
+            <p>For contractors seeking Cincinnati building permits, accessing new filings quickly means beating the competition to quality leads. PermitGrab delivers fresh Cincinnati permit data daily, helping you find and win jobs throughout the Queen City.</p>
+        """
+    },
+}
+
+# List of all cities for navigation
+ALL_CITIES = [
+    {"slug": "new-york", "name": "New York City"},
+    {"slug": "los-angeles", "name": "Los Angeles"},
+    {"slug": "chicago", "name": "Chicago"},
+    {"slug": "san-francisco", "name": "San Francisco"},
+    {"slug": "austin", "name": "Austin"},
+    {"slug": "seattle", "name": "Seattle"},
+    {"slug": "new-orleans", "name": "New Orleans"},
+    {"slug": "baton-rouge", "name": "Baton Rouge"},
+    {"slug": "nashville", "name": "Nashville"},
+    {"slug": "atlanta", "name": "Atlanta"},
+    {"slug": "cincinnati", "name": "Cincinnati"},
+]
+
+
+@app.route('/permits/<city_slug>')
+def city_landing(city_slug):
+    """Render SEO-optimized city landing page."""
+    if city_slug not in CITY_SEO_CONFIG:
+        return "City not found", 404
+
+    config = CITY_SEO_CONFIG[city_slug]
+    permits = load_permits()
+
+    # Filter permits for this city
+    city_permits = [p for p in permits if p.get('city') == config['name']]
+
+    # Calculate stats
+    permit_count = len(city_permits)
+    total_value = sum(p.get('estimated_cost', 0) for p in city_permits)
+    high_value_count = len([p for p in city_permits if p.get('value_tier') == 'high'])
+
+    # Trade breakdown
+    trade_breakdown = {}
+    for p in city_permits:
+        trade = p.get('trade_category', 'Other')
+        trade_breakdown[trade] = trade_breakdown.get(trade, 0) + 1
+
+    # Sort permits by value for preview
+    sorted_permits = sorted(city_permits, key=lambda x: x.get('estimated_cost', 0), reverse=True)
+
+    # Other cities for footer links
+    other_cities = [c for c in ALL_CITIES if c['slug'] != city_slug]
+
+    return render_template(
+        'city_landing.html',
+        city_name=config['name'],
+        city_slug=city_slug,
+        meta_title=config['meta_title'],
+        meta_description=config['meta_description'],
+        seo_content=config['seo_content'],
+        canonical_url=f"{SITE_URL}/permits/{city_slug}",
+        permit_count=permit_count,
+        total_value=total_value,
+        high_value_count=high_value_count,
+        trade_breakdown=trade_breakdown,
+        permits=sorted_permits,
+        other_cities=other_cities,
+        current_year=datetime.now().year,
+    )
+
+
+# ===========================
+# SITEMAP & ROBOTS.TXT
+# ===========================
+
+@app.route('/sitemap.xml')
+def sitemap():
+    """Generate XML sitemap for SEO."""
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    urls = [
+        {'loc': SITE_URL, 'changefreq': 'daily', 'priority': '1.0'},
+    ]
+
+    # Add city landing pages
+    for city in ALL_CITIES:
+        urls.append({
+            'loc': f"{SITE_URL}/permits/{city['slug']}",
+            'changefreq': 'weekly',
+            'priority': '0.8',
+        })
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+
+    for url in urls:
+        xml += '  <url>\n'
+        xml += f"    <loc>{url['loc']}</loc>\n"
+        xml += f"    <lastmod>{today}</lastmod>\n"
+        xml += f"    <changefreq>{url['changefreq']}</changefreq>\n"
+        xml += f"    <priority>{url['priority']}</priority>\n"
+        xml += '  </url>\n'
+
+    xml += '</urlset>'
+
+    return Response(xml, mimetype='application/xml')
+
+
+@app.route('/robots.txt')
+def robots():
+    """Serve robots.txt for search engines."""
+    content = f"""User-agent: *
+Allow: /
+
+Sitemap: {SITE_URL}/sitemap.xml
+"""
+    return Response(content, mimetype='text/plain')
 
 
 # ===========================
