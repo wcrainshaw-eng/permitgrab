@@ -809,7 +809,7 @@ footer a:hover { color: white; }
       <div class="stat-label">Active Permits</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-cities">8</div>
+      <div class="stat-value" id="stat-cities">85+</div>
       <div class="stat-label">Metro Areas</div>
     </div>
     <div class="stat-item">
@@ -956,7 +956,7 @@ footer a:hover { color: white; }
         <div class="pricing-price">$499<span>/mo</span></div>
         <div class="pricing-desc">For teams & multi-location ops</div>
         <ul class="pricing-features">
-          <li>All 8+ metro areas</li>
+          <li>All 85+ metro areas</li>
           <li>All trades + custom filters</li>
           <li>Real-time SMS + email alerts</li>
           <li>Full historical data</li>
@@ -1081,6 +1081,17 @@ function updateStats() {
   document.getElementById('stat-total').textContent = total.toLocaleString();
   document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
+
+  // Fetch city count from API
+  fetch('/api/cities')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('stat-cities').textContent = data.count || '85+';
+    })
+    .catch(() => {
+      const uniqueCities = new Set(allPermits.map(p => p.city)).size;
+      document.getElementById('stat-cities').textContent = uniqueCities || '85+';
+    });
 }
 
 // ===========================
