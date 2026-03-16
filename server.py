@@ -35,6 +35,80 @@ USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
 # ===========================
+# LEAD SCORING ENGINE
+# ===========================
+def score_lead(permit):
+    """
+    Calculate lead score (0-100) based on value, recency, trade, and contact info.
+    Returns score and quality tier (hot/warm/standard).
+    """
+    score = 0
+
+    # Project value scoring
+    value = permit.get('estimated_cost', 0) or 0
+    if value >= 100000:
+        score += 40
+    elif value >= 50000:
+        score += 25
+    elif value >= 25000:
+        score += 15
+    else:
+        score += 5
+
+    # Recency scoring (based on filing_date)
+    filing_date = permit.get('filing_date', '')
+    if filing_date:
+        try:
+            filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
+            days_ago = (datetime.now() - filed).days
+            if days_ago <= 3:
+                score += 30
+            elif days_ago <= 7:
+                score += 20
+            elif days_ago <= 14:
+                score += 10
+        except (ValueError, TypeError):
+            pass
+
+    # Trade scoring
+    trade = permit.get('trade_category', '')
+    high_value_trades = ['General Construction', 'HVAC', 'Electrical']
+    medium_value_trades = ['Plumbing', 'Roofing']
+    if trade in high_value_trades:
+        score += 20
+    elif trade in medium_value_trades:
+        score += 15
+    else:
+        score += 10
+
+    # Contact info bonus
+    if permit.get('contact_phone'):
+        score += 10
+
+    # Cap at 100
+    score = min(score, 100)
+
+    # Determine quality tier
+    if score >= 70:
+        quality = 'hot'
+    elif score >= 40:
+        quality = 'warm'
+    else:
+        quality = 'standard'
+
+    return score, quality
+
+
+def add_lead_scores(permits):
+    """Add lead_score and lead_quality to each permit."""
+    for permit in permits:
+        score, quality = score_lead(permit)
+        permit['lead_score'] = score
+        permit['lead_quality'] = quality
+    return permits
+
+
+# ===========================
 # DATA LOADING
 # ===========================
 def load_permits():
@@ -96,6 +170,30 @@ def generate_unsubscribe_token():
     return secrets.token_urlsafe(32)
 
 
+SAVED_LEADS_FILE = os.path.join(DATA_DIR, 'saved_leads.json')
+
+
+def load_saved_leads():
+    """Load saved leads from JSON file."""
+    if os.path.exists(SAVED_LEADS_FILE):
+        with open(SAVED_LEADS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def save_saved_leads(leads):
+    """Save saved leads to JSON file."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(SAVED_LEADS_FILE, 'w') as f:
+        json.dump(leads, f, indent=2)
+
+
+def get_user_saved_leads(user_email):
+    """Get saved leads for a specific user."""
+    all_leads = load_saved_leads()
+    return [l for l in all_leads if l.get('user_email') == user_email]
+
+
 # ===========================
 # API ROUTES
 # ===========================
@@ -110,16 +208,20 @@ def index():
 def api_permits():
     """
     GET /api/permits
-    Query params: city, trade, value, status, search, page, per_page
-    Returns paginated, filtered permit data.
+    Query params: city, trade, value, status, search, quality, page, per_page
+    Returns paginated, filtered permit data with lead scores.
     """
     permits = load_permits()
+
+    # Add lead scores to all permits
+    permits = add_lead_scores(permits)
 
     # Apply filters
     city = request.args.get('city', '')
     trade = request.args.get('trade', '')
     value = request.args.get('value', '')
     status = request.args.get('status', '')
+    quality = request.args.get('quality', '')
     search = request.args.get('search', '').lower()
 
     if city:
@@ -130,9 +232,17 @@ def api_permits():
         permits = [p for p in permits if p.get('value_tier') == value]
     if status:
         permits = [p for p in permits if p.get('status') == status]
+    if quality:
+        if quality == 'hot':
+            permits = [p for p in permits if p.get('lead_quality') == 'hot']
+        elif quality == 'warm':
+            permits = [p for p in permits if p.get('lead_quality') in ('hot', 'warm')]
     if search:
         permits = [p for p in permits if search in
                    f"{p.get('address','')} {p.get('description','')} {p.get('contact_name','')} {p.get('permit_number','')} {p.get('zip','')}".lower()]
+
+    # Sort by lead score (hot leads first)
+    permits.sort(key=lambda x: x.get('lead_score', 0), reverse=True)
 
     # Pagination
     page = int(request.args.get('page', 1))
@@ -230,36 +340,219 @@ def api_subscribers():
 
 @app.route('/api/export')
 def api_export():
-    """GET /api/export - Export filtered permits as CSV."""
+    """GET /api/export - Export filtered permits as CSV with lead scores."""
     permits = load_permits()
+    permits = add_lead_scores(permits)
 
     # Apply same filters as /api/permits
     city = request.args.get('city', '')
     trade = request.args.get('trade', '')
+    quality = request.args.get('quality', '')
+
     if city:
         permits = [p for p in permits if p.get('city') == city]
     if trade:
         permits = [p for p in permits if p.get('trade_category') == trade]
+    if quality:
+        if quality == 'hot':
+            permits = [p for p in permits if p.get('lead_quality') == 'hot']
+        elif quality == 'warm':
+            permits = [p for p in permits if p.get('lead_quality') in ('hot', 'warm')]
+
+    # Sort by lead score
+    permits.sort(key=lambda x: x.get('lead_score', 0), reverse=True)
 
     # Build CSV
     if not permits:
         return "No permits match your filters", 404
 
-    headers = ['permit_number', 'city', 'state', 'address', 'zip', 'trade_category',
-               'description', 'estimated_cost', 'filing_date', 'status', 'contact_name', 'contact_phone']
+    headers = ['address', 'city', 'state', 'zip', 'trade_category', 'estimated_cost',
+               'status', 'filing_date', 'contact_name', 'contact_phone', 'description',
+               'lead_score', 'lead_quality']
 
     lines = [','.join(headers)]
     for p in permits:
-        row = [str(p.get(h, '')).replace(',', ';').replace('"', "'") for h in headers]
+        row = [str(p.get(h, '')).replace(',', ';').replace('"', "'").replace('\n', ' ')[:200] for h in headers]
         lines.append(','.join(f'"{v}"' for v in row))
 
     csv_content = '\n'.join(lines)
 
-    from flask import Response
     return Response(
         csv_content,
         mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment; filename=permitgrab_export_{datetime.now().strftime("%Y%m%d")}.csv'}
+        headers={'Content-Disposition': f'attachment; filename=permitgrab_leads_{datetime.now().strftime("%Y%m%d")}.csv'}
+    )
+
+
+# ===========================
+# SAVED LEADS / CRM API
+# ===========================
+
+@app.route('/api/saved-leads', methods=['GET'])
+def get_saved_leads():
+    """GET /api/saved-leads - Get saved leads for logged-in user."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    user_leads = get_user_saved_leads(user['email'])
+
+    # Enrich with permit data
+    all_permits = load_permits()
+    permits = add_lead_scores(all_permits)
+    permit_map = {p.get('permit_number'): p for p in permits}
+
+    enriched_leads = []
+    for lead in user_leads:
+        permit = permit_map.get(lead.get('permit_id'), {})
+        enriched_leads.append({
+            **lead,
+            'permit': permit,
+        })
+
+    # Calculate stats
+    total_value = sum(l['permit'].get('estimated_cost', 0) for l in enriched_leads if l.get('permit'))
+    status_counts = {}
+    for l in enriched_leads:
+        status = l.get('status', 'new')
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    return jsonify({
+        'leads': enriched_leads,
+        'total': len(enriched_leads),
+        'total_value': total_value,
+        'status_counts': status_counts,
+    })
+
+
+@app.route('/api/saved-leads', methods=['POST'])
+def save_lead():
+    """POST /api/saved-leads - Save a lead for the logged-in user."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    data = request.get_json()
+    if not data or not data.get('permit_id'):
+        return jsonify({'error': 'permit_id required'}), 400
+
+    all_leads = load_saved_leads()
+
+    # Check if already saved
+    existing = next((l for l in all_leads if l['user_email'] == user['email'] and l['permit_id'] == data['permit_id']), None)
+    if existing:
+        return jsonify({'error': 'Lead already saved'}), 409
+
+    new_lead = {
+        'permit_id': data['permit_id'],
+        'user_email': user['email'],
+        'status': 'new',
+        'notes': '',
+        'date_saved': datetime.now().isoformat(),
+    }
+
+    all_leads.append(new_lead)
+    save_saved_leads(all_leads)
+
+    return jsonify({'message': 'Lead saved', 'lead': new_lead}), 201
+
+
+@app.route('/api/saved-leads/<permit_id>', methods=['PUT'])
+def update_saved_lead(permit_id):
+    """PUT /api/saved-leads/<permit_id> - Update status/notes for a saved lead."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    all_leads = load_saved_leads()
+    lead = next((l for l in all_leads if l['user_email'] == user['email'] and l['permit_id'] == permit_id), None)
+
+    if not lead:
+        return jsonify({'error': 'Lead not found'}), 404
+
+    # Update fields
+    if 'status' in data:
+        lead['status'] = data['status']
+    if 'notes' in data:
+        lead['notes'] = data['notes']
+    lead['updated_at'] = datetime.now().isoformat()
+
+    save_saved_leads(all_leads)
+
+    return jsonify({'message': 'Lead updated', 'lead': lead})
+
+
+@app.route('/api/saved-leads/<permit_id>', methods=['DELETE'])
+def delete_saved_lead(permit_id):
+    """DELETE /api/saved-leads/<permit_id> - Remove a saved lead."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    all_leads = load_saved_leads()
+    original_count = len(all_leads)
+    all_leads = [l for l in all_leads if not (l['user_email'] == user['email'] and l['permit_id'] == permit_id)]
+
+    if len(all_leads) == original_count:
+        return jsonify({'error': 'Lead not found'}), 404
+
+    save_saved_leads(all_leads)
+
+    return jsonify({'message': 'Lead removed'})
+
+
+@app.route('/api/saved-leads/export')
+def export_saved_leads():
+    """GET /api/saved-leads/export - Export saved leads as CSV."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    user_leads = get_user_saved_leads(user['email'])
+    all_permits = load_permits()
+    permits = add_lead_scores(all_permits)
+    permit_map = {p.get('permit_number'): p for p in permits}
+
+    if not user_leads:
+        return "No saved leads to export", 404
+
+    headers = ['address', 'city', 'state', 'zip', 'trade_category', 'estimated_cost',
+               'permit_status', 'filing_date', 'contact_name', 'contact_phone', 'description',
+               'lead_score', 'lead_quality', 'crm_status', 'notes', 'date_saved']
+
+    lines = [','.join(headers)]
+    for lead in user_leads:
+        permit = permit_map.get(lead.get('permit_id'), {})
+        row = [
+            str(permit.get('address', '')).replace(',', ';').replace('"', "'"),
+            str(permit.get('city', '')),
+            str(permit.get('state', '')),
+            str(permit.get('zip', '')),
+            str(permit.get('trade_category', '')),
+            str(permit.get('estimated_cost', '')),
+            str(permit.get('status', '')),
+            str(permit.get('filing_date', '')),
+            str(permit.get('contact_name', '')).replace(',', ';'),
+            str(permit.get('contact_phone', '')),
+            str(permit.get('description', '')).replace(',', ';').replace('"', "'").replace('\n', ' ')[:150],
+            str(permit.get('lead_score', '')),
+            str(permit.get('lead_quality', '')),
+            str(lead.get('status', '')),
+            str(lead.get('notes', '')).replace(',', ';').replace('"', "'").replace('\n', ' ')[:100],
+            str(lead.get('date_saved', ''))[:10],
+        ]
+        lines.append(','.join(f'"{v}"' for v in row))
+
+    csv_content = '\n'.join(lines)
+
+    return Response(
+        csv_content,
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=permitgrab_my_leads_{datetime.now().strftime("%Y%m%d")}.csv'}
     )
 
 
@@ -696,6 +989,28 @@ def admin_page():
 def check_admin_logout():
     if request.path == '/admin' and request.args.get('logout'):
         session.pop('admin_authenticated', None)
+
+
+# ===========================
+# MY LEADS CRM PAGE
+# ===========================
+
+@app.route('/my-leads')
+def my_leads_page():
+    """Render the My Leads CRM page."""
+    user = get_current_user()
+    if not user:
+        return '''
+        <!DOCTYPE html>
+        <html><head><title>Login Required - PermitGrab</title>
+        <style>body{font-family:sans-serif;padding:60px;text-align:center;}</style></head>
+        <body>
+            <h1>Login Required</h1>
+            <p>Please <a href="/">log in</a> to view your saved leads.</p>
+        </body></html>
+        '''
+
+    return render_template('my_leads.html', user=user)
 
 
 # ===========================

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Leads - PermitGrab CRM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --green: #16a34a;
+  --red: #dc2626;
+  --yellow: #eab308;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07);
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.5;
+}
+
+/* NAV */
+.nav {
+  background: var(--gray-900);
+  padding: 16px 32px;
+}
+
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+}
+
+.logo span { color: var(--accent); }
+
+.nav-links {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav-links a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+
+.nav-links a:hover { color: white; }
+.nav-links a.active { color: var(--accent); }
+
+/* HEADER */
+.page-header {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 32px;
+}
+
+.page-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.page-header p {
+  font-size: 16px;
+  color: var(--gray-500);
+}
+
+/* STATS */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.stat-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-card .value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+}
+
+.stat-card .label {
+  font-size: 12px;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-top: 4px;
+}
+
+.stat-card.new .value { color: var(--primary); }
+.stat-card.contacted .value { color: var(--yellow); }
+.stat-card.quoted .value { color: var(--accent); }
+.stat-card.won .value { color: var(--green); }
+
+/* FILTERS BAR */
+.filters-bar {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 16px 32px;
+}
+
+.filters-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-group label {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  text-decoration: none;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover { background: var(--primary-dark); }
+
+.btn-outline {
+  background: white;
+  border: 1px solid var(--gray-300);
+  color: var(--gray-700);
+}
+
+.btn-outline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* LEADS LIST */
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.leads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lead-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  transition: box-shadow .2s;
+}
+
+.lead-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.lead-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.lead-card-left h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.lead-card-left p {
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+.lead-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.score-badge.hot { background: #fef2f2; color: #dc2626; }
+.score-badge.warm { background: #fff7ed; color: #ea580c; }
+.score-badge.standard { background: var(--gray-100); color: var(--gray-500); }
+
+.lead-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.lead-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 16px;
+}
+
+.lead-actions {
+  display: flex;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-100);
+  align-items: flex-start;
+}
+
+.status-select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  min-width: 140px;
+}
+
+.status-new { border-color: var(--primary); }
+.status-contacted { border-color: var(--yellow); }
+.status-quoted { border-color: var(--accent); }
+.status-won { border-color: var(--green); }
+.status-lost { border-color: var(--red); }
+
+.notes-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  resize: none;
+  min-height: 40px;
+}
+
+.notes-input:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 8px;
+  font-size: 18px;
+}
+
+.remove-btn:hover { color: var(--red); }
+
+/* EMPTY STATE */
+.empty-state {
+  text-align: center;
+  padding: 80px 32px;
+}
+
+.empty-state h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  font-size: 16px;
+  color: var(--gray-500);
+  margin-bottom: 24px;
+}
+
+/* LOADING */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--gray-400);
+}
+
+/* TRADE BADGE */
+.trade-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1e40af;
+  margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .lead-actions { flex-direction: column; }
+  .notes-input { min-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/my-leads" class="active">My Leads</a>
+      <a href="/#pricing">Pricing</a>
+      <span style="color: rgba(255,255,255,.5); font-size: 14px;">{{ user.email }}</span>
+      <a href="#" onclick="logout(); return false;">Log Out</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1>My Leads</h1>
+    <p>Track and manage your saved construction leads</p>
+
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card">
+        <div class="value" id="stat-total">-</div>
+        <div class="label">Total Leads</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="stat-value">-</div>
+        <div class="label">Total Value</div>
+      </div>
+      <div class="stat-card new">
+        <div class="value" id="stat-new">-</div>
+        <div class="label">New</div>
+      </div>
+      <div class="stat-card contacted">
+        <div class="value" id="stat-contacted">-</div>
+        <div class="label">Contacted</div>
+      </div>
+      <div class="stat-card won">
+        <div class="value" id="stat-won">-</div>
+        <div class="label">Won</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters-bar">
+  <div class="filters-inner">
+    <div class="filter-group">
+      <label>Filter by status:</label>
+      <select id="status-filter" onchange="loadLeads()">
+        <option value="">All Leads</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="quoted">Quoted</option>
+        <option value="won">Won</option>
+        <option value="lost">Lost</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <a href="/api/saved-leads/export" class="btn btn-outline">Export CSV</a>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+  <div id="leads-container" class="leads-list">
+    <div class="loading">Loading your leads...</div>
+  </div>
+</div>
+
+<script>
+let allLeads = [];
+
+async function loadLeads() {
+  const container = document.getElementById('leads-container');
+  container.innerHTML = '<div class="loading">Loading your leads...</div>';
+
+  try {
+    const resp = await fetch('/api/saved-leads');
+    const data = await resp.json();
+
+    if (resp.status === 401) {
+      window.location.href = '/';
+      return;
+    }
+
+    allLeads = data.leads || [];
+
+    // Update stats
+    document.getElementById('stat-total').textContent = data.total || 0;
+    document.getElementById('stat-value').textContent = '$' + (data.total_value || 0).toLocaleString();
+    document.getElementById('stat-new').textContent = data.status_counts?.new || 0;
+    document.getElementById('stat-contacted').textContent = data.status_counts?.contacted || 0;
+    document.getElementById('stat-won').textContent = data.status_counts?.won || 0;
+
+    // Filter by status
+    const statusFilter = document.getElementById('status-filter').value;
+    let filteredLeads = allLeads;
+    if (statusFilter) {
+      filteredLeads = allLeads.filter(l => l.status === statusFilter);
+    }
+
+    if (filteredLeads.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <h2>No leads ${statusFilter ? 'with status "' + statusFilter + '"' : 'saved yet'}</h2>
+          <p>Browse the <a href="/">permit dashboard</a> and click "Save Lead" on permits you want to track.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filteredLeads.map(lead => renderLeadCard(lead)).join('');
+
+  } catch (error) {
+    console.error('Error loading leads:', error);
+    container.innerHTML = '<div class="empty-state"><h2>Error loading leads</h2><p>Please try again.</p></div>';
+  }
+}
+
+function renderLeadCard(lead) {
+  const p = lead.permit || {};
+  const score = p.lead_score || 0;
+  const quality = p.lead_quality || 'standard';
+  const value = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A';
+
+  const qualityIcon = quality === 'hot' ? '&#128293;' : quality === 'warm' ? '&#128293;' : '';
+
+  return `
+    <div class="lead-card" data-permit-id="${lead.permit_id}">
+      <div class="lead-card-header">
+        <div class="lead-card-left">
+          <h3>
+            <span class="trade-badge">${p.trade_category || 'Other'}</span>
+            ${p.address || 'Unknown Address'}
+          </h3>
+          <p>${p.city || ''}, ${p.state || ''} ${p.zip || ''}</p>
+        </div>
+        <div class="lead-score">
+          <span class="score-badge ${quality}">${qualityIcon} ${score} pts</span>
+          <span class="lead-value">${value}</span>
+        </div>
+      </div>
+
+      <div class="lead-meta">
+        <span>Filed: ${p.filing_date || 'N/A'}</span>
+        <span>Saved: ${lead.date_saved ? lead.date_saved.substring(0, 10) : 'N/A'}</span>
+        ${p.contact_name ? '<span>Contact: ' + p.contact_name + '</span>' : ''}
+        ${p.contact_phone ? '<span>Phone: ' + p.contact_phone + '</span>' : ''}
+      </div>
+
+      <div class="lead-actions">
+        <select class="status-select status-${lead.status || 'new'}" onchange="updateLeadStatus('${lead.permit_id}', this.value)">
+          <option value="new" ${lead.status === 'new' ? 'selected' : ''}>New</option>
+          <option value="contacted" ${lead.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+          <option value="quoted" ${lead.status === 'quoted' ? 'selected' : ''}>Quoted</option>
+          <option value="won" ${lead.status === 'won' ? 'selected' : ''}>Won</option>
+          <option value="lost" ${lead.status === 'lost' ? 'selected' : ''}>Lost</option>
+        </select>
+        <textarea class="notes-input" placeholder="Add notes..." onblur="updateLeadNotes('${lead.permit_id}', this.value)">${lead.notes || ''}</textarea>
+        <button class="remove-btn" onclick="removeLead('${lead.permit_id}')" title="Remove lead">&times;</button>
+      </div>
+    </div>
+  `;
+}
+
+async function updateLeadStatus(permitId, status) {
+  try {
+    await fetch('/api/saved-leads/' + permitId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    loadLeads(); // Refresh to update stats
+  } catch (error) {
+    console.error('Error updating status:', error);
+  }
+}
+
+async function updateLeadNotes(permitId, notes) {
+  try {
+    await fetch('/api/saved-leads/' + permitId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes }),
+    });
+  } catch (error) {
+    console.error('Error updating notes:', error);
+  }
+}
+
+async function removeLead(permitId) {
+  if (!confirm('Remove this lead from your saved list?')) return;
+
+  try {
+    await fetch('/api/saved-leads/' + permitId, { method: 'DELETE' });
+    loadLeads();
+  } catch (error) {
+    console.error('Error removing lead:', error);
+  }
+}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
+// Load on page load
+loadLeads();
+</script>
+
+</body>
+</html>

@@ -331,6 +331,33 @@ body {
   font-size: 18px;
 }
 
+/* Lead Score Badges */
+.lead-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.lead-score-badge.hot {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.lead-score-badge.warm {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.lead-score-badge.standard {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
 .value-high { color: var(--red); }
 .value-medium { color: var(--accent); }
 .value-low { color: var(--gray-500); }
@@ -860,6 +887,7 @@ footer a:hover { color: white; }
         <a href="#" class="btn-cta" onclick="showSignupModal(); return false;">Sign Up</a>
       </span>
       <span id="user-nav" style="display: none;">
+        <a href="/my-leads">My Leads</a>
         <span id="user-email" style="color: rgba(255,255,255,.7); font-size: 14px;"></span>
         <a href="#" onclick="logout(); return false;">Log Out</a>
       </span>
@@ -921,11 +949,20 @@ footer a:hover { color: white; }
         </select>
       </div>
       <div class="filter-group">
+        <label>Lead Quality</label>
+        <select id="filter-quality">
+          <option value="">All Leads</option>
+          <option value="hot">Hot Only (70+)</option>
+          <option value="warm">Warm+ (40+)</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <label>Search</label>
         <input type="text" id="filter-search" placeholder="Address, description, owner...">
       </div>
       <div class="results-count">
         <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
+        <button onclick="exportCSV()" style="margin-left: 16px; padding: 6px 14px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">Export CSV</button>
       </div>
     </div>
   </div>
@@ -1206,6 +1243,7 @@ function applyFilters() {
   const trade = document.getElementById('filter-trade').value;
   const value = document.getElementById('filter-value').value;
   const status = document.getElementById('filter-status').value;
+  const quality = document.getElementById('filter-quality').value;
   const search = document.getElementById('filter-search').value.toLowerCase();
 
   filteredPermits = allPermits.filter(p => {
@@ -1213,6 +1251,8 @@ function applyFilters() {
     if (trade && p.trade_category !== trade) return false;
     if (value && p.value_tier !== value) return false;
     if (status && p.status !== status) return false;
+    if (quality === 'hot' && p.lead_quality !== 'hot') return false;
+    if (quality === 'warm' && p.lead_quality !== 'hot' && p.lead_quality !== 'warm') return false;
     if (search) {
       const haystack = `${p.address} ${p.description} ${p.contact_name} ${p.permit_number} ${p.zip}`.toLowerCase();
       if (!haystack.includes(search)) return false;
@@ -1227,7 +1267,7 @@ function applyFilters() {
 }
 
 // Attach filter listeners
-['filter-city', 'filter-trade', 'filter-value', 'filter-status'].forEach(id => {
+['filter-city', 'filter-trade', 'filter-value', 'filter-status', 'filter-quality'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', applyFilters);
 });
 document.getElementById('filter-search')?.addEventListener('input', debounce(applyFilters, 300));
@@ -1262,11 +1302,15 @@ function renderPermits() {
     const tradeClass = getTradeClass(p.trade_category);
     const valueClass = p.value_tier === 'high' ? 'value-high' : p.value_tier === 'medium' ? 'value-medium' : 'value-low';
     const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A';
+    const leadScore = p.lead_score || 0;
+    const leadQuality = p.lead_quality || 'standard';
+    const scoreIcon = leadQuality === 'hot' ? '&#128293;' : leadQuality === 'warm' ? '&#128293;' : '';
 
     return `
       <div class="permit-card ${isLocked ? 'locked' : ''}">
         <div class="permit-card-header">
           <span class="permit-trade ${tradeClass}">${getTradeIcon(p.trade_category)} ${p.trade_category}</span>
+          <span class="lead-score-badge ${leadQuality}">${scoreIcon} ${leadScore} pts</span>
           <span class="permit-value ${valueClass}">${cost}</span>
         </div>
         <div class="permit-address">${escapeHtml(p.address)}</div>
@@ -1294,8 +1338,8 @@ function renderPermits() {
         ${!isLocked ? `
         <div class="permit-contact">
           ${p.contact_phone ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : ''}
-          <button class="contact-btn" onclick="savePermit('${p.id}')">Save Lead</button>
-          <button class="contact-btn" onclick="exportPermit('${p.id}')">Export</button>
+          <button class="contact-btn" onclick="savePermit('${p.permit_number}')">Save Lead</button>
+          <button class="contact-btn" onclick="exportPermit('${p.permit_number}')">Export</button>
         </div>` : `
         <div class="permit-contact" style="filter: blur(5px);">
           <a class="contact-btn primary" href="#">(555) 123-4567</a>
@@ -1438,15 +1482,48 @@ function goToPage(page) {
 // ===========================
 // ACTIONS
 // ===========================
-function savePermit(id) {
-  showToast('Lead saved! Check your saved leads dashboard.');
+async function savePermit(permitNumber) {
+  if (!currentUser) {
+    showToast('Please log in to save leads');
+    showLoginModal();
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/saved-leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permit_id: permitNumber }),
+    });
+
+    if (resp.status === 409) {
+      showToast('Lead already saved!');
+      return;
+    }
+
+    if (resp.status === 401) {
+      showToast('Please log in to save leads');
+      showLoginModal();
+      return;
+    }
+
+    if (resp.ok) {
+      showToast('Lead saved! View in My Leads');
+    } else {
+      showToast('Error saving lead');
+    }
+  } catch (e) {
+    console.error('Error saving lead:', e);
+    showToast('Error saving lead');
+  }
 }
 
 function exportPermit(id) {
-  const permit = allPermits.find(p => p.id === id);
+  const permit = allPermits.find(p => p.id === id || p.permit_number === id);
   if (!permit) return;
 
-  const csv = Object.keys(permit).join(',') + '\n' + Object.values(permit).map(v => `"${v}"`).join(',');
+  const headers = ['address', 'city', 'state', 'zip', 'trade_category', 'estimated_cost', 'status', 'filing_date', 'contact_name', 'contact_phone', 'description', 'lead_score', 'lead_quality'];
+  const csv = headers.join(',') + '\n' + headers.map(h => `"${String(permit[h] || '').replace(/"/g, "'").replace(/\n/g, ' ')}"`).join(',');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1455,6 +1532,20 @@ function exportPermit(id) {
   a.click();
   URL.revokeObjectURL(url);
   showToast('Lead exported to CSV!');
+}
+
+function exportCSV() {
+  // Build query params from current filters
+  const city = document.getElementById('filter-city').value;
+  const trade = document.getElementById('filter-trade').value;
+  const quality = document.getElementById('filter-quality').value;
+
+  let url = '/api/export?';
+  if (city) url += `city=${encodeURIComponent(city)}&`;
+  if (trade) url += `trade=${encodeURIComponent(trade)}&`;
+  if (quality) url += `quality=${encodeURIComponent(quality)}&`;
+
+  window.location.href = url;
 }
 
 function handleAlertSignup(e) {
