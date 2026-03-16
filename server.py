@@ -15,6 +15,7 @@ import stripe
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -345,6 +346,26 @@ def api_filters():
         'trades': trades,
         'statuses': statuses,
     })
+
+
+@app.route('/api/cities')
+def api_cities():
+    """GET /api/cities - Get all active cities with info."""
+    return jsonify({
+        'count': get_city_count(),
+        'cities': get_all_cities_info(),
+    })
+
+
+@app.route('/api/city-health')
+def api_city_health():
+    """GET /api/city-health - Get city API health status."""
+    health_file = os.path.join(DATA_DIR, 'city_health.json')
+    if os.path.exists(health_file):
+        with open(health_file) as f:
+            return jsonify(json.load(f))
+    return jsonify({'status': 'no health data available'})
+
 
 @app.route('/api/subscribe', methods=['POST'])
 @limiter.limit("5 per minute")
@@ -1949,31 +1970,215 @@ CITY_SEO_CONFIG = {
             <p>For contractors seeking Cincinnati building permits, accessing new filings quickly means beating the competition to quality leads. PermitGrab delivers fresh Cincinnati permit data daily, helping you find and win jobs throughout the Queen City.</p>
         """
     },
+    "cambridge": {
+        "name": "Cambridge",
+        "state": "MA",
+        "meta_title": "Cambridge Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Cambridge, MA. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Cambridge, home to Harvard and MIT, has a thriving construction market driven by academic institutions, biotech companies, and residential demand. Cambridge building permits span laboratory construction, commercial office space, and renovations to the city's historic housing stock.</p>
+            <p>The Cambridge construction industry benefits from the city's density and ongoing development around Kendall Square and Central Square. Cambridge construction permits reflect strong demand for HVAC, electrical, and plumbing work in both commercial and residential sectors.</p>
+            <p>For contractors seeking Cambridge building permits, timing is key in this competitive market. PermitGrab delivers fresh Cambridge permit data daily, helping you connect with project owners across Middlesex County.</p>
+        """
+    },
+    "washington-dc": {
+        "name": "Washington DC",
+        "state": "DC",
+        "meta_title": "Washington DC Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Washington DC. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Washington DC's construction market is driven by government buildings, commercial development, and a dense residential market. DC building permits cover everything from federal facility renovations to row house restorations in Capitol Hill, Georgetown, and Adams Morgan.</p>
+            <p>The DC construction industry benefits from constant government investment and the city's historic preservation requirements. Washington DC construction permits reflect strong demand for structural work, window replacements, and interior renovations in the city's iconic architecture.</p>
+            <p>For contractors seeking DC building permits, quick access to new filings means getting ahead of the competition. PermitGrab delivers fresh Washington DC permit data daily, helping you win contracts across the District.</p>
+        """
+    },
+    "san-antonio": {
+        "name": "San Antonio",
+        "state": "TX",
+        "meta_title": "San Antonio Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in San Antonio. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>San Antonio is one of the fastest-growing cities in Texas, with a booming construction market across residential and commercial sectors. San Antonio building permits cover new home construction, commercial development along the I-35 corridor, and renovations throughout Bexar County.</p>
+            <p>The San Antonio construction industry benefits from the city's affordable land and strong population growth. San Antonio construction permits reflect high demand for HVAC in the Texas heat, roofing projects, and general construction work.</p>
+            <p>For contractors seeking San Antonio building permits, early access to new filings is essential. PermitGrab delivers fresh San Antonio permit data daily, helping you connect with property owners across the Alamo City.</p>
+        """
+    },
+    "kansas-city": {
+        "name": "Kansas City",
+        "state": "MO",
+        "meta_title": "Kansas City Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Kansas City. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Kansas City's construction market spans both Missouri and Kansas, with major development in downtown KC, the Plaza, and surrounding suburbs. Kansas City building permits cover commercial construction, residential development, and renovations across the metro area.</p>
+            <p>The KC construction industry benefits from the region's central location and ongoing revitalization efforts. Kansas City construction permits reflect demand across all trades, from HVAC and electrical to general construction and roofing.</p>
+            <p>For contractors seeking Kansas City building permits, quick access to permit data helps you beat the competition. PermitGrab delivers fresh KC permit data daily, helping you find quality leads across the metro.</p>
+        """
+    },
+    "detroit": {
+        "name": "Detroit",
+        "state": "MI",
+        "meta_title": "Detroit Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Detroit. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Detroit's construction market is experiencing a renaissance, with major investments in downtown development and neighborhood revitalization. Detroit building permits cover commercial construction in the central business district, residential renovations across the city's historic neighborhoods, and industrial development.</p>
+            <p>The Detroit construction industry benefits from the city's comeback story—historic buildings being restored, new developments rising, and a growing population demanding quality contractors. Detroit construction permits reflect strong demand for renovation work, electrical upgrades, and HVAC installations.</p>
+            <p>For contractors seeking Detroit building permits, early access to new filings is crucial. PermitGrab delivers fresh Detroit permit data daily, helping you win jobs across the Motor City.</p>
+        """
+    },
+    "pittsburgh": {
+        "name": "Pittsburgh",
+        "state": "PA",
+        "meta_title": "Pittsburgh Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Pittsburgh. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Pittsburgh's construction market is thriving, driven by tech industry growth, healthcare development, and residential demand. Pittsburgh building permits cover commercial construction downtown, university expansions, and renovations in neighborhoods like Shadyside, Lawrenceville, and the South Side.</p>
+            <p>The Pittsburgh construction industry benefits from the city's transformation from industrial powerhouse to tech hub. Pittsburgh construction permits reflect strong demand for HVAC, electrical, and renovation work in both commercial and residential sectors.</p>
+            <p>For contractors seeking Pittsburgh building permits, quick access to new filings helps you connect with project owners first. PermitGrab delivers fresh Pittsburgh permit data daily across Allegheny County.</p>
+        """
+    },
+    "denver": {
+        "name": "Denver",
+        "state": "CO",
+        "meta_title": "Denver Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Denver. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Denver's construction market is one of the hottest in the nation, with explosive growth in both residential and commercial development. Denver building permits cover high-rise construction downtown, residential development across the metro, and renovations throughout the Front Range.</p>
+            <p>The Denver construction industry benefits from the city's population boom and strong economy. Denver construction permits reflect high demand for all trades—HVAC, electrical, plumbing, roofing, and general construction work are all in constant demand.</p>
+            <p>For contractors seeking Denver building permits, timing is everything in this competitive market. PermitGrab delivers fresh Denver permit data daily, helping you win contracts across the Mile High City.</p>
+        """
+    },
+    "portland": {
+        "name": "Portland",
+        "state": "OR",
+        "meta_title": "Portland Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Portland, OR. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Portland's construction market reflects the city's commitment to sustainability and urban density. Portland building permits cover green building projects, residential development, ADU construction, and commercial renovations throughout Multnomah County.</p>
+            <p>The Portland construction industry benefits from the city's unique building codes and environmental focus. Portland construction permits reflect strong demand for energy-efficient upgrades, solar installations, and sustainable building practices.</p>
+            <p>For contractors seeking Portland building permits, early access to new filings helps you connect with eco-conscious project owners. PermitGrab delivers fresh Portland permit data daily, helping you win jobs across the Rose City.</p>
+        """
+    },
+    "miami": {
+        "name": "Miami-Dade County",
+        "state": "FL",
+        "meta_title": "Miami Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Miami-Dade County. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Miami's construction market is among the most active in the nation, with constant development across residential, commercial, and hospitality sectors. Miami building permits cover high-rise condo construction, luxury home development, and renovations throughout Miami-Dade County.</p>
+            <p>The Miami construction industry benefits from the region's year-round building season and strong demand from domestic and international buyers. Miami construction permits reflect high demand for hurricane-resistant construction, HVAC work in the tropical climate, and pool construction.</p>
+            <p>For contractors seeking Miami building permits, quick access to new filings is essential in this competitive market. PermitGrab delivers fresh Miami permit data daily, helping you win contracts across South Florida.</p>
+        """
+    },
+    "raleigh": {
+        "name": "Raleigh",
+        "state": "NC",
+        "meta_title": "Raleigh Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Raleigh, NC. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Raleigh's construction market is booming as part of the Research Triangle's explosive growth. Raleigh building permits cover residential development, commercial construction, and tech campus expansions throughout Wake County.</p>
+            <p>The Raleigh construction industry benefits from the region's strong job growth and influx of new residents. Raleigh construction permits reflect high demand for new home construction, HVAC installations, and commercial build-outs.</p>
+            <p>For contractors seeking Raleigh building permits, early access to permit data helps you stay ahead of the competition. PermitGrab delivers fresh Raleigh permit data daily, helping you win jobs across the Triangle.</p>
+        """
+    },
+    "phoenix": {
+        "name": "Phoenix",
+        "state": "AZ",
+        "meta_title": "Phoenix Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Phoenix. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Phoenix's construction market is one of the largest in the Southwest, with constant development across the Valley of the Sun. Phoenix building permits cover new home construction, commercial development, and renovations throughout Maricopa County.</p>
+            <p>The Phoenix construction industry benefits from year-round building weather and strong population growth. Phoenix construction permits reflect high demand for HVAC in the desert heat, pool construction, and solar installations.</p>
+            <p>For contractors seeking Phoenix building permits, quick access to new filings is crucial. PermitGrab delivers fresh Phoenix permit data daily, helping you win contracts across the Valley.</p>
+        """
+    },
+    "san-jose": {
+        "name": "San Jose",
+        "state": "CA",
+        "meta_title": "San Jose Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in San Jose. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>San Jose's construction market is driven by Silicon Valley's tech industry and strong housing demand. San Jose building permits cover tech campus construction, residential development, and ADU projects throughout Santa Clara County.</p>
+            <p>The San Jose construction industry benefits from the region's high property values and constant development pressure. San Jose construction permits reflect strong demand for electrical work, seismic retrofitting, and energy-efficient upgrades.</p>
+            <p>For contractors seeking San Jose building permits, timing is key in this premium market. PermitGrab delivers fresh San Jose permit data daily, helping you connect with project owners across the South Bay.</p>
+        """
+    },
+    "san-diego": {
+        "name": "San Diego",
+        "state": "CA",
+        "meta_title": "San Diego Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in San Diego. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>San Diego's construction market benefits from year-round building weather and strong residential demand. San Diego building permits cover new home construction, ADU development, and commercial projects throughout San Diego County.</p>
+            <p>The San Diego construction industry reflects the region's military presence, biotech sector, and tourism industry. San Diego construction permits show strong demand for HVAC, solar installations, and pool construction.</p>
+            <p>For contractors seeking San Diego building permits, early access to permit data helps you win more jobs. PermitGrab delivers fresh San Diego permit data daily, helping you grow your business across America's Finest City.</p>
+        """
+    },
+    "sacramento": {
+        "name": "Sacramento",
+        "state": "CA",
+        "meta_title": "Sacramento Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Sacramento. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Sacramento's construction market is thriving as California's capital attracts new residents and businesses. Sacramento building permits cover new home construction, commercial development, and renovations throughout the Sacramento Valley.</p>
+            <p>The Sacramento construction industry benefits from the region's more affordable land compared to the Bay Area. Sacramento construction permits reflect strong demand for HVAC in the hot summers, roofing, and residential construction.</p>
+            <p>For contractors seeking Sacramento building permits, quick access to new filings helps you compete effectively. PermitGrab delivers fresh Sacramento permit data daily, helping you win contracts across the region.</p>
+        """
+    },
+    "boston": {
+        "name": "Boston",
+        "state": "MA",
+        "meta_title": "Boston Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Boston. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Boston's construction market is driven by world-class universities, healthcare institutions, and a dense residential market. Boston building permits cover commercial development in the Seaport, residential renovations in historic neighborhoods, and institutional construction throughout Greater Boston.</p>
+            <p>The Boston construction industry benefits from the region's strong economy and aging housing stock requiring constant maintenance. Boston construction permits reflect high demand for HVAC, electrical upgrades, and renovation work in the city's historic buildings.</p>
+            <p>For contractors seeking Boston building permits, early access to permit data is essential. PermitGrab delivers fresh Boston permit data daily, helping you win jobs across the Greater Boston area.</p>
+        """
+    },
+    "philadelphia": {
+        "name": "Philadelphia",
+        "state": "PA",
+        "meta_title": "Philadelphia Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Philadelphia. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        "seo_content": """
+            <p>Philadelphia's construction market is experiencing strong growth, with major development downtown and in surrounding neighborhoods. Philadelphia building permits cover commercial construction, residential renovations in historic rowhomes, and new development across the city.</p>
+            <p>The Philadelphia construction industry benefits from the city's affordability relative to NYC and DC. Philly construction permits reflect strong demand for HVAC, electrical work, and renovations in the city's historic housing stock.</p>
+            <p>For contractors seeking Philadelphia building permits, quick access to new filings helps you stay competitive. PermitGrab delivers fresh Philly permit data daily, helping you win contracts across the City of Brotherly Love.</p>
+        """
+    },
 }
 
-# List of all cities for navigation
-ALL_CITIES = [
-    {"slug": "new-york", "name": "New York City"},
-    {"slug": "los-angeles", "name": "Los Angeles"},
-    {"slug": "chicago", "name": "Chicago"},
-    {"slug": "san-francisco", "name": "San Francisco"},
-    {"slug": "austin", "name": "Austin"},
-    {"slug": "seattle", "name": "Seattle"},
-    {"slug": "new-orleans", "name": "New Orleans"},
-    {"slug": "baton-rouge", "name": "Baton Rouge"},
-    {"slug": "nashville", "name": "Nashville"},
-    {"slug": "atlanta", "name": "Atlanta"},
-    {"slug": "cincinnati", "name": "Cincinnati"},
-]
+# Dynamic city list from city_configs.py
+def get_all_cities_list():
+    """Get all active cities for navigation."""
+    return [{"slug": c["slug"], "name": c["name"]} for c in get_all_cities_info()]
+
+ALL_CITIES = get_all_cities_list()
 
 
 @app.route('/permits/<city_slug>')
 def city_landing(city_slug):
     """Render SEO-optimized city landing page."""
-    if city_slug not in CITY_SEO_CONFIG:
-        return "City not found", 404
+    # Check for SEO config, or create fallback from city_configs
+    if city_slug in CITY_SEO_CONFIG:
+        config = CITY_SEO_CONFIG[city_slug]
+    else:
+        # Try to get city from city_configs for dynamic fallback
+        city_key, city_config = get_city_by_slug(city_slug)
+        if not city_config:
+            return "City not found", 404
+        # Generate basic SEO config
+        config = {
+            "name": city_config["name"],
+            "state": city_config["state"],
+            "meta_title": f"{city_config['name']} Building Permits & Contractor Leads | PermitGrab",
+            "meta_description": f"Browse active building permits in {city_config['name']}. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+            "seo_content": f"""
+                <p>Track new building permits in {city_config['name']}, {city_config['state']}. PermitGrab delivers fresh permit data daily, helping contractors find quality leads across the region.</p>
+                <p>Access permit data including project values, contact information, and trade categories. Start browsing {city_config['name']} construction permits today.</p>
+            """
+        }
 
-    config = CITY_SEO_CONFIG[city_slug]
     permits = load_permits()
 
     # Filter permits for this city
@@ -2104,6 +2309,14 @@ def scheduled_collection():
                     print(f"[{datetime.now()}] Permit history collection complete.")
                 except Exception as e:
                     print(f"[{datetime.now()}] Permit history collection error: {e}")
+
+            # City health check (daily)
+            try:
+                from city_health import check_all_cities
+                check_all_cities()
+                print(f"[{datetime.now()}] City health check complete.")
+            except Exception as e:
+                print(f"[{datetime.now()}] City health check error: {e}")
 
             print(f"[{datetime.now()}] All collection tasks complete.")
         except Exception as e:

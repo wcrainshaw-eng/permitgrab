@@ -1033,18 +1033,34 @@ footer a:hover { color: white; }
       <a href="#dashboard">Dashboard</a>
       <div class="nav-dropdown">
         <a href="#" class="dropdown-toggle">Cities <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
-        <div class="dropdown-menu">
+        <div class="dropdown-menu" id="cities-dropdown">
           <a href="/permits/new-york">New York City</a>
           <a href="/permits/los-angeles">Los Angeles</a>
           <a href="/permits/chicago">Chicago</a>
           <a href="/permits/san-francisco">San Francisco</a>
           <a href="/permits/austin">Austin</a>
           <a href="/permits/seattle">Seattle</a>
-          <a href="/permits/new-orleans">New Orleans</a>
-          <a href="/permits/baton-rouge">Baton Rouge</a>
+          <a href="/permits/miami">Miami-Dade</a>
+          <a href="/permits/phoenix">Phoenix</a>
+          <a href="/permits/denver">Denver</a>
+          <a href="/permits/boston">Boston</a>
+          <a href="/permits/philadelphia">Philadelphia</a>
+          <a href="/permits/san-diego">San Diego</a>
+          <a href="/permits/san-jose">San Jose</a>
+          <a href="/permits/sacramento">Sacramento</a>
+          <a href="/permits/portland">Portland</a>
+          <a href="/permits/raleigh">Raleigh</a>
           <a href="/permits/nashville">Nashville</a>
           <a href="/permits/atlanta">Atlanta</a>
+          <a href="/permits/detroit">Detroit</a>
+          <a href="/permits/pittsburgh">Pittsburgh</a>
+          <a href="/permits/washington-dc">Washington DC</a>
+          <a href="/permits/kansas-city">Kansas City</a>
+          <a href="/permits/new-orleans">New Orleans</a>
+          <a href="/permits/baton-rouge">Baton Rouge</a>
           <a href="/permits/cincinnati">Cincinnati</a>
+          <a href="/permits/cambridge">Cambridge</a>
+          <a href="/permits/san-antonio">San Antonio</a>
         </div>
       </div>
       <a href="/contractors">Contractors</a>
@@ -1428,6 +1444,18 @@ function updateStats() {
   document.getElementById('stat-total').textContent = total.toLocaleString();
   document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
+
+  // Fetch dynamic city count
+  fetch('/api/cities')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('stat-cities').textContent = data.count || '20+';
+    })
+    .catch(() => {
+      // Fallback to counting unique cities in permits
+      const uniqueCities = new Set(allPermits.map(p => p.city)).size;
+      document.getElementById('stat-cities').textContent = uniqueCities || '20+';
+    });
 }
 
 // ===========================

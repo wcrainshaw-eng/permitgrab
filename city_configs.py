@@ -1,0 +1,893 @@
+"""
+PermitGrab - Modular City Configuration System
+Each city is a configuration entry with platform-specific settings.
+Supports: Socrata (SODA API), ArcGIS REST, CKAN, CARTO
+"""
+
+from datetime import datetime, timedelta
+
+# ============================================================================
+# CITY REGISTRY - All cities and their API configurations
+# ============================================================================
+# Each city config entry contains:
+#   - name: Display name
+#   - state: 2-letter state code
+#   - slug: URL-safe city identifier
+#   - platform: "socrata" | "arcgis" | "ckan" | "carto"
+#   - endpoint: Full API endpoint URL
+#   - dataset_id: Dataset identifier (for reference/debugging)
+#   - field_map: Maps our standard fields to source API fields
+#   - date_field: Field used for date filtering
+#   - date_format: "iso" (default), "epoch", "none"
+#   - active: Whether to include in collection
+#   - notes: Any special notes about this source
+
+CITY_REGISTRY = {
+    # =========================================================================
+    # SOCRATA PLATFORM CITIES (SODA API)
+    # =========================================================================
+
+    "new_york": {
+        "name": "New York City",
+        "state": "NY",
+        "slug": "new-york",
+        "platform": "socrata",
+        "endpoint": "https://data.cityofnewyork.us/resource/rbx6-tga4.json",
+        "dataset_id": "rbx6-tga4",
+        "description": "DOB NOW: Build - Approved Permits",
+        "field_map": {
+            "permit_number": "job_filing_number",
+            "permit_type": "work_type",
+            "work_type": "work_type",
+            "address": "house_no",
+            "street": "street_name",
+            "borough": "borough",
+            "zip": "zip_code",
+            "owner_name": "owner_name",
+            "filing_date": "issued_date",
+            "status": "permit_status",
+            "estimated_cost": "estimated_job_costs",
+            "description": "job_description",
+        },
+        "date_field": "issued_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "chicago": {
+        "name": "Chicago",
+        "state": "IL",
+        "slug": "chicago",
+        "platform": "socrata",
+        "endpoint": "https://data.cityofchicago.org/resource/ydr8-5enu.json",
+        "dataset_id": "ydr8-5enu",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_",
+            "permit_type": "permit_type",
+            "work_type": "work_description",
+            "address": "street_number",
+            "street": "street_direction",
+            "street_name": "street_name",
+            "zip": "zip_code",
+            "contact_name": "contact_1_name",
+            "contact_phone": "contact_1_city",
+            "filing_date": "issue_date",
+            "status": "permit_status",
+            "estimated_cost": "reported_cost",
+            "description": "work_description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "los_angeles": {
+        "name": "Los Angeles",
+        "state": "CA",
+        "slug": "los-angeles",
+        "platform": "socrata",
+        "endpoint": "https://data.lacity.org/resource/pi9x-tg5x.json",
+        "dataset_id": "pi9x-tg5x",
+        "description": "Building and Safety - Building Permits Issued from 2020 to Present",
+        "field_map": {
+            "permit_number": "permit_nbr",
+            "permit_type": "permit_type",
+            "permit_sub_type": "permit_sub_type",
+            "work_type": "work_desc",
+            "address": "primary_address",
+            "zip": "zip_code",
+            "filing_date": "issue_date",
+            "status": "status_desc",
+            "estimated_cost": "valuation",
+            "description": "work_desc",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "austin": {
+        "name": "Austin",
+        "state": "TX",
+        "slug": "austin",
+        "platform": "socrata",
+        "endpoint": "https://data.austintexas.gov/resource/3syk-w9eu.json",
+        "dataset_id": "3syk-w9eu",
+        "description": "Issued Construction Permits",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type_desc",
+            "work_type": "work_class",
+            "address": "original_address1",
+            "filing_date": "issue_date",
+            "status": "status_current",
+            "estimated_cost": "",
+            "description": "description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "san_francisco": {
+        "name": "San Francisco",
+        "state": "CA",
+        "slug": "san-francisco",
+        "platform": "socrata",
+        "endpoint": "https://data.sfgov.org/resource/i98e-djp9.json",
+        "dataset_id": "i98e-djp9",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type_definition",
+            "work_type": "proposed_use",
+            "address": "street_number",
+            "street": "street_name",
+            "zip": "zipcode",
+            "filing_date": "filed_date",
+            "status": "status",
+            "estimated_cost": "estimated_cost",
+            "description": "description",
+        },
+        "date_field": "filed_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "seattle": {
+        "name": "Seattle",
+        "state": "WA",
+        "slug": "seattle",
+        "platform": "socrata",
+        "endpoint": "https://data.seattle.gov/resource/76t5-zqzr.json",
+        "dataset_id": "76t5-zqzr",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permitnum",
+            "permit_type": "permitclass",
+            "work_type": "permitclassmapped",
+            "address": "originaladdress1",
+            "filing_date": "issueddate",
+            "status": "statuscurrent",
+            "estimated_cost": "",
+            "description": "description",
+        },
+        "date_field": "issueddate",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "new_orleans": {
+        "name": "New Orleans",
+        "state": "LA",
+        "slug": "new-orleans",
+        "platform": "socrata",
+        "endpoint": "https://data.nola.gov/resource/rcm3-fn58.json",
+        "dataset_id": "rcm3-fn58",
+        "description": "Permits",
+        "field_map": {
+            "permit_number": "numstring",
+            "permit_type": "type",
+            "work_type": "code",
+            "address": "address",
+            "zip": "",
+            "owner_name": "owner",
+            "contact_name": "applicant",
+            "filing_date": "issuedate",
+            "status": "currentstatus",
+            "estimated_cost": "constrval",
+            "description": "description",
+        },
+        "date_field": "issuedate",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "baton_rouge": {
+        "name": "Baton Rouge",
+        "state": "LA",
+        "slug": "baton-rouge",
+        "platform": "socrata",
+        "endpoint": "https://data.brla.gov/resource/f3qw-nd5k.json",
+        "dataset_id": "f3qw-nd5k",
+        "description": "EBR Building Permits",
+        "field_map": {
+            "permit_number": "permitnumber",
+            "permit_type": "permittype",
+            "work_type": "designation",
+            "address": "streetaddress",
+            "zip": "zip",
+            "contact_name": "contractorname",
+            "filing_date": "issueddate",
+            "status": "",
+            "estimated_cost": "projectvalue",
+            "description": "projectdescription",
+        },
+        "date_field": "issueddate",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "cincinnati": {
+        "name": "Cincinnati",
+        "state": "OH",
+        "slug": "cincinnati",
+        "platform": "socrata",
+        "endpoint": "https://data.cincinnati-oh.gov/resource/cfkj-xb9y.json",
+        "dataset_id": "cfkj-xb9y",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permitnum",
+            "permit_type": "permittype",
+            "work_type": "workclass",
+            "address": "originaladdress1",
+            "zip": "originalzip",
+            "filing_date": "issueddate",
+            "status": "statuscurrent",
+            "estimated_cost": "estprojectcostdec",
+            "description": "description",
+        },
+        "date_field": "issueddate",
+        "limit": 2000,
+        "active": True,
+    },
+
+    # NEW SOCRATA CITIES
+
+    "cambridge": {
+        "name": "Cambridge",
+        "state": "MA",
+        "slug": "cambridge",
+        "platform": "socrata",
+        "endpoint": "https://data.cambridgema.gov/resource/9qm7-wbdc.json",
+        "dataset_id": "9qm7-wbdc",
+        "description": "Building Permits: New Construction",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "work_type": "work_type",
+            "address": "address",
+            "zip": "zip",
+            "filing_date": "issue_date",
+            "status": "status",
+            "estimated_cost": "estimated_cost",
+            "description": "description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "washington_dc": {
+        "name": "Washington DC",
+        "state": "DC",
+        "slug": "washington-dc",
+        "platform": "socrata",
+        "endpoint": "https://opendata.dc.gov/resource/awax-vqek.json",
+        "dataset_id": "awax-vqek",
+        "description": "Building Permits - 2024",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "work_type": "permit_subtype",
+            "address": "full_address",
+            "zip": "zip",
+            "owner_name": "owner_name",
+            "contact_name": "applicant",
+            "filing_date": "issue_date",
+            "status": "status",
+            "estimated_cost": "fees_paid",
+            "description": "description_of_work",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "san_antonio": {
+        "name": "San Antonio",
+        "state": "TX",
+        "slug": "san-antonio",
+        "platform": "socrata",
+        "endpoint": "https://data.sanantonio.gov/resource/v23u-v49r.json",
+        "dataset_id": "v23u-v49r",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "work_type": "permit_class",
+            "address": "site_address",
+            "zip": "zip_code",
+            "filing_date": "issue_date",
+            "status": "permit_status",
+            "estimated_cost": "valuation",
+            "description": "project_description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "kansas_city": {
+        "name": "Kansas City",
+        "state": "MO",
+        "slug": "kansas-city",
+        "platform": "socrata",
+        "endpoint": "https://data.kcmo.org/resource/c78j-bgqg.json",
+        "dataset_id": "c78j-bgqg",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "work_type": "work_type",
+            "address": "address",
+            "zip": "zip",
+            "filing_date": "issue_date",
+            "status": "status",
+            "estimated_cost": "job_value",
+            "description": "description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "detroit": {
+        "name": "Detroit",
+        "state": "MI",
+        "slug": "detroit",
+        "platform": "socrata",
+        "endpoint": "https://data.detroitmi.gov/resource/xw2a-a7tf.json",
+        "dataset_id": "xw2a-a7tf",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_no",
+            "permit_type": "permit_type",
+            "work_type": "bld_type_use",
+            "address": "site_address",
+            "zip": "zip_code",
+            "owner_name": "owner_name",
+            "contact_name": "contractor_name",
+            "filing_date": "permit_issued",
+            "status": "permit_status",
+            "estimated_cost": "permit_value",
+            "description": "work_description",
+        },
+        "date_field": "permit_issued",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "pittsburgh": {
+        "name": "Pittsburgh",
+        "state": "PA",
+        "slug": "pittsburgh",
+        "platform": "socrata",
+        "endpoint": "https://data.wprdc.org/resource/p7jk-dqfa.json",
+        "dataset_id": "p7jk-dqfa",
+        "description": "City of Pittsburgh Building Permits",
+        "field_map": {
+            "permit_number": "permit_id",
+            "permit_type": "permit_type",
+            "work_type": "work_type",
+            "address": "address",
+            "zip": "zip",
+            "owner_name": "owner",
+            "contact_name": "contractor",
+            "filing_date": "issue_date",
+            "status": "status",
+            "estimated_cost": "total_project_value",
+            "description": "work_desc",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "denver": {
+        "name": "Denver",
+        "state": "CO",
+        "slug": "denver",
+        "platform": "socrata",
+        "endpoint": "https://data.denvergov.org/resource/75gn-3pb7.json",
+        "dataset_id": "75gn-3pb7",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "work_type": "permit_class",
+            "address": "full_address",
+            "zip": "zip_code",
+            "filing_date": "issue_date",
+            "status": "status_current",
+            "estimated_cost": "valuation",
+            "description": "work_description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "portland": {
+        "name": "Portland",
+        "state": "OR",
+        "slug": "portland",
+        "platform": "socrata",
+        "endpoint": "https://data.portland.gov/resource/7ebi-ybjd.json",
+        "dataset_id": "7ebi-ybjd",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "type",
+            "work_type": "work_type",
+            "address": "address",
+            "zip": "zip",
+            "filing_date": "issue_date",
+            "status": "status",
+            "estimated_cost": "valuation",
+            "description": "work_description",
+        },
+        "date_field": "issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    # =========================================================================
+    # ARCGIS PLATFORM CITIES
+    # =========================================================================
+
+    "atlanta": {
+        "name": "Atlanta",
+        "state": "GA",
+        "slug": "atlanta",
+        "platform": "arcgis",
+        "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/Building_Permit_latest/FeatureServer/0/query",
+        "dataset_id": "Building_Permit_latest",
+        "description": "Building Permits (2019-Present)",
+        "field_map": {
+            "permit_number": "RecordID",
+            "permit_type": "TypeCombo",
+            "work_type": "Subtype",
+            "address": "Address",
+            "zip": "",
+            "filing_date": "Opend",
+            "status": "Status_1",
+            "estimated_cost": "JobValue",
+            "description": "Name",
+        },
+        "date_field": "Opend",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "nashville": {
+        "name": "Nashville",
+        "state": "TN",
+        "slug": "nashville",
+        "platform": "arcgis",
+        "endpoint": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Building_Permit_Applications_Feature_Layer_view/FeatureServer/0/query",
+        "dataset_id": "Building_Permit_Applications",
+        "description": "Building Permit Applications",
+        "field_map": {
+            "permit_number": "Permit__",
+            "permit_type": "Permit_Type_Description",
+            "work_type": "Permit_Subtype_Description",
+            "address": "Address",
+            "zip": "ZIP",
+            "contact_name": "Contact",
+            "filing_date": "Date_Entered",
+            "status": "",
+            "estimated_cost": "Const_Cost",
+            "description": "Purpose",
+        },
+        "date_field": "Date_Entered",
+        "date_format": "none",  # Fetch all, filter in Python
+        "limit": 2000,
+        "active": True,
+    },
+
+    "miami_dade": {
+        "name": "Miami-Dade County",
+        "state": "FL",
+        "slug": "miami",
+        "platform": "arcgis",
+        "endpoint": "https://gis.miamidade.gov/arcgis/rest/services/MD_OpenData/MapServer/2/query",
+        "dataset_id": "Building_Permits",
+        "description": "Building Permits Issued",
+        "field_map": {
+            "permit_number": "PERMIT_NUM",
+            "permit_type": "PROC_DESC",
+            "work_type": "PROC_DESC",
+            "address": "ADDRESS",
+            "zip": "ZIP",
+            "contact_name": "APPL_NAME",
+            "filing_date": "ISSUED_DATE",
+            "status": "STATUS_DESC",
+            "estimated_cost": "EST_COST",
+            "description": "PROC_DESC",
+        },
+        "date_field": "ISSUED_DATE",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "raleigh": {
+        "name": "Raleigh",
+        "state": "NC",
+        "slug": "raleigh",
+        "platform": "arcgis",
+        "endpoint": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Building_Permits/FeatureServer/0/query",
+        "dataset_id": "Building_Permits",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "PERMIT_NUM",
+            "permit_type": "PERMIT_TYPE",
+            "work_type": "WORK_CLASS",
+            "address": "SITE_ADDRESS",
+            "zip": "ZIP_CODE",
+            "owner_name": "OWNER_NAME",
+            "contact_name": "CONTRACTOR_NAME",
+            "filing_date": "ISSUED_DATE",
+            "status": "STATUS",
+            "estimated_cost": "TOTAL_SQFT",
+            "description": "PROJECT_NAME",
+        },
+        "date_field": "ISSUED_DATE",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "phoenix": {
+        "name": "Phoenix",
+        "state": "AZ",
+        "slug": "phoenix",
+        "platform": "arcgis",
+        "endpoint": "https://services2.arcgis.com/2t1927381mhTgWNC/arcgis/rest/services/Bldg_Permits/FeatureServer/0/query",
+        "dataset_id": "Bldg_Permits",
+        "description": "Building Permit Data",
+        "field_map": {
+            "permit_number": "PERMIT_NO",
+            "permit_type": "PERMIT_TYPE",
+            "work_type": "WORK_CLASS",
+            "address": "ADDRESS",
+            "zip": "ZIP",
+            "owner_name": "OWNER_NAME",
+            "contact_name": "CONTRACTOR",
+            "filing_date": "ISSUE_DATE",
+            "status": "STATUS",
+            "estimated_cost": "VALUATION",
+            "description": "WORK_DESC",
+        },
+        "date_field": "ISSUE_DATE",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "san_jose": {
+        "name": "San Jose",
+        "state": "CA",
+        "slug": "san-jose",
+        "platform": "arcgis",
+        "endpoint": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_BuildingPermits/FeatureServer/0/query",
+        "dataset_id": "PLN_BuildingPermits",
+        "description": "Active Building Permits",
+        "field_map": {
+            "permit_number": "PERMIT_NUM",
+            "permit_type": "PERMIT_TYPE",
+            "work_type": "WORK_CLASS",
+            "address": "ADDRESS",
+            "zip": "ZIP_CODE",
+            "owner_name": "OWNER",
+            "contact_name": "CONTRACTOR",
+            "filing_date": "ISSUE_DATE",
+            "status": "STATUS",
+            "estimated_cost": "VALUATION",
+            "description": "DESCRIPTION",
+        },
+        "date_field": "ISSUE_DATE",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "san_diego": {
+        "name": "San Diego",
+        "state": "CA",
+        "slug": "san-diego",
+        "platform": "socrata",
+        "endpoint": "https://data.sandiego.gov/resource/nq97-icrc.json",
+        "dataset_id": "nq97-icrc",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "approval_id",
+            "permit_type": "approval_type",
+            "work_type": "project_scope",
+            "address": "street_address",
+            "zip": "zip_code",
+            "filing_date": "approval_issue_date",
+            "status": "status",
+            "estimated_cost": "total_existing_bldg_sq_ft",
+            "description": "project_title",
+        },
+        "date_field": "approval_issue_date",
+        "limit": 2000,
+        "active": True,
+    },
+
+    "sacramento": {
+        "name": "Sacramento",
+        "state": "CA",
+        "slug": "sacramento",
+        "platform": "arcgis",
+        "endpoint": "https://services5.arcgis.com/54falWtcpty3V47Z/arcgis/rest/services/Building_Permits/FeatureServer/0/query",
+        "dataset_id": "Building_Permits",
+        "description": "Issued Building Permits",
+        "field_map": {
+            "permit_number": "PERMIT_NUMBER",
+            "permit_type": "PERMIT_TYPE",
+            "work_type": "WORK_TYPE",
+            "address": "ADDRESS",
+            "zip": "ZIP",
+            "owner_name": "OWNER",
+            "contact_name": "CONTRACTOR",
+            "filing_date": "ISSUE_DATE",
+            "status": "STATUS",
+            "estimated_cost": "VALUATION",
+            "description": "PROJECT_DESCRIPTION",
+        },
+        "date_field": "ISSUE_DATE",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+    # =========================================================================
+    # CKAN PLATFORM CITIES
+    # =========================================================================
+
+    "boston": {
+        "name": "Boston",
+        "state": "MA",
+        "slug": "boston",
+        "platform": "ckan",
+        "endpoint": "https://data.boston.gov/api/3/action/datastore_search",
+        "dataset_id": "6ddcd912-32a0-43df-9908-63574f8c7e77",
+        "description": "Approved Building Permits",
+        "field_map": {
+            "permit_number": "PermitNumber",
+            "permit_type": "PERMITTYPEDESCR",
+            "work_type": "WORKTYPE",
+            "address": "ADDRESS",
+            "zip": "ZIP",
+            "owner_name": "OWNER",
+            "contact_name": "APPLICANT",
+            "filing_date": "ISSUED_DATE",
+            "status": "STATUS",
+            "estimated_cost": "TOTAL_FEES",
+            "description": "DESCRIPTION",
+        },
+        "date_field": "ISSUED_DATE",
+        "limit": 2000,
+        "active": True,
+    },
+
+    # =========================================================================
+    # CARTO PLATFORM CITIES
+    # =========================================================================
+
+    "philadelphia": {
+        "name": "Philadelphia",
+        "state": "PA",
+        "slug": "philadelphia",
+        "platform": "carto",
+        "endpoint": "https://phl.carto.com/api/v2/sql",
+        "table_name": "li_permits",
+        "dataset_id": "li_permits",
+        "description": "L&I Building and Zoning Permits",
+        "field_map": {
+            "permit_number": "permitnumber",
+            "permit_type": "permittype",
+            "work_type": "typeofwork",
+            "address": "address",
+            "zip": "zip",
+            "owner_name": "opa_owner",
+            "contact_name": "contractorname",
+            "filing_date": "permitissuedate",
+            "status": "status",
+            "estimated_cost": "",
+            "description": "typeofwork",
+        },
+        "date_field": "permitissuedate",
+        "limit": 2000,
+        "active": True,
+    },
+
+    # =========================================================================
+    # INACTIVE / PENDING CITIES
+    # =========================================================================
+
+    "dallas": {
+        "name": "Dallas",
+        "state": "TX",
+        "slug": "dallas",
+        "platform": "socrata",
+        "endpoint": "",
+        "dataset_id": "",
+        "description": "Building Permits - Pending API availability",
+        "field_map": {},
+        "date_field": "",
+        "limit": 2000,
+        "active": False,
+        "notes": "Dallas open data portal needs further investigation for permit API",
+    },
+
+    "houston": {
+        "name": "Houston",
+        "state": "TX",
+        "slug": "houston",
+        "platform": "ckan",
+        "endpoint": "",
+        "dataset_id": "",
+        "description": "Building Permits - Aggregate data only",
+        "field_map": {},
+        "date_field": "",
+        "limit": 2000,
+        "active": False,
+        "notes": "Houston provides aggregated monthly data, not individual permits",
+    },
+
+    "minneapolis": {
+        "name": "Minneapolis",
+        "state": "MN",
+        "slug": "minneapolis",
+        "platform": "socrata",
+        "endpoint": "",
+        "dataset_id": "",
+        "description": "Building Permits - Pending API availability",
+        "field_map": {},
+        "date_field": "",
+        "limit": 2000,
+        "active": False,
+        "notes": "Minneapolis data may be regional (Twin Cities area)",
+    },
+}
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def get_active_cities():
+    """Return list of active city keys."""
+    return [k for k, v in CITY_REGISTRY.items() if v.get("active", False)]
+
+
+def get_city_config(city_key):
+    """Get configuration for a specific city."""
+    return CITY_REGISTRY.get(city_key)
+
+
+def get_cities_by_platform(platform):
+    """Get all active cities for a specific platform."""
+    return [k for k, v in CITY_REGISTRY.items()
+            if v.get("platform") == platform and v.get("active", False)]
+
+
+def get_city_count():
+    """Get count of active cities."""
+    return len(get_active_cities())
+
+
+def get_city_by_slug(slug):
+    """Find city config by its URL slug."""
+    for key, config in CITY_REGISTRY.items():
+        if config.get("slug") == slug:
+            return key, config
+    return None, None
+
+
+def get_all_cities_info():
+    """Get basic info for all active cities (for display purposes)."""
+    cities = []
+    for key, config in CITY_REGISTRY.items():
+        if config.get("active", False):
+            cities.append({
+                "key": key,
+                "name": config["name"],
+                "state": config["state"],
+                "slug": config["slug"],
+                "platform": config["platform"],
+            })
+    return sorted(cities, key=lambda x: x["name"])
+
+
+# Trade classification keywords (moved from config.py for consolidation)
+TRADE_CATEGORIES = {
+    "Roofing": [
+        "roof", "roofing", "shingle", "membrane", "flashing", "gutter",
+        "soffit", "fascia", "re-roof", "reroof"
+    ],
+    "HVAC": [
+        "hvac", "heating", "cooling", "air condition", "furnace", "boiler",
+        "ductwork", "ventilation", "heat pump", "ac unit", "a/c", "mini split",
+        "thermostat", "refriger"
+    ],
+    "Electrical": [
+        "electric", "wiring", "panel", "circuit", "outlet", "lighting",
+        "solar", "photovoltaic", "pv system", "ev charger", "generator",
+        "transformer", "switchgear"
+    ],
+    "Plumbing": [
+        "plumb", "pipe", "sewer", "drain", "water heater", "fixture",
+        "backflow", "septic", "gas line", "water line", "sprinkler"
+    ],
+    "General Construction": [
+        "new building", "new construction", "addition", "alteration",
+        "renovation", "remodel", "tenant improvement", "build out",
+        "commercial build", "residential build", "foundation"
+    ],
+    "Demolition": [
+        "demolition", "demo", "tear down", "abatement", "asbestos",
+        "hazmat", "deconstruct"
+    ],
+    "Interior Renovation": [
+        "interior", "kitchen", "bathroom", "flooring", "drywall",
+        "painting", "cabinet", "countertop", "tile", "finish"
+    ],
+    "Windows & Doors": [
+        "window", "door", "glazing", "storefront", "curtain wall",
+        "skylight", "glass"
+    ],
+    "Structural": [
+        "structural", "beam", "column", "load bearing", "seismic",
+        "retrofit", "reinforc", "steel", "concrete"
+    ],
+    "Landscaping & Exterior": [
+        "landscape", "fence", "deck", "patio", "retaining wall",
+        "pool", "spa", "pergola", "awning", "carport", "garage"
+    ],
+}
+
+# Value tiers for lead scoring
+PERMIT_VALUE_TIERS = {
+    "high": {
+        "min_cost": 50000,
+        "label": "High Value",
+        "color": "#e74c3c",
+    },
+    "medium": {
+        "min_cost": 10000,
+        "label": "Medium Value",
+        "color": "#f39c12",
+    },
+    "low": {
+        "min_cost": 0,
+        "label": "Standard",
+        "color": "#27ae60",
+    },
+}

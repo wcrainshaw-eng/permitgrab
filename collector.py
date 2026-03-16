@@ -1,24 +1,36 @@
 """
 PermitGrab - Data Collector
-Pulls real permit data from free municipal APIs (Socrata/SODA and ArcGIS REST)
+Pulls real permit data from free municipal APIs
+Supports: Socrata (SODA API), ArcGIS REST, CKAN, CARTO
 """
 
 import requests
 import json
 import os
 import re
+import time
 from datetime import datetime, timedelta
-from config import CITY_SOURCES, TRADE_CATEGORIES, PERMIT_VALUE_TIERS
+from city_configs import (
+    CITY_REGISTRY, TRADE_CATEGORIES, PERMIT_VALUE_TIERS,
+    get_active_cities, get_city_config
+)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Rate limiting: 1 second between city pulls
+RATE_LIMIT_DELAY = 1.0
 
-def fetch_permits_socrata(source, days_back):
+
+# ============================================================================
+# PLATFORM-SPECIFIC FETCHERS
+# ============================================================================
+
+def fetch_socrata(config, days_back):
     """Fetch permits from a Socrata SODA API."""
-    endpoint = source["endpoint"]
-    date_field = source["date_field"]
-    limit = source.get("limit", 500)
+    endpoint = config["endpoint"]
+    date_field = config["date_field"]
+    limit = config.get("limit", 2000)
 
     # Calculate date filter
     since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
@@ -34,30 +46,25 @@ def fetch_permits_socrata(source, days_back):
     return resp.json()
 
 
-def fetch_permits_arcgis(source, days_back):
+def fetch_arcgis(config, days_back):
     """Fetch permits from an ArcGIS REST API FeatureServer."""
-    endpoint = source["endpoint"]
-    date_field = source["date_field"]
-    limit = source.get("limit", 500)
-    date_format = source.get("date_format", "date")  # "date", "epoch", or "none"
+    endpoint = config["endpoint"]
+    date_field = config["date_field"]
+    limit = config.get("limit", 2000)
+    date_format = config.get("date_format", "date")  # "date", "epoch", or "none"
 
     # Calculate date filter
     since_dt = datetime.now() - timedelta(days=days_back)
 
     if date_format == "epoch":
-        # Some ArcGIS services store dates as Unix epoch milliseconds
-        # Use TIMESTAMP syntax which works better with epoch fields
         since_epoch = int(since_dt.timestamp() * 1000)
-        where_clause = f"{date_field} >= TIMESTAMP '{since_dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+        where_clause = f"{date_field} >= {since_epoch}"
     elif date_format == "none":
-        # Skip date filtering, just get most recent by order
         where_clause = "1=1"
     else:
-        # Standard ArcGIS DATE format
         since_date = since_dt.strftime("%Y-%m-%d")
         where_clause = f"{date_field} >= DATE '{since_date}'"
 
-    # ArcGIS query parameters
     params = {
         "where": where_clause,
         "outFields": "*",
@@ -70,7 +77,6 @@ def fetch_permits_arcgis(source, days_back):
     resp.raise_for_status()
     data = resp.json()
 
-    # ArcGIS returns features in a nested structure
     if "features" in data:
         results = [f["attributes"] for f in data["features"]]
         # If using "none" date_format, filter in Python
@@ -81,42 +87,129 @@ def fetch_permits_arcgis(source, days_back):
     return []
 
 
+def fetch_ckan(config, days_back):
+    """Fetch permits from a CKAN datastore API."""
+    endpoint = config["endpoint"]
+    dataset_id = config["dataset_id"]
+    limit = config.get("limit", 2000)
+    date_field = config.get("date_field", "")
+
+    # Calculate date filter
+    since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
+    params = {
+        "resource_id": dataset_id,
+        "limit": limit,
+    }
+
+    # CKAN doesn't have great date filtering, so we fetch and filter in Python
+    if date_field:
+        params["sort"] = f"{date_field} desc"
+
+    resp = requests.get(endpoint, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if data.get("success") and "result" in data and "records" in data["result"]:
+        records = data["result"]["records"]
+        # Filter by date in Python
+        if date_field:
+            filtered = []
+            for r in records:
+                date_val = r.get(date_field, "")
+                if date_val and str(date_val)[:10] >= since_date:
+                    filtered.append(r)
+            return filtered
+        return records
+    return []
+
+
+def fetch_carto(config, days_back):
+    """Fetch permits from a CARTO SQL API."""
+    endpoint = config["endpoint"]
+    table_name = config.get("table_name", config["dataset_id"])
+    limit = config.get("limit", 2000)
+    date_field = config.get("date_field", "")
+
+    # Calculate date filter
+    since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
+    # Build SQL query
+    if date_field:
+        sql = f"SELECT * FROM {table_name} WHERE {date_field} >= '{since_date}' ORDER BY {date_field} DESC LIMIT {limit}"
+    else:
+        sql = f"SELECT * FROM {table_name} LIMIT {limit}"
+
+    params = {"q": sql, "format": "json"}
+
+    resp = requests.get(endpoint, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if "rows" in data:
+        return data["rows"]
+    return []
+
+
 def fetch_permits(city_key, days_back=30):
-    """Fetch recent permits from a city's API (Socrata or ArcGIS)."""
-    source = CITY_SOURCES.get(city_key)
-    if not source:
+    """Fetch recent permits from a city's API using the appropriate platform fetcher."""
+    config = get_city_config(city_key)
+    if not config:
         print(f"  [SKIP] Unknown city: {city_key}")
         return []
 
-    api_type = source.get("api_type", "socrata")
-    print(f"  Fetching {source['name']} permits (last {days_back} days)...")
+    if not config.get("active", False):
+        print(f"  [SKIP] Inactive city: {city_key}")
+        return []
+
+    platform = config.get("platform", "socrata")
+    print(f"  Fetching {config['name']} permits (last {days_back} days) via {platform}...")
 
     try:
-        if api_type == "arcgis":
-            raw = fetch_permits_arcgis(source, days_back)
+        if platform == "socrata":
+            raw = fetch_socrata(config, days_back)
+        elif platform == "arcgis":
+            raw = fetch_arcgis(config, days_back)
+        elif platform == "ckan":
+            raw = fetch_ckan(config, days_back)
+        elif platform == "carto":
+            raw = fetch_carto(config, days_back)
         else:
-            raw = fetch_permits_socrata(source, days_back)
+            print(f"  [ERROR] Unknown platform: {platform}")
+            return []
 
-        print(f"  ✓ Got {len(raw)} raw permits from {source['name']}")
+        print(f"  Got {len(raw)} raw permits from {config['name']}")
+
+        # Warn if we hit the limit (might be more data available)
+        if len(raw) >= config.get("limit", 2000):
+            print(f"  [WARNING] Hit limit of {config.get('limit', 2000)} - there may be more permits available")
+
         return raw
     except requests.exceptions.HTTPError as e:
-        print(f"  [ERROR] HTTP {e.response.status_code} for {source['name']}: {e}")
+        print(f"  [ERROR] HTTP {e.response.status_code} for {config['name']}: {e}")
         return []
     except requests.exceptions.ConnectionError:
-        print(f"  [ERROR] Connection failed for {source['name']}")
+        print(f"  [ERROR] Connection failed for {config['name']}")
         return []
     except requests.exceptions.Timeout:
-        print(f"  [ERROR] Timeout for {source['name']}")
+        print(f"  [ERROR] Timeout for {config['name']}")
         return []
     except Exception as e:
-        print(f"  [ERROR] {source['name']}: {e}")
+        print(f"  [ERROR] {config['name']}: {e}")
         return []
 
+
+# ============================================================================
+# NORMALIZATION FUNCTIONS
+# ============================================================================
 
 def normalize_permit(raw_record, city_key):
     """Normalize a raw permit record into our standard schema."""
-    source = CITY_SOURCES[city_key]
-    fmap = source["field_map"]
+    config = get_city_config(city_key)
+    if not config:
+        return None
+
+    fmap = config["field_map"]
 
     def get_field(field_name):
         raw_key = fmap.get(field_name, "")
@@ -153,7 +246,7 @@ def normalize_permit(raw_record, city_key):
     parsed_date = ""
     if date_str:
         # Check if it's an epoch timestamp (milliseconds)
-        if date_str.isdigit() and len(date_str) >= 10:
+        if str(date_str).isdigit() and len(str(date_str)) >= 10:
             try:
                 epoch_ms = int(date_str)
                 parsed_date = datetime.fromtimestamp(epoch_ms / 1000).strftime("%Y-%m-%d")
@@ -162,12 +255,12 @@ def normalize_permit(raw_record, city_key):
         if not parsed_date:
             for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
                 try:
-                    parsed_date = datetime.strptime(date_str[:26], fmt).strftime("%Y-%m-%d")
+                    parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
                     break
                 except ValueError:
                     continue
         if not parsed_date:
-            parsed_date = date_str[:10]
+            parsed_date = str(date_str)[:10]
 
     # Build description from available fields
     desc = get_field("description") or get_field("work_type") or get_field("permit_type")
@@ -187,8 +280,8 @@ def normalize_permit(raw_record, city_key):
 
     return {
         "id": f"{city_key}_{get_field('permit_number')}",
-        "city": source["name"],
-        "state": source["state"],
+        "city": config["name"],
+        "state": config["state"],
         "permit_number": get_field("permit_number"),
         "permit_type": get_field("permit_type"),
         "work_type": get_field("work_type"),
@@ -234,11 +327,8 @@ def normalize_address(address):
     """Normalize an address for consistent indexing and matching."""
     if not address:
         return ""
-    # Lowercase, strip whitespace, normalize common abbreviations
     addr = address.lower().strip()
-    # Remove extra whitespace
     addr = re.sub(r'\s+', ' ', addr)
-    # Common abbreviations
     replacements = [
         (r'\bstreet\b', 'st'),
         (r'\bavenue\b', 'ave'),
@@ -257,21 +347,23 @@ def normalize_address(address):
     ]
     for pattern, replacement in replacements:
         addr = re.sub(pattern, replacement, addr)
-    # Remove punctuation except for essential chars
     addr = re.sub(r'[^\w\s#-]', '', addr)
     return addr
 
 
-def fetch_permit_history_socrata(source, years_back=3):
-    """Fetch historical permits from a Socrata SODA API."""
-    endpoint = source["endpoint"]
-    date_field = source["date_field"]
+# ============================================================================
+# HISTORY FETCHERS
+# ============================================================================
 
-    # Calculate date filter - go back 3 years
+def fetch_history_socrata(config, years_back=3):
+    """Fetch historical permits from a Socrata SODA API."""
+    endpoint = config["endpoint"]
+    date_field = config["date_field"]
+
     since_date = (datetime.now() - timedelta(days=years_back * 365)).strftime("%Y-%m-%d")
 
     params = {
-        "$limit": 5000,  # Higher limit for historical data
+        "$limit": 5000,
         "$order": f"{date_field} DESC",
         "$where": f"{date_field} > '{since_date}T00:00:00'",
     }
@@ -281,17 +373,17 @@ def fetch_permit_history_socrata(source, years_back=3):
     return resp.json()
 
 
-def fetch_permit_history_arcgis(source, years_back=3):
+def fetch_history_arcgis(config, years_back=3):
     """Fetch historical permits from an ArcGIS REST API FeatureServer."""
-    endpoint = source["endpoint"]
-    date_field = source["date_field"]
-    date_format = source.get("date_format", "date")
+    endpoint = config["endpoint"]
+    date_field = config["date_field"]
+    date_format = config.get("date_format", "date")
 
-    # Calculate date filter - go back 3 years
     since_dt = datetime.now() - timedelta(days=years_back * 365)
 
     if date_format == "epoch":
-        where_clause = f"{date_field} >= TIMESTAMP '{since_dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+        since_epoch = int(since_dt.timestamp() * 1000)
+        where_clause = f"{date_field} >= {since_epoch}"
     elif date_format == "none":
         where_clause = "1=1"
     else:
@@ -319,56 +411,127 @@ def fetch_permit_history_arcgis(source, years_back=3):
     return []
 
 
+def fetch_history_ckan(config, years_back=3):
+    """Fetch historical permits from a CKAN API."""
+    endpoint = config["endpoint"]
+    dataset_id = config["dataset_id"]
+    date_field = config.get("date_field", "")
+
+    since_date = (datetime.now() - timedelta(days=years_back * 365)).strftime("%Y-%m-%d")
+
+    params = {
+        "resource_id": dataset_id,
+        "limit": 5000,
+    }
+    if date_field:
+        params["sort"] = f"{date_field} desc"
+
+    resp = requests.get(endpoint, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if data.get("success") and "result" in data and "records" in data["result"]:
+        records = data["result"]["records"]
+        if date_field:
+            filtered = []
+            for r in records:
+                date_val = r.get(date_field, "")
+                if date_val and str(date_val)[:10] >= since_date:
+                    filtered.append(r)
+            return filtered
+        return records
+    return []
+
+
+def fetch_history_carto(config, years_back=3):
+    """Fetch historical permits from a CARTO SQL API."""
+    endpoint = config["endpoint"]
+    table_name = config.get("table_name", config["dataset_id"])
+    date_field = config.get("date_field", "")
+
+    since_date = (datetime.now() - timedelta(days=years_back * 365)).strftime("%Y-%m-%d")
+
+    if date_field:
+        sql = f"SELECT * FROM {table_name} WHERE {date_field} >= '{since_date}' ORDER BY {date_field} DESC LIMIT 5000"
+    else:
+        sql = f"SELECT * FROM {table_name} LIMIT 5000"
+
+    params = {"q": sql, "format": "json"}
+
+    resp = requests.get(endpoint, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if "rows" in data:
+        return data["rows"]
+    return []
+
+
 def fetch_permit_history(city_key, years_back=3):
     """Fetch historical permits for a city (last 3 years)."""
-    source = CITY_SOURCES.get(city_key)
-    if not source:
+    config = get_city_config(city_key)
+    if not config:
         print(f"  [SKIP] Unknown city: {city_key}")
         return []
 
-    api_type = source.get("api_type", "socrata")
-    print(f"  Fetching {source['name']} permit history (last {years_back} years)...")
+    if not config.get("active", False):
+        print(f"  [SKIP] Inactive city: {city_key}")
+        return []
+
+    platform = config.get("platform", "socrata")
+    print(f"  Fetching {config['name']} permit history (last {years_back} years)...")
 
     try:
-        if api_type == "arcgis":
-            raw = fetch_permit_history_arcgis(source, years_back)
+        if platform == "socrata":
+            raw = fetch_history_socrata(config, years_back)
+        elif platform == "arcgis":
+            raw = fetch_history_arcgis(config, years_back)
+        elif platform == "ckan":
+            raw = fetch_history_ckan(config, years_back)
+        elif platform == "carto":
+            raw = fetch_history_carto(config, years_back)
         else:
-            raw = fetch_permit_history_socrata(source, years_back)
+            return []
 
-        print(f"  ✓ Got {len(raw)} historical permits from {source['name']}")
+        print(f"  Got {len(raw)} historical permits from {config['name']}")
         return raw
     except requests.exceptions.HTTPError as e:
-        print(f"  [ERROR] HTTP {e.response.status_code} for {source['name']}: {e}")
+        print(f"  [ERROR] HTTP {e.response.status_code} for {config['name']}: {e}")
         return []
     except requests.exceptions.Timeout:
-        print(f"  [ERROR] Timeout for {source['name']} (history takes longer)")
+        print(f"  [ERROR] Timeout for {config['name']} (history takes longer)")
         return []
     except Exception as e:
-        print(f"  [ERROR] {source['name']}: {e}")
+        print(f"  [ERROR] {config['name']}: {e}")
         return []
 
 
+# ============================================================================
+# COLLECTION FUNCTIONS
+# ============================================================================
+
 def collect_permit_history(years_back=3):
-    """Collect permit history from all cities, indexed by normalized address."""
+    """Collect permit history from all active cities, indexed by normalized address."""
     history_index = {}
     stats = {}
+    active_cities = get_active_cities()
 
     print("=" * 60)
     print("PermitGrab - Permit History Collection")
-    print(f"Pulling {years_back} years of history from {len(CITY_SOURCES)} cities")
+    print(f"Pulling {years_back} years of history from {len(active_cities)} cities")
     print("=" * 60)
 
-    for city_key in CITY_SOURCES:
+    for city_key in active_cities:
+        config = get_city_config(city_key)
         raw = fetch_permit_history(city_key, years_back)
         city_count = 0
 
         for record in raw:
             try:
                 normalized = normalize_permit(record, city_key)
-                if not normalized["permit_number"]:
+                if not normalized or not normalized["permit_number"]:
                     continue
 
-                # Index by normalized address
                 addr_key = normalize_address(normalized["address"])
                 if not addr_key or addr_key == "address not provided":
                     continue
@@ -399,8 +562,11 @@ def collect_permit_history(years_back=3):
         stats[city_key] = {
             "raw": len(raw),
             "indexed": city_count,
-            "city_name": CITY_SOURCES[city_key]["name"],
+            "city_name": config["name"],
         }
+
+        # Rate limiting
+        time.sleep(RATE_LIMIT_DELAY)
 
     # Sort permits by date for each address
     for addr_key in history_index:
@@ -415,12 +581,10 @@ def collect_permit_history(years_back=3):
     with open(output_file, "w") as f:
         json.dump(history_index, f, indent=2, default=str)
 
-    # Calculate stats
     total_addresses = len(history_index)
     total_permits = sum(len(h["permits"]) for h in history_index.values())
     repeat_renovators = sum(1 for h in history_index.values() if len(h["permits"]) >= 3)
 
-    # Print summary
     print("\n" + "=" * 60)
     print("PERMIT HISTORY COLLECTION COMPLETE")
     print("=" * 60)
@@ -436,33 +600,38 @@ def collect_permit_history(years_back=3):
 
 
 def collect_all(days_back=30):
-    """Collect permits from all configured cities."""
+    """Collect permits from all active cities."""
     all_permits = []
     stats = {}
+    active_cities = get_active_cities()
 
     print("=" * 60)
     print("PermitGrab - Data Collection")
-    print(f"Pulling permits from {len(CITY_SOURCES)} cities (last {days_back} days)")
+    print(f"Pulling permits from {len(active_cities)} cities (last {days_back} days)")
     print("=" * 60)
 
-    for city_key in CITY_SOURCES:
+    for city_key in active_cities:
+        config = get_city_config(city_key)
         raw = fetch_permits(city_key, days_back)
         city_permits = []
 
         for record in raw:
             try:
                 normalized = normalize_permit(record, city_key)
-                if normalized["permit_number"]:  # Skip records without permit numbers
+                if normalized and normalized["permit_number"]:
                     city_permits.append(normalized)
-            except Exception as e:
-                continue  # Skip malformed records
+            except Exception:
+                continue
 
         all_permits.extend(city_permits)
         stats[city_key] = {
             "raw": len(raw),
             "normalized": len(city_permits),
-            "city_name": CITY_SOURCES[city_key]["name"],
+            "city_name": config["name"],
         }
+
+        # Rate limiting
+        time.sleep(RATE_LIMIT_DELAY)
 
     # Trade category breakdown
     trade_counts = {}
@@ -493,7 +662,6 @@ def collect_all(days_back=30):
     with open(stats_file, "w") as f:
         json.dump(collection_stats, f, indent=2)
 
-    # Print summary
     print("\n" + "=" * 60)
     print("COLLECTION COMPLETE")
     print("=" * 60)
