@@ -276,7 +276,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "Field mapping needs verification",
     },
 
     "washington_dc": {
@@ -302,7 +303,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "Dataset ID needs verification",
     },
 
     "san_antonio": {
@@ -326,7 +328,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "404 - Dataset ID needs verification",
     },
 
     "kansas_city": {
@@ -334,9 +337,9 @@ CITY_REGISTRY = {
         "state": "MO",
         "slug": "kansas-city",
         "platform": "socrata",
-        "endpoint": "https://data.kcmo.org/resource/c78j-bgqg.json",
-        "dataset_id": "c78j-bgqg",
-        "description": "Building Permits",
+        "endpoint": "https://data.kcmo.org/resource/ue52-x8g8.json",
+        "dataset_id": "ue52-x8g8",
+        "description": "Permits - Core Dataset",
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "permit_type",
@@ -350,7 +353,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "403 Forbidden - May require app token",
     },
 
     "detroit": {
@@ -376,7 +380,8 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "Dataset ID needs verification",
     },
 
     "pittsburgh": {
@@ -402,7 +407,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "404 - Dataset ID needs verification",
     },
 
     "denver": {
@@ -426,29 +432,31 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "Dataset ID needs verification",
     },
 
     "portland": {
         "name": "Portland",
         "state": "OR",
         "slug": "portland",
-        "platform": "socrata",
-        "endpoint": "https://data.portland.gov/resource/7ebi-ybjd.json",
-        "dataset_id": "7ebi-ybjd",
-        "description": "Building Permits",
+        "platform": "arcgis",
+        "endpoint": "https://services.arcgis.com/quVN97tn06YNGj9s/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query",
+        "dataset_id": "Residential_Building_Permits",
+        "description": "Residential Building Permits",
         "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "type",
-            "work_type": "work_type",
-            "address": "address",
-            "zip": "zip",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "work_description",
+            "permit_number": "PERMIT_NUMBER",
+            "permit_type": "PERMIT_TYPE",
+            "work_type": "WORK_TYPE",
+            "address": "ADDRESS",
+            "zip": "ZIP",
+            "filing_date": "ISSUE_DATE",
+            "status": "STATUS",
+            "estimated_cost": "VALUATION",
+            "description": "DESCRIPTION",
         },
-        "date_field": "issue_date",
+        "date_field": "ISSUE_DATE",
+        "date_format": "epoch",
         "limit": 2000,
         "active": True,
     },
