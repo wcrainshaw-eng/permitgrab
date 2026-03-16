@@ -725,6 +725,388 @@ def api_violations_by_address(address):
 
 
 # ===========================
+# CONTRACTOR INTELLIGENCE API
+# ===========================
+
+@app.route('/api/contractors')
+def api_contractors():
+    """
+    GET /api/contractors
+    Query params: city, search, sort_by, sort_order, page, per_page
+    Returns aggregated contractor data from permits.
+    """
+    permits = load_permits()
+
+    # Filter by city if specified
+    city = request.args.get('city', '')
+    if city:
+        permits = [p for p in permits if p.get('city') == city]
+
+    # Aggregate by contractor name
+    contractors = {}
+    for p in permits:
+        name = p.get('contact_name', '').strip()
+        if not name or name.lower() in ('n/a', 'unknown', 'none', ''):
+            continue
+
+        if name not in contractors:
+            contractors[name] = {
+                'name': name,
+                'total_permits': 0,
+                'total_value': 0,
+                'cities': set(),
+                'trades': {},
+                'most_recent_date': '',
+                'permits': [],
+            }
+
+        contractors[name]['total_permits'] += 1
+        contractors[name]['total_value'] += p.get('estimated_cost', 0) or 0
+        contractors[name]['cities'].add(p.get('city', ''))
+
+        trade = p.get('trade_category', 'Other')
+        contractors[name]['trades'][trade] = contractors[name]['trades'].get(trade, 0) + 1
+
+        filing_date = p.get('filing_date', '')
+        if filing_date > contractors[name]['most_recent_date']:
+            contractors[name]['most_recent_date'] = filing_date
+
+        contractors[name]['permits'].append(p.get('permit_number'))
+
+    # Convert to list and determine primary trade
+    contractor_list = []
+    for name, data in contractors.items():
+        primary_trade = max(data['trades'].items(), key=lambda x: x[1])[0] if data['trades'] else 'Unknown'
+        contractor_list.append({
+            'name': data['name'],
+            'total_permits': data['total_permits'],
+            'total_value': data['total_value'],
+            'cities': sorted(list(data['cities'])),
+            'city_count': len(data['cities']),
+            'primary_trade': primary_trade,
+            'most_recent_date': data['most_recent_date'],
+            'permit_ids': data['permits'][:50],  # Limit stored permits
+        })
+
+    # Search filter
+    search = request.args.get('search', '').lower()
+    if search:
+        contractor_list = [c for c in contractor_list if search in c['name'].lower()]
+
+    # Sorting
+    sort_by = request.args.get('sort_by', 'total_permits')
+    sort_order = request.args.get('sort_order', 'desc')
+    reverse = sort_order == 'desc'
+
+    if sort_by == 'name':
+        contractor_list.sort(key=lambda x: x['name'].lower(), reverse=reverse)
+    elif sort_by == 'total_value':
+        contractor_list.sort(key=lambda x: x['total_value'], reverse=reverse)
+    elif sort_by == 'most_recent_date':
+        contractor_list.sort(key=lambda x: x['most_recent_date'] or '', reverse=reverse)
+    else:
+        contractor_list.sort(key=lambda x: x['total_permits'], reverse=reverse)
+
+    # Pagination
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    total = len(contractor_list)
+    start = (page - 1) * per_page
+    page_contractors = contractor_list[start:start + per_page]
+
+    return jsonify({
+        'contractors': page_contractors,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page,
+    })
+
+
+@app.route('/api/contractors/<path:name>')
+def api_contractor_detail(name):
+    """
+    GET /api/contractors/<name>
+    Returns all permits for a specific contractor.
+    """
+    permits = load_permits()
+    permits = add_lead_scores(permits)
+
+    # Find permits by contractor name (case-insensitive)
+    contractor_permits = [p for p in permits if p.get('contact_name', '').lower() == name.lower()]
+
+    if not contractor_permits:
+        return jsonify({'error': 'Contractor not found'}), 404
+
+    # Calculate stats
+    total_value = sum(p.get('estimated_cost', 0) or 0 for p in contractor_permits)
+    cities = sorted(set(p.get('city', '') for p in contractor_permits))
+    trades = {}
+    for p in contractor_permits:
+        trade = p.get('trade_category', 'Other')
+        trades[trade] = trades.get(trade, 0) + 1
+
+    return jsonify({
+        'name': name,
+        'permits': contractor_permits,
+        'total_permits': len(contractor_permits),
+        'total_value': total_value,
+        'cities': cities,
+        'trade_breakdown': trades,
+    })
+
+
+@app.route('/api/contractors/top')
+def api_top_contractors():
+    """
+    GET /api/contractors/top
+    Query params: city, limit
+    Returns top contractors by permit volume.
+    """
+    permits = load_permits()
+
+    city = request.args.get('city', '')
+    if city:
+        permits = [p for p in permits if p.get('city') == city]
+
+    limit = int(request.args.get('limit', 5))
+
+    # Aggregate by contractor
+    contractors = {}
+    for p in permits:
+        name = p.get('contact_name', '').strip()
+        if not name or name.lower() in ('n/a', 'unknown', 'none', ''):
+            continue
+
+        if name not in contractors:
+            contractors[name] = {'name': name, 'permits': 0, 'value': 0}
+
+        contractors[name]['permits'] += 1
+        contractors[name]['value'] += p.get('estimated_cost', 0) or 0
+
+    # Sort by permit count
+    top_list = sorted(contractors.values(), key=lambda x: x['permits'], reverse=True)[:limit]
+
+    return jsonify({
+        'top_contractors': top_list,
+        'city': city or 'All Cities',
+    })
+
+
+@app.route('/contractors')
+def contractors_page():
+    """Render the Contractors Intelligence page."""
+    return render_template('contractors.html')
+
+
+# ===========================
+# TREND ANALYTICS API
+# ===========================
+
+@app.route('/api/analytics/volume')
+def api_analytics_volume():
+    """
+    GET /api/analytics/volume
+    Query params: city, weeks (default 12)
+    Returns weekly permit counts for trend analysis.
+    """
+    permits = load_permits()
+
+    city = request.args.get('city', '')
+    weeks = int(request.args.get('weeks', 12))
+
+    if city:
+        permits = [p for p in permits if p.get('city') == city]
+
+    # Group by week
+    from datetime import timedelta
+    now = datetime.now()
+    weekly_counts = {}
+
+    for i in range(weeks):
+        week_start = now - timedelta(weeks=i+1)
+        week_end = now - timedelta(weeks=i)
+        week_key = week_start.strftime('%Y-%m-%d')
+        weekly_counts[week_key] = 0
+
+    for p in permits:
+        filing_date = p.get('filing_date', '')
+        if not filing_date:
+            continue
+        try:
+            filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
+            weeks_ago = (now - filed).days // 7
+            if 0 <= weeks_ago < weeks:
+                week_start = now - timedelta(weeks=weeks_ago+1)
+                week_key = week_start.strftime('%Y-%m-%d')
+                if week_key in weekly_counts:
+                    weekly_counts[week_key] += 1
+        except (ValueError, TypeError):
+            continue
+
+    # Convert to sorted list
+    volume_data = sorted(weekly_counts.items())
+
+    # Calculate trend
+    if len(volume_data) >= 2:
+        recent_avg = sum(v for _, v in volume_data[-4:]) / min(4, len(volume_data))
+        older_avg = sum(v for _, v in volume_data[:4]) / min(4, len(volume_data))
+        if older_avg > 0:
+            trend_pct = ((recent_avg - older_avg) / older_avg) * 100
+        else:
+            trend_pct = 0
+        trend_direction = 'up' if trend_pct > 0 else 'down' if trend_pct < 0 else 'flat'
+    else:
+        trend_pct = 0
+        trend_direction = 'flat'
+
+    return jsonify({
+        'volume': [{'week': k, 'count': v} for k, v in volume_data],
+        'total': sum(v for _, v in volume_data),
+        'trend_percentage': round(trend_pct, 1),
+        'trend_direction': trend_direction,
+        'city': city or 'All Cities',
+    })
+
+
+@app.route('/api/analytics/trades')
+def api_analytics_trades():
+    """
+    GET /api/analytics/trades
+    Query params: city
+    Returns trade breakdown for the selected city.
+    """
+    permits = load_permits()
+
+    city = request.args.get('city', '')
+    if city:
+        permits = [p for p in permits if p.get('city') == city]
+
+    # Count by trade
+    trade_counts = {}
+    for p in permits:
+        trade = p.get('trade_category', 'Other')
+        trade_counts[trade] = trade_counts.get(trade, 0) + 1
+
+    # Sort by count
+    trades = sorted(trade_counts.items(), key=lambda x: -x[1])
+
+    return jsonify({
+        'trades': [{'trade': t, 'count': c} for t, c in trades],
+        'total': len(permits),
+        'city': city or 'All Cities',
+    })
+
+
+@app.route('/api/analytics/values')
+def api_analytics_values():
+    """
+    GET /api/analytics/values
+    Query params: city, weeks (default 12)
+    Returns weekly average project values.
+    """
+    permits = load_permits()
+
+    city = request.args.get('city', '')
+    weeks = int(request.args.get('weeks', 12))
+
+    if city:
+        permits = [p for p in permits if p.get('city') == city]
+
+    # Group by week
+    from datetime import timedelta
+    now = datetime.now()
+    weekly_values = {}
+    weekly_counts = {}
+
+    for i in range(weeks):
+        week_start = now - timedelta(weeks=i+1)
+        week_key = week_start.strftime('%Y-%m-%d')
+        weekly_values[week_key] = 0
+        weekly_counts[week_key] = 0
+
+    for p in permits:
+        filing_date = p.get('filing_date', '')
+        value = p.get('estimated_cost', 0) or 0
+        if not filing_date or value <= 0:
+            continue
+        try:
+            filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
+            weeks_ago = (now - filed).days // 7
+            if 0 <= weeks_ago < weeks:
+                week_start = now - timedelta(weeks=weeks_ago+1)
+                week_key = week_start.strftime('%Y-%m-%d')
+                if week_key in weekly_values:
+                    weekly_values[week_key] += value
+                    weekly_counts[week_key] += 1
+        except (ValueError, TypeError):
+            continue
+
+    # Calculate averages
+    value_data = []
+    for week_key in sorted(weekly_values.keys()):
+        count = weekly_counts[week_key]
+        avg = weekly_values[week_key] / count if count > 0 else 0
+        value_data.append({'week': week_key, 'average_value': round(avg, 2), 'count': count})
+
+    # Calculate trend
+    recent_values = [d['average_value'] for d in value_data[-4:] if d['average_value'] > 0]
+    older_values = [d['average_value'] for d in value_data[:4] if d['average_value'] > 0]
+
+    if recent_values and older_values:
+        recent_avg = sum(recent_values) / len(recent_values)
+        older_avg = sum(older_values) / len(older_values)
+        if older_avg > 0:
+            trend_pct = ((recent_avg - older_avg) / older_avg) * 100
+        else:
+            trend_pct = 0
+        trend_direction = 'up' if trend_pct > 0 else 'down' if trend_pct < 0 else 'flat'
+    else:
+        trend_pct = 0
+        trend_direction = 'flat'
+
+    return jsonify({
+        'values': value_data,
+        'trend_percentage': round(trend_pct, 1),
+        'trend_direction': trend_direction,
+        'city': city or 'All Cities',
+    })
+
+
+@app.route('/analytics')
+def analytics_page():
+    """Render the Analytics page (Pro users only)."""
+    user = get_current_user()
+
+    # Check if user has Pro plan
+    if not user or user.get('plan') not in ('professional', 'enterprise'):
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html><head>
+                <title>Analytics - PermitGrab</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 60px; text-align: center; background: #f3f4f6; }
+                    .card { background: white; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+                    h1 { margin-bottom: 16px; }
+                    p { color: #6b7280; margin-bottom: 24px; }
+                    .btn { display: inline-block; background: #2563eb; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+                    .btn:hover { background: #1d4ed8; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>Analytics is a Pro Feature</h1>
+                    <p>Upgrade to Professional to access trend analytics, market insights, and contractor intelligence.</p>
+                    <a href="/#pricing" class="btn">Upgrade to Pro</a>
+                    <p style="margin-top: 16px;"><a href="/" style="color: #6b7280;">Back to Dashboard</a></p>
+                </div>
+            </body></html>
+        ''')
+
+    return render_template('analytics.html', user=user)
+
+
+# ===========================
 # STRIPE PAYMENT ENDPOINTS
 # ===========================
 

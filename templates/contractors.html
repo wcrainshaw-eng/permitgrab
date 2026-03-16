@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contractor Intelligence | PermitGrab</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --green: #16a34a;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07);
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.5;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+  color: white;
+  padding: 16px 32px;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  text-decoration: none;
+  color: white;
+}
+
+.logo span { color: var(--accent); }
+
+.nav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+
+.nav a:hover { color: white; }
+
+.nav a.active { color: white; font-weight: 600; }
+
+/* Page Header */
+.page-header {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 24px 32px;
+}
+
+.page-header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.page-header p {
+  color: var(--gray-500);
+  font-size: 16px;
+}
+
+/* Filters */
+.filters {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 16px 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.filters-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--gray-500);
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  min-width: 180px;
+}
+
+.results-count {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+.results-count strong {
+  color: var(--gray-800);
+}
+
+/* Table Container */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.table-card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+th {
+  background: var(--gray-50);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--gray-500);
+  cursor: pointer;
+  user-select: none;
+}
+
+th:hover {
+  background: var(--gray-100);
+}
+
+th.sorted {
+  color: var(--primary);
+}
+
+th .sort-icon {
+  margin-left: 4px;
+  opacity: 0.5;
+}
+
+th.sorted .sort-icon {
+  opacity: 1;
+}
+
+td {
+  font-size: 14px;
+}
+
+tr:hover td {
+  background: var(--gray-50);
+}
+
+.contractor-name {
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.contractor-name:hover {
+  text-decoration: underline;
+}
+
+.value-cell {
+  font-weight: 600;
+  color: var(--green);
+}
+
+.cities-cell {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.trade-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  border-top: 1px solid var(--gray-100);
+}
+
+.page-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-700);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.page-btn:hover, .page-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.page-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--gray-400);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.show { display: flex; }
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 25px 50px rgba(0,0,0,.25);
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--gray-400);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.modal-stat {
+  background: var(--gray-50);
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.modal-stat .value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.modal-stat .label {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.permit-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.permit-item {
+  padding: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.permit-item .address {
+  font-weight: 600;
+}
+
+.permit-item .meta {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filters-inner { flex-direction: column; align-items: stretch; }
+  .results-count { margin-left: 0; }
+  .table-card { overflow-x: auto; }
+  .modal-stats { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <nav class="nav">
+      <a href="/">Dashboard</a>
+      <a href="/contractors" class="active">Contractors</a>
+      <a href="/analytics">Analytics <span style="font-size: 10px; background: var(--accent); padding: 2px 6px; border-radius: 10px; margin-left: 4px;">Pro</span></a>
+      <a href="/my-leads">My Leads</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1>Contractor Intelligence</h1>
+    <p>Analyze contractors pulling permits in your target markets. See who's most active and what they're building.</p>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filters-inner">
+    <div class="filter-group">
+      <label>City</label>
+      <select id="filter-city">
+        <option value="">All Cities</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Search</label>
+      <input type="text" id="filter-search" placeholder="Search contractors...">
+    </div>
+    <div class="results-count">
+      <strong id="showing-count">0</strong> contractors
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="container">
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name">Contractor Name <span class="sort-icon">&#8597;</span></th>
+          <th data-sort="total_permits" class="sorted">Permits <span class="sort-icon">&#8595;</span></th>
+          <th data-sort="total_value">Total Value <span class="sort-icon">&#8597;</span></th>
+          <th>Cities</th>
+          <th>Primary Trade</th>
+          <th data-sort="most_recent_date">Last Active <span class="sort-icon">&#8597;</span></th>
+        </tr>
+      </thead>
+      <tbody id="contractors-table">
+        <tr>
+          <td colspan="6">
+            <div class="loading">
+              <div class="spinner"></div>
+              Loading contractors...
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- Contractor Detail Modal -->
+<div class="modal-backdrop" id="contractor-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-contractor-name">Contractor Name</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-stats">
+        <div class="modal-stat">
+          <div class="value" id="modal-permits">0</div>
+          <div class="label">Total Permits</div>
+        </div>
+        <div class="modal-stat">
+          <div class="value" id="modal-value">$0</div>
+          <div class="label">Total Value</div>
+        </div>
+        <div class="modal-stat">
+          <div class="value" id="modal-cities">0</div>
+          <div class="label">Cities Active</div>
+        </div>
+      </div>
+      <h3 style="margin-bottom: 12px; font-size: 16px;">Recent Permits</h3>
+      <div class="permit-list" id="modal-permits-list">
+        Loading...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let allContractors = [];
+let currentPage = 1;
+const perPage = 50;
+let sortBy = 'total_permits';
+let sortOrder = 'desc';
+
+async function loadContractors() {
+  const city = document.getElementById('filter-city').value;
+  const search = document.getElementById('filter-search').value;
+
+  const params = new URLSearchParams({
+    page: currentPage,
+    per_page: perPage,
+    sort_by: sortBy,
+    sort_order: sortOrder,
+  });
+
+  if (city) params.append('city', city);
+  if (search) params.append('search', search);
+
+  try {
+    const resp = await fetch(`/api/contractors?${params}`);
+    const data = await resp.json();
+    allContractors = data.contractors;
+    renderTable(data);
+    document.getElementById('showing-count').textContent = data.total.toLocaleString();
+  } catch (e) {
+    console.error('Failed to load contractors:', e);
+  }
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('contractors-table');
+
+  if (data.contractors.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-400);">No contractors found</td></tr>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = data.contractors.map(c => `
+    <tr>
+      <td><span class="contractor-name" onclick="showContractor('${escapeHtml(c.name)}')">${escapeHtml(c.name)}</span></td>
+      <td>${c.total_permits.toLocaleString()}</td>
+      <td class="value-cell">$${c.total_value.toLocaleString()}</td>
+      <td class="cities-cell">${c.cities.slice(0, 3).join(', ')}${c.cities.length > 3 ? ` +${c.cities.length - 3}` : ''}</td>
+      <td><span class="trade-badge">${escapeHtml(c.primary_trade)}</span></td>
+      <td>${c.most_recent_date || 'N/A'}</td>
+    </tr>
+  `).join('');
+
+  renderPagination(data);
+}
+
+function renderPagination(data) {
+  const pag = document.getElementById('pagination');
+  if (data.total_pages <= 1) {
+    pag.innerHTML = '';
+    return;
+  }
+
+  let html = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+
+  for (let i = Math.max(1, currentPage - 2); i <= Math.min(data.total_pages, currentPage + 2); i++) {
+    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  }
+
+  html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === data.total_pages ? 'disabled' : ''}>Next</button>`;
+  pag.innerHTML = html;
+}
+
+function goToPage(page) {
+  currentPage = page;
+  loadContractors();
+}
+
+async function showContractor(name) {
+  document.getElementById('modal-contractor-name').textContent = name;
+  document.getElementById('modal-permits-list').innerHTML = 'Loading...';
+  document.getElementById('contractor-modal').classList.add('show');
+
+  try {
+    const resp = await fetch(`/api/contractors/${encodeURIComponent(name)}`);
+    const data = await resp.json();
+
+    document.getElementById('modal-permits').textContent = data.total_permits.toLocaleString();
+    document.getElementById('modal-value').textContent = '$' + data.total_value.toLocaleString();
+    document.getElementById('modal-cities').textContent = data.cities.length;
+
+    document.getElementById('modal-permits-list').innerHTML = data.permits.slice(0, 20).map(p => `
+      <div class="permit-item">
+        <div class="address">${escapeHtml(p.address)}</div>
+        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || 'N/A'} | $${(p.estimated_cost || 0).toLocaleString()}</div>
+      </div>
+    `).join('') || '<div style="color: var(--gray-400);">No permits found</div>';
+
+  } catch (e) {
+    document.getElementById('modal-permits-list').innerHTML = '<div style="color: var(--gray-400);">Failed to load contractor details</div>';
+  }
+}
+
+function closeModal() {
+  document.getElementById('contractor-modal').classList.remove('show');
+}
+
+document.getElementById('contractor-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Sorting
+document.querySelectorAll('th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const newSort = th.dataset.sort;
+    if (sortBy === newSort) {
+      sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    } else {
+      sortBy = newSort;
+      sortOrder = 'desc';
+    }
+
+    // Update UI
+    document.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
+    th.classList.add('sorted');
+    th.querySelector('.sort-icon').innerHTML = sortOrder === 'desc' ? '&#8595;' : '&#8593;';
+
+    currentPage = 1;
+    loadContractors();
+  });
+});
+
+// Filters
+document.getElementById('filter-city').addEventListener('change', () => {
+  currentPage = 1;
+  loadContractors();
+});
+
+document.getElementById('filter-search').addEventListener('input', debounce(() => {
+  currentPage = 1;
+  loadContractors();
+}, 300));
+
+function debounce(fn, ms) {
+  let t;
+  return function(...args) { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Load cities for filter
+async function loadCities() {
+  try {
+    const resp = await fetch('/api/filters');
+    const data = await resp.json();
+    const select = document.getElementById('filter-city');
+    data.cities.forEach(c => {
+      select.add(new Option(c, c));
+    });
+  } catch (e) {
+    console.error('Failed to load cities:', e);
+  }
+}
+
+// Init
+loadCities();
+loadContractors();
+</script>
+</body>
+</html>

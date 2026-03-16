@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trend Analytics | PermitGrab Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --green: #16a34a;
+  --red: #dc2626;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07);
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-900);
+  color: white;
+  line-height: 1.5;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+  padding: 16px 32px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  text-decoration: none;
+  color: white;
+}
+
+.logo span { color: var(--accent); }
+
+.nav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+
+.nav a:hover { color: white; }
+.nav a.active { color: white; font-weight: 600; }
+
+.pro-badge {
+  font-size: 10px;
+  background: var(--accent);
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+/* Page Header */
+.page-header {
+  background: var(--gray-800);
+  padding: 32px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.page-header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.page-header p {
+  color: rgba(255,255,255,.6);
+  font-size: 16px;
+  margin-top: 4px;
+}
+
+.city-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.city-filter label {
+  font-size: 14px;
+  color: rgba(255,255,255,.6);
+}
+
+.city-filter select {
+  padding: 10px 16px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  background: var(--gray-700);
+  color: white;
+  font-size: 14px;
+  min-width: 200px;
+}
+
+/* Charts Grid */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.chart-card {
+  background: var(--gray-800);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  padding: 24px;
+}
+
+.chart-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.chart-subtitle {
+  font-size: 13px;
+  color: rgba(255,255,255,.5);
+  margin-top: 4px;
+}
+
+.trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.trend-badge.up {
+  background: rgba(22, 163, 74, 0.2);
+  color: #4ade80;
+}
+
+.trend-badge.down {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
+
+.trend-badge.flat {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+}
+
+.chart-container {
+  position: relative;
+  height: 300px;
+}
+
+/* Stats Row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--gray-800);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-card .value {
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+}
+
+.stat-card .label {
+  font-size: 13px;
+  color: rgba(255,255,255,.5);
+  margin-top: 4px;
+}
+
+.stat-card .trend {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.stat-card .trend.up { color: #4ade80; }
+.stat-card .trend.down { color: #f87171; }
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: rgba(255,255,255,.4);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin-right: 12px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .page-header-inner { flex-direction: column; gap: 16px; align-items: flex-start; }
+  .stats-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <nav class="nav">
+      <a href="/">Dashboard</a>
+      <a href="/contractors">Contractors</a>
+      <a href="/analytics" class="active">Analytics <span class="pro-badge">Pro</span></a>
+      <a href="/my-leads">My Leads</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1>Trend Analytics</h1>
+      <p>Market intelligence and permit trends for {{ user.email }}</p>
+    </div>
+    <div class="city-filter">
+      <label>Filter by City:</label>
+      <select id="city-filter">
+        <option value="">All Cities</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Content -->
+<div class="container">
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="value" id="stat-total-permits">—</div>
+      <div class="label">Permits (12 weeks)</div>
+      <div class="trend" id="stat-permits-trend"></div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="stat-avg-value">—</div>
+      <div class="label">Avg. Project Value</div>
+      <div class="trend" id="stat-value-trend"></div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="stat-top-trade">—</div>
+      <div class="label">Top Trade</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="stat-contractors">—</div>
+      <div class="label">Active Contractors</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <!-- Permit Volume Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Permit Volume</div>
+          <div class="chart-subtitle">New permits per week (last 12 weeks)</div>
+        </div>
+        <div class="trend-badge" id="volume-trend-badge">—</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="volume-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Value Trends Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Value Trends</div>
+          <div class="chart-subtitle">Average project value per week</div>
+        </div>
+        <div class="trend-badge" id="value-trend-badge">—</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="value-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Trade Breakdown Chart -->
+    <div class="chart-card full-width">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Trade Breakdown</div>
+          <div class="chart-subtitle">Permit counts by trade category</div>
+        </div>
+      </div>
+      <div class="chart-container" style="height: 400px;">
+        <canvas id="trades-chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let volumeChart, valueChart, tradesChart;
+
+const chartColors = [
+  '#2563eb', '#f97316', '#16a34a', '#dc2626', '#8b5cf6',
+  '#06b6d4', '#ec4899', '#eab308', '#64748b', '#14b8a6'
+];
+
+// Chart.js defaults for dark theme
+Chart.defaults.color = 'rgba(255,255,255,0.7)';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.1)';
+
+async function loadAnalytics() {
+  const city = document.getElementById('city-filter').value;
+
+  // Load all data in parallel
+  const [volumeData, valueData, tradesData, contractorsData] = await Promise.all([
+    fetch(`/api/analytics/volume?city=${city}&weeks=12`).then(r => r.json()),
+    fetch(`/api/analytics/values?city=${city}&weeks=12`).then(r => r.json()),
+    fetch(`/api/analytics/trades?city=${city}`).then(r => r.json()),
+    fetch(`/api/contractors/top?city=${city}&limit=100`).then(r => r.json()),
+  ]);
+
+  // Update stats
+  document.getElementById('stat-total-permits').textContent = volumeData.total.toLocaleString();
+  updateTrendStat('stat-permits-trend', volumeData.trend_direction, volumeData.trend_percentage);
+
+  const avgValue = valueData.values.reduce((sum, v) => sum + v.average_value, 0) / valueData.values.filter(v => v.average_value > 0).length || 0;
+  document.getElementById('stat-avg-value').textContent = '$' + Math.round(avgValue).toLocaleString();
+  updateTrendStat('stat-value-trend', valueData.trend_direction, valueData.trend_percentage);
+
+  if (tradesData.trades.length > 0) {
+    document.getElementById('stat-top-trade').textContent = tradesData.trades[0].trade;
+  }
+
+  document.getElementById('stat-contractors').textContent = contractorsData.top_contractors.length.toLocaleString();
+
+  // Update trend badges
+  updateTrendBadge('volume-trend-badge', volumeData.trend_direction, volumeData.trend_percentage);
+  updateTrendBadge('value-trend-badge', valueData.trend_direction, valueData.trend_percentage);
+
+  // Render charts
+  renderVolumeChart(volumeData);
+  renderValueChart(valueData);
+  renderTradesChart(tradesData);
+}
+
+function updateTrendStat(elementId, direction, percentage) {
+  const el = document.getElementById(elementId);
+  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
+  el.textContent = `${arrow} ${Math.abs(percentage)}%`;
+  el.className = 'trend ' + direction;
+}
+
+function updateTrendBadge(elementId, direction, percentage) {
+  const el = document.getElementById(elementId);
+  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
+  el.textContent = `${arrow} ${Math.abs(percentage)}%`;
+  el.className = 'trend-badge ' + direction;
+}
+
+function renderVolumeChart(data) {
+  const ctx = document.getElementById('volume-chart').getContext('2d');
+
+  if (volumeChart) volumeChart.destroy();
+
+  volumeChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.volume.map(v => formatWeek(v.week)),
+      datasets: [{
+        label: 'Permits',
+        data: data.volume.map(v => v.count),
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#2563eb',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+function renderValueChart(data) {
+  const ctx = document.getElementById('value-chart').getContext('2d');
+
+  if (valueChart) valueChart.destroy();
+
+  valueChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.values.map(v => formatWeek(v.week)),
+      datasets: [{
+        label: 'Avg Value',
+        data: data.values.map(v => v.average_value),
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22, 163, 74, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#16a34a',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => '$' + ctx.parsed.y.toLocaleString()
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            callback: (value) => '$' + (value / 1000).toFixed(0) + 'K'
+          }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+function renderTradesChart(data) {
+  const ctx = document.getElementById('trades-chart').getContext('2d');
+
+  if (tradesChart) tradesChart.destroy();
+
+  tradesChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.trades.map(t => t.trade),
+      datasets: [{
+        label: 'Permits',
+        data: data.trades.map(t => t.count),
+        backgroundColor: data.trades.map((_, i) => chartColors[i % chartColors.length]),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+function formatWeek(dateStr) {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// Load cities for filter
+async function loadCities() {
+  try {
+    const resp = await fetch('/api/filters');
+    const data = await resp.json();
+    const select = document.getElementById('city-filter');
+    data.cities.forEach(c => {
+      select.add(new Option(c, c));
+    });
+  } catch (e) {
+    console.error('Failed to load cities:', e);
+  }
+}
+
+// City filter change
+document.getElementById('city-filter').addEventListener('change', loadAnalytics);
+
+// Init
+loadCities();
+loadAnalytics();
+</script>
+</body>
+</html>

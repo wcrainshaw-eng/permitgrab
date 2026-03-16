@@ -991,6 +991,8 @@ footer a:hover { color: white; }
           <a href="/permits/cincinnati">Cincinnati</a>
         </div>
       </div>
+      <a href="/contractors">Contractors</a>
+      <a href="/analytics">Analytics <span style="font-size: 10px; background: var(--accent); padding: 2px 6px; border-radius: 10px; margin-left: 2px;">Pro</span></a>
       <a href="#pricing">Pricing</a>
       <a href="#" onclick="showAlertModal(); return false;">Get Alerts</a>
       <span id="auth-nav">
@@ -1093,6 +1095,17 @@ footer a:hover { color: white; }
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
+    <!-- Market Leaders -->
+    <div class="sidebar-card" style="border-color: var(--primary);">
+      <div class="sidebar-card-header" style="background: var(--primary); color: white; display: flex; justify-content: space-between; align-items: center;">
+        <span>Market Leaders</span>
+        <a href="/contractors" style="color: rgba(255,255,255,.8); font-size: 12px; text-decoration: none;">View All &rarr;</a>
+      </div>
+      <div class="sidebar-card-body" id="market-leaders">
+        <div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">Loading...</div>
+      </div>
+    </div>
+
     <!-- Trade Breakdown -->
     <div class="sidebar-card">
       <div class="sidebar-card-header">Leads by Trade</div>
@@ -1928,6 +1941,48 @@ function loadMoreViolations() {
   showToast('Full violations view coming soon!');
 }
 
+async function loadMarketLeaders() {
+  const container = document.getElementById('market-leaders');
+  const city = document.getElementById('filter-city').value;
+
+  try {
+    const resp = await fetch(`/api/contractors/top?city=${encodeURIComponent(city)}&limit=5`);
+    if (resp.ok) {
+      const data = await resp.json();
+      renderMarketLeaders(data.top_contractors, data.city);
+    }
+  } catch (e) {
+    console.error('Failed to load market leaders:', e);
+    container.innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">Unable to load</div>';
+  }
+}
+
+function renderMarketLeaders(contractors, cityLabel) {
+  const container = document.getElementById('market-leaders');
+
+  if (!contractors || contractors.length === 0) {
+    container.innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">No contractors found</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="font-size: 11px; color: var(--gray-400); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px;">${escapeHtml(cityLabel)}</div>
+    ${contractors.map((c, i) => `
+      <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray-100);">
+        <div style="width: 24px; height: 24px; background: ${i === 0 ? 'var(--accent)' : i === 1 ? 'var(--gray-400)' : 'var(--gray-300)'}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">${i + 1}</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(c.name)}</div>
+          <div style="font-size: 11px; color: var(--gray-500);">${c.permits} permits</div>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--green);">$${(c.value / 1000).toFixed(0)}K</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// Reload market leaders when city filter changes
+document.getElementById('filter-city')?.addEventListener('change', loadMarketLeaders);
+
 async function fetchPermitHistory(address) {
   if (permitHistoryCache[address]) {
     return permitHistoryCache[address];
@@ -2020,6 +2075,9 @@ checkCurrentUser();
 
 // Load violations for sidebar
 loadViolations();
+
+// Load market leaders for sidebar
+loadMarketLeaders();
 
 // Check for payment status in URL
 const urlParams = new URLSearchParams(window.location.search);
