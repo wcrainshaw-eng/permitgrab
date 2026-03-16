@@ -16,6 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY
+from lifecycle import get_lifecycle_label
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -444,12 +445,18 @@ def api_export():
         return "No permits match your filters", 404
 
     headers = ['address', 'city', 'state', 'zip', 'trade_category', 'estimated_cost',
-               'status', 'filing_date', 'contact_name', 'contact_phone', 'description',
+               'status', 'lifecycle_stage', 'filing_date', 'contact_name', 'contact_phone', 'description',
                'lead_score', 'lead_quality']
 
     lines = [','.join(headers)]
     for p in permits:
-        row = [str(p.get(h, '')).replace(',', ';').replace('"', "'").replace('\n', ' ')[:200] for h in headers]
+        # Build row with lifecycle stage
+        row = []
+        for h in headers:
+            if h == 'lifecycle_stage':
+                row.append(get_lifecycle_label(p))
+            else:
+                row.append(str(p.get(h, '')).replace(',', ';').replace('"', "'").replace('\n', ' ')[:200])
         lines.append(','.join(f'"{v}"' for v in row))
 
     csv_content = '\n'.join(lines)
@@ -598,7 +605,7 @@ def export_saved_leads():
         return "No saved leads to export", 404
 
     headers = ['address', 'city', 'state', 'zip', 'trade_category', 'estimated_cost',
-               'permit_status', 'filing_date', 'contact_name', 'contact_phone', 'description',
+               'permit_status', 'lifecycle_stage', 'filing_date', 'contact_name', 'contact_phone', 'description',
                'lead_score', 'lead_quality', 'crm_status', 'notes', 'date_saved']
 
     lines = [','.join(headers)]
@@ -612,6 +619,7 @@ def export_saved_leads():
             str(permit.get('trade_category', '')),
             str(permit.get('estimated_cost', '')),
             str(permit.get('status', '')),
+            get_lifecycle_label(permit),
             str(permit.get('filing_date', '')),
             str(permit.get('contact_name', '')).replace(',', ';'),
             str(permit.get('contact_phone', '')),
