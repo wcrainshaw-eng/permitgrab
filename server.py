@@ -1729,6 +1729,15 @@ def admin_page():
                 .badge-inactive { background: #fee2e2; color: #991b1b; }
                 .badge-pro { background: #dbeafe; color: #1e40af; }
                 .logout-link { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+                .form-row { display: flex; gap: 12px; align-items: flex-end; }
+                .form-group { display: flex; flex-direction: column; gap: 4px; }
+                .form-group label { font-size: 13px; font-weight: 500; color: #374151; }
+                .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+                .btn-upgrade { background: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 500; cursor: pointer; }
+                .btn-upgrade:hover { background: #1d4ed8; }
+                .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+                .alert-success { background: #dcfce7; color: #166534; }
+                .alert-error { background: #fee2e2; color: #991b1b; }
             </style>
         </head>
         <body>
@@ -1755,6 +1764,34 @@ def admin_page():
                     <div class="stat-card">
                         <div class="value">{{ paid_subscribers }}</div>
                         <div class="label">Paid Subscribers</div>
+                    </div>
+                </div>
+
+                {% if success_msg %}
+                <div class="alert alert-success">{{ success_msg }}</div>
+                {% endif %}
+                {% if error_msg %}
+                <div class="alert alert-error">{{ error_msg }}</div>
+                {% endif %}
+
+                <div class="section">
+                    <div class="section-header">Upgrade User</div>
+                    <div class="section-body">
+                        <form method="POST" action="/admin/upgrade-user" class="form-row">
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email" placeholder="user@example.com" required style="width: 280px;">
+                            </div>
+                            <div class="form-group">
+                                <label for="plan">Plan</label>
+                                <select id="plan" name="plan" required>
+                                    <option value="free">Free</option>
+                                    <option value="pro">Pro</option>
+                                    <option value="enterprise">Enterprise</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn-upgrade">Upgrade</button>
+                        </form>
                     </div>
                 </div>
 
@@ -1820,6 +1857,8 @@ def admin_page():
         total_users=len(users),
         last_updated=stats.get('collected_at', ''),
         subscribers=subscribers,
+        success_msg=request.args.get('success', ''),
+        error_msg=request.args.get('error', ''),
     )
 
 
@@ -1828,6 +1867,56 @@ def admin_page():
 def check_admin_logout():
     if request.path == '/admin' and request.args.get('logout'):
         session.pop('admin_authenticated', None)
+
+
+@app.route('/admin/upgrade-user', methods=['POST'])
+def admin_upgrade_user():
+    """POST /admin/upgrade-user - Upgrade a user's subscription plan."""
+    # Check admin authentication
+    if not session.get('admin_authenticated'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    email = request.form.get('email', '').strip().lower()
+    plan = request.form.get('plan', 'free').strip().lower()
+
+    if not email:
+        return redirect('/admin?error=Email+is+required')
+
+    if plan not in ('free', 'pro', 'enterprise'):
+        return redirect('/admin?error=Invalid+plan')
+
+    # Update user
+    users = load_users()
+    user_found = False
+    for user in users:
+        if user.get('email', '').lower() == email:
+            user['plan'] = plan
+            user['upgraded_at'] = datetime.now().isoformat()
+            user['upgraded_by'] = 'admin'
+            user_found = True
+            break
+
+    if user_found:
+        save_users(users)
+
+    # Also update subscriber if exists
+    subs = load_subscribers()
+    sub_found = False
+    for sub in subs:
+        if sub.get('email', '').lower() == email:
+            sub['plan'] = plan
+            sub['upgraded_at'] = datetime.now().isoformat()
+            sub['upgraded_by'] = 'admin'
+            sub_found = True
+            break
+
+    if sub_found:
+        save_subscribers(subs)
+
+    if user_found or sub_found:
+        return redirect(f'/admin?success=Upgraded+{email}+to+{plan}')
+    else:
+        return redirect(f'/admin?error=User+{email}+not+found')
 
 
 # ===========================
