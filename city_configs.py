@@ -1372,6 +1372,35 @@ CITY_REGISTRY = {
     },
 
     # =========================================================================
+    # ADDITIONAL VERIFIED WORKING CITIES
+    # =========================================================================
+
+    "roseville": {
+        "name": "Roseville",
+        "state": "CA",
+        "slug": "roseville",
+        "platform": "socrata",
+        "endpoint": "https://data.roseville.ca.us/resource/buxi-gsvq.json",
+        "dataset_id": "buxi-gsvq",
+        "description": "Building Permits Issued",
+        "field_map": {
+            "permit_number": "record_number",
+            "permit_type": "record_type",
+            "work_type": "record_group",
+            "address": "",
+            "zip": "",
+            "filing_date": "issued_date",
+            "status": "",
+            "estimated_cost": "job_value",
+            "description": "record_type",
+        },
+        "date_field": "issued_date",
+        "limit": 2000,
+        "active": False,
+        "notes": "No address data in dataset - not useful for leads",
+    },
+
+    # =========================================================================
     # INACTIVE / PENDING CITIES
     # =========================================================================
 
