@@ -1,10 +1,12 @@
 """
 PermitGrab - Configuration
-Free municipal data sources using Socrata SODA API
+Free municipal data sources using Socrata SODA API and ArcGIS REST API
 """
 
-# Socrata SODA API endpoints (all FREE, no API key required)
-# Rate limit: 1000 requests/hour without app token
+# Municipal API endpoints (all FREE, no API key required)
+# Socrata: Rate limit 1000 requests/hour without app token
+# ArcGIS: Generally no rate limit for public services
+# Set api_type="arcgis" for ArcGIS FeatureServer endpoints (default is "socrata")
 CITY_SOURCES = {
     "new_york": {
         "name": "New York City",
@@ -185,6 +187,51 @@ CITY_SOURCES = {
             "description": "description",
         },
         "date_field": "issueddate",
+        "limit": 2000,
+    },
+    # =========================================================================
+    # ArcGIS REST API Sources (api_type="arcgis")
+    # =========================================================================
+    "atlanta": {
+        "name": "Atlanta",
+        "state": "GA",
+        "api_type": "arcgis",
+        "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/Building_Permit_latest/FeatureServer/0/query",
+        "description": "Building Permits (2019-Present)",
+        "field_map": {
+            "permit_number": "RecordID",
+            "permit_type": "TypeCombo",
+            "work_type": "Subtype",
+            "address": "Address",
+            "zip": "",
+            "filing_date": "Opend",
+            "status": "Status_1",
+            "estimated_cost": "JobValue",
+            "description": "Name",
+        },
+        "date_field": "Opend",
+        "limit": 2000,
+    },
+    "nashville": {
+        "name": "Nashville",
+        "state": "TN",
+        "api_type": "arcgis",
+        "date_format": "none",  # Fetch all, filter in Python (ArcGIS date query syntax issues)
+        "endpoint": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Building_Permit_Applications_Feature_Layer_view/FeatureServer/0/query",
+        "description": "Building Permit Applications",
+        "field_map": {
+            "permit_number": "Permit__",
+            "permit_type": "Permit_Type_Description",
+            "work_type": "Permit_Subtype_Description",
+            "address": "Address",
+            "zip": "ZIP",
+            "contact_name": "Contact",
+            "filing_date": "Date_Entered",
+            "status": "",
+            "estimated_cost": "Const_Cost",
+            "description": "Purpose",
+        },
+        "date_field": "Date_Entered",
         "limit": 2000,
     },
 }

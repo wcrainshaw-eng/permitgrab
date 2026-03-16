@@ -1,6 +1,6 @@
 """
 PermitGrab - Data Collector
-Pulls real permit data from free municipal Socrata/SODA APIs
+Pulls real permit data from free municipal APIs (Socrata/SODA and ArcGIS REST)
 """
 
 import requests
@@ -14,13 +14,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
-def fetch_permits(city_key, days_back=30):
-    """Fetch recent permits from a city's Socrata API."""
-    source = CITY_SOURCES.get(city_key)
-    if not source:
-        print(f"  [SKIP] Unknown city: {city_key}")
-        return []
-
+def fetch_permits_socrata(source, days_back):
+    """Fetch permits from a Socrata SODA API."""
     endpoint = source["endpoint"]
     date_field = source["date_field"]
     limit = source.get("limit", 500)
@@ -34,12 +29,74 @@ def fetch_permits(city_key, days_back=30):
         "$where": f"{date_field} > '{since_date}'",
     }
 
+    resp = requests.get(endpoint, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_permits_arcgis(source, days_back):
+    """Fetch permits from an ArcGIS REST API FeatureServer."""
+    endpoint = source["endpoint"]
+    date_field = source["date_field"]
+    limit = source.get("limit", 500)
+    date_format = source.get("date_format", "date")  # "date", "epoch", or "none"
+
+    # Calculate date filter
+    since_dt = datetime.now() - timedelta(days=days_back)
+
+    if date_format == "epoch":
+        # Some ArcGIS services store dates as Unix epoch milliseconds
+        # Use TIMESTAMP syntax which works better with epoch fields
+        since_epoch = int(since_dt.timestamp() * 1000)
+        where_clause = f"{date_field} >= TIMESTAMP '{since_dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+    elif date_format == "none":
+        # Skip date filtering, just get most recent by order
+        where_clause = "1=1"
+    else:
+        # Standard ArcGIS DATE format
+        since_date = since_dt.strftime("%Y-%m-%d")
+        where_clause = f"{date_field} >= DATE '{since_date}'"
+
+    # ArcGIS query parameters
+    params = {
+        "where": where_clause,
+        "outFields": "*",
+        "resultRecordCount": limit,
+        "orderByFields": f"{date_field} DESC",
+        "f": "json",
+    }
+
+    resp = requests.get(endpoint, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # ArcGIS returns features in a nested structure
+    if "features" in data:
+        results = [f["attributes"] for f in data["features"]]
+        # If using "none" date_format, filter in Python
+        if date_format == "none" and date_field and results:
+            since_epoch = int(since_dt.timestamp() * 1000)
+            results = [r for r in results if r.get(date_field, 0) and r[date_field] >= since_epoch]
+        return results
+    return []
+
+
+def fetch_permits(city_key, days_back=30):
+    """Fetch recent permits from a city's API (Socrata or ArcGIS)."""
+    source = CITY_SOURCES.get(city_key)
+    if not source:
+        print(f"  [SKIP] Unknown city: {city_key}")
+        return []
+
+    api_type = source.get("api_type", "socrata")
     print(f"  Fetching {source['name']} permits (last {days_back} days)...")
 
     try:
-        resp = requests.get(endpoint, params=params, timeout=30)
-        resp.raise_for_status()
-        raw = resp.json()
+        if api_type == "arcgis":
+            raw = fetch_permits_arcgis(source, days_back)
+        else:
+            raw = fetch_permits_socrata(source, days_back)
+
         print(f"  ✓ Got {len(raw)} raw permits from {source['name']}")
         return raw
     except requests.exceptions.HTTPError as e:
@@ -95,12 +152,20 @@ def normalize_permit(raw_record, city_key):
     date_str = get_field("filing_date")
     parsed_date = ""
     if date_str:
-        for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+        # Check if it's an epoch timestamp (milliseconds)
+        if date_str.isdigit() and len(date_str) >= 10:
             try:
-                parsed_date = datetime.strptime(date_str[:26], fmt).strftime("%Y-%m-%d")
-                break
-            except ValueError:
-                continue
+                epoch_ms = int(date_str)
+                parsed_date = datetime.fromtimestamp(epoch_ms / 1000).strftime("%Y-%m-%d")
+            except (ValueError, OSError):
+                pass
+        if not parsed_date:
+            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+                try:
+                    parsed_date = datetime.strptime(date_str[:26], fmt).strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    continue
         if not parsed_date:
             parsed_date = date_str[:10]
 
