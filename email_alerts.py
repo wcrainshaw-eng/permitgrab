@@ -63,10 +63,21 @@ def get_matching_permits(subscriber, days_back=1):
 
         matches.append(p)
 
-    # Sort by value (highest first)
-    matches.sort(key=lambda x: x.get('estimated_cost', 0), reverse=True)
+    # Deduplicate by permit number (same permit can appear multiple times in data)
+    seen = set()
+    unique_matches = []
+    for p in matches:
+        permit_num = p.get('permit_number', '')
+        if permit_num and permit_num not in seen:
+            seen.add(permit_num)
+            unique_matches.append(p)
+        elif not permit_num:
+            unique_matches.append(p)  # Keep permits without numbers
 
-    return matches
+    # Sort by value (highest first)
+    unique_matches.sort(key=lambda x: x.get('estimated_cost', 0), reverse=True)
+
+    return unique_matches
 
 
 def build_email_html(subscriber, permits):
@@ -118,7 +129,7 @@ def build_email_html(subscriber, permits):
 
         <!-- Header -->
         <div style="background:linear-gradient(135deg,#111827,#1e3a5f);padding:24px 32px;text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:white;">Permit<span style="color:#f97316;">Flow</span></div>
+          <div style="font-size:22px;font-weight:700;color:white;">Permit<span style="color:#f97316;">Grab</span></div>
           <div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:4px;">Your Daily Permit Digest</div>
         </div>
 

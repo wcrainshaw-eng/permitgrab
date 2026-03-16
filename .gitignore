@@ -8,6 +8,8 @@ venv/
 
 # Environment
 .env
+SENDGRID_API_KEY.txt
+TWILIO_RECOVERY_CODE.txt
 
 # Node
 node_modules/
