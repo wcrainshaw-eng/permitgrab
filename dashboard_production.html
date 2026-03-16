@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PermitGrab — Construction Permit Leads for Contractors</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #dbeafe;
+  --accent: #f97316;
+  --accent-dark: #ea580c;
+  --green: #16a34a;
+  --green-light: #dcfce7;
+  --red: #dc2626;
+  --red-light: #fef2f2;
+  --yellow: #eab308;
+  --yellow-light: #fefce8;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.5;
+}
+
+/* HEADER / HERO */
+.hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+  color: white;
+  padding: 0;
+}
+
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 32px;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.logo span { color: var(--accent); }
+
+.hero-nav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.hero-nav a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+
+.hero-nav a:hover { color: white; }
+
+.btn-cta {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .2s;
+}
+
+.btn-cta:hover { background: var(--accent-dark); }
+
+.hero-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 32px 48px;
+  text-align: center;
+}
+
+.hero-content h1 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 16px;
+  line-height: 1.15;
+}
+
+.hero-content h1 span { color: var(--accent); }
+
+.hero-content p {
+  font-size: 18px;
+  color: rgba(255,255,255,.7);
+  max-width: 680px;
+  margin: 0 auto 32px;
+}
+
+/* STATS BAR */
+.stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  padding: 24px 32px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: rgba(255,255,255,.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+/* FILTERS */
+.filters-section {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+
+.filters-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 32px;
+}
+
+.filters-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--gray-500);
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  color: var(--gray-800);
+  min-width: 160px;
+  outline: none;
+  transition: border-color .2s;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+
+.filter-group input[type="text"] {
+  min-width: 220px;
+}
+
+.results-count {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--gray-500);
+  align-self: flex-end;
+  padding-bottom: 8px;
+}
+
+.results-count strong {
+  color: var(--gray-800);
+  font-weight: 700;
+}
+
+/* MAIN CONTENT */
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+}
+
+/* PERMIT CARDS */
+.permits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.permit-card {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  padding: 20px 24px;
+  transition: box-shadow .2s, border-color .2s;
+  cursor: pointer;
+  position: relative;
+}
+
+.permit-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.permit-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.permit-trade {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trade-roofing { background: #fef3c7; color: #92400e; }
+.trade-hvac { background: #dbeafe; color: #1e40af; }
+.trade-electrical { background: #fce7f3; color: #9d174d; }
+.trade-plumbing { background: #d1fae5; color: #065f46; }
+.trade-general { background: #e0e7ff; color: #3730a3; }
+.trade-demolition { background: #fee2e2; color: #991b1b; }
+.trade-interior { background: #faf5ff; color: #6b21a8; }
+.trade-windows { background: #ecfdf5; color: #047857; }
+.trade-structural { background: #f1f5f9; color: #334155; }
+.trade-landscape { background: #f0fdf4; color: #166534; }
+.trade-other { background: var(--gray-100); color: var(--gray-600); }
+
+.permit-value {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.value-high { color: var(--red); }
+.value-medium { color: var(--accent); }
+.value-low { color: var(--gray-500); }
+
+.permit-address {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.permit-city-state {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 8px;
+}
+
+.permit-description {
+  font-size: 14px;
+  color: var(--gray-600);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.permit-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.permit-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.permit-meta-item svg {
+  width: 14px;
+  height: 14px;
+  opacity: .5;
+}
+
+.permit-contact {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-100);
+}
+
+.contact-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  border: 1px solid var(--gray-300);
+  background: white;
+  color: var(--gray-700);
+  text-decoration: none;
+}
+
+.contact-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.contact-btn.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.contact-btn.primary:hover {
+  background: var(--primary-dark);
+}
+
+/* BLURRED OVERLAY FOR FREE TIER */
+.permit-card.locked .permit-contact,
+.permit-card.locked .permit-meta-item.contact-info {
+  filter: blur(5px);
+  user-select: none;
+  pointer-events: none;
+}
+
+.lock-overlay {
+  display: none;
+  position: absolute;
+  bottom: 12px;
+  left: 24px;
+  right: 24px;
+  background: linear-gradient(0deg, white 60%, transparent);
+  padding: 24px 0 4px;
+  text-align: center;
+}
+
+.permit-card.locked .lock-overlay {
+  display: block;
+}
+
+.lock-overlay a {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lock-overlay a:hover { text-decoration: underline; }
+
+/* SIDEBAR */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sidebar-card {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+
+.sidebar-card-header {
+  padding: 16px 20px;
+  font-weight: 700;
+  font-size: 15px;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.sidebar-card-body {
+  padding: 16px 20px;
+}
+
+/* TRADE BREAKDOWN */
+.trade-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.trade-bar-label {
+  font-size: 13px;
+  color: var(--gray-600);
+  min-width: 130px;
+}
+
+.trade-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--gray-100);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.trade-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .6s ease;
+}
+
+.trade-bar-count {
+  font-size: 12px;
+  color: var(--gray-400);
+  min-width: 30px;
+  text-align: right;
+}
+
+/* ALERT SIGNUP */
+.alert-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alert-form input,
+.alert-form select {
+  padding: 10px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+}
+
+.alert-form input:focus,
+.alert-form select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+
+.alert-form button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.alert-form button:hover { background: var(--accent-dark); }
+
+.alert-note {
+  font-size: 12px;
+  color: var(--gray-400);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* PRICING CARDS */
+.pricing-section {
+  background: white;
+  padding: 80px 32px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.pricing-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.pricing-inner h2 {
+  font-size: 36px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.pricing-inner .subtitle {
+  font-size: 18px;
+  color: var(--gray-500);
+  margin-bottom: 48px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.pricing-card {
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  text-align: left;
+  position: relative;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.pricing-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.pricing-card.featured {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.pricing-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: white;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.pricing-name {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pricing-price {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.pricing-price span { font-size: 16px; color: var(--gray-500); font-weight: 400; }
+
+.pricing-desc {
+  font-size: 14px;
+  color: var(--gray-500);
+  margin-bottom: 24px;
+  min-height: 40px;
+}
+
+.pricing-features {
+  list-style: none;
+  margin-bottom: 32px;
+}
+
+.pricing-features li {
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--gray-600);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pricing-features li::before {
+  content: "✓";
+  color: var(--green);
+  font-weight: 700;
+}
+
+.pricing-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all .2s;
+  text-decoration: none;
+  border: 2px solid var(--gray-300);
+  background: white;
+  color: var(--gray-800);
+}
+
+.pricing-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pricing-btn.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.pricing-btn.primary:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+/* PAGINATION */
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 0;
+}
+
+.page-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-700);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.page-btn:hover, .page-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.page-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+/* FOOTER */
+footer {
+  background: var(--gray-900);
+  color: rgba(255,255,255,.5);
+  padding: 40px 32px;
+  text-align: center;
+  font-size: 14px;
+}
+
+footer a { color: rgba(255,255,255,.7); text-decoration: none; }
+footer a:hover { color: white; }
+
+/* LOADING */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--gray-400);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .main-content { grid-template-columns: 1fr; }
+  .sidebar { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pricing-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+}
+
+@media (max-width: 768px) {
+  .hero-content h1 { font-size: 28px; }
+  .stats-bar { flex-wrap: wrap; gap: 24px; }
+  .filters-row { flex-direction: column; }
+  .filter-group select, .filter-group input { min-width: auto; width: 100%; }
+  .results-count { margin-left: 0; }
+  .sidebar { grid-template-columns: 1fr; }
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--gray-900);
+  color: white;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all .3s ease;
+  z-index: 1000;
+}
+
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Modal */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.show { display: flex; }
+
+.modal {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal h3 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.modal p {
+  color: var(--gray-500);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--gray-400);
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-top">
+    <div class="logo">Permit<span>Flow</span></div>
+    <nav class="hero-nav">
+      <a href="#dashboard">Dashboard</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#" onclick="showAlertModal(); return false;">Get Alerts</a>
+      <a href="#pricing" class="btn-cta">Start Free Trial</a>
+    </nav>
+  </div>
+  <div class="hero-content">
+    <h1>Turn Building Permits Into <span>Your Next Job</span></h1>
+    <p>Real-time construction permit leads delivered to your inbox. Know who's building, what they're building, and how to reach them — before your competition.</p>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-label">Active Permits</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-cities">8</div>
+      <div class="stat-label">Metro Areas</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-value">—</div>
+      <div class="stat-label">Total Project Value</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-high">—</div>
+      <div class="stat-label">High-Value Leads</div>
+    </div>
+  </div>
+</section>
+
+<!-- FILTERS -->
+<section class="filters-section" id="dashboard">
+  <div class="filters-inner">
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>City</label>
+        <select id="filter-city">
+          <option value="">All Cities</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Trade</label>
+        <select id="filter-trade">
+          <option value="">All Trades</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Value Tier</label>
+        <select id="filter-value">
+          <option value="">All Values</option>
+          <option value="high">High ($50K+)</option>
+          <option value="medium">Medium ($10K-$50K)</option>
+          <option value="low">Standard (&lt;$10K)</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Status</label>
+        <select id="filter-status">
+          <option value="">All Statuses</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Search</label>
+        <input type="text" id="filter-search" placeholder="Address, description, owner...">
+      </div>
+      <div class="results-count">
+        <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN -->
+<div class="main-content">
+  <div>
+    <div class="permits-list" id="permits-list">
+      <div class="loading">
+        <div class="spinner"></div>
+        Loading permits...
+      </div>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <!-- Trade Breakdown -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">Leads by Trade</div>
+      <div class="sidebar-card-body" id="trade-breakdown"></div>
+    </div>
+
+    <!-- City Breakdown -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">Leads by City</div>
+      <div class="sidebar-card-body" id="city-breakdown"></div>
+    </div>
+
+    <!-- Alert Signup -->
+    <div class="sidebar-card" style="border-color: var(--accent);">
+      <div class="sidebar-card-header" style="background: var(--accent); color: white;">
+        Get Permit Alerts
+      </div>
+      <div class="sidebar-card-body">
+        <p style="font-size: 14px; color: var(--gray-500); margin-bottom: 12px;">
+          Get matching permits emailed to you daily. Free for your first metro area.
+        </p>
+        <form class="alert-form" onsubmit="handleAlertSignup(event)">
+          <input type="email" placeholder="Your email" required id="alert-email">
+          <select id="alert-city">
+            <option value="">Select your city...</option>
+          </select>
+          <select id="alert-trade">
+            <option value="">Select your trade...</option>
+          </select>
+          <button type="submit">Start Free Alerts</button>
+          <div class="alert-note">Free 14-day trial, no credit card required</div>
+        </form>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- PRICING -->
+<section class="pricing-section" id="pricing">
+  <div class="pricing-inner">
+    <h2>Simple Pricing, Real Leads</h2>
+    <p class="subtitle">Start free. Upgrade when you're closing deals.</p>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-name">Starter</div>
+        <div class="pricing-price">$0<span>/mo</span></div>
+        <div class="pricing-desc">Perfect for testing the waters</div>
+        <ul class="pricing-features">
+          <li>1 metro area</li>
+          <li>1 trade category</li>
+          <li>Weekly email digest</li>
+          <li>Last 7 days of permits</li>
+          <li>Basic search & filters</li>
+        </ul>
+        <a href="#" class="pricing-btn" onclick="showAlertModal(); return false;">Get Started Free</a>
+      </div>
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most Popular</div>
+        <div class="pricing-name">Professional</div>
+        <div class="pricing-price">$149<span>/mo</span></div>
+        <div class="pricing-desc">For contractors ready to grow</div>
+        <ul class="pricing-features">
+          <li>3 metro areas</li>
+          <li>All trade categories</li>
+          <li>Daily email alerts</li>
+          <li>Full 60-day history</li>
+          <li>Contact info & phone numbers</li>
+          <li>Export to CSV</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="#" class="pricing-btn primary" onclick="showAlertModal(); return false;">Start 14-Day Trial</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-name">Enterprise</div>
+        <div class="pricing-price">$499<span>/mo</span></div>
+        <div class="pricing-desc">For teams & multi-location ops</div>
+        <ul class="pricing-features">
+          <li>All 8+ metro areas</li>
+          <li>All trades + custom filters</li>
+          <li>Real-time SMS + email alerts</li>
+          <li>Full historical data</li>
+          <li>API access</li>
+          <li>CRM integrations</li>
+          <li>Dedicated account manager</li>
+        </ul>
+        <a href="#" class="pricing-btn" onclick="showAlertModal(); return false;">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>PermitGrab — Construction permit leads that help contractors find their next job.</p>
+  <p style="margin-top: 8px;">
+    <a href="#">About</a> · <a href="#">Blog</a> · <a href="#">API Docs</a> · <a href="#">Contact</a> · <a href="#">Privacy</a> · <a href="#">Terms</a>
+  </p>
+  <p style="margin-top: 16px; font-size: 12px;">Data sourced from public municipal records. Updated daily.</p>
+</footer>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h3>Get Free Permit Alerts</h3>
+    <p>Enter your details and we'll send matching permits to your inbox — starting today.</p>
+    <form class="alert-form" onsubmit="handleModalSignup(event)">
+      <input type="text" placeholder="Your name" required>
+      <input type="email" placeholder="Your email" required>
+      <input type="text" placeholder="Your company (optional)">
+      <select>
+        <option value="">Select your city...</option>
+        <option>New York City</option>
+        <option>Chicago</option>
+        <option>Los Angeles</option>
+        <option>Austin</option>
+        <option>Denver</option>
+        <option>San Francisco</option>
+        <option>Seattle</option>
+        <option>Portland</option>
+      </select>
+      <select>
+        <option value="">Select your trade...</option>
+        <option>Roofing</option>
+        <option>HVAC</option>
+        <option>Electrical</option>
+        <option>Plumbing</option>
+        <option>General Construction</option>
+        <option>Interior Renovation</option>
+        <option>Windows & Doors</option>
+        <option>Structural</option>
+        <option>Landscaping & Exterior</option>
+      </select>
+      <button type="submit">Start My Free Trial</button>
+      <div class="alert-note">14-day free trial · No credit card required · Cancel anytime</div>
+    </form>
+    <div style="text-align: center; margin-top: 12px;">
+      <a href="#" onclick="closeModal(); return false;" style="font-size: 13px; color: var(--gray-400);">Maybe later</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===========================
+// DATA & STATE
+// ===========================
+let allPermits = [];
+let filteredPermits = [];
+let currentPage = 1;
+const perPage = 20;
+const freePreviewLimit = 5; // Show contact info for first 5
+
+// ===========================
+// LOAD DATA
+// ===========================
+async function loadData() {
+  try {
+    const resp = await fetch('/api/permits?per_page=2000');
+    const data = await resp.json();
+    allPermits = data.permits;
+  } catch (e) {
+    console.error('Failed to load permits:', e);
+    document.getElementById('permits-list').innerHTML = '<div class="loading">Unable to connect to API. Please refresh.</div>';
+    return;
+  }
+
+  // Populate filters
+  populateFilters();
+  // Update stats
+  updateStats();
+  // Initial render
+  applyFilters();
+}
+
+function populateFilters() {
+  const cities = [...new Set(allPermits.map(p => p.city))].sort();
+  const trades = [...new Set(allPermits.map(p => p.trade_category))].sort();
+  const statuses = [...new Set(allPermits.map(p => p.status))].sort();
+
+  const citySelect = document.getElementById('filter-city');
+  const alertCity = document.getElementById('alert-city');
+  cities.forEach(c => {
+    citySelect.add(new Option(c, c));
+    alertCity.add(new Option(c, c));
+  });
+
+  const tradeSelect = document.getElementById('filter-trade');
+  const alertTrade = document.getElementById('alert-trade');
+  trades.forEach(t => {
+    tradeSelect.add(new Option(t, t));
+    alertTrade.add(new Option(t, t));
+  });
+
+  const statusSelect = document.getElementById('filter-status');
+  statuses.forEach(s => {
+    statusSelect.add(new Option(s, s));
+  });
+}
+
+function updateStats() {
+  const total = allPermits.length;
+  const totalValue = allPermits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
+  const highValue = allPermits.filter(p => p.value_tier === 'high').length;
+
+  document.getElementById('stat-total').textContent = total.toLocaleString();
+  document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
+  document.getElementById('stat-high').textContent = highValue.toLocaleString();
+}
+
+// ===========================
+// FILTERS
+// ===========================
+function applyFilters() {
+  const city = document.getElementById('filter-city').value;
+  const trade = document.getElementById('filter-trade').value;
+  const value = document.getElementById('filter-value').value;
+  const status = document.getElementById('filter-status').value;
+  const search = document.getElementById('filter-search').value.toLowerCase();
+
+  filteredPermits = allPermits.filter(p => {
+    if (city && p.city !== city) return false;
+    if (trade && p.trade_category !== trade) return false;
+    if (value && p.value_tier !== value) return false;
+    if (status && p.status !== status) return false;
+    if (search) {
+      const haystack = `${p.address} ${p.description} ${p.contact_name} ${p.permit_number} ${p.zip}`.toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  currentPage = 1;
+  renderPermits();
+  renderSidebar();
+  updateResultsCount();
+}
+
+// Attach filter listeners
+['filter-city', 'filter-trade', 'filter-value', 'filter-status'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', applyFilters);
+});
+document.getElementById('filter-search')?.addEventListener('input', debounce(applyFilters, 300));
+
+function debounce(fn, ms) {
+  let t;
+  return function(...args) { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function updateResultsCount() {
+  document.getElementById('showing-count').textContent = filteredPermits.length.toLocaleString();
+  document.getElementById('total-count').textContent = allPermits.length.toLocaleString();
+}
+
+// ===========================
+// RENDER PERMITS
+// ===========================
+function renderPermits() {
+  const list = document.getElementById('permits-list');
+  const start = (currentPage - 1) * perPage;
+  const pagePermits = filteredPermits.slice(start, start + perPage);
+
+  if (pagePermits.length === 0) {
+    list.innerHTML = '<div class="loading" style="color: var(--gray-400);">No permits match your filters. Try adjusting your criteria.</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = pagePermits.map((p, i) => {
+    const globalIdx = start + i;
+    const isLocked = globalIdx >= freePreviewLimit;
+    const tradeClass = getTradeClass(p.trade_category);
+    const valueClass = p.value_tier === 'high' ? 'value-high' : p.value_tier === 'medium' ? 'value-medium' : 'value-low';
+    const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A';
+
+    return `
+      <div class="permit-card ${isLocked ? 'locked' : ''}">
+        <div class="permit-card-header">
+          <span class="permit-trade ${tradeClass}">${getTradeIcon(p.trade_category)} ${p.trade_category}</span>
+          <span class="permit-value ${valueClass}">${cost}</span>
+        </div>
+        <div class="permit-address">${escapeHtml(p.address)}</div>
+        <div class="permit-city-state">${escapeHtml(p.city)}, ${p.state} ${p.zip || ''}</div>
+        <div class="permit-description">${escapeHtml(p.description)}</div>
+        <div class="permit-meta">
+          <div class="permit-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            ${p.filing_date}
+          </div>
+          <div class="permit-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            ${escapeHtml(p.permit_type || 'N/A')}
+          </div>
+          <div class="permit-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            ${escapeHtml(p.status)}
+          </div>
+          ${!isLocked && p.contact_name ? `
+          <div class="permit-meta-item contact-info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            ${escapeHtml(p.contact_name)}
+          </div>` : ''}
+        </div>
+        ${!isLocked ? `
+        <div class="permit-contact">
+          ${p.contact_phone ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : ''}
+          <button class="contact-btn" onclick="savePermit('${p.id}')">Save Lead</button>
+          <button class="contact-btn" onclick="exportPermit('${p.id}')">Export</button>
+        </div>` : `
+        <div class="permit-contact" style="filter: blur(5px);">
+          <a class="contact-btn primary" href="#">(555) 123-4567</a>
+          <button class="contact-btn">Save Lead</button>
+          <button class="contact-btn">Export</button>
+        </div>
+        <div class="lock-overlay">
+          <a href="#pricing">Upgrade to see contact info for all leads →</a>
+        </div>`}
+      </div>
+    `;
+  }).join('');
+
+  renderPagination();
+}
+
+function getTradeClass(trade) {
+  const map = {
+    'Roofing': 'trade-roofing',
+    'HVAC': 'trade-hvac',
+    'Electrical': 'trade-electrical',
+    'Plumbing': 'trade-plumbing',
+    'General Construction': 'trade-general',
+    'Demolition': 'trade-demolition',
+    'Interior Renovation': 'trade-interior',
+    'Windows & Doors': 'trade-windows',
+    'Structural': 'trade-structural',
+    'Landscaping & Exterior': 'trade-landscape',
+  };
+  return map[trade] || 'trade-other';
+}
+
+function getTradeIcon(trade) {
+  const icons = {
+    'Roofing': '🏠',
+    'HVAC': '❄️',
+    'Electrical': '⚡',
+    'Plumbing': '🔧',
+    'General Construction': '🏗️',
+    'Demolition': '💥',
+    'Interior Renovation': '🎨',
+    'Windows & Doors': '🪟',
+    'Structural': '🏛️',
+    'Landscaping & Exterior': '🌿',
+  };
+  return icons[trade] || '📋';
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ===========================
+// SIDEBAR
+// ===========================
+function renderSidebar() {
+  // Trade breakdown
+  const tradeCounts = {};
+  filteredPermits.forEach(p => {
+    tradeCounts[p.trade_category] = (tradeCounts[p.trade_category] || 0) + 1;
+  });
+  const tradeEntries = Object.entries(tradeCounts).sort((a, b) => b[1] - a[1]);
+  const maxTrade = tradeEntries.length > 0 ? tradeEntries[0][1] : 1;
+
+  const colors = ['#2563eb', '#f97316', '#16a34a', '#dc2626', '#8b5cf6', '#06b6d4', '#ec4899', '#eab308', '#64748b', '#14b8a6'];
+
+  document.getElementById('trade-breakdown').innerHTML = tradeEntries.map(([ trade, count ], i) => `
+    <div class="trade-bar">
+      <div class="trade-bar-label">${trade}</div>
+      <div class="trade-bar-track">
+        <div class="trade-bar-fill" style="width: ${(count / maxTrade * 100).toFixed(1)}%; background: ${colors[i % colors.length]};"></div>
+      </div>
+      <div class="trade-bar-count">${count}</div>
+    </div>
+  `).join('');
+
+  // City breakdown
+  const cityCounts = {};
+  filteredPermits.forEach(p => {
+    cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
+  });
+  const cityEntries = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
+  const maxCity = cityEntries.length > 0 ? cityEntries[0][1] : 1;
+
+  document.getElementById('city-breakdown').innerHTML = cityEntries.map(([ city, count ], i) => `
+    <div class="trade-bar">
+      <div class="trade-bar-label">${city}</div>
+      <div class="trade-bar-track">
+        <div class="trade-bar-fill" style="width: ${(count / maxCity * 100).toFixed(1)}%; background: ${colors[i % colors.length]};"></div>
+      </div>
+      <div class="trade-bar-count">${count}</div>
+    </div>
+  `).join('');
+}
+
+// ===========================
+// PAGINATION
+// ===========================
+function renderPagination() {
+  const totalPages = Math.ceil(filteredPermits.length / perPage);
+  const pag = document.getElementById('pagination');
+
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>`;
+
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, currentPage + 2);
+
+  if (startPage > 1) {
+    html += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
+    if (startPage > 2) html += `<span style="padding: 8px; color: var(--gray-400);">...</span>`;
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  }
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) html += `<span style="padding: 8px; color: var(--gray-400);">...</span>`;
+    html += `<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+  }
+
+  html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>`;
+
+  pag.innerHTML = html;
+}
+
+function goToPage(page) {
+  const totalPages = Math.ceil(filteredPermits.length / perPage);
+  if (page < 1 || page > totalPages) return;
+  currentPage = page;
+  renderPermits();
+  document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===========================
+// ACTIONS
+// ===========================
+function savePermit(id) {
+  showToast('Lead saved! Check your saved leads dashboard.');
+}
+
+function exportPermit(id) {
+  const permit = allPermits.find(p => p.id === id);
+  if (!permit) return;
+
+  const csv = Object.keys(permit).join(',') + '\n' + Object.values(permit).map(v => `"${v}"`).join(',');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `permit_${permit.permit_number}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Lead exported to CSV!');
+}
+
+function handleAlertSignup(e) {
+  e.preventDefault();
+  const email = document.getElementById('alert-email').value;
+  showToast(`Alert created! We'll send matching permits to ${email}`);
+}
+
+function handleModalSignup(e) {
+  e.preventDefault();
+  closeModal();
+  showToast('You\'re signed up! Check your email for your first permit digest.');
+}
+
+function showAlertModal() {
+  document.getElementById('modal-backdrop').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('show');
+}
+
+document.getElementById('modal-backdrop')?.addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ===========================
+// INIT
+// ===========================
+loadData();
+</script>
+</body>
+</html>

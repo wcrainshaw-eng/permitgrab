@@ -1,0 +1,15 @@
+# Data files
+data/*.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store

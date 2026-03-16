@@ -1,0 +1,396 @@
+================================================================================
+PERMITGRAB — COMPLETE TECHNICAL REFERENCE FOR CLAUDE CODE
+================================================================================
+Last updated: March 15, 2026
+Owner: Wes Crainshaw (wcrainshaw@gmail.com)
+
+This file contains EVERYTHING Claude Code needs to know about the PermitGrab
+project to deploy it, fix it, extend it, and maintain it. Read this entire
+file before doing anything.
+
+================================================================================
+SECTION 1: WHAT IS PERMITGRAB?
+================================================================================
+
+PermitGrab is a B2B SaaS platform that:
+1. Pulls public building permit data from 8 US city government APIs (free)
+2. Classifies each permit by trade (roofing, HVAC, electrical, plumbing, etc.)
+3. Scores each permit by project value (high/medium/low)
+4. Displays them in a searchable web dashboard with contact info
+5. Sends daily email alerts to subscribers with matching permits
+6. Monetizes through a freemium model ($0 / $149/mo / $499/mo)
+
+The target customer is contractors and home service companies who want leads
+on people who are building, renovating, or remodeling.
+
+================================================================================
+SECTION 2: WHERE ARE ALL THE FILES?
+================================================================================
+
+All project files are in the user's Documents/PermitGrab/ folder.
+
+Here is every file and what it does:
+
+BACKEND (Python):
+  config.py                 - All 8 city API endpoints, field mappings for
+                              each city's raw data format, trade classification
+                              keywords (10 categories), and value tier thresholds.
+
+  collector.py              - Fetches raw permits from Socrata/SODA APIs.
+                              For each city: hits the endpoint with a date filter,
+                              gets up to 500 records, normalizes each one to our
+                              standard schema using the field_map from config.py,
+                              classifies by trade, scores by value, saves to
+                              data/permits.json. Run with: python collector.py
+
+  server.py                 - Flask web server. Serves the dashboard and REST API.
+                              API endpoints:
+                                GET  /                     -> serves dashboard_production.html
+                                GET  /api/permits          -> filtered, paginated permits
+                                     params: city, trade, value, status, search, page, per_page
+                                GET  /api/stats            -> dashboard statistics
+                                GET  /api/filters          -> available filter options
+                                POST /api/subscribe        -> add email subscriber
+                                     body: {email, name, company, city, trade, plan}
+                                GET  /api/subscribers      -> list all subscribers (admin)
+                                GET  /api/export           -> CSV download of filtered permits
+                                     params: city, trade
+                              Has a commented-out background thread (lines ~237-238) that
+                              runs collector.py every 24 hours. Uncomment to enable.
+                              Run with: python server.py (starts on port 5000)
+
+  email_alerts.py           - Daily digest email system. Loads subscribers from
+                              data/subscribers.json, matches each to permits by
+                              city and trade, builds HTML email, sends via SMTP.
+                              Environment variables needed:
+                                SMTP_HOST  (default: smtp.gmail.com)
+                                SMTP_PORT  (default: 587)
+                                SMTP_USER  (your email)
+                                SMTP_PASS  (Gmail App Password, NOT regular password)
+                                FROM_EMAIL (default: alerts@permitgrab.com)
+                                SITE_URL   (default: https://permitgrab.com)
+                              Run with: python email_alerts.py          (send to all subscribers)
+                              Test with: python email_alerts.py test you@email.com
+
+  generate_sample_data.py   - Generates 2,000 realistic fake permits for demos.
+                              Uses real street names, proper cost distributions,
+                              weighted city sizes. Run with: python generate_sample_data.py
+
+FRONTEND (HTML/CSS/JS):
+  dashboard.html              - STANDALONE dashboard with 500 permits embedded as JSON.
+                                Works offline by opening the file directly in a browser.
+                                Full filtering, search, pagination, trade/city sidebars,
+                                freemium paywall (blurs contact info after first 5 permits),
+                                alert signup modal, pricing section.
+
+  dashboard_production.html   - Same dashboard but fetches from /api/permits instead of
+                                embedded JSON. This is what server.py serves at the / route.
+
+  landing.html                - SEO-optimized marketing landing page. Has:
+                                - Meta description and keywords
+                                - Open Graph tags for social sharing
+                                - Schema.org structured data for Google
+                                - "How it works" section
+                                - Trade-specific use cases with live permit counts
+                                - City coverage cards
+                                - Testimonials section
+                                - Pricing cards matching the dashboard
+                                - SEO content about building permit leads
+                                In production, this should be served at / and the
+                                dashboard should move to /dashboard.
+
+  email_preview.html          - Sample daily digest email. Shows what subscribers receive.
+
+DATA FILES:
+  data/permits.json           - 2,000 permit records (~1.2 MB). Currently sample data.
+                                Will be replaced by real data once collector.py runs
+                                on a server with internet access.
+
+  data/collection_stats.json  - Summary: total permits, city breakdown, trade breakdown,
+                                value tier breakdown, last collection timestamp.
+
+  data/subscribers.json       - Created when first subscriber signs up. Array of objects:
+                                [{email, name, company, city, trade, plan, subscribed_at, active}]
+
+DEPLOYMENT FILES:
+  requirements.txt            - Python deps: flask==3.0.0, requests==2.31.0,
+                                gunicorn==21.2.0, apscheduler==3.10.4
+
+  Dockerfile                  - Python 3.11 slim, installs deps, generates sample data,
+                                runs gunicorn on port 5000 with 2 workers.
+
+  render.yaml                 - One-click deploy config for Render.com free tier.
+
+
+================================================================================
+SECTION 3: DATA SOURCE DETAILS
+================================================================================
+
+All 8 city APIs are Socrata Open Data (SODA) endpoints. FREE. No API keys needed.
+Rate limit: 1,000 requests/hour without an app token.
+
+City              Endpoint Domain           Dataset ID    Date Field
+-----------       ----------------------    ----------    ----------
+New York City     data.cityofnewyork.us     ipu4-2vj7     filing_date
+Chicago           data.cityofchicago.org    ydr8-5enu     issue_date
+Los Angeles       data.lacity.org           yv23-pmwf     issue_date
+Austin            data.austintexas.gov      3syk-w9eu     issued_date
+Denver            data.denvergov.org        p2dh-phhj     issue_date
+San Francisco     data.sfgov.org            i98e-djp9     filed_date
+Seattle           data.seattle.gov          76t5-zbd6     issueddate
+Portland          data.portland.gov         g9fh-kir9     issue_date
+
+Full URL pattern: https://{domain}/resource/{dataset_id}.json
+Example: https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=5
+
+Each city names its fields differently. The field_map in config.py translates
+each city's raw field names to our standard schema. If an endpoint changes,
+update the field_map in config.py.
+
+To add a new city:
+1. Find their Socrata open data portal (search "[city] open data building permits")
+2. Find the dataset ID (it's in the URL, e.g., /resource/xxxx-xxxx.json)
+3. Check what fields exist (hit the URL with ?$limit=1 to see a sample record)
+4. Add a new entry to CITY_SOURCES in config.py with the correct field_map
+
+
+================================================================================
+SECTION 4: NORMALIZED PERMIT SCHEMA
+================================================================================
+
+Every permit, regardless of source city, is stored with these fields:
+
+{
+  "id": "city_key_PERMIT_NUM",       // Unique identifier
+  "city": "New York City",            // Display name
+  "state": "NY",                      // Two-letter state code
+  "permit_number": "NYC-2026-123456", // Municipal permit number
+  "permit_type": "A1",                // Raw type from source
+  "work_type": "Roofing",             // Raw work type from source
+  "trade_category": "Roofing",        // Our classification (10 categories)
+  "address": "123 Broadway",          // Full street address
+  "zip": "10001",                     // ZIP code
+  "filing_date": "2026-03-10",        // YYYY-MM-DD
+  "status": "Issued",                 // Permit status
+  "estimated_cost": 25000.0,          // Project cost in dollars
+  "value_tier": "medium",             // "high" ($50K+), "medium" ($10K-$50K), "low" (<$10K)
+  "description": "Complete roof...",   // Work description, max 500 chars
+  "contact_name": "John Smith",       // Owner/contact name (when available)
+  "contact_phone": "(555) 123-4567",  // Phone (when available)
+  "borough": "",                      // NYC only
+  "source_city": "new_york"           // Internal city key
+}
+
+
+================================================================================
+SECTION 5: TRADE CLASSIFICATION
+================================================================================
+
+The classify_trade() function in collector.py scores each permit's description
+against keyword lists. The 10 trade categories and their keywords are defined
+in TRADE_CATEGORIES in config.py:
+
+Roofing:              roof, roofing, shingle, membrane, flashing, gutter, soffit, fascia, re-roof, reroof
+HVAC:                 hvac, heating, cooling, air condition, furnace, boiler, ductwork, ventilation, heat pump, ac unit, a/c, mini split, thermostat, refriger
+Electrical:           electric, wiring, panel, circuit, outlet, lighting, solar, photovoltaic, pv system, ev charger, generator, transformer, switchgear
+Plumbing:             plumb, pipe, sewer, drain, water heater, fixture, backflow, septic, gas line, water line, sprinkler
+General Construction: new building, new construction, addition, alteration, renovation, remodel, tenant improvement, build out, commercial build, residential build, foundation
+Demolition:           demolition, demo, tear down, abatement, asbestos, hazmat, deconstruct
+Interior Renovation:  interior, kitchen, bathroom, flooring, drywall, painting, cabinet, countertop, tile, finish
+Windows & Doors:      window, door, glazing, storefront, curtain wall, skylight, glass
+Structural:           structural, beam, column, load bearing, seismic, retrofit, reinforc, steel, concrete
+Landscaping/Exterior: landscape, fence, deck, patio, retaining wall, pool, spa, pergola, awning, carport, garage
+
+
+================================================================================
+SECTION 6: PRICING MODEL
+================================================================================
+
+Built into the dashboard HTML:
+
+Free (Starter):        $0/month
+  - 1 metro area
+  - 1 trade category
+  - Weekly email digest
+  - Last 7 days of permits
+  - Basic search & filters
+  - Contact info visible on first 5 permits only (rest blurred)
+
+Professional:          $149/month
+  - 3 metro areas
+  - All trade categories
+  - Daily email alerts
+  - Full 60-day history
+  - Contact info & phone numbers on ALL permits
+  - Export to CSV
+  - Priority support
+
+Enterprise:            $499/month
+  - All 8+ metro areas
+  - All trades + custom filters
+  - Real-time SMS + email alerts
+  - Full historical data
+  - API access
+  - CRM integrations
+  - Dedicated account manager
+
+
+================================================================================
+SECTION 7: FEATURES THAT NEED BUILDING (FOR CLAUDE CODE)
+================================================================================
+
+CRITICAL (required before taking payments):
+
+1. STRIPE PAYMENT INTEGRATION
+   - Install: pip install stripe
+   - Create /api/create-checkout-session endpoint
+   - Use Stripe Checkout (hosted payment page — simplest approach)
+   - After successful payment, update subscriber's plan field
+   - Add STRIPE_SECRET_KEY and STRIPE_PRICE_ID env vars
+   - Wes will create the Stripe account and provide the keys
+
+2. USER AUTHENTICATION
+   - Simplest approach: email magic links (no passwords to manage)
+   - Alternative: Flask-Login with email/password
+   - Free users: see 5 permits with contact info, rest blurred
+   - Paid users: see all contact info
+   - Store users in data/users.json (or migrate to SQLite)
+
+3. ADMIN DASHBOARD
+   - Protected page at /admin
+   - Show: subscriber count, revenue, last collection timestamp,
+     permits per city, error log
+   - Currently /api/subscribers is unprotected — add auth check
+
+4. UNSUBSCRIBE ENDPOINT
+   - Add /api/unsubscribe?token=xxx
+   - Generate unique token per subscriber at signup time
+   - Include token in email footer unsubscribe link
+   - Sets subscriber's active field to false
+
+5. RATE LIMITING
+   - pip install flask-limiter
+   - Limit /api/permits to 60 requests/minute
+   - Limit /api/subscribe to 5 requests/minute
+
+IMPORTANT (for growth):
+
+6. DATABASE MIGRATION
+   - Current: JSON files (works fine under 10K permits)
+   - Migrate to: SQLite (simplest) or PostgreSQL (scalable)
+   - Use SQLAlchemy ORM
+
+7. PER-CITY LANDING PAGES
+   - /permits/new-york, /permits/chicago, etc.
+   - Each with city-specific H1, permit counts, testimonials
+   - Critical for SEO (captures "contractor leads [city]" searches)
+
+8. BLOG
+   - Target keywords: "how to find construction leads",
+     "building permit database", "roofing leads [city]"
+   - Static HTML or simple markdown-to-HTML system
+
+9. ANALYTICS
+   - Add Plausible.io script tag (privacy-friendly, free for 1 site)
+   - Or Google Analytics 4
+
+
+================================================================================
+SECTION 8: ENVIRONMENT VARIABLES REFERENCE
+================================================================================
+
+For deployment, these environment variables should be set:
+
+# Required for email alerts
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-gmail-app-password
+FROM_EMAIL=alerts@permitgrab.com
+SITE_URL=https://permitgrab.com
+
+# Required for payments (once Stripe is integrated)
+STRIPE_SECRET_KEY=sk_live_xxxxx
+STRIPE_PRICE_ID=price_xxxxx
+
+# Optional
+FLASK_ENV=production
+PORT=5000
+
+
+================================================================================
+SECTION 9: DEPLOYMENT OPTIONS
+================================================================================
+
+OPTION A: RENDER.COM (Recommended — free tier available)
+  1. Push code to GitHub
+  2. Connect GitHub repo to Render.com
+  3. render.yaml auto-configures everything
+  4. Free tier: sleeps after 15 min inactivity, 750 hrs/month
+  5. Paid starter: $7/month, always-on
+  6. Custom domain: free SSL included
+
+OPTION B: DOCKER (any VPS)
+  cd PermitGrab/
+  docker build -t permitgrab .
+  docker run -d -p 5000:5000 --name permitgrab permitgrab
+  Then set up nginx reverse proxy for port 80/443.
+
+OPTION C: LOCAL TESTING
+  cd PermitGrab/
+  pip install -r requirements.txt
+  python generate_sample_data.py
+  python server.py
+  Visit http://localhost:5000
+
+
+================================================================================
+SECTION 10: MONTHLY OPERATING COSTS
+================================================================================
+
+Item                    Cost          Notes
+----                    ----          -----
+Render.com (free)       $0/mo         Sleeps after inactivity
+Render.com (starter)    $7/mo         Always-on, recommended
+Domain name             ~$1/mo        Namecheap/Cloudflare
+Socrata APIs            $0            Free, no keys needed
+Gmail SMTP              $0            100 emails/day free
+SendGrid (scaled)       $0-$20/mo     When > 100 subscribers
+Stripe                  2.9% + $0.30  Per transaction only
+-------------------------------------------------------
+TOTAL AT LAUNCH:        $0 to $8/mo
+
+Break-even: 1 subscriber at $149/month.
+
+
+================================================================================
+SECTION 11: COMMON ISSUES & FIXES
+================================================================================
+
+ISSUE: Collector returns 0 permits from a city
+FIX:   The endpoint URL or field names may have changed. Visit the endpoint
+       URL in a browser with ?$limit=1 to see if it still works. Update
+       config.py if fields have changed.
+
+ISSUE: Trade classification puts everything in "Other / Unclassified"
+FIX:   The city's description field might be mapped incorrectly. Check the
+       field_map in config.py — make sure "description" maps to the field
+       that contains the actual work description text.
+
+ISSUE: Email alerts not sending
+FIX:   Check SMTP_USER and SMTP_PASS environment variables are set.
+       For Gmail, you MUST use an App Password (not your regular password).
+       Go to myaccount.google.com > Security > 2-Step Verification > App Passwords.
+
+ISSUE: Dashboard shows "Unable to connect to API"
+FIX:   The production dashboard fetches from /api/permits. Make sure
+       server.py is running and data/permits.json exists.
+
+ISSUE: All costs show as $0
+FIX:   The estimated_cost field mapping may be wrong for that city.
+       Check the field_map in config.py.
+
+
+================================================================================
+END OF REFERENCE
+================================================================================

@@ -1,0 +1,15 @@
+# Deploy to Render.com (free tier available)
+# 1. Push this repo to GitHub
+# 2. Connect to Render.com
+# 3. It auto-deploys from this config
+
+services:
+  - type: web
+    name: permitgrab
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python generate_sample_data.py
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+    plan: free
