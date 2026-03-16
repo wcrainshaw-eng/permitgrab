@@ -72,18 +72,25 @@ Then commit and push the changes to GitHub.
 
 ---
 
-## PHASE 3: SET UP EMAIL ALERTS (20 minutes)
+## PHASE 3: SET UP EMAIL SENDING VIA SENDGRID (20 minutes)
 
-### Step 6: Create a Gmail App Password
+Emails will be sent FROM alerts@permitgrab.com using SendGrid (free: 100 emails/day).
+
+### Step 6: Create a SendGrid account and verify your domain
 **YOU DO THIS.**
 
-1. Go to **myaccount.google.com**
-2. Click **Security** (left sidebar)
-3. Make sure **2-Step Verification** is turned ON
-4. Search for **"App Passwords"** or go to Security → 2-Step Verification → App Passwords
-5. Create a new app password (name it "PermitGrab")
-6. Copy the 16-character password (looks like: `abcd efgh ijkl mnop`)
-7. **Save this password somewhere safe — you'll need it in the next step**
+1. Go to **sendgrid.com** and sign up for a free account
+2. Once in the dashboard, go to **Settings** → **Sender Authentication**
+3. Click **"Authenticate Your Domain"**
+4. Choose **Cloudflare** as your DNS provider
+5. Enter **permitgrab.com** as your domain
+6. SendGrid will give you **3 CNAME records** to add to your DNS
+7. Go to your **Cloudflare dashboard** → permitgrab.com → **DNS**
+8. Add all 3 CNAME records that SendGrid provided
+9. Go back to SendGrid and click **"Verify"** — it should turn green
+10. Now go to **Settings** → **API Keys** → **Create API Key**
+11. Name it "PermitGrab Alerts", select **Full Access**, and click **Create**
+12. **Copy the API key** (starts with `SG.`) — you only see it once!
 
 ### Step 7: Add email environment variables in Render
 **YOU DO THIS.**
@@ -91,11 +98,11 @@ Then commit and push the changes to GitHub.
 1. Go to your Render.com dashboard → permitgrab service
 2. Click **"Environment"** tab
 3. Add these environment variables:
-   - `SMTP_HOST` = `smtp.gmail.com`
+   - `SMTP_HOST` = `smtp.sendgrid.net`
    - `SMTP_PORT` = `587`
-   - `SMTP_USER` = `wcrainshaw@gmail.com`
-   - `SMTP_PASS` = (the App Password from Step 6)
-   - `FROM_EMAIL` = `wcrainshaw@gmail.com`
+   - `SMTP_USER` = `apikey` (this is the literal word "apikey", not your actual key)
+   - `SMTP_PASS` = (the SendGrid API key from Step 6, starts with `SG.`)
+   - `FROM_EMAIL` = `alerts@permitgrab.com`
    - `SITE_URL` = (your Render URL, like `https://permitgrab.onrender.com`)
 4. Click **"Save Changes"** — Render will auto-redeploy
 
@@ -105,17 +112,17 @@ Then commit and push the changes to GitHub.
 ```
 In ~/Documents/PermitGrab/, set these environment variables then run the email test:
 
-export SMTP_HOST=smtp.gmail.com
+export SMTP_HOST=smtp.sendgrid.net
 export SMTP_PORT=587
-export SMTP_USER=wcrainshaw@gmail.com
-export SMTP_PASS="YOUR_APP_PASSWORD_HERE"
-export FROM_EMAIL=wcrainshaw@gmail.com
+export SMTP_USER=apikey
+export SMTP_PASS="SG.YOUR_SENDGRID_API_KEY_HERE"
+export FROM_EMAIL=alerts@permitgrab.com
 export SITE_URL=https://permitgrab.onrender.com
 
 python email_alerts.py test wcrainshaw@gmail.com
 ```
 
-**WHAT YOU GET BACK:** You should receive a test email at wcrainshaw@gmail.com showing ~15 NYC permit leads with contact info, trade tags, and project values.
+**WHAT YOU GET BACK:** You should receive a test email at wcrainshaw@gmail.com FROM alerts@permitgrab.com showing ~15 NYC permit leads with contact info, trade tags, and project values.
 
 ---
 

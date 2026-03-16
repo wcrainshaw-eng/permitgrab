@@ -1,7 +1,8 @@
 """
 PermitGrab — Email Alert System
 Sends daily/weekly permit digest emails to subscribers
-Uses free SMTP (Gmail, SendGrid free tier, or Mailgun free tier)
+Uses SendGrid SMTP (free tier: 100 emails/day)
+Emails sent from alerts@permitgrab.com via verified SendGrid domain
 """
 
 import json
@@ -13,13 +14,13 @@ from datetime import datetime, timedelta
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
-# Configure with your SMTP provider
-# Gmail: smtp.gmail.com:587 (use App Password, not regular password)
-# SendGrid: smtp.sendgrid.net:587 (free tier: 100 emails/day)
-# Mailgun: smtp.mailgun.org:587 (free tier: limited)
-SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+# SendGrid SMTP configuration
+# Host: smtp.sendgrid.net, Port: 587
+# Username is always "apikey" (literal string)
+# Password is your SendGrid API key (starts with SG.)
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.sendgrid.net')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_USER = os.environ.get('SMTP_USER', 'apikey')
 SMTP_PASS = os.environ.get('SMTP_PASS', '')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'alerts@permitgrab.com')
 SITE_URL = os.environ.get('SITE_URL', 'https://permitgrab.com')

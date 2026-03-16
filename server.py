@@ -234,9 +234,8 @@ if __name__ == '__main__':
     os.makedirs(DATA_DIR, exist_ok=True)
 
     # Start background data collection
-    # Uncomment when deploying with real API access:
-    # collector_thread = threading.Thread(target=scheduled_collection, daemon=True)
-    # collector_thread.start()
+    collector_thread = threading.Thread(target=scheduled_collection, daemon=True)
+    collector_thread.start()
 
     print("=" * 50)
     print("PermitGrab Server Starting")

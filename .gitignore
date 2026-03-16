@@ -4,6 +4,7 @@ data/*.json
 # Python
 __pycache__/
 *.pyc
+venv/
 
 # Environment
 .env

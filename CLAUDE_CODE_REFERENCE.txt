@@ -63,10 +63,10 @@ BACKEND (Python):
                               data/subscribers.json, matches each to permits by
                               city and trade, builds HTML email, sends via SMTP.
                               Environment variables needed:
-                                SMTP_HOST  (default: smtp.gmail.com)
+                                SMTP_HOST  (default: smtp.sendgrid.net)
                                 SMTP_PORT  (default: 587)
-                                SMTP_USER  (your email)
-                                SMTP_PASS  (Gmail App Password, NOT regular password)
+                                SMTP_USER  (default: apikey — literal string, not your key)
+                                SMTP_PASS  (SendGrid API key, starts with SG.)
                                 FROM_EMAIL (default: alerts@permitgrab.com)
                                 SITE_URL   (default: https://permitgrab.com)
                               Run with: python email_alerts.py          (send to all subscribers)
@@ -301,11 +301,11 @@ SECTION 8: ENVIRONMENT VARIABLES REFERENCE
 
 For deployment, these environment variables should be set:
 
-# Required for email alerts
-SMTP_HOST=smtp.gmail.com
+# Required for email alerts (SendGrid SMTP)
+SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-gmail-app-password
+SMTP_USER=apikey
+SMTP_PASS=SG.your-sendgrid-api-key
 FROM_EMAIL=alerts@permitgrab.com
 SITE_URL=https://permitgrab.com
 
