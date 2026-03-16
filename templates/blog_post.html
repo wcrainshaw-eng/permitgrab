@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ post.title }} | PermitGrab Blog</title>
+<meta name="description" content="{{ post.excerpt }}">
+<link rel="canonical" href="https://permitgrab.com/blog/{{ post.slug }}">
+<meta property="og:title" content="{{ post.title }}">
+<meta property="og:description" content="{{ post.excerpt }}">
+<meta property="og:url" content="https://permitgrab.com/blog/{{ post.slug }}">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{ post.title }}",
+  "datePublished": "{{ post.date }}",
+  "author": {
+    "@type": "Organization",
+    "name": "{{ post.author }}"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "PermitGrab"
+  }
+}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --primary: #2563eb; --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.7; }
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 800px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: #f97316; }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: white; }
+.dropdown { position: relative; }
+.dropdown-toggle { background: none; border: none; color: rgba(255,255,255,.7); font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.dropdown-toggle:hover { color: white; }
+.dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: white; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,.1); min-width: 200px; z-index: 1000; margin-top: 8px; padding: 8px 0; }
+.dropdown:hover .dropdown-menu { display: block; }
+.dropdown-menu a { display: block; padding: 10px 16px; color: var(--gray-700) !important; }
+.dropdown-menu a:hover { background: var(--gray-50); color: var(--primary) !important; }
+
+.main { max-width: 720px; margin: 0 auto; padding: 60px 20px; }
+.breadcrumb { font-size: 14px; color: var(--gray-500); margin-bottom: 24px; }
+.breadcrumb a { color: var(--primary); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+article h1 { font-size: 36px; font-weight: 800; color: var(--gray-900); margin-bottom: 16px; line-height: 1.2; }
+.meta { font-size: 14px; color: var(--gray-500); margin-bottom: 40px; }
+
+.content { font-size: 18px; }
+.content p { margin-bottom: 24px; }
+.content h2 { font-size: 26px; font-weight: 700; color: var(--gray-900); margin: 40px 0 16px; }
+.content h3 { font-size: 20px; font-weight: 600; color: var(--gray-900); margin: 32px 0 12px; }
+.content ul, .content ol { margin-bottom: 24px; padding-left: 24px; }
+.content li { margin-bottom: 8px; }
+.content a { color: var(--primary); }
+.content blockquote { border-left: 4px solid var(--primary); padding-left: 20px; margin: 24px 0; font-style: italic; color: var(--gray-600); }
+.content code { background: var(--gray-100); padding: 2px 6px; border-radius: 4px; font-size: 15px; }
+.content pre { background: var(--gray-900); color: #e5e7eb; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 24px 0; }
+.content pre code { background: none; padding: 0; }
+
+.cta-box { background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%); color: white; border-radius: 12px; padding: 40px; text-align: center; margin: 50px 0; }
+.cta-box h3 { font-size: 24px; font-weight: 700; margin-bottom: 12px; }
+.cta-box p { font-size: 16px; opacity: .9; margin-bottom: 20px; }
+.cta-btn { display: inline-block; background: white; color: var(--primary); padding: 14px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+.cta-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+
+.footer { background: var(--gray-900); color: rgba(255,255,255,.7); padding: 40px 32px; text-align: center; font-size: 14px; margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <div class="dropdown">
+        <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york">New York City</a>
+          <a href="/permits/los-angeles">Los Angeles</a>
+          <a href="/permits/chicago">Chicago</a>
+          <a href="/permits/austin">Austin</a>
+          <a href="/permits/seattle">Seattle</a>
+        </div>
+      </div>
+      <div class="dropdown">
+        <button class="dropdown-toggle">Trades <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york/plumbing">🔧 Plumbing</a>
+          <a href="/permits/new-york/electrical">⚡ Electrical</a>
+          <a href="/permits/new-york/hvac">🌡️ HVAC</a>
+          <a href="/permits/new-york/roofing">🏠 Roofing</a>
+        </div>
+      </div>
+      <a href="/blog">Blog</a>
+      <a href="/#pricing">Pricing</a>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="breadcrumb">
+    <a href="/blog">&larr; Back to Blog</a>
+  </div>
+
+  <article>
+    <h1>{{ post.title }}</h1>
+    <div class="meta">By {{ post.author }} &bull; {{ post.date }}</div>
+    <div class="content">
+      {{ post.content | safe }}
+    </div>
+  </article>
+
+  <div class="cta-box">
+    <h3>Ready to Find More Construction Leads?</h3>
+    <p>PermitGrab delivers fresh building permit leads daily with contact info and lead scores.</p>
+    <a href="/#signup" class="cta-btn">Start Free &rarr;</a>
+  </div>
+</div>
+
+<footer class="footer">
+  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
+</footer>
+
+</body>
+</html>

@@ -17,6 +17,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY
 from lifecycle import get_lifecycle_label
+from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_slugs
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -2491,26 +2492,127 @@ def city_landing(city_slug):
     )
 
 
+@app.route('/permits/<city_slug>/<trade_slug>')
+def city_trade_landing(city_slug, trade_slug):
+    """Render SEO-optimized city × trade landing page."""
+    # Get city from config
+    city_key, city_config = get_city_by_slug(city_slug)
+    if not city_config:
+        return "City not found", 404
+
+    # Get trade from config
+    trade = get_trade(trade_slug)
+    if not trade:
+        return "Trade not found", 404
+
+    permits = load_permits()
+
+    # Filter permits for this city and trade
+    city_permits = [p for p in permits if p.get('city') == city_config['name']]
+
+    # Match permits to this trade based on keywords
+    trade_keywords = [kw.lower() for kw in trade['keywords']]
+    matching_permits = []
+    for p in city_permits:
+        text = ""
+        if p.get("description"):
+            text += p["description"].lower() + " "
+        if p.get("permit_type"):
+            text += p["permit_type"].lower() + " "
+        if p.get("work_type"):
+            text += p["work_type"].lower() + " "
+        if p.get("trade_category"):
+            text += p["trade_category"].lower()
+
+        if any(kw in text for kw in trade_keywords):
+            matching_permits.append(p)
+
+    # Sort by date
+    matching_permits.sort(key=lambda x: x.get('filing_date', ''), reverse=True)
+
+    # Calculate stats
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    month_ago = (now - timedelta(days=30)).isoformat()
+    week_ago = (now - timedelta(days=7)).isoformat()
+
+    monthly_count = len([p for p in matching_permits if p.get('filing_date', '') >= month_ago])
+    weekly_count = len([p for p in matching_permits if p.get('filing_date', '') >= week_ago])
+
+    values = [p.get('estimated_cost', 0) for p in matching_permits if p.get('estimated_cost')]
+    avg_value = int(sum(values) / len(values)) if values else 0
+
+    # Build city dict for template
+    city_dict = {
+        "name": city_config['name'],
+        "state": city_config['state'],
+        "slug": city_slug,
+    }
+
+    stats = {
+        "monthly_count": monthly_count or len(matching_permits),
+        "weekly_count": weekly_count,
+        "avg_value": f"{avg_value:,}" if avg_value else "N/A",
+    }
+
+    # Other trades for cross-linking (exclude current)
+    other_trades = [t for t in get_all_trades() if t['slug'] != trade_slug]
+
+    # Other cities for cross-linking (exclude current)
+    other_cities = [{"name": c['name'], "slug": c['slug']} for c in ALL_CITIES if c['slug'] != city_slug]
+
+    return render_template(
+        'city_trade_landing.html',
+        city=city_dict,
+        trade=trade,
+        permits=matching_permits[:10],
+        stats=stats,
+        other_trades=other_trades,
+        other_cities=other_cities,
+    )
+
+
 # ===========================
 # SITEMAP & ROBOTS.TXT
 # ===========================
 
 @app.route('/sitemap.xml')
 def sitemap():
-    """Generate XML sitemap for SEO."""
+    """Generate XML sitemap for SEO - fully dynamic."""
     today = datetime.now().strftime('%Y-%m-%d')
 
     urls = [
         {'loc': SITE_URL, 'changefreq': 'daily', 'priority': '1.0'},
+        {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
     ]
 
     # Add city landing pages
     for city in ALL_CITIES:
         urls.append({
             'loc': f"{SITE_URL}/permits/{city['slug']}",
-            'changefreq': 'weekly',
+            'changefreq': 'daily',
             'priority': '0.8',
         })
+
+        # Add city × trade pages for each trade
+        for trade_slug in get_trade_slugs():
+            urls.append({
+                'loc': f"{SITE_URL}/permits/{city['slug']}/{trade_slug}",
+                'changefreq': 'daily',
+                'priority': '0.8',
+            })
+
+    # Add blog posts
+    blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
+    if os.path.exists(blog_dir):
+        for filename in os.listdir(blog_dir):
+            if filename.endswith('.md'):
+                slug = filename.replace('.md', '')
+                urls.append({
+                    'loc': f"{SITE_URL}/blog/{slug}",
+                    'changefreq': 'monthly',
+                    'priority': '0.6',
+                })
 
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -2533,10 +2635,96 @@ def robots():
     """Serve robots.txt for search engines."""
     content = f"""User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /my-leads
+Disallow: /account
+Disallow: /saved-leads
 
 Sitemap: {SITE_URL}/sitemap.xml
 """
     return Response(content, mimetype='text/plain')
+
+
+# ===========================
+# BLOG SYSTEM
+# ===========================
+import markdown
+import re
+
+BLOG_DIR = os.path.join(os.path.dirname(__file__), 'blog')
+
+
+def parse_blog_post(filename):
+    """Parse a markdown blog post with frontmatter."""
+    filepath = os.path.join(BLOG_DIR, filename)
+    if not os.path.exists(filepath):
+        return None
+
+    with open(filepath, 'r') as f:
+        content = f.read()
+
+    # Parse frontmatter (YAML between --- markers)
+    meta = {}
+    body = content
+    if content.startswith('---'):
+        parts = content.split('---', 2)
+        if len(parts) >= 3:
+            for line in parts[1].strip().split('\n'):
+                if ':' in line:
+                    key, val = line.split(':', 1)
+                    meta[key.strip()] = val.strip().strip('"').strip("'")
+            body = parts[2]
+
+    # Convert markdown to HTML
+    html = markdown.markdown(body, extensions=['fenced_code', 'tables'])
+
+    # Extract excerpt (first 160 chars of text)
+    text_only = re.sub(r'<[^>]+>', '', html)
+    excerpt = text_only[:160].strip() + '...' if len(text_only) > 160 else text_only
+
+    return {
+        'slug': filename.replace('.md', ''),
+        'title': meta.get('title', 'Untitled'),
+        'date': meta.get('date', ''),
+        'author': meta.get('author', 'PermitGrab Team'),
+        'excerpt': excerpt,
+        'content': html,
+        'keywords': meta.get('keywords', ''),
+    }
+
+
+def get_all_blog_posts():
+    """Get all blog posts sorted by date."""
+    if not os.path.exists(BLOG_DIR):
+        return []
+
+    posts = []
+    for filename in os.listdir(BLOG_DIR):
+        if filename.endswith('.md'):
+            post = parse_blog_post(filename)
+            if post:
+                posts.append(post)
+
+    # Sort by date descending
+    posts.sort(key=lambda x: x.get('date', ''), reverse=True)
+    return posts
+
+
+@app.route('/blog')
+def blog_index():
+    """Blog index page."""
+    posts = get_all_blog_posts()
+    return render_template('blog_index.html', posts=posts)
+
+
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    """Individual blog post page."""
+    post = parse_blog_post(f"{slug}.md")
+    if not post:
+        return "Post not found", 404
+    return render_template('blog_post.html', post=post)
 
 
 # ===========================

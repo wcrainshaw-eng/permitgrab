@@ -569,6 +569,54 @@ body {
   color: rgba(255,255,255,.4);
 }
 
+/* CROSS LINKS */
+.cross-links-section {
+  max-width: 1200px;
+  margin: 0 auto 60px;
+  padding: 0 32px;
+}
+
+.cross-links-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+}
+
+.cross-link-box {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.cross-link-box h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 16px;
+}
+
+.cross-link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cross-link-list a {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all .2s;
+}
+
+.cross-link-list a:hover {
+  background: var(--primary);
+  color: white;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .hero h1 { font-size: 32px; }
@@ -578,6 +626,7 @@ body {
   .nav-links { display: none; }
   .main-content { grid-template-columns: 1fr; }
   .footer-inner { flex-direction: column; }
+  .cross-links-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -604,6 +653,21 @@ body {
           <a href="/permits/nashville">Nashville</a>
         </div>
       </div>
+      <div class="dropdown">
+        <button class="dropdown-toggle">
+          Trades
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg>
+        </button>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york/plumbing">🔧 Plumbing</a>
+          <a href="/permits/new-york/electrical">⚡ Electrical</a>
+          <a href="/permits/new-york/hvac">🌡️ HVAC</a>
+          <a href="/permits/new-york/roofing">🏠 Roofing</a>
+          <a href="/permits/new-york/solar">☀️ Solar</a>
+          <a href="/permits/new-york/general-construction">🏗️ General Construction</a>
+        </div>
+      </div>
+      <a href="/blog">Blog</a>
       <a href="/#pricing">Pricing</a>
       <a href="/#features">Features</a>
       <a href="/" class="btn-cta">Browse All Permits</a>
@@ -722,6 +786,33 @@ body {
   </div>
 </section>
 
+<!-- CROSS LINKS -->
+<section class="cross-links-section">
+  <div class="cross-links-grid">
+    <div class="cross-link-box">
+      <h3>Browse {{ city_name }} Permits by Trade</h3>
+      <div class="cross-link-list">
+        <a href="/permits/{{ city_slug }}/plumbing">🔧 Plumbing</a>
+        <a href="/permits/{{ city_slug }}/electrical">⚡ Electrical</a>
+        <a href="/permits/{{ city_slug }}/hvac">🌡️ HVAC</a>
+        <a href="/permits/{{ city_slug }}/roofing">🏠 Roofing</a>
+        <a href="/permits/{{ city_slug }}/solar">☀️ Solar</a>
+        <a href="/permits/{{ city_slug }}/general-construction">🏗️ General Construction</a>
+        <a href="/permits/{{ city_slug }}/demolition">🔨 Demolition</a>
+        <a href="/permits/{{ city_slug }}/fire-protection">🔥 Fire Protection</a>
+      </div>
+    </div>
+    <div class="cross-link-box">
+      <h3>Permits in Nearby Cities</h3>
+      <div class="cross-link-list">
+        {% for city in other_cities[:10] %}
+        <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- CTA -->
 <section class="cta-section">
   <h2>Start Finding {{ city_name }} Leads Today</h2>
@@ -749,6 +840,7 @@ body {
       <a href="/">Home</a>
       <a href="/#pricing">Pricing</a>
       <a href="/#features">Features</a>
+      <a href="/blog">Blog</a>
     </div>
   </div>
 

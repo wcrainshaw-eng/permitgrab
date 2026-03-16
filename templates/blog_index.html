@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog | PermitGrab - Construction Permit Leads & Insights</title>
+<meta name="description" content="Expert insights on finding construction leads, understanding building permits, and growing your contracting business. Updated weekly.">
+<link rel="canonical" href="https://permitgrab.com/blog">
+<meta property="og:title" content="PermitGrab Blog - Construction Lead Generation Insights">
+<meta property="og:description" content="Expert tips on finding construction leads using permit data.">
+<meta property="og:url" content="https://permitgrab.com/blog">
+<meta property="og:type" content="website">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --primary: #2563eb; --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 1000px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: #f97316; }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: white; }
+.dropdown { position: relative; }
+.dropdown-toggle { background: none; border: none; color: rgba(255,255,255,.7); font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.dropdown-toggle:hover { color: white; }
+.dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: white; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,.1); min-width: 200px; z-index: 1000; margin-top: 8px; padding: 8px 0; }
+.dropdown:hover .dropdown-menu { display: block; }
+.dropdown-menu a { display: block; padding: 10px 16px; color: var(--gray-700) !important; }
+.dropdown-menu a:hover { background: var(--gray-50); color: var(--primary) !important; }
+
+.hero { background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%); color: white; padding: 60px 32px; text-align: center; }
+.hero h1 { font-size: 36px; font-weight: 800; margin-bottom: 12px; }
+.hero p { font-size: 18px; opacity: .9; }
+
+.main { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+.post-card { background: white; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.post-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+.post-date { font-size: 13px; color: var(--gray-500); margin-bottom: 8px; }
+.post-card h2 { font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px; }
+.post-card h2 a { color: inherit; text-decoration: none; }
+.post-card h2 a:hover { color: var(--primary); }
+.post-excerpt { color: var(--gray-600); margin-bottom: 16px; }
+.read-more { color: var(--primary); font-weight: 600; text-decoration: none; }
+.read-more:hover { text-decoration: underline; }
+
+.footer { background: var(--gray-900); color: rgba(255,255,255,.7); padding: 40px 32px; text-align: center; font-size: 14px; margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <div class="dropdown">
+        <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york">New York City</a>
+          <a href="/permits/los-angeles">Los Angeles</a>
+          <a href="/permits/chicago">Chicago</a>
+          <a href="/permits/austin">Austin</a>
+          <a href="/permits/seattle">Seattle</a>
+        </div>
+      </div>
+      <div class="dropdown">
+        <button class="dropdown-toggle">Trades <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          <a href="/permits/new-york/plumbing">🔧 Plumbing</a>
+          <a href="/permits/new-york/electrical">⚡ Electrical</a>
+          <a href="/permits/new-york/hvac">🌡️ HVAC</a>
+          <a href="/permits/new-york/roofing">🏠 Roofing</a>
+        </div>
+      </div>
+      <a href="/blog">Blog</a>
+      <a href="/#pricing">Pricing</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>PermitGrab Blog</h1>
+  <p>Expert insights on finding construction leads and growing your business</p>
+</div>
+
+<div class="main">
+  {% for post in posts %}
+  <article class="post-card">
+    <div class="post-date">{{ post.date }}</div>
+    <h2><a href="/blog/{{ post.slug }}">{{ post.title }}</a></h2>
+    <p class="post-excerpt">{{ post.excerpt }}</p>
+    <a href="/blog/{{ post.slug }}" class="read-more">Read more &rarr;</a>
+  </article>
+  {% endfor %}
+
+  {% if not posts %}
+  <p style="text-align: center; color: var(--gray-500);">No blog posts yet. Check back soon!</p>
+  {% endif %}
+</div>
+
+<footer class="footer">
+  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
+</footer>
+
+</body>
+</html>
