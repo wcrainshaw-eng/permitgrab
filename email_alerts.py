@@ -85,6 +85,7 @@ def build_email_html(subscriber, permits):
     name = subscriber.get('name', 'there')
     city = subscriber.get('city', 'your area')
     trade = subscriber.get('trade', 'all trades')
+    unsubscribe_token = subscriber.get('unsubscribe_token', '')
 
     # Value summary
     total_value = sum(p.get('estimated_cost', 0) for p in permits)
@@ -161,7 +162,7 @@ def build_email_html(subscriber, permits):
         <!-- Footer -->
         <div style="padding:20px 32px;text-align:center;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;">
           <p>PermitGrab · Construction Permit Leads</p>
-          <p><a href="#" style="color:#9ca3af;">Unsubscribe</a> · <a href="#" style="color:#9ca3af;">Manage Preferences</a></p>
+          <p><a href="{SITE_URL}/api/unsubscribe?token={unsubscribe_token}" style="color:#9ca3af;">Unsubscribe</a> · <a href="{SITE_URL}" style="color:#9ca3af;">Manage Preferences</a></p>
         </div>
       </div>
     </body>

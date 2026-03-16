@@ -796,7 +796,14 @@ footer a:hover { color: white; }
       <a href="#dashboard">Dashboard</a>
       <a href="#pricing">Pricing</a>
       <a href="#" onclick="showAlertModal(); return false;">Get Alerts</a>
-      <a href="#pricing" class="btn-cta">Start Free Trial</a>
+      <span id="auth-nav">
+        <a href="#" onclick="showLoginModal(); return false;">Log In</a>
+        <a href="#" class="btn-cta" onclick="showSignupModal(); return false;">Sign Up</a>
+      </span>
+      <span id="user-nav" style="display: none;">
+        <span id="user-email" style="color: rgba(255,255,255,.7); font-size: 14px;"></span>
+        <a href="#" onclick="logout(); return false;">Log Out</a>
+      </span>
     </nav>
   </div>
   <div class="hero-content">
@@ -1023,6 +1030,47 @@ footer a:hover { color: white; }
   </div>
 </div>
 
+<!-- LOGIN MODAL -->
+<div class="modal-backdrop" id="login-modal">
+  <div class="modal">
+    <h3>Log In</h3>
+    <p>Enter your email and password to access your account.</p>
+    <form class="alert-form" onsubmit="handleLogin(event)">
+      <input type="email" id="login-email" placeholder="Email" required>
+      <input type="password" id="login-password" placeholder="Password" required>
+      <button type="submit">Log In</button>
+      <div id="login-error" style="color: var(--red); font-size: 13px; text-align: center; display: none;"></div>
+    </form>
+    <div style="text-align: center; margin-top: 12px;">
+      <a href="#" onclick="closeLoginModal(); showSignupModal(); return false;" style="font-size: 13px; color: var(--primary);">Don't have an account? Sign up</a>
+    </div>
+    <div style="text-align: center; margin-top: 8px;">
+      <a href="#" onclick="closeLoginModal(); return false;" style="font-size: 13px; color: var(--gray-400);">Cancel</a>
+    </div>
+  </div>
+</div>
+
+<!-- SIGNUP MODAL -->
+<div class="modal-backdrop" id="signup-modal">
+  <div class="modal">
+    <h3>Create Account</h3>
+    <p>Sign up for free to access permit leads.</p>
+    <form class="alert-form" onsubmit="handleSignup(event)">
+      <input type="text" id="signup-name" placeholder="Your name" required>
+      <input type="email" id="signup-email" placeholder="Email" required>
+      <input type="password" id="signup-password" placeholder="Password (min 8 characters)" required minlength="8">
+      <button type="submit">Create Account</button>
+      <div id="signup-error" style="color: var(--red); font-size: 13px; text-align: center; display: none;"></div>
+    </form>
+    <div style="text-align: center; margin-top: 12px;">
+      <a href="#" onclick="closeSignupModal(); showLoginModal(); return false;" style="font-size: 13px; color: var(--primary);">Already have an account? Log in</a>
+    </div>
+    <div style="text-align: center; margin-top: 8px;">
+      <a href="#" onclick="closeSignupModal(); return false;" style="font-size: 13px; color: var(--gray-400);">Cancel</a>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===========================
 // DATA & STATE
@@ -1031,7 +1079,8 @@ let allPermits = [];
 let filteredPermits = [];
 let currentPage = 1;
 const perPage = 20;
-const freePreviewLimit = 5; // Show contact info for first 5
+let freePreviewLimit = 5; // Show contact info for first 5 (updated based on user plan)
+let currentUser = null;
 
 // ===========================
 // LOAD DATA
@@ -1400,14 +1449,161 @@ async function startStripeCheckout() {
 }
 
 // ===========================
+// AUTHENTICATION
+// ===========================
+async function checkCurrentUser() {
+  try {
+    const resp = await fetch('/api/me');
+    const data = await resp.json();
+    currentUser = data.user;
+    updateAuthUI();
+    updateFreePreviewLimit();
+  } catch (e) {
+    console.error('Failed to check user:', e);
+  }
+}
+
+function updateAuthUI() {
+  const authNav = document.getElementById('auth-nav');
+  const userNav = document.getElementById('user-nav');
+  const userEmail = document.getElementById('user-email');
+
+  if (currentUser) {
+    authNav.style.display = 'none';
+    userNav.style.display = 'inline';
+    userEmail.textContent = currentUser.email;
+  } else {
+    authNav.style.display = 'inline';
+    userNav.style.display = 'none';
+  }
+}
+
+function updateFreePreviewLimit() {
+  if (currentUser && (currentUser.plan === 'professional' || currentUser.plan === 'enterprise')) {
+    freePreviewLimit = Infinity; // Paid users see all contact info
+  } else {
+    freePreviewLimit = 5;
+  }
+  // Re-render permits if already loaded
+  if (allPermits.length > 0) {
+    renderPermits();
+  }
+}
+
+function showLoginModal() {
+  document.getElementById('login-modal').classList.add('show');
+  document.getElementById('login-error').style.display = 'none';
+}
+
+function closeLoginModal() {
+  document.getElementById('login-modal').classList.remove('show');
+}
+
+function showSignupModal() {
+  document.getElementById('signup-modal').classList.add('show');
+  document.getElementById('signup-error').style.display = 'none';
+}
+
+function closeSignupModal() {
+  document.getElementById('signup-modal').classList.remove('show');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorDiv = document.getElementById('login-error');
+
+  try {
+    const resp = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await resp.json();
+
+    if (resp.ok) {
+      currentUser = data.user;
+      closeLoginModal();
+      updateAuthUI();
+      updateFreePreviewLimit();
+      showToast('Welcome back, ' + (currentUser.name || currentUser.email) + '!');
+    } else {
+      errorDiv.textContent = data.error || 'Login failed';
+      errorDiv.style.display = 'block';
+    }
+  } catch (e) {
+    errorDiv.textContent = 'Connection error. Please try again.';
+    errorDiv.style.display = 'block';
+  }
+}
+
+async function handleSignup(e) {
+  e.preventDefault();
+  const name = document.getElementById('signup-name').value;
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const errorDiv = document.getElementById('signup-error');
+
+  try {
+    const resp = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    });
+    const data = await resp.json();
+
+    if (resp.ok) {
+      currentUser = data.user;
+      closeSignupModal();
+      updateAuthUI();
+      updateFreePreviewLimit();
+      showToast('Account created! Welcome to PermitGrab.');
+    } else {
+      errorDiv.textContent = data.error || 'Registration failed';
+      errorDiv.style.display = 'block';
+    }
+  } catch (e) {
+    errorDiv.textContent = 'Connection error. Please try again.';
+    errorDiv.style.display = 'block';
+  }
+}
+
+async function logout() {
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+    currentUser = null;
+    updateAuthUI();
+    updateFreePreviewLimit();
+    showToast('You have been logged out.');
+  } catch (e) {
+    console.error('Logout error:', e);
+  }
+}
+
+// Close modals on backdrop click
+document.getElementById('login-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeLoginModal();
+});
+document.getElementById('signup-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeSignupModal();
+});
+
+// ===========================
 // INIT
 // ===========================
+
+// Check current user first
+checkCurrentUser();
 
 // Check for payment status in URL
 const urlParams = new URLSearchParams(window.location.search);
 const paymentStatus = urlParams.get('payment');
 if (paymentStatus === 'success') {
-  setTimeout(() => showToast('Payment successful! Welcome to Professional.'), 500);
+  setTimeout(() => {
+    showToast('Payment successful! Welcome to Professional.');
+    checkCurrentUser(); // Refresh user state after payment
+  }, 500);
   // Clean up URL
   window.history.replaceState({}, document.title, window.location.pathname);
 } else if (paymentStatus === 'cancelled') {
