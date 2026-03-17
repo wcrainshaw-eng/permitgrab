@@ -314,19 +314,37 @@ def save_subscribers(subs):
         json.dump(subs, f, indent=2)
 
 
+import fcntl
+
+# Lock file for user operations (prevents race conditions with multiple workers)
+USERS_LOCK_FILE = os.path.join(DATA_DIR, '.users.lock')
+
+
 def load_users():
-    """Load user list."""
+    """Load user list with file locking for multi-worker safety."""
+    os.makedirs(DATA_DIR, exist_ok=True)
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE) as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                print(f"[Users] WARNING: Corrupted users.json, returning empty list")
+                return []
     return []
 
 
 def save_users(users):
-    """Save user list."""
+    """Save user list with file locking for multi-worker safety."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
+    # Use lock file to prevent race conditions between workers
+    lock_path = USERS_LOCK_FILE
+    with open(lock_path, 'w') as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            with open(USERS_FILE, 'w') as f:
+                json.dump(users, f, indent=2)
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def get_current_user():
@@ -2404,22 +2422,43 @@ def api_register():
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters'}), 400
 
-    users = load_users()
+    # Use file locking to prevent race conditions between Gunicorn workers
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(USERS_LOCK_FILE, 'w') as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            users = load_users()
+            print(f"[Register] Checking email: {email}, existing users: {len(users)}")
 
-    # Check for duplicate (case-insensitive)
-    if any(u['email'].lower() == email for u in users):
-        return jsonify({'error': 'Email already registered'}), 409
+            # Check for duplicate (case-insensitive, defensive)
+            existing_emails = set()
+            for u in users:
+                user_email = u.get('email', '')
+                if user_email:
+                    existing_emails.add(user_email.lower())
 
-    user = {
-        'email': email,
-        'name': name,
-        'password_hash': generate_password_hash(password),
-        'plan': 'free',
-        'created_at': datetime.now().isoformat(),
-    }
+            if email in existing_emails:
+                print(f"[Register] DUPLICATE BLOCKED: {email}")
+                return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
 
-    users.append(user)
-    save_users(users)
+            print(f"[Register] Creating new user: {email}")
+
+            user = {
+                'email': email,
+                'name': name,
+                'password_hash': generate_password_hash(password),
+                'plan': 'free',
+                'created_at': datetime.now().isoformat(),
+            }
+
+            users.append(user)
+
+            # Save directly within the lock to prevent race conditions
+            with open(USERS_FILE, 'w') as f:
+                json.dump(users, f, indent=2)
+            print(f"[Register] User saved. Total users now: {len(users)}")
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     # Log in the user
     session['user_email'] = email
