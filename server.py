@@ -586,10 +586,26 @@ def api_permits():
     quality = request.args.get('quality', '')
     search = request.args.get('search', '').lower()
 
+    # City filter - handle both slug (from onboarding) and city name (from dashboard)
     if city:
-        permits = [p for p in permits if p.get('city') == city]
+        # Try to resolve city slug to city name
+        city_key, city_config = get_city_by_slug(city)
+        if city_config:
+            city_name = city_config.get('name', city)
+        else:
+            city_name = city  # Use as-is if not a valid slug
+        permits = [p for p in permits if p.get('city') == city_name]
+
+    # Trade filter - handle both slug (from onboarding) and trade category name (from dashboard)
     if trade:
-        permits = [p for p in permits if p.get('trade_category') == trade]
+        # Try to resolve trade slug to trade name
+        trade_config = get_trade(trade)
+        if trade_config:
+            trade_name = trade_config.get('name', trade)
+        else:
+            trade_name = trade  # Use as-is if not a valid slug
+        # Case-insensitive match for trade_category
+        permits = [p for p in permits if p.get('trade_category', '').lower() == trade_name.lower()]
     if value:
         permits = [p for p in permits if p.get('value_tier') == value]
     if status:
