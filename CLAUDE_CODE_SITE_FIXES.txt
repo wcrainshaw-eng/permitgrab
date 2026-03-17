@@ -1,0 +1,503 @@
+PERMITGRAB SITE FIXES — PASTE THIS INTO CLAUDE CODE:
+=====================================================
+Run this BEFORE the SEO batch. These are critical fixes for broken routes, UX issues, and credibility problems found during a full site review. The site currently has dead links, broken navigation, and data quality issues that would undermine any SEO traffic.
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+Work through ALL parts in order. Commit after each part.
+
+========================================================================
+PART 1: PRICING PAGE (Currently returns 404)
+========================================================================
+
+The "Pricing" link in the nav points to /#pricing but no pricing section exists on the homepage. /pricing as a direct URL returns a raw unstyled 404. Every city landing page has a "See Pricing" button that goes nowhere. This is the #1 conversion killer.
+
+Create a new route /pricing that renders a proper pricing page:
+
+LAYOUT:
+- Use the same base template/nav as the main dashboard (dark nav bar with PermitGrab logo)
+- Clean white background, centered content
+
+HERO SECTION:
+- Heading: "Simple, Transparent Pricing"
+- Subheading: "Get the leads your competitors don't know about yet."
+
+TWO-TIER COMPARISON:
+
+FREE tier card (left, outlined border):
+  - Title: "Free"
+  - Price: "$0/month"
+  - Features list:
+    - Browse all permits
+    - Filter by city, trade, value
+    - See permit details & descriptions
+    - View project values
+    - Limited contact info (blurred)
+  - CTA button (outline style): "Browse Free" → links to /
+
+PROFESSIONAL tier card (right, highlighted with blue border/shadow, "Most Popular" badge):
+  - Title: "Professional"
+  - Price: "$149/month"
+  - Features list:
+    - Everything in Free, plus:
+    - Full contact info (names, phone numbers)
+    - Contractor intelligence dashboard
+    - Early Intel pre-construction signals
+    - Market analytics & trends
+    - Daily email alerts
+    - CSV export
+    - Save & manage leads
+    - Priority support
+  - CTA button (solid blue, prominent): "Start Free Trial" → links to Stripe checkout
+    - Use the existing Stripe checkout integration
+    - The Stripe price ID is in the environment variable or config
+
+BOTTOM SECTION:
+- "Frequently Asked Questions" with 4-5 FAQs:
+  - "What's included in the free plan?" → Basic permit browsing without contact info
+  - "Can I cancel anytime?" → Yes, cancel from your account settings, no contracts
+  - "How fresh is the permit data?" → Updated daily from official municipal sources
+  - "What cities do you cover?" → Currently covering [dynamic count] metro areas including NYC, LA, Chicago, Austin, and more. We add new cities regularly.
+  - "Do you offer team pricing?" → Contact us at support@permitgrab.com for team/enterprise pricing
+
+Also update the nav bar "Pricing" link from /#pricing to /pricing.
+
+========================================================================
+PART 2: SIGNUP & LOGIN ROUTES (Both currently 404)
+========================================================================
+
+The "Sign Up" and "Log In" buttons in the nav both point to /# (dead links). /signup and /register both return 404. Users literally cannot create accounts.
+
+CREATE /signup route:
+
+LAYOUT:
+- Centered card on light gray background, same nav as rest of site
+- PermitGrab logo at top of card
+
+FORM FIELDS:
+- Full Name (text input)
+- Email (email input)
+- Password (password input, minimum 8 characters)
+- Confirm Password (password input)
+- Checkbox: "I agree to the Terms of Service and Privacy Policy"
+- Submit button: "Create Account" (blue, full-width)
+- Below: "Already have an account? Log in" → links to /login
+
+ON SUBMIT:
+- Validate all fields client-side (name required, email format, passwords match, min length, checkbox checked)
+- POST to /api/auth/register (create this endpoint)
+- Hash password with bcrypt
+- Store user in the database/JSON store (wherever existing user data lives)
+- Set session cookie
+- Redirect to / (dashboard) with a flash message "Welcome to PermitGrab!"
+- New users default to the FREE tier
+
+CREATE /login route:
+
+LAYOUT:
+- Same centered card style as signup
+
+FORM FIELDS:
+- Email (email input)
+- Password (password input)
+- Submit button: "Log In" (blue, full-width)
+- Below: "Don't have an account? Sign up free" → links to /signup
+- Below that: "Forgot password?" (can be a placeholder link for now)
+
+ON SUBMIT:
+- Validate email/password
+- POST to /api/auth/login (create this endpoint)
+- Check credentials against stored users
+- Set session cookie
+- Redirect to / (dashboard)
+
+UPDATE NAV BAR:
+- Change "Sign Up" href from /# to /signup
+- Change "Log In" href from /# to /login
+- When user IS logged in, replace "Log In" and "Sign Up" with the user's name or "Account" and a "Log Out" link
+
+SESSION MANAGEMENT:
+- Use Flask sessions with the existing SECRET_KEY from environment
+- Create a @login_required decorator for protected routes
+- /my-leads, /early-intel (for Pro), /analytics (for Pro) should require login
+- Store user tier (free/pro) in session for gating features
+
+========================================================================
+PART 3: GET ALERTS LINK FIX
+========================================================================
+
+The "Get Alerts" nav link points to /# (dead). The sidebar already has a working "Get Permit Alerts" form with email/city/trade fields.
+
+Two fixes:
+1. Change the "Get Alerts" nav link to scroll to the alert form on the dashboard: href="/#get-alerts" and add id="get-alerts" to the alerts sidebar widget
+2. Also create a standalone /get-alerts page that has:
+   - The same alert signup form but larger/centered
+   - Heading: "Get Permit Alerts Delivered Daily"
+   - Subheading: "Choose your city and trade — we'll email you fresh leads every morning. Free for your first metro area."
+   - Same form fields: email, city dropdown, trade dropdown
+   - CTA: "Start Free Alerts"
+   - Below: small text "No credit card required. Upgrade anytime for full contact info."
+
+========================================================================
+PART 4: DASHBOARD PAGINATION
+========================================================================
+
+The dashboard currently loads ALL 2,000 permits on a single page. This is slow and overwhelming.
+
+Add server-side pagination:
+
+- Default: 50 permits per page
+- URL parameter: ?page=1 (default), ?page=2, etc.
+- Keep all existing filters working WITH pagination (city, trade, value tier, status, lead quality, search)
+- When filters are applied, pagination resets to page 1
+
+PAGINATION UI:
+- Add pagination controls below the permit cards, above where a footer will go
+- Show: "← Previous | Page 1 of 40 | Next →"
+- Also show: "Showing 1-50 of 2,000 permits"
+- Style: simple, clean buttons matching site design
+- Keep the "2,000 of 2,000 permits" counter at top accurate (total count, not page count)
+- Update it to say "2,000 permits (showing 1-50)" or similar
+
+PERFORMANCE:
+- Only load the current page's permits from the data source, not all 2,000 then slice
+- If the data is loaded from a JSON file, implement proper offset/limit
+- Maintain sort order (currently appears to be by value or date descending)
+
+========================================================================
+PART 5: TRADE CLASSIFICATION FIX
+========================================================================
+
+Nearly every permit currently shows "General Construction" as the trade badge. The trade classifier is not differentiating. Real permit descriptions contain keywords that map to specific trades.
+
+Fix the trade classification function to use keyword matching on the permit description AND the permit type/category fields:
+
+TRADE KEYWORDS (check description, work_type, permit_type fields — case-insensitive):
+
+Electrical:
+  - "electrical", "wiring", "panel", "circuit", "outlet", "lighting", "transformer", "switchgear", "conduit", "ampere", "amp service", "meter base", "electric"
+
+Plumbing:
+  - "plumbing", "plumb", "sewer", "drain", "water heater", "water line", "gas line", "backflow", "fixture", "pipe", "sprinkler system", "irrigation"
+
+HVAC:
+  - "hvac", "heating", "cooling", "air conditioning", "a/c", "furnace", "ductwork", "heat pump", "boiler", "ventilation", "mini-split", "condensing unit", "mechanical"
+
+Roofing:
+  - "roof", "roofing", "re-roof", "reroof", "shingle", "membrane", "flashing"
+
+Interior Renovation:
+  - "interior", "renovation", "remodel", "kitchen", "bathroom", "bath remodel", "tenant improvement", "t.i.", "finish out", "interior renovation", "gut remodel", "buildout"
+
+Windows & Doors:
+  - "window", "door", "glazing", "storefront", "curtain wall"
+
+Demolition:
+  - "demo", "demolition", "demolish", "tear down", "abatement", "strip out"
+
+Structural:
+  - "structural", "foundation", "footing", "retaining wall", "steel", "concrete", "framing", "load-bearing"
+
+Landscaping & Exterior:
+  - "landscape", "landscaping", "fence", "deck", "patio", "driveway", "sidewalk", "grading", "pool", "retaining", "pergola", "exterior"
+
+General Construction (FALLBACK — only use if no other keywords match):
+  - "new construction", "addition", "alteration", "repair", "commercial", "residential", "building", "permit"
+
+MATCHING RULES:
+1. Check description first, then work_type, then permit_type
+2. Use the FIRST specific match (not General Construction)
+3. If description contains keywords for multiple trades (e.g., "kitchen remodel with new electrical"), pick the one that appears first/most prominently OR assign the most specific one
+4. Only fall back to "General Construction" if NO specific keywords match
+5. Re-classify all existing permits in the data when this runs
+
+========================================================================
+PART 6: LEAD SCORING FIX
+========================================================================
+
+Every permit currently shows "100 pts" — the scoring function is not differentiating. Implement real scoring:
+
+SCORING FORMULA (0-100 points):
+
+Recency (0-30 points):
+  - Filed today: 30 pts
+  - Filed within 3 days: 25 pts
+  - Filed within 7 days: 20 pts
+  - Filed within 14 days: 15 pts
+  - Filed within 30 days: 10 pts
+  - Filed within 60 days: 5 pts
+  - Older than 60 days: 0 pts
+
+Project Value (0-25 points):
+  - Over $1M: 25 pts
+  - $500K-$1M: 20 pts
+  - $250K-$500K: 15 pts
+  - $100K-$250K: 10 pts
+  - $50K-$100K: 5 pts
+  - Under $50K or unknown: 0 pts
+
+Contact Completeness (0-20 points):
+  - Has owner name: +8 pts
+  - Has phone number: +6 pts
+  - Has full address (not just city): +6 pts
+
+Permit Stage (0-15 points):
+  - Filed/Application (early = less competition): 15 pts
+  - In Review: 12 pts
+  - Permitted/Issued: 10 pts
+  - In Progress: 5 pts
+  - Final/Complete: 2 pts
+  - Denied/Expired: 0 pts
+
+Trade Specificity (0-10 points):
+  - Specific trade classified (not General Construction): 10 pts
+  - General Construction: 3 pts
+  - Unknown/unclassified: 0 pts
+
+DISPLAY:
+- Keep the flame icon 🔥 but only show it for scores >= 70
+- Color code: 80-100 = orange/hot, 60-79 = yellow, 40-59 = gray, below 40 = light gray
+- Show the actual point value (not always 100)
+- Re-score all existing permits when this deploys
+
+========================================================================
+PART 7: STYLED 404 PAGE
+========================================================================
+
+The current 404 page is raw unstyled "Not Found" text on white background. Create a proper 404 page:
+
+- Use the same base template and nav bar as the rest of the site
+- Dark hero section (matching dashboard header style)
+- Large "404" number
+- Heading: "Page Not Found"
+- Subheading: "The page you're looking for doesn't exist or has been moved."
+- Two buttons:
+  - "Back to Dashboard" (primary, blue) → /
+  - "Browse Cities" (outline) → links to cities dropdown or a /cities page
+- Below: "Looking for something? Try searching for permits on the dashboard."
+- Register this as the Flask error handler for 404 so ALL missing routes get this page
+
+========================================================================
+PART 8: FOOTER ON ALL APP PAGES
+========================================================================
+
+The city SEO landing pages (/permits/austin) have a proper footer with Cities list, Company links, and branding. The main dashboard and other app pages (/, /contractors, /my-leads, /early-intel, /analytics, /pricing, /signup, /login) have NO footer.
+
+Add the same footer to ALL pages:
+
+FOOTER CONTENT:
+- Dark background (matching the SEO pages footer, dark slate/navy)
+- Left column: PermitGrab logo + tagline "Real-time construction permit leads for contractors. Get the jobs before your competition."
+- Middle column: "CITIES" header with links to all cities that have actual permit data (not all 44 — only the ones with real data)
+- Right column: "COMPANY" header with links: Home, Pricing, Features, Get Alerts, Log In
+- Bottom bar: "© 2026 PermitGrab. All rights reserved." centered
+
+IMPLEMENTATION:
+- Create a shared footer template/partial (Jinja2 {% include %} or similar) so it's defined once and included everywhere
+- The footer's city list should be dynamically generated from the same source that populates the nav dropdown — but filtered to only show cities with actual permit data
+
+========================================================================
+PART 9: DYNAMIC HERO STATS
+========================================================================
+
+The hero section shows hardcoded stats: "2,000 Active Permits, 44 Metro Areas, $444M Total Project Value, 712 High-Value Leads." The "44 Metro Areas" number is misleading — only ~8-10 cities have real data.
+
+Make the stats dynamic:
+
+- "Active Permits" → count of actual permits in the database/JSON
+- "Metro Areas" → count of cities that have at least 1 permit in the data (NOT total cities in config)
+- "Total Project Value" → sum of all permit values in the data, formatted (e.g., "$25M" or "$444M")
+- "High-Value Leads" → count of permits with lead score >= 70 (after the scoring fix)
+
+If pulling dynamic counts is too slow for page load, cache them and update on each data collection run. The key thing is the numbers should reflect reality, not aspirational totals.
+
+========================================================================
+PART 10: CITIES DROPDOWN — ONLY SHOW CITIES WITH DATA
+========================================================================
+
+The Cities dropdown in the nav lists all 44 cities in the config, but most have zero permits. A contractor clicking "Honolulu" sees nothing.
+
+Fix the dropdown:
+
+OPTION A (preferred): Only show cities that have at least 1 permit in the current dataset. Query the data on page load (or cache it) and dynamically build the dropdown.
+
+OPTION B (fallback): Keep all cities but add visual indicators:
+- Cities with data: normal text, clickable
+- Cities without data: grayed out with "(coming soon)" label, still clickable but the landing page should say "We're working on adding [city] data. Sign up for alerts and we'll notify you when it's live."
+
+Also apply the same logic to:
+- The "City" filter dropdown on the dashboard
+- The footer city links
+- The city landing pages (cities without data should show a "coming soon" message, not an empty permit list)
+
+========================================================================
+PART 11: PHONE NUMBER CREDIBILITY
+========================================================================
+
+Every permit card shows a green phone button with a phone number. These numbers appear auto-generated (random area codes that don't match the permit's city). Fake phone numbers destroy credibility.
+
+Fix:
+- If the phone number comes from actual permit data or a verified enrichment source → show it
+- If the phone number is generated/synthetic → DO NOT show it
+- For free users: show "📞 Contact Info" with a lock icon and "Upgrade for contact details" tooltip — this is BETTER for conversion than showing a fake number
+- For Pro users: show the real phone number if available, or "No phone on file" if not
+
+Same logic for owner names — if the owner name comes from actual permit data, show it. If it's randomly generated, either pull the real name from the permit record or show "Owner info available with Pro."
+
+The bottom line: it's better to show NO phone number than a FAKE phone number. A contractor who calls a wrong number will never trust the site again.
+
+========================================================================
+PART 12: UNIFIED NAV BAR
+========================================================================
+
+Currently two different nav bars exist:
+- Dashboard pages: Dashboard, Cities ▼, Contractors, Early Intel (NEW), Analytics (Pro), Pricing, Get Alerts, Log In, Sign Up
+- SEO landing pages: Cities ▼, Pricing, Features, Browse All Permits
+
+Unify to ONE nav bar across all pages:
+
+LOGGED OUT NAV:
+  PermitGrab [logo] | Dashboard | Cities ▼ | Contractors | Pricing | Get Alerts | Log In | Sign Up [orange button]
+
+LOGGED IN (FREE) NAV:
+  PermitGrab [logo] | Dashboard | Cities ▼ | Contractors | Early Intel (NEW) | Analytics (PRO) | My Leads | [User Name ▼ → Account, Log Out]
+
+LOGGED IN (PRO) NAV:
+  PermitGrab [logo] | Dashboard | Cities ▼ | Contractors | Early Intel | Analytics | My Leads | [User Name ▼ → Account, Billing, Log Out]
+
+SEO LANDING PAGES (same nav but with an extra CTA):
+  Same as logged-out nav, since SEO pages are public
+
+RULES:
+- "Early Intel" and "Analytics" labels should only show in the nav for logged-in users (don't tease features to logged-out visitors with badge labels they can't access)
+- "My Leads" only shows for logged-in users
+- The orange "Sign Up" button is the primary CTA for logged-out users
+- Create the nav as a shared template partial used by ALL pages
+
+========================================================================
+PART 13: UPGRADE CTA LINKS
+========================================================================
+
+Several places show "Upgrade to see contact info for all leads →" but the link goes nowhere since there's no pricing page or checkout flow.
+
+After the pricing page exists (Part 1):
+- Link all "Upgrade" CTAs to /pricing
+- Link all "Upgrade to Pro" buttons (on /early-intel, /analytics paywalls) to /pricing
+- On the pricing page, the "Start Free Trial" button should go to Stripe checkout
+- After Stripe checkout success, redirect back to the dashboard with the user's account upgraded
+
+========================================================================
+PART 14: META TAGS & SEO BASICS
+========================================================================
+
+Add proper meta tags to EVERY page:
+
+HOMEPAGE (/):
+  <title>PermitGrab — Construction Permit Leads for Contractors</title>
+  <meta name="description" content="Find construction permit leads before your competition. Browse building permits, get contractor contact info, and win more jobs. Free to start.">
+  <meta property="og:title" content="PermitGrab — Construction Permit Leads">
+  <meta property="og:description" content="Real-time building permit leads delivered daily. Find who's building, what they're building, and how to reach them.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://permitgrab.com">
+
+PRICING (/pricing):
+  <title>Pricing — PermitGrab | $149/mo for Full Contractor Leads</title>
+  <meta name="description" content="PermitGrab Professional: $149/month for full contact info, daily email alerts, analytics, and early construction intel. Free plan available.">
+
+CITY LANDING PAGES (/permits/[city]):
+  Already have good titles — verify meta descriptions exist too
+
+CONTRACTORS (/contractors):
+  <title>Contractor Intelligence — Who's Pulling Permits | PermitGrab</title>
+  <meta name="description" content="See which contractors are most active in your market. Track permits by contractor, total project value, and primary trade.">
+
+ALL PAGES:
+  - Add canonical URL: <link rel="canonical" href="https://permitgrab.com/[current-path]">
+  - Add favicon if missing
+  - Add og:image (create a simple PermitGrab social share card, 1200x630px)
+
+========================================================================
+PART 15: ROBOTS.TXT AND SITEMAP
+========================================================================
+
+Create /robots.txt route:
+```
+User-agent: *
+Allow: /
+Allow: /permits/
+Allow: /pricing
+Allow: /contractors
+Disallow: /admin
+Disallow: /api/
+Disallow: /my-leads
+Disallow: /early-intel
+Disallow: /analytics
+
+Sitemap: https://permitgrab.com/sitemap.xml
+```
+
+Create /sitemap.xml route (dynamic):
+- Include: /, /pricing, /contractors
+- Include: /permits/[city] for every city that has actual permit data
+- Each URL should have <lastmod> based on the most recent permit date for that city
+- Set <changefreq>daily</changefreq> for city pages, weekly for static pages
+- Set <priority>1.0</priority> for homepage, 0.8 for city pages, 0.6 for other pages
+- Return proper XML content type
+
+========================================================================
+PART 16: HIDE EMPTY WIDGETS
+========================================================================
+
+Quick cleanup:
+
+- "Code Violations" sidebar widget says "No code violations found" — if there are zero violations in the data, hide this widget entirely. Only show it when there's actual violation data to display.
+- "Export CSV" button — if this is meant to be a Pro feature, show it but with a lock icon for free users and "Export CSV (Pro)" text. Clicking it as a free user should prompt upgrade.
+- "View All Violations →" link in the violations widget — if /violations doesn't exist, remove this link.
+
+========================================================================
+PART 17: CITY LANDING PAGES — CROSS-LINKS
+========================================================================
+
+The city landing pages (/permits/austin) are well built but don't cross-link to other cities. Internal linking distributes SEO authority.
+
+Add a section ABOVE the footer on each city landing page:
+
+"Explore Permits in Other Cities"
+- Grid of cards/links to all other active cities (cities with data)
+- Each shows: City Name, permit count, and a small arrow
+- Example: "New York City — 611 permits →"
+- Exclude the current city from the list
+- Limit to 12-15 cities max, with a "View All Cities" link if there are more
+
+========================================================================
+PART 18: QUICK WINS — MISC CLEANUP
+========================================================================
+
+Small fixes that take 5 minutes each:
+
+1. The "My Leads" nav link — should go to /my-leads and require login. If user is not logged in, redirect to /login with a flash message "Log in to access your saved leads."
+
+2. "View Permit History" link on permit cards — verify this route exists and works. If it's broken or shows no data, hide the link.
+
+3. The Get Permit Alerts form in the sidebar — verify the POST endpoint works and actually stores the email/preferences. If it's not wired up, connect it to whatever alert storage exists (or create a simple JSON store for email signups).
+
+4. Add a loading spinner or skeleton screen for the initial page load. On free Render tier, cold starts take ~50 seconds. Show something while the app wakes up rather than a blank screen.
+
+========================================================================
+DEPLOYMENT NOTES
+========================================================================
+
+- Commit and push after each part (or group 2-3 small parts together)
+- Test each route after deploying: /pricing, /signup, /login, /get-alerts, /sitemap.xml, /robots.txt
+- The Render deploy takes 2-5 minutes after push
+- After all parts are done, do a full walkthrough: homepage → filter → permit card → pricing → sign up → log in → my leads → early intel (paywall) → analytics (paywall) → city landing page → footer links
+- Verify all nav links work on every page
+- Check that the 404 page appears for genuinely missing URLs like /asdf
+
+========================================================================
+AFTER THIS IS DONE, DEPLOY THE REMAINING BATCHES IN ORDER:
+========================================================================
+1. CLAUDE_CODE_SEO_PROGRAMMATIC.txt (programmatic trade×city pages, blog, etc.)
+2. CLAUDE_CODE_BATCH4_PRECONSTRUCTION_SIGNALS.txt (pre-construction signals)
+3. CLAUDE_CODE_BATCH5_CITY_EXPANSION.txt (20 new cities)
+4. CLAUDE_CODE_LIFECYCLE_PILLS.txt (lifecycle stage badges — may already be partially done)

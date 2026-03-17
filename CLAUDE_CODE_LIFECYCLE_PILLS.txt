@@ -1,0 +1,77 @@
+LIFECYCLE STATUS PILLS — PASTE THIS INTO CLAUDE CODE:
+======================================================
+(Can be run anytime after Batch 4 signals are in place)
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+Add a color-coded "lifecycle stage" pill/badge to EVERY record displayed in the dashboard — permits, signals, and violations. The pill tells the user at a glance where this project sits in the construction lifecycle, from earliest whisper to completed work.
+
+1. LIFECYCLE STAGES (in chronological order):
+
+   Stage              | Pill Label         | Color              | Applies To
+   -------------------------------------------------------------------------------
+   Pre-construction   | "Early Signal"     | Purple (#7C3AED)   | Signals with status=pending
+   Approved planning  | "Approved"         | Blue (#2563EB)     | Signals with status=approved
+   Application filed  | "Filed"            | Indigo (#4F46E5)   | Permits with status containing "filed" or "application" or "submitted" or "in review" or "plan check"
+   Permit issued      | "Permitted"        | Green (#16A34A)    | Permits with status containing "issued" or "approved" or "active" or "completed"
+   Under construction | "In Progress"      | Amber (#D97706)    | Permits with status containing "in progress" or "partial" or inspections logged
+   Final inspection   | "Final"            | Teal (#0D9488)     | Permits with status containing "final" or "c of o" or "certificate"
+   Violation flagged  | "Violation"        | Red (#DC2626)      | Any record with linked violations from Batch 2
+   Denied / expired   | "Denied"           | Gray (#6B7280)     | Signals with status=denied OR permits with status containing "denied" or "expired" or "revoked" or "withdrawn"
+
+2. IMPLEMENTATION:
+
+   Create a function get_lifecycle_stage(record) in a new file lifecycle.py that:
+   - Takes any record (permit, signal, or violation)
+   - Determines the record type (has permit_number → permit, has signal_id → signal, has violation_id → violation)
+   - Reads the status field and matches against the keywords above (case-insensitive)
+   - If a permit has linked_signals, check if any signal was "approved" → that means it progressed from signal to permit (good intel)
+   - If a record has linked violations, ALWAYS show the "Violation" pill AS A SECOND pill alongside the lifecycle pill — violations don't replace the stage, they augment it
+   - Returns: { "label": "Permitted", "color": "#16A34A", "secondary": null } or { "label": "Filed", "color": "#4F46E5", "secondary": { "label": "Violation", "color": "#DC2626" } }
+   - If status field is empty/null/unrecognized, default to "Filed" for permits and "Early Signal" for signals
+
+3. PILL HTML/CSS:
+
+   Render each pill as an inline badge:
+   - Rounded-full (fully rounded corners)
+   - Small text (text-xs or 11px)
+   - Font weight: semibold
+   - Padding: 2px 10px
+   - Background: the color at 15% opacity (e.g., rgba(124,58,237,0.15) for purple)
+   - Text color: the full color (e.g., #7C3AED)
+   - No border, just the soft colored background with matching text
+
+   Example HTML:
+   <span style="background:rgba(22,163,74,0.15);color:#16A34A;font-size:11px;font-weight:600;padding:2px 10px;border-radius:9999px;">Permitted</span>
+
+   If there's a secondary pill (violation), render it right next to the first with a 4px gap.
+
+4. WHERE TO SHOW THE PILLS:
+
+   - Main permits dashboard: each permit card/row gets a pill next to the permit number or address
+   - Early Intel tab: each signal card gets a pill
+   - Saved Leads (/my-leads): each saved lead shows its current pill
+   - Search results: pills appear inline
+   - Address intel view (/api/address-intel rendered page): show pills on the timeline for each record
+   - CSV export: include a "lifecycle_stage" column with the label text (no colors obviously)
+
+5. PILL PRIORITY FOR MIXED RECORDS:
+
+   When showing an address that has MULTIPLE records (a signal AND a permit AND a violation):
+   - Show the MOST ADVANCED lifecycle stage as the primary pill
+   - Show the violation pill as secondary if applicable
+   - In the expanded/detail view, show the full timeline with a pill for each record
+
+6. TIMELINE INDICATOR (optional enhancement):
+
+   On the address detail view, show a horizontal progress bar with dots for each stage the project has passed through:
+
+   ● Early Signal → ● Approved → ● Filed → ● Permitted → ○ In Progress → ○ Final
+
+   Filled dots (●) = stages this project has evidence for
+   Empty dots (○) = stages not yet reached
+   Red dot anywhere = violation at that stage
+
+   This gives contractors a visual sense of project momentum — a project that went Signal → Approved → Filed fast is one to jump on.
+
+7. Commit and push.

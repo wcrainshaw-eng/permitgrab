@@ -938,6 +938,15 @@ def contractors_page():
     return render_template('contractors.html')
 
 
+@app.route('/pricing')
+def pricing_page():
+    """Render the Pricing page."""
+    user = get_current_user()
+    cities = get_all_cities_info()
+    city_count = get_city_count()
+    return render_template('pricing.html', user=user, cities=cities, city_count=city_count)
+
+
 # ===========================
 # TREND ANALYTICS API
 # ===========================
@@ -1136,7 +1145,7 @@ def analytics_page():
                 <div class="card">
                     <h1>Analytics is a Pro Feature</h1>
                     <p>Upgrade to Professional to access trend analytics, market insights, and contractor intelligence.</p>
-                    <a href="/#pricing" class="btn">Upgrade to Pro</a>
+                    <a href="/pricing" class="btn">Upgrade to Pro</a>
                     <p style="margin-top: 16px;"><a href="/" style="color: #6b7280;">Back to Dashboard</a></p>
                 </div>
             </body></html>
@@ -1386,7 +1395,7 @@ def early_intel_page():
                 <div class="card">
                     <h1>Early Intel is a Pro Feature</h1>
                     <p>Upgrade to Professional to access pre-construction signals, zoning applications, and early-stage filings before permits are issued.</p>
-                    <a href="/#pricing" class="btn">Upgrade to Pro</a>
+                    <a href="/pricing" class="btn">Upgrade to Pro</a>
                     <p style="margin-top: 16px;"><a href="/" style="color: #6b7280;">Back to Dashboard</a></p>
                 </div>
             </body></html>

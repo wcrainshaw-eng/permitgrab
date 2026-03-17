@@ -1,0 +1,39 @@
+BATCH 2 — PASTE THIS INTO CLAUDE CODE:
+========================================
+(Permit History + Code Violations)
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+Add these two features to PermitGrab:
+
+1. PERMIT HISTORY PER ADDRESS:
+   - Create a new collector function fetch_permit_history(city) in collector.py that pulls historical permits (last 3 years) from each city's Socrata API using $where=date > '2023-01-01'
+   - Store in data/permit_history.json indexed by normalized address (lowercase, stripped)
+   - Create GET /api/permit-history/<address> that returns all historical permits at that address
+   - In dashboard_production.html, when a user clicks a permit card, show an expandable "Permit History" section showing:
+     * Number of previous permits at this address
+     * Timeline list of past permits with date, type, value, and contractor
+     * A badge "Repeat Renovator" if 3+ permits exist at the address (indicates warm lead)
+   - Run the history collector once at startup then weekly alongside the regular collector
+
+2. CODE VIOLATION ALERTS:
+   - Create a new file violation_collector.py that pulls code violations from city open-data Socrata APIs:
+     * NYC: data.cityofnewyork.us/resource/wvxf-dwi5.json (Housing Maintenance Code Violations)
+     * Chicago: data.cityofchicago.org/resource/22u3-xenr.json (Building Violations)
+     * LA: data.lacity.org Code Enforcement dataset
+     * Austin: data.austintexas.gov Code Compliance Cases
+     * Denver: data.denvergov.org Code Enforcement
+     * Seattle: data.seattle.gov SDCI violations
+     * Portland: data.portland.gov BDS violations
+     * San Francisco: data.sfgov.org DBI complaints
+   - For each city, pull violations from the last 90 days, store in data/violations.json
+   - Cross-reference violations with permits by normalized address
+   - Create GET /api/violations?city=X endpoint
+   - On the dashboard, add a "Code Violations" tab/section showing:
+     * Recent violations that DON'T have a matching permit (these are pre-leads)
+     * Address, violation type, date, status (open/closed)
+     * A "Pre-Lead" badge on violations with no matching permit
+   - On individual permit cards, show a warning icon if there are active violations at that address
+   - Schedule the violation collector to run daily alongside the permit collector
+
+3. Commit and push to GitHub.

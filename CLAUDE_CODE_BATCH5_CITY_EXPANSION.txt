@@ -1,0 +1,254 @@
+BATCH 5 — PASTE THIS INTO CLAUDE CODE:
+========================================
+(City Expansion — Add 20+ New Cities Using Free Open Data APIs)
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+This batch expands PermitGrab from its current ~11 cities to 30+ cities by tapping into free public open data APIs across three platforms: Socrata (SODA API), ArcGIS Open Data Hub, and CKAN. NO scraping required — these are all structured JSON APIs.
+
+IMPORTANT: The existing permit collector pattern should be refactored into a modular system where each city is a configuration entry, not a hardcoded function. This makes adding future cities trivial.
+
+=============================================
+PART 1: REFACTOR COLLECTOR INTO MODULAR SYSTEM
+=============================================
+
+Refactor the permit collection system so each city is defined by a config entry rather than custom code. Create a file called city_configs.py with a CITY_REGISTRY dictionary:
+
+Each city config entry should contain:
+{
+    "name": "Nashville",
+    "state": "TN",
+    "slug": "nashville",
+    "platform": "socrata" | "arcgis" | "ckan" | "carto",
+    "base_url": "https://data.nashville.gov",
+    "dataset_id": "3h5w-q8b7",
+    "field_map": {
+        "permit_number": "permit_number",
+        "address": "address",
+        "description": "const_cost",
+        "permit_type": "permit_type_mapped",
+        "value": "const_cost",
+        "date_issued": "date_issued",
+        "status": "status",
+        "contractor": "contractor",
+        "owner": "owner"
+    },
+    "default_filter": "$where=date_issued > '{ninety_days_ago}'",
+    "active": true
+}
+
+Create platform-specific fetcher functions:
+- fetch_socrata(config) — uses SODA API: {base_url}/resource/{dataset_id}.json?{filter}&$limit=5000
+- fetch_arcgis(config) — uses ArcGIS REST: {base_url}/api/download/v1/items/{dataset_id}/csv (or /query endpoint with f=json)
+- fetch_ckan(config) — uses CKAN API: {base_url}/api/3/action/datastore_search?resource_id={dataset_id}&limit=5000
+- fetch_carto(config) — uses CARTO SQL API: {base_url}/api/v2/sql?q=SELECT * FROM {table} WHERE {filter}
+
+Each fetcher normalizes the response into the standard permit format used by the rest of the app.
+
+Migrate ALL existing cities (NYC, Chicago, LA, Austin, Denver, Seattle, Portland, SF, and any others currently live) into this config system first, verify they still work, then add the new cities below.
+
+=============================================
+PART 2: NEW CITIES — SOCRATA PLATFORM (SODA API)
+=============================================
+These use the exact same API pattern as your existing cities. Easiest to add.
+
+1. NASHVILLE, TN
+   - Portal: data.nashville.gov
+   - Dataset: Building Permits Issued — ID: 3h5w-q8b7
+   - Also available: Building Permit Applications (pre-issue) — ID: kqff-rxj8
+   - Fields: permit_number, date_issued, const_cost, permit_type, permit_sub_type, address, city, state, zip, contractor, owner
+   - Filter: $where=date_issued > '(90 days ago)'
+
+2. CINCINNATI, OH
+   - Portal: data.cincinnati-oh.gov
+   - Dataset: Building Permits — look up current dataset ID at the portal
+   - Fields: Map to standard permit fields
+   - Filter: Recent 90 days by issue date
+
+3. CAMBRIDGE, MA
+   - Portal: data.cambridgema.gov
+   - Dataset: Building Permits: New Construction — ID: 9qm7-wbdc
+   - Fields: Map to standard permit fields
+   - Filter: Recent 90 days
+
+4. WASHINGTON, DC
+   - Portal: opendata.dc.gov
+   - Dataset: Building Permits in 2025/2026 — check for latest year dataset
+   - Note: DC splits data by year. Check for the current year dataset ID.
+   - May use ArcGIS hub rather than pure Socrata — check the API endpoint format
+   - Fields: PERMIT_NUMBER, PERMIT_TYPE, FULL_ADDRESS, ISSUE_DATE, STATUS, OWNER_NAME, APPLICANT
+   - Filter: Recent 90 days by issue date
+
+5. DALLAS, TX
+   - Portal: data.dallasopendata.com (if available) or dallasgis.com
+   - Check for building permits dataset — Dallas uses Socrata for some datasets
+   - If not available via API, skip and note as "pending — check for API availability"
+
+6. SAN ANTONIO, TX
+   - Portal: data.sanantonio.gov
+   - Check for building/construction permits dataset
+   - San Antonio is on Socrata platform
+
+7. KANSAS CITY, MO
+   - Portal: data.kcmo.org
+   - Check for building permits dataset
+   - Kansas City is on Socrata platform
+
+8. NEW ORLEANS, LA
+   - Portal: data.nola.gov
+   - Check for building permits dataset
+   - New Orleans is on Socrata platform
+
+9. DETROIT, MI
+   - Portal: data.detroitmi.gov
+   - Check for building permits dataset
+   - Detroit is on Socrata platform
+
+10. PITTSBURGH, PA
+    - Portal: data.wprdc.org (Western PA Regional Data Center)
+    - Check for building permits dataset
+    - Uses Socrata/CKAN hybrid
+
+=============================================
+PART 3: NEW CITIES — ARCGIS OPEN DATA HUB
+=============================================
+These use ArcGIS REST API. Different from Socrata but still structured JSON.
+
+11. MIAMI-DADE COUNTY, FL
+    - Portal: gis-mdc.opendata.arcgis.com
+    - Dataset: Building Permits Issued (2 Previous Years to Present)
+    - Also: Building Permit (single dataset for all)
+    - ArcGIS Feature Service — query with: /query?where=1=1&outFields=*&f=json&resultRecordCount=5000
+    - Filter by issue date > 90 days ago
+    - Fields: PERMIT_NUM, PROC_DESC, ADDRESS, ISSUED_DATE, STATUS_DESC, APPL_NAME
+
+12. RALEIGH, NC
+    - Portal: data-ral.opendata.arcgis.com
+    - Dataset: Building Permits
+    - ArcGIS Feature Service
+    - Fields: Map to standard permit format
+    - Filter: Recent 90 days
+
+13. SACRAMENTO, CA
+    - Portal: data.cityofsacramento.org
+    - Datasets: Issued Building Permits Current Year + Applied Building Permits Current Year
+    - ArcGIS-based
+    - Fields: PERMIT_NUMBER, ADDRESS, PERMIT_TYPE, VALUATION, ISSUE_DATE, CONTRACTOR, OWNER
+
+14. PHOENIX, AZ
+    - Portal: phoenixopendata.com / mapping-phoenix.opendata.arcgis.com
+    - Dataset: Building Permit Data
+    - Fields: Map to standard permit format
+    - Filter: Recent 90 days
+
+15. SAN JOSE, CA
+    - Portal: data.sanjoseca.gov
+    - Dataset: Active Building Permits
+    - ArcGIS-based
+    - Fields: Map to standard permit format
+
+16. SAN DIEGO COUNTY, CA
+    - Portal: data.sandiegocounty.gov
+    - Dataset: Building Permits — ID: dyzh-7eat
+    - Fields: Map to standard permit format
+
+=============================================
+PART 4: NEW CITIES — CKAN / CARTO / OTHER
+=============================================
+These use different API formats but are still free structured APIs.
+
+17. PHILADELPHIA, PA
+    - Portal: opendataphilly.org (CARTO-backed)
+    - Dataset: L&I Building and Zoning Permits (2007-present)
+    - API: CARTO SQL API endpoint
+    - Contact for API details: ligisteam@phila.gov
+    - Fields: permitnumber, address, typeofwork, permittype, status, applicantname, contractorname, commercialorresidential
+    - Filter: Recent 90 days by permitissuedate
+    - NOTE: Very large dataset — always use date filters and $limit
+
+18. BOSTON, MA
+    - Portal: data.boston.gov (CKAN platform)
+    - Dataset: Approved Building Permits
+    - API: CKAN datastore_search endpoint
+    - Fields: Map to standard permit format
+    - Filter: Recent 90 days
+
+19. HOUSTON, TX
+    - Portal: data.houstontx.gov (CKAN platform)
+    - Dataset: Residential Building Permits by Month and Year
+    - NOTE: Houston's data is aggregated (monthly counts), NOT individual permits. May be limited for lead gen.
+    - If individual permit data isn't available via API, check the Houston Permitting Center (permits.houstontx.gov) and note as "limited — aggregate data only"
+
+20. MINNEAPOLIS, MN
+    - Portal: opendata.minneapolismn.gov or gisdata.mn.gov
+    - Dataset: Residential Building Permits (Metropolitan Council data)
+    - Fields: Map to standard permit format
+    - NOTE: May be regional (7-county Twin Cities area) rather than just Minneapolis
+
+=============================================
+PART 5: CITY LANDING PAGES FOR NEW CITIES
+=============================================
+
+For EVERY new city successfully added:
+
+1. Create a landing page at /permits/{city-slug} following the same template as existing city pages (see Batch SEO command for the template)
+2. Add the city to the nav dropdown
+3. Add the city to sitemap.xml
+4. Add appropriate meta tags:
+   - Title: "Building Permits in {City}, {State} | PermitGrab — Contractor Leads"
+   - Description: "Track new building permits in {City}, {State}. Get real-time contractor leads from {City} construction permits. Free access to permit data with lead scoring."
+5. Add the city to the homepage city grid/list
+
+=============================================
+PART 6: AUTO-DISCOVERY & HEALTH MONITORING
+=============================================
+
+Create a small utility (city_health.py) that:
+
+1. HEALTH CHECK: For each active city config, runs a test query (limit=1) and records:
+   - Last successful pull timestamp
+   - Record count from last full pull
+   - Any errors or timeouts
+   - API response time
+
+2. Stores results in data/city_health.json
+
+3. Adds a "City Status" section to the /admin page showing:
+   - Green dot = pulled data successfully in last 24hrs
+   - Yellow dot = pulled but got fewer records than usual (>50% drop)
+   - Red dot = failed to pull in last 24hrs
+   - Each city shows: name, platform, last pull time, record count, status
+
+4. If a city API changes or breaks, the admin page makes it obvious immediately
+
+=============================================
+PART 7: DYNAMIC CITY COUNT ON MARKETING
+=============================================
+
+Update the homepage and any marketing copy to dynamically show the city count instead of hardcoding it:
+- "Track permits across {len(active_cities)} US cities"
+- Pull the count from the city registry at render time
+- This way the number auto-updates as you add cities
+
+=============================================
+PART 8: IMPLEMENTATION ORDER
+=============================================
+
+Do this in order:
+1. Build the modular config system (city_configs.py + platform fetchers)
+2. Migrate existing cities to the new config system — TEST that everything still works
+3. Add Socrata cities first (easiest, same pattern) — Nashville, Cincinnati, Cambridge, DC, etc.
+4. Add ArcGIS cities next — Miami, Raleigh, Sacramento, Phoenix, San Jose, San Diego
+5. Add CKAN/Carto cities — Philadelphia, Boston, Houston, Minneapolis
+6. For each city: test the API endpoint manually first. If the dataset ID has changed or the API returns errors, mark that city as "inactive" in the config and move on. Don't let one broken city block the others.
+7. Create landing pages for all successfully added cities
+8. Build city_health.py monitoring
+9. Update homepage dynamic city count
+10. Commit and push to GitHub
+
+IMPORTANT NOTES:
+- Some dataset IDs listed above may have changed. The collector should log clearly when a dataset returns an error so you can update the ID.
+- Always respect API rate limits. Add a 1-second delay between city pulls.
+- Set $limit=5000 (or equivalent) on all queries. If a city returns exactly 5000, there may be more — log a warning and consider pagination.
+- For cities marked "check for dataset" — visit the portal, find the permits dataset, grab the ID, and add it. If no permits dataset exists, skip the city and mark it inactive with a note.
+- Houston may only have aggregate data (monthly counts, not individual permits). If so, mark it as "limited" and skip it for now. Individual permit records are required for lead generation.

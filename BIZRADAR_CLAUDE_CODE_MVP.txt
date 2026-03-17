@@ -1,0 +1,423 @@
+BIZRADAR MVP — PASTE THIS INTO CLAUDE CODE:
+=============================================
+(New Business Filing Leads SaaS — Separate project from PermitGrab)
+
+Create a NEW project called BizRadar. This is a separate Flask web application (same stack as PermitGrab) that monitors Secretary of State business filings and delivers new-business-owner leads to subscribers.
+
+Do NOT modify PermitGrab. This is a standalone project with its own repo.
+
+=============================================
+PART 1: PROJECT SETUP
+=============================================
+
+Create the project structure:
+bizradar/
+├── app.py                    # Main Flask application
+├── config.py                 # Configuration (env vars, state configs)
+├── requirements.txt          # Flask, requests, stripe, gunicorn, sendgrid, apscheduler
+├── state_configs.py          # Registry of all state data sources
+├── collectors/
+│   ├── __init__.py
+│   ├── base_collector.py     # Base class for all collectors
+│   ├── ftp_collector.py      # For states with FTP downloads (Florida)
+│   ├── api_collector.py      # For states with REST APIs (California, OpenCorporates)
+│   ├── bulk_collector.py     # For states with bulk file downloads
+│   └── enrichment.py         # Contact enrichment and AI industry classification
+├── models/
+│   ├── __init__.py
+│   ├── leads.py              # Lead data model and storage
+│   ├── users.py              # User accounts and subscriptions
+│   └── filters.py            # Saved filter management
+├── routes/
+│   ├── __init__.py
+│   ├── auth.py               # Login, register, password reset
+│   ├── dashboard.py          # Main lead dashboard
+│   ├── api.py                # REST API endpoints (Enterprise tier)
+│   ├── billing.py            # Stripe checkout, webhooks, portal
+│   ├── landing.py            # Marketing pages and per-state SEO pages
+│   └── admin.py              # Admin panel
+├── templates/
+│   ├── base.html             # Base template with nav, footer
+│   ├── index.html            # Marketing landing page
+│   ├── dashboard.html        # Lead dashboard with filters
+│   ├── lead_detail.html      # Individual lead detail view
+│   ├── my_leads.html         # Saved leads / CRM-lite
+│   ├── pricing.html          # Pricing page
+│   ├── login.html            # Login page
+│   ├── register.html         # Registration page
+│   ├── state_landing.html    # Per-state SEO landing page template
+│   └── admin.html            # Admin dashboard
+├── static/
+│   ├── css/style.css         # Main stylesheet
+│   └── js/app.js             # Dashboard interactivity
+├── data/
+│   ├── leads.json            # Lead storage (migrate to PostgreSQL later)
+│   ├── users.json            # User accounts
+│   ├── saved_leads.json      # CRM-lite saved leads per user
+│   └── collection_stats.json # Collector health monitoring
+├── Procfile                  # web: gunicorn app:app
+├── render.yaml               # Render deployment config
+├── .gitignore
+└── README.md
+
+=============================================
+PART 2: STATE DATA REGISTRY (state_configs.py)
+=============================================
+
+Create a STATE_REGISTRY dictionary. Each state entry contains:
+{
+    "name": "Florida",
+    "abbreviation": "FL",
+    "slug": "florida",
+    "collector_type": "ftp",           # ftp | api | bulk | opencorporates
+    "data_url": "ftp://...",           # Primary data source URL
+    "update_frequency": "daily",       # daily | weekly | monthly
+    "data_format": "csv",             # csv | json | txt | xml
+    "field_map": {
+        "entity_name": "...",
+        "entity_type": "...",
+        "formation_date": "...",
+        "registered_agent": "...",
+        "principal_address": "...",
+        "filing_number": "...",
+        "status": "...",
+        "purpose": "..."
+    },
+    "cost": "free",                    # free | $X per download
+    "active": true,
+    "tier": 1                          # 1=launch, 2=phase2, 3=phase3
+}
+
+MVP launch states (Tier 1):
+
+1. FLORIDA
+   - Type: ftp
+   - URL: https://dos.fl.gov/sunbiz/other-services/data-downloads/daily-data/
+   - FTP credentials: Public access (check the data downloads page for current FTP URL and login)
+   - Format: Fixed-width text files OR CSV (check format on download page)
+   - Contains: Corp/LLC/LP filings added that day
+   - Fields: Entity name, entity number, filing date, status, state, registered agent name/address, principal address
+   - Cost: Free
+   - Update: Daily (workdays)
+
+2. NEW YORK
+   - Type: api / bulk
+   - URL: https://data.ny.gov/ — Dataset "Corporations and Other Entities: All Filings"
+   - Also has 30-day rolling window dataset
+   - Format: JSON (Socrata SODA API) or CSV download
+   - Fields: DOS ID, Filing Date, Entity Name, County, Jurisdiction, Entity Type
+   - Cost: Free
+   - Update: Regularly updated
+
+3. CALIFORNIA
+   - Type: api
+   - URL: bizfileonline.sos.ca.gov — API Management Portal
+   - Also: Bulk "Master Unload" for $100 one-time
+   - Format: JSON (REST API)
+   - Fields: Entity name, number, registration date, address
+   - Cost: API free with subscription key; Bulk $100
+   - Notes: Register for API key at their developer portal
+
+4. TEXAS
+   - Type: bulk
+   - URL: https://direct.sos.state.tx.us/ (SOSDirect)
+   - Bulk data order from the website
+   - Format: Electronic data files
+   - Cost: Varies (bulk orders have fees)
+   - Notes: May need to request bulk access
+
+5. WASHINGTON
+   - Type: bulk
+   - URL: sos.wa.gov — business entity data
+   - Format: CSV/bulk download
+   - Cost: Free
+
+6. KENTUCKY
+   - Type: bulk
+   - URL: sos.ky.gov/bus/Pages/Bulk-Data-Service.aspx
+   - Format: Bulk subscription
+   - Cost: Monthly subscription (commercial use)
+
+For states without direct access, use:
+7. OPENCORPORATES FALLBACK
+   - Type: api
+   - URL: https://api.opencorporates.com/v0.4/
+   - Endpoint: /companies/search?q=*&jurisdiction_code=us_{state}&created_since={yesterday}
+   - Format: JSON
+   - Cost: Free for limited queries, paid for commercial volume
+   - Notes: Good fallback for any state. Rate limited.
+
+=============================================
+PART 3: LEAD DATA MODEL (models/leads.py)
+=============================================
+
+Each filing becomes a lead record:
+{
+    "lead_id": "lead_fl_L24000012345",
+    "entity_name": "Sunrise Coffee LLC",
+    "entity_type": "LLC",
+    "state": "FL",
+    "state_name": "Florida",
+    "formation_date": "2026-03-15",
+    "date_collected": "2026-03-16",
+    "days_since_filing": 1,
+    "registered_agent": {
+        "name": "John Smith",
+        "address": "123 Main St, Miami, FL 33101"
+    },
+    "principal_address": "456 Ocean Dr, Miami Beach, FL 33139",
+    "filing_number": "L24000012345",
+    "status": "Active",
+    "purpose_statement": "Coffee shop and bakery",
+    "industry_tag": "restaurant",
+    "industry_confidence": 0.85,
+    "contact": {
+        "phone": null,
+        "email": null,
+        "linkedin": null
+    },
+    "lead_score": 72,
+    "freshness_badge": "NEW"  // NEW (<48hrs), RECENT (<7 days), STANDARD (>7 days)
+}
+
+Functions to implement:
+- store_leads(leads_list) — deduplicate by filing_number + state, store to data/leads.json
+- get_leads(filters) — query with filters: state, entity_type, date_range, keyword, industry_tag, min_score
+- get_lead(lead_id) — single lead detail
+- get_lead_stats() — counts by state, entity type, industry, and freshness
+- cleanup_old_leads() — archive leads older than 90 days to reduce active dataset size
+
+=============================================
+PART 4: COLLECTORS (collectors/)
+=============================================
+
+base_collector.py:
+- Abstract base class with methods: fetch(), parse(), normalize(), store()
+- Logging to data/collection_stats.json
+- Error handling with retry logic (3 retries, exponential backoff)
+- Rate limiting (1 second between requests)
+
+ftp_collector.py (for Florida):
+- Download daily data file from SunBiz FTP
+- Parse the file format (check SunBiz documentation for current format)
+- Extract new filings only (filter by filing date = today or yesterday)
+- Normalize to standard lead format
+- Store via models/leads.py
+
+api_collector.py (for NY, CA, OpenCorporates):
+- REST API calls with appropriate authentication
+- Pagination handling
+- Filter by formation_date > last_collection_date
+- Normalize to standard lead format
+
+bulk_collector.py (for TX, WA, KY):
+- Download bulk files
+- Diff against previous download to find new filings
+- Normalize to standard lead format
+
+enrichment.py:
+- classify_industry(entity_name, purpose_statement) — Simple keyword-based classification:
+  * If name contains "restaurant|cafe|coffee|bar|grill|pizza|bakery|catering" → "restaurant"
+  * If name contains "construction|building|roofing|plumbing|electric" → "construction"
+  * If name contains "consulting|advisory|solutions|services" → "professional_services"
+  * If name contains "medical|dental|health|therapy|clinic" → "healthcare"
+  * If name contains "real estate|realty|property|homes" → "real_estate"
+  * If name contains "tech|software|digital|app|data|cyber" → "technology"
+  * If name contains "salon|spa|beauty|barber|aesthetic" → "beauty"
+  * If name contains "fitness|gym|training|yoga|crossfit" → "fitness"
+  * If name contains "retail|shop|store|boutique|market" → "retail"
+  * If name contains "transport|trucking|logistics|moving|freight" → "transportation"
+  * If name contains "cleaning|janitorial|maid|pressure wash" → "cleaning"
+  * If name contains "landscape|lawn|garden|tree" → "landscaping"
+  * Default → "other"
+  (Phase 2 will upgrade this to an AI classifier)
+
+- score_lead(lead) — Score 0-100:
+  * +25 if entity_type is LLC (most common small business)
+  * +20 if formation_date is within 48 hours
+  * +15 if formation_date is within 7 days
+  * +10 if industry_tag is not "other" (classified = more actionable)
+  * +15 if principal_address is present and complete
+  * +10 if registered_agent name looks like a person (not a registered agent service)
+  * +5 if purpose_statement is present
+  * +10 if state is high-activity (FL, TX, CA, NY)
+
+=============================================
+PART 5: DASHBOARD (routes/dashboard.py + templates/dashboard.html)
+=============================================
+
+The main dashboard shows a filterable table of leads:
+
+Filters (top bar):
+- State dropdown (multi-select)
+- Entity Type dropdown (LLC, Corporation, LP, LLP, Non-Profit, DBA)
+- Industry dropdown (all classified industries)
+- Date Range (Last 24hrs, Last 7 days, Last 30 days, Custom)
+- Keyword search (searches entity_name and purpose_statement)
+- Minimum Lead Score slider (0-100)
+- Freshness filter (NEW only, RECENT, All)
+
+Table columns:
+- Freshness badge (NEW = green pill, RECENT = blue pill, STANDARD = gray pill)
+- Lead Score (color-coded: 80+ green, 50-79 amber, <50 gray)
+- Entity Name (clickable → detail view)
+- Entity Type
+- State
+- Formation Date
+- Industry Tag (color-coded pill, same style as PermitGrab lifecycle pills)
+- Registered Agent (name only, full details on click)
+- City (extracted from principal address)
+
+Actions:
+- "Save Lead" button on each row → adds to saved leads (CRM-lite)
+- "Export CSV" button → downloads filtered results as CSV
+- Bulk select + bulk save
+
+Stats bar at top:
+- Total leads in view
+- New today (last 24hrs)
+- Top state (by volume)
+- Top industry (by volume)
+
+Pagination: 50 leads per page.
+
+Design: Clean, professional. Dark sidebar nav, white content area. Same general aesthetic as PermitGrab but with a different color scheme — use deep navy (#1B2A4A) as primary and bright teal (#00BFA6) as accent.
+
+=============================================
+PART 6: MARKETING PAGES
+=============================================
+
+index.html (landing page):
+- Hero: "Your competitors are calling new business owners the day they register. Are you?"
+- Subhead: "BizRadar monitors Secretary of State filings across [X] states and delivers fresh new-business-owner leads daily."
+- Three-column value prop: Fresh (same-day leads) | Filtered (by state, industry, entity type) | Affordable (starting at $99/mo)
+- Social proof placeholder (will add testimonials later)
+- "How it works" section: 1. We collect → 2. We classify → 3. You close
+- Per-persona sections: "Built for Insurance Agents", "Built for CPAs", "Built for Payroll Providers"
+- Pricing table
+- CTA: "Start your 7-day free trial"
+
+pricing.html:
+- Three-tier pricing table (Starter $99, Pro $199, Enterprise $349)
+- Feature comparison grid
+- Annual discount callout (save 20%)
+- FAQ section
+
+state_landing.html (template for per-state SEO pages):
+- /leads/{state-slug} (e.g., /leads/florida, /leads/new-york)
+- Title: "New Business Filings in {State} | BizRadar"
+- Description: "Track new LLC and corporation filings in {State}. Get daily leads on new business owners. Filter by industry, entity type, and location."
+- Show recent filing count for that state
+- Sample leads (blurred for non-subscribers)
+- State-specific stats (filings per day, top industries, etc.)
+- CTA: "Get {State} leads starting at $99/mo"
+- Create a page for each active state
+
+=============================================
+PART 7: AUTH + BILLING
+=============================================
+
+Same patterns as PermitGrab:
+
+User registration:
+- Email + password
+- Email verification (SendGrid)
+- 7-day free trial (no credit card required for trial)
+
+Stripe integration:
+- Three products: Starter ($99/mo), Pro ($199/mo), Enterprise ($349/mo)
+- Annual variants: Starter ($79/mo), Pro ($159/mo), Enterprise ($279/mo)
+- Stripe Checkout for new subscriptions
+- Stripe Customer Portal for managing subscription
+- Webhook handler for: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted, invoice.payment_failed
+
+Tier enforcement:
+- Starter: 1 state, LLC only, dashboard + CSV, 48hr freshness, 1 user
+- Pro: 5 states, all entity types, + email alerts + phone/email enrichment, same-day freshness, 3 users
+- Enterprise: all states, all features + API access + webhooks, priority freshness, unlimited users
+
+=============================================
+PART 8: EMAIL ALERTS (Pro + Enterprise)
+=============================================
+
+Daily digest email at 8 AM ET for Pro and Enterprise subscribers:
+- Subject: "BizRadar: {count} new leads in {state(s)} — {date}"
+- Body: Summary stats + top 10 highest-scored leads with entity name, type, state, industry, score
+- "View all leads" button → dashboard with today's date filter
+- Unsubscribe link
+
+Use SendGrid dynamic templates.
+
+=============================================
+PART 9: SAVED LEADS / CRM-LITE
+=============================================
+
+Same pattern as PermitGrab saved leads:
+- Save any lead from the dashboard
+- Pipeline stages: New → Contacted → Proposal Sent → Won → Lost
+- Notes field per saved lead
+- Filter saved leads by stage, state, industry
+- /my-leads page
+
+=============================================
+PART 10: ADMIN PANEL
+=============================================
+
+/admin page showing:
+- Collection health: last run time, records collected, errors per state
+- Green/yellow/red status dots per state (same as PermitGrab city_health.py)
+- Subscriber count and MRR
+- Lead counts by state, industry, freshness
+- Manual trigger buttons to re-run collectors
+
+=============================================
+PART 11: SCHEDULING
+=============================================
+
+Use APScheduler or cron to run:
+- Collectors: Daily at 6 AM ET (each state)
+- Enrichment: Daily at 6:30 AM ET (on new leads)
+- Email alerts: Daily at 8 AM ET
+- Lead cleanup: Weekly (archive leads >90 days old)
+- Health check: Every 6 hours
+
+=============================================
+PART 12: DEPLOYMENT
+=============================================
+
+Deploy to Render.com:
+- Procfile: web: gunicorn app:app
+- render.yaml with env vars
+- Environment variables needed:
+  * SECRET_KEY
+  * ADMIN_PASSWORD
+  * STRIPE_SECRET_KEY
+  * STRIPE_PUBLISHABLE_KEY
+  * STRIPE_WEBHOOK_SECRET
+  * STRIPE_PRICE_STARTER
+  * STRIPE_PRICE_PRO
+  * STRIPE_PRICE_ENTERPRISE
+  * SENDGRID_API_KEY
+  * SENDGRID_FROM_EMAIL
+  * SITE_URL
+  * CA_SOS_API_KEY (California API subscription key)
+
+=============================================
+IMPLEMENTATION ORDER:
+=============================================
+
+1. Project structure + config
+2. Florida collector (ftp_collector.py) — get daily filings flowing
+3. Lead data model + storage
+4. Dashboard with filters + table
+5. Auth (register/login) + Stripe billing
+6. CSV export
+7. Industry classification (keyword-based)
+8. Lead scoring
+9. Marketing landing page + pricing page
+10. Per-state SEO landing pages
+11. Add 4-5 more states (NY, CA, WA, KY)
+12. Email alerts (Pro tier)
+13. Saved leads / CRM-lite
+14. Admin panel + health monitoring
+15. Commit and push to GitHub

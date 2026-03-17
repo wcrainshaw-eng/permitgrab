@@ -1,0 +1,213 @@
+PROGRAMMATIC SEO — PASTE THIS INTO CLAUDE CODE:
+==================================================
+(City × Trade Landing Pages + Blog Framework)
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+This batch creates hundreds of SEO landing pages automatically by crossing every active city with every trade type, plus a blog framework. The system must be DYNAMIC — it auto-generates pages based on whatever cities are currently active in the system, so as new cities are added, new SEO pages appear automatically with zero manual work.
+
+=============================================
+PART 1: TRADE TYPE REGISTRY
+=============================================
+
+Create a TRADE_REGISTRY in a new file trade_configs.py (or add to existing config). Each trade has:
+
+{
+    "slug": "plumbing",
+    "name": "Plumbing",
+    "keywords": ["plumb", "plumbing", "pipe", "sewer", "water heater", "drain", "backflow"],
+    "icon": "🔧",
+    "color": "#2563EB",
+    "description_template": "plumbing permits including pipe installation, water heater replacement, sewer line repair, and backflow prevention",
+    "buyer_phrase": "plumbing contractors",
+    "related_trades": ["hvac", "general-construction"]
+}
+
+Define these trades:
+
+1.  plumbing — plumb, plumbing, pipe, sewer, water heater, drain, backflow
+2.  electrical — electric, electrical, wiring, panel, circuit, lighting, generator, solar
+3.  hvac — hvac, heating, cooling, air condition, furnace, ductwork, ventilation, heat pump
+4.  roofing — roof, roofing, shingle, gutter, flashing, skylight
+5.  general-construction — construction, build, addition, remodel, renovation, alteration, tenant improvement
+6.  demolition — demolition, demo, tear down, abatement, deconstruction
+7.  fire-protection — fire, sprinkler, fire alarm, fire suppression, fire escape, standpipe
+8.  painting — paint, painting, coating, stain, wallpaper, finish
+9.  concrete — concrete, foundation, slab, footing, masonry, brick, block
+10. landscaping — landscape, landscaping, irrigation, grading, retaining wall, fence
+11. solar — solar, photovoltaic, pv, solar panel, renewable
+12. new-construction — new build, new construction, ground up, new building, new dwelling
+
+=============================================
+PART 2: DYNAMIC CITY × TRADE ROUTES
+=============================================
+
+Create TWO dynamic route patterns:
+
+A) /permits/<city-slug>/<trade-slug>
+   Example: /permits/nashville/plumbing
+
+B) /permits/<city-slug> (already exists from previous SEO batch — make sure it still works)
+
+The city × trade route should:
+
+1. Look up the city from whatever city registry/config the app uses to get the list of active cities. If the city slug doesn't match an active city, return 404.
+
+2. Look up the trade from TRADE_REGISTRY. If the trade slug doesn't match, return 404.
+
+3. Query the local permit data for that city, filtering permits whose description/type matches any of the trade's keywords (case-insensitive substring match).
+
+4. Render a template (templates/city_trade_landing.html) with:
+
+   META TAGS:
+   - Title: "{Trade} Permits in {City}, {State} | PermitGrab"
+     Example: "Plumbing Permits in Nashville, TN | PermitGrab"
+   - Description: "Track new {trade description_template} in {City}, {State}. Real-time {trade name} contractor leads from {City} building permits. Updated daily."
+   - Canonical URL: https://permitgrab.com/permits/{city-slug}/{trade-slug}
+   - Open Graph tags (og:title, og:description, og:url, og:type=website)
+
+   PAGE CONTENT:
+   - H1: "{Trade} Permits in {City}, {State}"
+   - Intro paragraph (auto-generated): "PermitGrab tracks all new {trade description_template} in {City}, {State}. {Buyer_phrase} use this data to find new jobs before the competition. Below are the latest {trade name} permits filed in {City}."
+
+   - STATS BOX: Show counts pulled from actual data:
+     * Total {trade} permits this month
+     * Total {trade} permits this week
+     * Average estimated value (if value data available)
+     * "Updated daily" badge
+
+   - RECENT PERMITS TABLE: Show the 10 most recent permits matching this trade in this city. Columns: Date, Address, Description, Estimated Value, Status. If user is not logged in, blur the last 3 rows and show "Sign up free to see all {trade} permits in {City}" CTA.
+
+   - FAQ SECTION (for FAQPage schema): Auto-generate 4 FAQs:
+     * "How many {trade} permits are filed in {City} per month?" → Answer with real count from data
+     * "What types of {trade} work require permits in {City}?" → Answer listing the trade's keyword categories
+     * "How can I find {trade} leads in {City}?" → Answer mentioning PermitGrab's daily updates and lead scoring
+     * "How quickly are {trade} permits updated on PermitGrab?" → Answer: "Permits are collected daily from {City}'s open data portal and available on PermitGrab within 24 hours of filing."
+
+   - CROSS-LINKS SECTION:
+     * "Other trades in {City}:" → links to all other trade pages for this city
+     * "See {Trade} permits in other cities:" → links to this trade in all other active cities
+     * Link back to /permits/{city-slug} (the main city page)
+
+   - CTA BOX: "Get all {City} {Trade} permits delivered to your dashboard. Start free →"
+
+   STRUCTURED DATA (JSON-LD):
+   - FAQPage schema with the 4 FAQs above
+   - BreadcrumbList: Home > {City} Permits > {Trade} Permits
+
+5. IMPORTANT: The route must dynamically discover active cities from the app's existing city configuration — do NOT hardcode city names. When Code adds a new city, that city's trade pages should automatically work without any changes to this code.
+
+=============================================
+PART 3: AUTO-GENERATED SITEMAP
+=============================================
+
+Replace the existing sitemap.xml route (or create one) at /sitemap.xml that DYNAMICALLY generates entries for:
+
+1. Homepage (/)
+2. Pricing page (/pricing)
+3. All active city pages (/permits/{city-slug}) — one per active city
+4. All active city × trade pages (/permits/{city-slug}/{trade-slug}) — one per active city per trade
+5. Any blog posts (/blog/{slug})
+
+The sitemap must auto-discover active cities from the city config at generation time. When a new city is added, its sitemap entries appear automatically.
+
+Set <changefreq>daily</changefreq> and <priority>0.8</priority> for city and city×trade pages.
+
+If total URLs exceed 50,000 (unlikely but safe), implement a sitemap index with multiple sub-sitemaps.
+
+=============================================
+PART 4: NAV BAR TRADE DROPDOWN
+=============================================
+
+Add a "Trades" dropdown to the main nav bar (next to the city dropdown). It lists all 12 trades. Clicking a trade shows that trade filtered across ALL cities (existing dashboard filter behavior), but the dropdown also shows sub-items for "in {City}" for the top 5 cities by permit volume.
+
+Example dropdown:
+  Trades ▼
+  ├── Plumbing
+  │   ├── All Cities
+  │   ├── New York
+  │   ├── Chicago
+  │   ├── Los Angeles
+  │   ├── Houston
+  │   └── Austin
+  ├── Electrical
+  │   └── (same pattern)
+  └── ... etc
+
+Keep the dropdown manageable — only show top 5 cities per trade, with an "All Cities →" link.
+
+=============================================
+PART 5: INTERNAL LINKING MESH
+=============================================
+
+On EVERY page in the app, add contextual cross-links:
+
+1. City pages (/permits/{city}) should link to all trade sub-pages for that city in a "Browse by Trade" section at the bottom.
+
+2. Trade pages (/permits/{city}/{trade}) should link to:
+   - The parent city page
+   - Other trades in the same city
+   - The same trade in neighboring/related cities
+
+3. The dashboard should have a "Popular Searches" or "Trending Permits" widget in the sidebar linking to the highest-volume city×trade combinations (auto-calculated from actual data).
+
+This internal linking mesh is critical for SEO — it helps Google discover and index all pages, and distributes page authority across the site.
+
+=============================================
+PART 6: ROBOTS.TXT UPDATE
+=============================================
+
+Update robots.txt to:
+- Allow all crawlers on all public pages
+- Disallow /admin, /api, /my-leads, /account
+- Point to sitemap: https://permitgrab.com/sitemap.xml
+
+=============================================
+PART 7: BLOG FRAMEWORK
+=============================================
+
+Create a simple blog system:
+
+- Blog posts stored as markdown files in a /blog/ directory (or data/blog/)
+- Route: /blog/ (index) and /blog/<slug> (individual post)
+- Blog index shows all posts sorted by date, with title, date, excerpt
+- Individual post renders markdown to HTML with proper meta tags
+- Each post auto-links to relevant city and trade pages based on content
+
+Create 3 starter posts (just the markdown files, the route will render them):
+
+1. "how-to-find-construction-leads.md"
+   - Title: "How to Find Construction Leads in 2026: The Complete Guide"
+   - Target keyword: "how to find construction leads"
+   - Content: ~800 words covering traditional methods (cold calling, door knocking, referrals) vs data-driven methods (permit monitoring). Mention PermitGrab naturally. Link to city pages.
+
+2. "what-is-a-building-permit.md"
+   - Title: "What Is a Building Permit? Everything Contractors Need to Know"
+   - Target keyword: "what is a building permit"
+   - Content: ~600 words explaining permits, when they're required, how they're public record, and why they matter for lead generation.
+
+3. "permit-trends-monthly.md"
+   - Title: "Building Permit Trends: March 2026 Report"
+   - Target keyword: "building permit trends [month] [year]"
+   - Content: Template post — pull real stats from the permit data (total permits by city, top trades, month-over-month change). This becomes a monthly recurring post.
+
+Blog meta tags:
+- Title: "{Post Title} | PermitGrab Blog"
+- Description: First 160 chars of post content
+- og:type = article
+- Schema: Article markup with datePublished, author, headline
+
+=============================================
+IMPLEMENTATION ORDER:
+=============================================
+
+1. Create trade_configs.py with all 12 trades
+2. Create the /permits/<city>/<trade> dynamic route + template
+3. Test with a few cities — verify it auto-discovers active cities
+4. Update sitemap.xml to be fully dynamic
+5. Add Trades dropdown to nav
+6. Add internal cross-linking sections to all page templates
+7. Update robots.txt
+8. Create blog route + 3 starter posts
+9. Verify all pages render correctly, all meta tags are present, all cross-links work
+10. Commit and push to GitHub

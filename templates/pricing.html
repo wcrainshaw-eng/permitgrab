@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — PermitGrab | $149/mo for Full Contractor Leads</title>
+<meta name="description" content="PermitGrab Professional: $149/month for full contact info, daily email alerts, analytics, and early construction intel. Free plan available.">
+<link rel="canonical" href="https://permitgrab.com/pricing">
+<meta property="og:title" content="Pricing — PermitGrab">
+<meta property="og:description" content="Simple, transparent pricing for construction permit leads. Free to browse, $149/mo for full contact info and alerts.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://permitgrab.com/pricing">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+
+/* NAV */
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: white; }
+.nav-btn { background: var(--accent); color: white !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; }
+.nav-btn:hover { background: #ea580c; }
+.dropdown { position: relative; }
+.dropdown-toggle { background: none; border: none; color: rgba(255,255,255,.7); font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.dropdown-toggle:hover { color: white; }
+.dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: white; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,.1); min-width: 200px; z-index: 1000; margin-top: 8px; padding: 8px 0; }
+.dropdown:hover .dropdown-menu { display: block; }
+.dropdown-menu a { display: block; padding: 10px 16px; color: var(--gray-700) !important; }
+.dropdown-menu a:hover { background: var(--gray-50); color: var(--primary) !important; }
+
+/* HERO */
+.hero { text-align: center; padding: 80px 32px 60px; background: white; }
+.hero h1 { font-size: 48px; font-weight: 800; color: var(--gray-900); margin-bottom: 16px; }
+.hero p { font-size: 20px; color: var(--gray-500); max-width: 500px; margin: 0 auto; }
+
+/* PRICING CARDS */
+.pricing-section { padding: 60px 32px 80px; }
+.pricing-inner { max-width: 900px; margin: 0 auto; }
+.pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+
+.pricing-card {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  border: 2px solid var(--gray-200);
+  position: relative;
+}
+.pricing-card.featured {
+  border-color: var(--primary);
+  box-shadow: 0 8px 30px rgba(37,99,235,.15);
+}
+.popular-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: white;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.plan-name { font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; }
+.plan-price { font-size: 48px; font-weight: 800; color: var(--gray-900); margin-bottom: 4px; }
+.plan-price span { font-size: 18px; font-weight: 400; color: var(--gray-500); }
+.plan-desc { font-size: 14px; color: var(--gray-500); margin-bottom: 32px; }
+
+.features-list { list-style: none; margin-bottom: 32px; }
+.features-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.features-list li:last-child { border-bottom: none; }
+.check { color: #10b981; font-size: 18px; }
+.lock { color: var(--gray-400); font-size: 16px; }
+.blurred { color: var(--gray-400); }
+
+.btn {
+  display: block;
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+}
+.btn-outline {
+  background: white;
+  border: 2px solid var(--gray-200);
+  color: var(--gray-700);
+}
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37,99,235,.3); }
+
+/* FAQ */
+.faq-section { padding: 80px 32px; background: white; }
+.faq-inner { max-width: 700px; margin: 0 auto; }
+.faq-title { font-size: 32px; font-weight: 800; color: var(--gray-900); text-align: center; margin-bottom: 48px; }
+.faq-item { border-bottom: 1px solid var(--gray-200); padding: 24px 0; }
+.faq-item:last-child { border-bottom: none; }
+.faq-question { font-size: 18px; font-weight: 600; color: var(--gray-900); margin-bottom: 12px; }
+.faq-answer { font-size: 15px; color: var(--gray-600); line-height: 1.7; }
+
+/* FOOTER */
+.footer { background: var(--gray-900); color: rgba(255,255,255,.6); padding: 48px 32px; text-align: center; }
+.footer-inner { max-width: 1100px; margin: 0 auto; }
+.footer p { font-size: 14px; }
+.footer a { color: rgba(255,255,255,.8); text-decoration: none; }
+.footer a:hover { color: white; }
+
+@media (max-width: 768px) {
+  .pricing-grid { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 36px; }
+  .plan-price { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <div class="dropdown">
+        <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          {% for city in cities[:10] %}
+          <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      <a href="/contractors">Contractors</a>
+      <a href="/pricing" style="color: white;">Pricing</a>
+      <a href="/get-alerts">Get Alerts</a>
+      {% if user %}
+      <a href="/my-leads">My Leads</a>
+      <a href="#">{{ user.name or user.email }}</a>
+      {% else %}
+      <a href="/login">Log In</a>
+      <a href="/signup" class="nav-btn">Sign Up</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Simple, Transparent Pricing</h1>
+  <p>Get the leads your competitors don't know about yet.</p>
+</section>
+
+<section class="pricing-section">
+  <div class="pricing-inner">
+    <div class="pricing-grid">
+
+      <!-- FREE TIER -->
+      <div class="pricing-card">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0<span>/month</span></div>
+        <div class="plan-desc">Browse permits and find opportunities</div>
+
+        <ul class="features-list">
+          <li><span class="check">&#10003;</span> Browse all permits</li>
+          <li><span class="check">&#10003;</span> Filter by city, trade, value</li>
+          <li><span class="check">&#10003;</span> See permit details & descriptions</li>
+          <li><span class="check">&#10003;</span> View project values</li>
+          <li><span class="lock">&#128274;</span> <span class="blurred">Contact info (blurred)</span></li>
+        </ul>
+
+        <a href="/" class="btn btn-outline">Browse Free</a>
+      </div>
+
+      <!-- PROFESSIONAL TIER -->
+      <div class="pricing-card featured">
+        <div class="popular-badge">Most Popular</div>
+        <div class="plan-name">Professional</div>
+        <div class="plan-price">$149<span>/month</span></div>
+        <div class="plan-desc">Full access to win more jobs</div>
+
+        <ul class="features-list">
+          <li><span class="check">&#10003;</span> Everything in Free, plus:</li>
+          <li><span class="check">&#10003;</span> Full contact info (names, phones)</li>
+          <li><span class="check">&#10003;</span> Contractor intelligence dashboard</li>
+          <li><span class="check">&#10003;</span> Early Intel pre-construction signals</li>
+          <li><span class="check">&#10003;</span> Market analytics & trends</li>
+          <li><span class="check">&#10003;</span> Daily email alerts</li>
+          <li><span class="check">&#10003;</span> CSV export</li>
+          <li><span class="check">&#10003;</span> Save & manage leads</li>
+          <li><span class="check">&#10003;</span> Priority support</li>
+        </ul>
+
+        <button onclick="startStripeCheckout()" class="btn btn-primary">Start Free Trial</button>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="faq-section">
+  <div class="faq-inner">
+    <h2 class="faq-title">Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+      <div class="faq-question">What's included in the free plan?</div>
+      <div class="faq-answer">The free plan lets you browse all building permits, filter by city, trade, and value, and see permit details and project values. Contact information is available with the Professional plan.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">Can I cancel anytime?</div>
+      <div class="faq-answer">Yes, you can cancel your subscription anytime from your account settings. No contracts, no hidden fees. Your access continues until the end of your billing period.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">How fresh is the permit data?</div>
+      <div class="faq-answer">Our permit data is updated daily from official municipal sources. We pull directly from city and county building department APIs to ensure you're seeing the latest permits.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">What cities do you cover?</div>
+      <div class="faq-answer">We currently cover {{ city_count }}+ metro areas including New York City, Los Angeles, Chicago, Austin, Seattle, and more. We add new cities regularly based on customer demand.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">Do you offer team pricing?</div>
+      <div class="faq-answer">Yes! Contact us at <a href="mailto:support@permitgrab.com">support@permitgrab.com</a> for team and enterprise pricing options.</div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
+    <p style="margin-top: 12px;"><a href="/">Home</a> &bull; <a href="/pricing">Pricing</a> &bull; <a href="/get-alerts">Get Alerts</a></p>
+  </div>
+</footer>
+
+<script>
+async function startStripeCheckout() {
+  try {
+    const resp = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await resp.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert('Unable to start checkout. Please try again.');
+    }
+  } catch (err) {
+    console.error('Checkout error:', err);
+    alert('Unable to start checkout. Please try again.');
+  }
+}
+</script>
+
+</body>
+</html>

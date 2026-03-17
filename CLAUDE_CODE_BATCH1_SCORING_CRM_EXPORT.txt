@@ -1,0 +1,39 @@
+BATCH 1 — PASTE THIS INTO CLAUDE CODE:
+========================================
+(Lead Scoring + Saved Leads CRM + CSV Export)
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+Add these three features to PermitGrab:
+
+1. LEAD SCORING ENGINE:
+   - In server.py, add a score_lead(permit) function that calculates a score (0-100) based on:
+     * Project value: >$100K = +40pts, $50K-$100K = +25pts, $25K-$50K = +15pts, <$25K = +5pts
+     * Recency: filed in last 3 days = +30pts, last 7 days = +20pts, last 14 days = +10pts, older = +0pts
+     * Trade: General Construction/HVAC/Electrical = +20pts, Plumbing/Roofing = +15pts, others = +10pts
+     * Has phone number = +10pts bonus
+   - Score maps to: 70+ = "Hot" (green flame icon), 40-69 = "Warm" (orange), <40 = "Standard" (gray)
+   - Display the score badge on every permit card in dashboard_production.html
+   - Add a "Lead Quality" filter dropdown: All / Hot Only / Warm+ / Standard
+   - Sort Hot leads to the top by default
+
+2. SAVED LEADS + CRM-LITE (requires login):
+   - Create data/saved_leads.json to store per-user saved leads
+   - Each saved lead stores: permit_id, user_email, status (new/contacted/quoted/won/lost), notes (text), date_saved
+   - Add a "Save Lead" button on each permit card (already exists but wire it up with backend)
+   - Create GET/POST /api/saved-leads endpoints for the logged-in user
+   - Create PUT /api/saved-leads/<permit_id> to update status and notes
+   - Create a new page /my-leads that shows all saved leads for the logged-in user with:
+     * Filter by status (All / New / Contacted / Quoted / Won / Lost)
+     * Editable status dropdown on each lead
+     * Editable notes textarea on each lead
+     * Summary stats at top: total leads, total value, leads by status
+   - Add "My Leads" link to the nav bar (only visible when logged in)
+
+3. CSV EXPORT:
+   - Add a GET /api/export/csv endpoint that exports the current filtered permit view as a .csv file
+   - Include columns: address, city, state, zip, trade, project_value, status, date, owner_name, phone, description, lead_score
+   - Add an "Export CSV" button next to the search/filter bar on the dashboard
+   - Also add CSV export on the /my-leads page to export saved leads
+
+4. Commit and push to GitHub.

@@ -1,0 +1,35 @@
+BATCH 3 — PASTE THIS INTO CLAUDE CODE:
+========================================
+(Contractor Intelligence + Trend Analytics)
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+Add these two features to PermitGrab:
+
+1. CONTRACTOR INTELLIGENCE:
+   - Create GET /api/contractors endpoint that aggregates permit data by contractor name
+   - For each contractor, return: name, total permits, total project value, cities active in, primary trade, most recent permit date
+   - Create a /contractors page showing:
+     * A searchable table of all contractors in the database
+     * Columns: Contractor Name, Permits Pulled, Total Value, Cities, Primary Trade, Last Active
+     * Sortable by any column
+     * Search by contractor name
+     * Click a contractor name to see all their permits
+   - Create a "Market Leaders" widget on the dashboard sidebar showing top 5 contractors by permit volume for the selected city
+   - Add "Contractors" link to the main nav bar
+   - This is all built from existing permit data — just aggregate the contractor_name field
+
+2. TREND ANALYTICS DASHBOARD:
+   - Create a /analytics page (Pro users only — redirect free users to pricing)
+   - Use Chart.js loaded from CDN (https://cdn.jsdelivr.net/npm/chart.js)
+   - Show three charts:
+     a) PERMIT VOLUME: Line chart showing new permits per week for the last 12 weeks. Dropdown to filter by city or "All Cities". Shows trend direction (up/down arrow + percentage).
+     b) TRADE BREAKDOWN: Horizontal bar chart showing permit counts by trade for the selected city. Color-coded bars matching the existing dashboard color scheme.
+     c) VALUE TRENDS: Line chart showing average project value per week. Overlay a trend line.
+   - Create GET /api/analytics/volume?city=X&weeks=12 that returns weekly permit counts
+   - Create GET /api/analytics/trades?city=X that returns trade breakdown
+   - Create GET /api/analytics/values?city=X&weeks=12 that returns weekly average values
+   - Add "Analytics" link to the main nav bar (with a small "Pro" badge)
+   - Match the dark theme of the existing dashboard
+
+3. Commit and push to GitHub.

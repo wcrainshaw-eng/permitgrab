@@ -155,7 +155,7 @@ def build_email_html(subscriber, permits):
         <div style="padding:24px 32px;text-align:center;background:#f9fafb;">
           <a href="{SITE_URL}" style="display:inline-block;padding:12px 32px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px;">View All Permits</a>
           <div style="margin-top:12px;font-size:13px;color:#9ca3af;">
-            <a href="{SITE_URL}/#pricing" style="color:#f97316;text-decoration:none;">Upgrade to Pro</a> for contact info + phone numbers on every lead
+            <a href="{SITE_URL}/pricing" style="color:#f97316;text-decoration:none;">Upgrade to Pro</a> for contact info + phone numbers on every lead
           </div>
         </div>
 
