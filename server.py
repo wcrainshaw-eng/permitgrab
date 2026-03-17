@@ -311,30 +311,89 @@ USERS_LOCK_FILE = os.path.join(DATA_DIR, '.users.lock')
 
 
 def load_users():
-    """Load user list with file locking for multi-worker safety."""
+    """Load user list from JSON file."""
     os.makedirs(DATA_DIR, exist_ok=True)
     if os.path.exists(USERS_FILE):
-        with open(USERS_FILE) as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                print(f"[Users] WARNING: Corrupted users.json, returning empty list")
+        try:
+            with open(USERS_FILE, 'r') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+                print(f"[Users] WARNING: users.json is not a list, returning empty")
                 return []
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"[Users] WARNING: Error reading users.json: {e}")
+            return []
     return []
 
 
-def save_users(users):
-    """Save user list with file locking for multi-worker safety."""
+def save_users_atomic(users):
+    """Save user list with atomic write (write to temp, then rename)."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    # Use lock file to prevent race conditions between workers
-    lock_path = USERS_LOCK_FILE
-    with open(lock_path, 'w') as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            with open(USERS_FILE, 'w') as f:
-                json.dump(users, f, indent=2)
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    temp_file = USERS_FILE + '.tmp'
+    try:
+        with open(temp_file, 'w') as f:
+            json.dump(users, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_file, USERS_FILE)  # Atomic on POSIX
+    except Exception as e:
+        print(f"[Users] ERROR saving users: {e}")
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        raise
+
+
+def save_users(users):
+    """Save user list (wrapper for backward compatibility)."""
+    save_users_atomic(users)
+
+
+def find_user_by_email(email):
+    """Find a user by email (case-insensitive). Returns user dict or None."""
+    email_lower = email.lower().strip()
+    users = load_users()
+    for user in users:
+        if user.get('email', '').lower() == email_lower:
+            return user
+    return None
+
+
+def cleanup_duplicate_users():
+    """
+    Remove duplicate user records, keeping the OLDEST (first registered).
+    The oldest account likely has Pro subscription and original password.
+    Called on app startup to fix any existing duplicates.
+    """
+    users = load_users()
+    if not users:
+        return
+
+    seen_emails = {}
+    clean_users = []
+    duplicates_removed = 0
+
+    for user in users:
+        email = user.get('email', '').lower()
+        if not email:
+            clean_users.append(user)
+            continue
+
+        if email not in seen_emails:
+            seen_emails[email] = user
+            clean_users.append(user)
+        else:
+            # Duplicate found - skip it (keep the first/oldest one)
+            duplicates_removed += 1
+            print(f"[Cleanup] Removing duplicate user: {email}")
+
+    if duplicates_removed > 0:
+        print(f"[Cleanup] Removed {duplicates_removed} duplicate user(s)")
+        save_users_atomic(clean_users)
+
+
+# Run cleanup on module load (works with Gunicorn)
+cleanup_duplicate_users()
 
 
 def get_current_user():
@@ -2397,14 +2456,21 @@ def sendgrid_webhook():
 @app.route('/api/register', methods=['POST'])
 @limiter.limit("10 per hour")
 def api_register():
-    """POST /api/register - Register a new user."""
+    """POST /api/register - Register a new user.
+
+    DUPLICATE PREVENTION (V5):
+    1. Check BEFORE insert using find_user_by_email()
+    2. Use file locking for atomicity
+    3. Use atomic file writes
+    4. Verify AFTER save that no duplicates exist
+    """
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Invalid request'}), 400
 
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
-    name = data.get('name', '')
+    name = data.get('name', '').strip()
 
     if not email or not password:
         return jsonify({'error': 'Email and password required'}), 400
@@ -2412,43 +2478,64 @@ def api_register():
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters'}), 400
 
-    # Use file locking to prevent race conditions between Gunicorn workers
+    # Validate email format (basic check)
+    if '@' not in email or '.' not in email.split('@')[-1]:
+        return jsonify({'error': 'Please enter a valid email address'}), 400
+
+    # ========================================
+    # LAYER 1: Pre-check for existing user
+    # ========================================
+    existing = find_user_by_email(email)
+    if existing:
+        print(f"[Register] DUPLICATE BLOCKED (pre-check): {email}")
+        return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
+
+    # ========================================
+    # LAYER 2: Locked check-and-insert
+    # ========================================
     os.makedirs(DATA_DIR, exist_ok=True)
+    user = None
+
     with open(USERS_LOCK_FILE, 'w') as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
+            # Re-check within the lock (another worker may have inserted)
             users = load_users()
-            print(f"[Register] Checking email: {email}, existing users: {len(users)}")
+            email_set = {u.get('email', '').lower() for u in users if u.get('email')}
 
-            # Check for duplicate (case-insensitive, defensive)
-            existing_emails = set()
-            for u in users:
-                user_email = u.get('email', '')
-                if user_email:
-                    existing_emails.add(user_email.lower())
-
-            if email in existing_emails:
-                print(f"[Register] DUPLICATE BLOCKED: {email}")
+            if email in email_set:
+                print(f"[Register] DUPLICATE BLOCKED (in-lock check): {email}")
                 return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
 
-            print(f"[Register] Creating new user: {email}")
-
+            # Create the new user
             user = {
+                'id': str(uuid.uuid4()),
                 'email': email,
                 'name': name,
                 'password_hash': generate_password_hash(password),
                 'plan': 'free',
                 'created_at': datetime.now().isoformat(),
             }
-
             users.append(user)
 
-            # Save directly within the lock to prevent race conditions
-            with open(USERS_FILE, 'w') as f:
-                json.dump(users, f, indent=2)
-            print(f"[Register] User saved. Total users now: {len(users)}")
+            # Save atomically
+            save_users_atomic(users)
+            print(f"[Register] User created: {email}, total users: {len(users)}")
+
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    # ========================================
+    # LAYER 3: Post-save verification
+    # ========================================
+    # Verify the save worked and no duplicates slipped through
+    all_users = load_users()
+    matching = [u for u in all_users if u.get('email', '').lower() == email]
+    if len(matching) > 1:
+        print(f"[Register] ERROR: Duplicate detected post-save for {email}, count={len(matching)}")
+        # Keep only the user we just created (by id)
+        all_users = [u for u in all_users if u.get('email', '').lower() != email or u.get('id') == user['id']]
+        save_users_atomic(all_users)
 
     # Log in the user
     session['user_email'] = email
