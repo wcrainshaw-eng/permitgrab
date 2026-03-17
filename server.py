@@ -570,6 +570,8 @@ def api_permits():
     GET /api/permits
     Query params: city, trade, value, status, search, quality, page, per_page
     Returns paginated, filtered permit data with lead scores.
+
+    FREEMIUM GATING: Non-Pro users only see contact info for first 5 permits.
     """
     permits = load_permits()
 
@@ -611,12 +613,35 @@ def api_permits():
     start = (page - 1) * per_page
     page_permits = permits[start:start + per_page]
 
+    # FREEMIUM GATING: Strip contact info for non-Pro users (except first 5 permits)
+    user = get_current_user()
+    user_is_pro = is_pro(user)
+
+    if not user_is_pro:
+        # Calculate global index for each permit to determine which get contact info
+        for i, permit in enumerate(page_permits):
+            global_idx = start + i
+            if global_idx >= 5:  # Only first 5 permits (indices 0-4) get contact info
+                # Strip contact info and mark as gated
+                permit['contact_phone'] = None
+                permit['contact_name'] = None
+                permit['contact_email'] = None
+                permit['owner_name'] = None
+                permit['is_gated'] = True
+            else:
+                permit['is_gated'] = False
+    else:
+        # Pro users get all contact info
+        for permit in page_permits:
+            permit['is_gated'] = False
+
     return jsonify({
         'permits': page_permits,
         'total': total,
         'page': page,
         'per_page': per_page,
         'total_pages': (total + per_page - 1) // per_page,
+        'user_is_pro': user_is_pro,
     })
 
 @app.route('/api/stats')
@@ -726,7 +751,18 @@ def api_subscribers():
 
 @app.route('/api/export')
 def api_export():
-    """GET /api/export - Export filtered permits as CSV with lead scores."""
+    """GET /api/export - Export filtered permits as CSV with lead scores.
+
+    PRO FEATURE: Non-Pro users cannot export and are redirected to pricing.
+    """
+    # Check if user is Pro - exports are a Pro feature
+    user = get_current_user()
+    if not is_pro(user):
+        return jsonify({
+            'error': 'Export is a Pro feature',
+            'upgrade_url': '/pricing'
+        }), 403
+
     permits = load_permits()
     permits = add_lead_scores(permits)
 
@@ -825,10 +861,20 @@ def get_saved_leads():
 
 @app.route('/api/saved-leads', methods=['POST'])
 def save_lead():
-    """POST /api/saved-leads - Save a lead for the logged-in user."""
+    """POST /api/saved-leads - Save a lead for the logged-in user.
+
+    PRO FEATURE: Only Pro users can save leads.
+    """
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Login required'}), 401
+
+    # Save Lead is a Pro feature
+    if not is_pro(user):
+        return jsonify({
+            'error': 'Save Lead is a Pro feature',
+            'upgrade_url': '/pricing'
+        }), 403
 
     data = request.get_json()
     if not data or not data.get('permit_id'):
@@ -911,10 +957,19 @@ def delete_saved_lead(permit_id):
 
 @app.route('/api/saved-leads/export')
 def export_saved_leads():
-    """GET /api/saved-leads/export - Export saved leads as CSV."""
+    """GET /api/saved-leads/export - Export saved leads as CSV.
+
+    PRO FEATURE: Only Pro users can export.
+    """
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Login required'}), 401
+
+    if not is_pro(user):
+        return jsonify({
+            'error': 'Export is a Pro feature',
+            'upgrade_url': '/pricing'
+        }), 403
 
     user_leads = get_user_saved_leads(user['email'])
     all_permits = load_permits()
@@ -999,10 +1054,20 @@ def get_saved_searches():
 
 @app.route('/api/saved-searches', methods=['POST'])
 def create_saved_search():
-    """POST /api/saved-searches - Create a new saved search."""
+    """POST /api/saved-searches - Create a new saved search.
+
+    PRO FEATURE: Only Pro users can save searches.
+    """
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Login required'}), 401
+
+    # Save Search is a Pro feature
+    if not is_pro(user):
+        return jsonify({
+            'error': 'Save Search is a Pro feature',
+            'upgrade_url': '/pricing'
+        }), 403
 
     data = request.get_json()
     if not data:
