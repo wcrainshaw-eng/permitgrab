@@ -42,98 +42,108 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 # LEAD SCORING ENGINE
 # ===========================
-# Uses PERCENTILE-BASED scoring to guarantee spread across 40-99 range
-# regardless of data characteristics. Best permit in dataset ~99, worst ~40.
+# V5: FORCED LINEAR SPREAD - maps actual data distribution to 40-99 range.
+# Unlike V4 percentile ranking (which clustered at 97-99), this approach:
+# 1. Normalizes VALUE within the dataset's actual min/max
+# 2. Uses continuous raw scores (not discrete percentile ranks)
+# 3. Linearly maps raw_min→40, raw_max→99
 
-import math
 import hashlib
-
-
-def _compute_raw_score(permit):
-    """Compute raw composite score for a single permit (before percentile normalization)."""
-    raw = 0
-
-    # 1. Value component (log scale for better distribution)
-    value = permit.get('estimated_cost') or permit.get('project_value') or 0
-    if value > 0:
-        raw += math.log10(max(value, 1)) * 5  # log scale: $1K=15, $100K=25, $1M=30
-
-    # 2. Recency (days old, inverted - newer is better)
-    filed_date = permit.get('filing_date') or permit.get('filed_date') or permit.get('date')
-    if filed_date:
-        try:
-            if isinstance(filed_date, str):
-                filed = datetime.strptime(str(filed_date)[:10], '%Y-%m-%d')
-            else:
-                filed = filed_date
-            days = (datetime.now() - filed).days
-            raw += max(0, 30 - days)  # 30 pts for today, 0 for 30+ days
-        except (ValueError, TypeError):
-            raw += 10  # Unknown date gets middle value
-
-    # 3. Status score
-    status = (permit.get('status') or '').lower()
-    status_scores = {
-        'filed': 15, 'active': 12, 'issued': 10, 'approved': 10,
-        'permitted': 8, 'pending': 5, 'completed': 2, 'closed': 1
-    }
-    raw += status_scores.get(status, 5)
-
-    # 4. Contact info
-    has_phone = bool(permit.get('contact_phone') or permit.get('phone'))
-    has_name = bool(permit.get('contact_name') or permit.get('owner_name') or permit.get('owner'))
-    raw += (5 if has_phone else 0) + (5 if has_name else 0)
-
-    # 5. Trade type
-    trade = (permit.get('trade_category') or permit.get('permit_type') or permit.get('trade') or '').lower()
-    high_trades = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection']
-    raw += 10 if any(t in trade for t in high_trades) else 5
-
-    return raw
 
 
 def add_lead_scores(permits):
     """
-    Score permits relative to each other using percentile ranking.
-    Guarantees spread across full 40-99 range regardless of data characteristics.
+    Score permits using forced linear spread across 40-99 range.
+    Maps the actual data distribution to guarantee full range usage.
+
+    V5 Fix: Replaces V4 percentile ranking which compressed to 97-99.
     """
     if not permits:
         return permits
 
-    # 1. Calculate raw scores for all permits
-    raw_scores = [_compute_raw_score(p) for p in permits]
+    # Step 1: Extract values for normalization
+    values = []
+    for p in permits:
+        val = float(p.get('estimated_cost') or p.get('project_value') or 0)
+        values.append(val)
 
-    # 2. Build sorted unique scores for percentile calculation
-    sorted_scores = sorted(set(raw_scores))
-    n = len(sorted_scores)
+    min_val = min(values) if values else 0
+    max_val = max(values) if values else 1
+    val_range = max_val - min_val if max_val > min_val else 1
 
-    # 3. Normalize each permit to 40-99 range using percentile ranking
-    for i, permit in enumerate(permits):
-        raw = raw_scores[i]
+    # Step 2: Calculate raw composite scores with normalized value
+    raw_scores = []
+    for i, p in enumerate(permits):
+        score = 0.0
 
-        if n <= 1:
-            percentile = 0.5
+        # Value: normalize to 0-35 within THIS dataset's range
+        # This ensures $500K-$2M permits get spread across full 35 points
+        val = values[i]
+        score += ((val - min_val) / val_range) * 35
+
+        # Recency: 0-25 (days old, gradual decay)
+        filed_date = p.get('filing_date') or p.get('filed_date') or p.get('date')
+        if filed_date:
+            try:
+                if isinstance(filed_date, str):
+                    filed = datetime.strptime(str(filed_date)[:10], '%Y-%m-%d')
+                else:
+                    filed = filed_date
+                days = (datetime.now() - filed).days
+                score += max(0, 25 - (days * 0.8))  # Gradual decay
+            except (ValueError, TypeError):
+                score += 12  # Unknown date gets middle value
+
+        # Status: 0-15
+        status = (p.get('status') or '').lower()
+        status_map = {
+            'filed': 15, 'active': 13, 'issued': 11, 'approved': 11,
+            'permitted': 9, 'pending': 6, 'completed': 3, 'closed': 1
+        }
+        score += status_map.get(status, 7)
+
+        # Contact info: 0-10
+        has_phone = bool(p.get('contact_phone') or p.get('phone'))
+        has_name = bool(p.get('contact_name') or p.get('owner_name') or p.get('owner'))
+        score += (5 if has_phone else 0) + (5 if has_name else 0)
+
+        # Trade: 0-10
+        trade = (p.get('trade_category') or p.get('permit_type') or p.get('trade') or '').lower()
+        high = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection']
+        mid = ['roofing', 'interior renovation', 'demolition', 'addition', 'structural']
+        if any(t in trade for t in high):
+            score += 10
+        elif any(t in trade for t in mid):
+            score += 7
         else:
-            rank = sorted_scores.index(raw)
-            percentile = rank / (n - 1)
+            score += 4
 
-        # Map percentile to 40-99
-        score = int(40 + percentile * 59)
-
-        # Add small jitter from permit ID for visual variety
-        permit_id = str(permit.get('id') or permit.get('permit_number') or '')
+        # Deterministic jitter from permit ID (0-4)
+        permit_id = str(p.get('id') or p.get('permit_number') or str(id(p)))
         jitter = int(hashlib.md5(permit_id.encode()).hexdigest()[:4], 16) % 5
-        score = max(40, min(99, score + jitter - 2))
+        score += jitter
 
-        permit['lead_score'] = score
+        raw_scores.append(score)
+
+    # Step 3: FORCED LINEAR SPREAD — map actual score range to 40-99
+    raw_min = min(raw_scores)
+    raw_max = max(raw_scores)
+    raw_range = raw_max - raw_min if raw_max > raw_min else 1
+
+    for i, p in enumerate(permits):
+        # Linear map: raw_min → 40, raw_max → 99
+        normalized = 40 + ((raw_scores[i] - raw_min) / raw_range) * 59
+        final_score = max(40, min(99, int(normalized)))
+
+        p['lead_score'] = final_score
 
         # Determine quality tier
-        if score >= 85:
-            permit['lead_quality'] = 'hot'
-        elif score >= 70:
-            permit['lead_quality'] = 'warm'
+        if final_score >= 85:
+            p['lead_quality'] = 'hot'
+        elif final_score >= 70:
+            p['lead_quality'] = 'warm'
         else:
-            permit['lead_quality'] = 'standard'
+            p['lead_quality'] = 'standard'
 
     return permits
 
