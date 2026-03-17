@@ -42,109 +42,99 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 # LEAD SCORING ENGINE
 # ===========================
-def score_lead(permit):
-    """
-    Calculate lead score (40-99) based on value, recency, contacts, status, trade, and jitter.
-    Returns score and quality tier (hot/warm/cool).
+# Uses PERCENTILE-BASED scoring to guarantee spread across 40-99 range
+# regardless of data characteristics. Best permit in dataset ~99, worst ~40.
 
-    Formula designed to produce a wide spread across the 40-99 range.
-    """
-    score = 40  # Base score - everyone starts at 40
+import math
+import hashlib
 
-    # 1. PROJECT VALUE (0-20 points)
-    value = permit.get('estimated_cost', 0) or 0
-    if value >= 1_000_000:
-        score += 20
-    elif value >= 500_000:
-        score += 16
-    elif value >= 250_000:
-        score += 12
-    elif value >= 100_000:
-        score += 8
-    elif value >= 50_000:
-        score += 5
-    elif value >= 10_000:
-        score += 2
-    # else: 0 points
 
-    # 2. RECENCY (0-18 points)
-    filing_date = permit.get('filing_date', '')
-    if filing_date:
+def _compute_raw_score(permit):
+    """Compute raw composite score for a single permit (before percentile normalization)."""
+    raw = 0
+
+    # 1. Value component (log scale for better distribution)
+    value = permit.get('estimated_cost') or permit.get('project_value') or 0
+    if value > 0:
+        raw += math.log10(max(value, 1)) * 5  # log scale: $1K=15, $100K=25, $1M=30
+
+    # 2. Recency (days old, inverted - newer is better)
+    filed_date = permit.get('filing_date') or permit.get('filed_date') or permit.get('date')
+    if filed_date:
         try:
-            filed = datetime.strptime(str(filing_date)[:10], '%Y-%m-%d')
-            days_ago = (datetime.now() - filed).days
-            if days_ago <= 1:
-                score += 18
-            elif days_ago <= 3:
-                score += 15
-            elif days_ago <= 7:
-                score += 12
-            elif days_ago <= 14:
-                score += 8
-            elif days_ago <= 30:
-                score += 4
-            elif days_ago <= 60:
-                score += 2
-            # else: 0 points (older than 60 days)
+            if isinstance(filed_date, str):
+                filed = datetime.strptime(str(filed_date)[:10], '%Y-%m-%d')
+            else:
+                filed = filed_date
+            days = (datetime.now() - filed).days
+            raw += max(0, 30 - days)  # 30 pts for today, 0 for 30+ days
         except (ValueError, TypeError):
-            score += 5  # Unknown date
+            raw += 10  # Unknown date gets middle value
 
-    # 3. PERMIT STATUS (0-10 points)
-    status = (permit.get('status', '') or '').lower()
-    if any(kw in status for kw in ['active', 'issued', 'approved']):
-        score += 10
-    elif any(kw in status for kw in ['permitted', 'filed', 'pending']):
-        score += 6
-    elif any(kw in status for kw in ['completed', 'closed']):
-        score += 2
-    else:
-        score += 4  # Unknown status
+    # 3. Status score
+    status = (permit.get('status') or '').lower()
+    status_scores = {
+        'filed': 15, 'active': 12, 'issued': 10, 'approved': 10,
+        'permitted': 8, 'pending': 5, 'completed': 2, 'closed': 1
+    }
+    raw += status_scores.get(status, 5)
 
-    # 4. HAS CONTACT INFO (0-6 points)
-    has_phone = bool(permit.get('contact_phone'))
-    has_name = bool(permit.get('contact_name') or permit.get('owner_name'))
-    if has_phone and has_name:
-        score += 6
-    elif has_phone or has_name:
-        score += 3
+    # 4. Contact info
+    has_phone = bool(permit.get('contact_phone') or permit.get('phone'))
+    has_name = bool(permit.get('contact_name') or permit.get('owner_name') or permit.get('owner'))
+    raw += (5 if has_phone else 0) + (5 if has_name else 0)
 
-    # 5. TRADE TYPE VALUE (0-6 points)
-    trade = (permit.get('trade_category', '') or permit.get('permit_type', '') or '').lower()
-    high_value_trades = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection', 'structural']
-    mid_value_trades = ['roofing', 'interior renovation', 'general construction', 'demolition', 'addition']
-    if any(t in trade for t in high_value_trades):
-        score += 6
-    elif any(t in trade for t in mid_value_trades):
-        score += 4
-    else:
-        score += 2
+    # 5. Trade type
+    trade = (permit.get('trade_category') or permit.get('permit_type') or permit.get('trade') or '').lower()
+    high_trades = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection']
+    raw += 10 if any(t in trade for t in high_trades) else 5
 
-    # 6. JITTER for visual variety (0-9 points based on permit ID hash)
-    # This prevents identical-looking permits from having the same score
-    permit_id = str(permit.get('id') or permit.get('permit_number') or '')
-    jitter = hash(permit_id) % 10
-    score += jitter
-
-    # Clamp to 40-99 range
-    final_score = max(40, min(99, score))
-
-    # Determine quality tier
-    if final_score >= 85:
-        quality = 'hot'
-    elif final_score >= 70:
-        quality = 'warm'
-    else:
-        quality = 'standard'
-
-    return final_score, quality
+    return raw
 
 
 def add_lead_scores(permits):
-    """Add lead_score and lead_quality to each permit."""
-    for permit in permits:
-        score, quality = score_lead(permit)
+    """
+    Score permits relative to each other using percentile ranking.
+    Guarantees spread across full 40-99 range regardless of data characteristics.
+    """
+    if not permits:
+        return permits
+
+    # 1. Calculate raw scores for all permits
+    raw_scores = [_compute_raw_score(p) for p in permits]
+
+    # 2. Build sorted unique scores for percentile calculation
+    sorted_scores = sorted(set(raw_scores))
+    n = len(sorted_scores)
+
+    # 3. Normalize each permit to 40-99 range using percentile ranking
+    for i, permit in enumerate(permits):
+        raw = raw_scores[i]
+
+        if n <= 1:
+            percentile = 0.5
+        else:
+            rank = sorted_scores.index(raw)
+            percentile = rank / (n - 1)
+
+        # Map percentile to 40-99
+        score = int(40 + percentile * 59)
+
+        # Add small jitter from permit ID for visual variety
+        permit_id = str(permit.get('id') or permit.get('permit_number') or '')
+        jitter = int(hashlib.md5(permit_id.encode()).hexdigest()[:4], 16) % 5
+        score = max(40, min(99, score + jitter - 2))
+
         permit['lead_score'] = score
-        permit['lead_quality'] = quality
+
+        # Determine quality tier
+        if score >= 85:
+            permit['lead_quality'] = 'hot'
+        elif score >= 70:
+            permit['lead_quality'] = 'warm'
+        else:
+            permit['lead_quality'] = 'standard'
+
     return permits
 
 
