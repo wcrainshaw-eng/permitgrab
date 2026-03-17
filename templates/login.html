@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log In - PermitGrab</title>
+<meta name="description" content="Log in to your PermitGrab account to access building permit leads.">
+<link rel="canonical" href="https://permitgrab.com/login">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --red: #dc2626;
+  --green: #16a34a;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-100); color: var(--gray-700); line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* NAV */
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: white; }
+.nav-btn { background: var(--accent); color: white !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; }
+.nav-btn:hover { background: #ea580c; }
+
+/* AUTH CONTAINER */
+.auth-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.auth-card {
+  background: white;
+  border-radius: 16px;
+  padding: 48px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 4px 6px rgba(0,0,0,.05), 0 10px 15px rgba(0,0,0,.1);
+}
+
+.auth-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.auth-logo a {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  text-decoration: none;
+}
+.auth-logo a span { color: var(--accent); }
+
+.auth-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+  text-align: center;
+  margin-bottom: 8px;
+}
+.auth-subtitle {
+  font-size: 15px;
+  color: var(--gray-500);
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: 6px;
+}
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 15px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+.form-group input.error {
+  border-color: var(--red);
+}
+
+.error-message {
+  color: var(--red);
+  font-size: 13px;
+  margin-top: 6px;
+  display: none;
+}
+.error-message.show { display: block; }
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+.alert-error {
+  background: #fef2f2;
+  color: var(--red);
+  border: 1px solid #fecaca;
+}
+.alert-success {
+  background: #f0fdf4;
+  color: var(--green);
+  border: 1px solid #bbf7d0;
+}
+
+.btn {
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+}
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--gray-500);
+}
+.auth-footer a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.auth-footer a:hover { text-decoration: underline; }
+
+.forgot-link {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--gray-500);
+}
+.forgot-link a {
+  color: var(--gray-600);
+  text-decoration: none;
+}
+.forgot-link a:hover { text-decoration: underline; }
+
+.footer { background: var(--gray-900); color: rgba(255,255,255,.6); padding: 24px 32px; text-align: center; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/signup" class="nav-btn">Sign Up</a>
+    </div>
+  </div>
+</nav>
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <a href="/">Permit<span>Grab</span></a>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Log in to access your permit leads</p>
+
+    <div id="alert-container"></div>
+
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required>
+        <div class="error-message" id="email-error"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Your password" required>
+        <div class="error-message" id="password-error"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submit-btn">Log In</button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="/signup">Sign up free</a>
+    </div>
+
+    <div class="forgot-link">
+      <a href="#">Forgot password?</a>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
+</footer>
+
+<script>
+// Check if redirected with message
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('redirect') === 'my-leads') {
+  showAlert('Log in to access your saved leads', 'error');
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+
+  // Clear previous errors
+  document.querySelectorAll('.error-message').forEach(el => {
+    el.classList.remove('show');
+    el.textContent = '';
+  });
+  document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
+  document.getElementById('alert-container').innerHTML = '';
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  let valid = true;
+
+  // Validate email
+  if (!email || !email.includes('@')) {
+    showError('email', 'Please enter a valid email address');
+    valid = false;
+  }
+
+  // Validate password
+  if (!password) {
+    showError('password', 'Please enter your password');
+    valid = false;
+  }
+
+  if (!valid) return;
+
+  // Disable submit button
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Logging in...';
+
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showAlert('Login successful! Redirecting...', 'success');
+      // Check for redirect param
+      const redirect = urlParams.get('redirect');
+      setTimeout(() => {
+        window.location.href = redirect ? '/' + redirect : '/';
+      }, 500);
+    } else {
+      showAlert(data.error || 'Invalid email or password', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Log In';
+    }
+  } catch (err) {
+    showAlert('Unable to log in. Please try again.', 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Log In';
+  }
+}
+
+function showError(field, message) {
+  const input = document.getElementById(field);
+  const error = document.getElementById(field + '-error');
+  input.classList.add('error');
+  error.textContent = message;
+  error.classList.add('show');
+}
+
+function showAlert(message, type) {
+  const container = document.getElementById('alert-container');
+  container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+}
+</script>
+
+</body>
+</html>

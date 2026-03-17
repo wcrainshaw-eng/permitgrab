@@ -4,7 +4,7 @@ Flask app that serves the dashboard and API endpoints
 Deploy to any VPS (DigitalOcean, Railway, Render, etc.)
 """
 
-from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response
+from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response, redirect
 import json
 import os
 import threading
@@ -945,6 +945,24 @@ def pricing_page():
     cities = get_all_cities_info()
     city_count = get_city_count()
     return render_template('pricing.html', user=user, cities=cities, city_count=city_count)
+
+
+@app.route('/signup')
+def signup_page():
+    """Render the Sign Up page."""
+    # Redirect if already logged in
+    if get_current_user():
+        return redirect('/')
+    return render_template('signup.html')
+
+
+@app.route('/login')
+def login_page():
+    """Render the Login page."""
+    # Redirect if already logged in
+    if get_current_user():
+        return redirect('/')
+    return render_template('login.html')
 
 
 # ===========================
