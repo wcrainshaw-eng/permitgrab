@@ -10,6 +10,12 @@
 <meta property="og:description" content="Simple, transparent pricing for construction permit leads. Free to browse, $149/mo for full contact info and alerts.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://permitgrab.com/pricing">
+<meta property="og:site_name" content="PermitGrab">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Pricing — PermitGrab">
+<meta name="twitter:description" content="Simple, transparent pricing for construction permit leads. Free to browse, $149/mo for full contact info and alerts.">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -133,16 +139,67 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .faq-answer { font-size: 15px; color: var(--gray-600); line-height: 1.7; }
 
 /* FOOTER */
-.footer { background: var(--gray-900); color: rgba(255,255,255,.6); padding: 48px 32px; text-align: center; }
-.footer-inner { max-width: 1100px; margin: 0 auto; }
-.footer p { font-size: 14px; }
-.footer a { color: rgba(255,255,255,.8); text-decoration: none; }
-.footer a:hover { color: white; }
+/* SITE FOOTER */
+.site-footer {
+  background: var(--gray-900);
+  color: white;
+  padding: 48px 32px 24px;
+}
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+.footer-brand { max-width: 300px; }
+.footer-logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 12px;
+}
+.footer-logo span { color: var(--accent); }
+.footer-brand p {
+  font-size: 14px;
+  color: rgba(255,255,255,.5);
+  line-height: 1.6;
+}
+.footer-links h4 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: rgba(255,255,255,.7);
+}
+.footer-links a {
+  display: block;
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 10px;
+  transition: color .2s;
+}
+.footer-links a:hover { color: white; }
+.footer-bottom {
+  max-width: 1200px;
+  margin: 32px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,.4);
+}
 
 @media (max-width: 768px) {
   .pricing-grid { grid-template-columns: 1fr; }
   .hero h1 { font-size: 36px; }
   .plan-price { font-size: 36px; }
+  .footer-inner { flex-direction: column; gap: 32px; }
 }
 </style>
 </head>
@@ -259,12 +316,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </div>
 </section>
 
-<footer class="footer">
-  <div class="footer-inner">
-    <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
-    <p style="margin-top: 12px;"><a href="/">Home</a> &bull; <a href="/pricing">Pricing</a> &bull; <a href="/get-alerts">Get Alerts</a></p>
-  </div>
-</footer>
+{% include 'partials/footer.html' %}
 
 <script>
 async function startStripeCheckout() {

@@ -1120,57 +1120,9 @@ footer a:hover { color: white; }
       <div class="nav-dropdown">
         <a href="#" class="dropdown-toggle">Cities <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
         <div class="dropdown-menu" id="cities-dropdown" style="max-height: 400px; overflow-y: auto; columns: 2; column-gap: 20px;">
-          <a href="/permits/albuquerque">Albuquerque</a>
-          <a href="/permits/atlanta">Atlanta</a>
-          <a href="/permits/austin">Austin</a>
-          <a href="/permits/baltimore">Baltimore</a>
-          <a href="/permits/baton-rouge">Baton Rouge</a>
-          <a href="/permits/boston">Boston</a>
-          <a href="/permits/cambridge">Cambridge</a>
-          <a href="/permits/charlotte">Charlotte</a>
-          <a href="/permits/chicago">Chicago</a>
-          <a href="/permits/cincinnati">Cincinnati</a>
-          <a href="/permits/cleveland">Cleveland</a>
-          <a href="/permits/columbus">Columbus</a>
-          <a href="/permits/denver">Denver</a>
-          <a href="/permits/detroit">Detroit</a>
-          <a href="/permits/fort-worth">Fort Worth</a>
-          <a href="/permits/fresno">Fresno</a>
-          <a href="/permits/honolulu">Honolulu</a>
-          <a href="/permits/indianapolis">Indianapolis</a>
-          <a href="/permits/jacksonville">Jacksonville</a>
-          <a href="/permits/kansas-city">Kansas City</a>
-          <a href="/permits/las-vegas">Las Vegas</a>
-          <a href="/permits/long-beach">Long Beach</a>
-          <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/louisville">Louisville</a>
-          <a href="/permits/memphis">Memphis</a>
-          <a href="/permits/mesa">Mesa</a>
-          <a href="/permits/miami">Miami-Dade</a>
-          <a href="/permits/milwaukee">Milwaukee</a>
-          <a href="/permits/nashville">Nashville</a>
-          <a href="/permits/new-orleans">New Orleans</a>
-          <a href="/permits/new-york">New York City</a>
-          <a href="/permits/oakland">Oakland</a>
-          <a href="/permits/oklahoma-city">Oklahoma City</a>
-          <a href="/permits/omaha">Omaha</a>
-          <a href="/permits/orlando">Orlando</a>
-          <a href="/permits/philadelphia">Philadelphia</a>
-          <a href="/permits/phoenix">Phoenix</a>
-          <a href="/permits/pittsburgh">Pittsburgh</a>
-          <a href="/permits/portland">Portland</a>
-          <a href="/permits/raleigh">Raleigh</a>
-          <a href="/permits/sacramento">Sacramento</a>
-          <a href="/permits/san-antonio">San Antonio</a>
-          <a href="/permits/san-diego">San Diego</a>
-          <a href="/permits/san-francisco">San Francisco</a>
-          <a href="/permits/san-jose">San Jose</a>
-          <a href="/permits/seattle">Seattle</a>
-          <a href="/permits/st-louis">St. Louis</a>
-          <a href="/permits/tampa">Tampa</a>
-          <a href="/permits/tucson">Tucson</a>
-          <a href="/permits/virginia-beach">Virginia Beach</a>
-          <a href="/permits/washington-dc">Washington DC</a>
+          {% for city in footer_cities %}
+          <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+          {% endfor %}
         </div>
       </div>
       <a href="/contractors">Contractors</a>
@@ -1301,17 +1253,14 @@ footer a:hover { color: white; }
       <div class="sidebar-card-body" id="city-breakdown"></div>
     </div>
 
-    <!-- Code Violations (Pre-Leads) -->
-    <div class="sidebar-card" style="border-color: var(--red);">
+    <!-- Code Violations (Pre-Leads) - Hidden by default, shown only if data exists -->
+    <div class="sidebar-card" id="violations-widget" style="border-color: var(--red); display: none;">
       <div class="sidebar-card-header" style="background: var(--red); color: white; display: flex; justify-content: space-between; align-items: center;">
         <span>Code Violations</span>
         <span class="badge-pre-lead" style="background: white; color: var(--red);">Pre-Leads</span>
       </div>
       <div class="sidebar-card-body" id="violations-list">
         <div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">Loading violations...</div>
-      </div>
-      <div style="padding: 12px 20px; border-top: 1px solid var(--gray-100); text-align: center;">
-        <button onclick="loadMoreViolations()" style="font-size: 13px; color: var(--primary); background: none; border: none; cursor: pointer; font-weight: 500;">View All Violations →</button>
       </div>
     </div>
 
@@ -1682,7 +1631,7 @@ function renderPermits() {
         </div>
         ${!isLocked ? `
         <div class="permit-contact">
-          ${p.contact_phone ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : ''}
+          ${p.contact_phone && isValidPhone(p.contact_phone) ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : '<span class="contact-btn" style="color: var(--gray-400); cursor: default;">No phone on file</span>'}
           <button class="contact-btn" onclick="savePermit('${p.permit_number}')">Save Lead</button>
           <button class="contact-btn" onclick="exportPermit('${p.permit_number}')">Export</button>
         </div>
@@ -1692,13 +1641,13 @@ function renderPermits() {
         <div class="permit-history" id="history-${globalIdx}">
           <div class="permit-history-content" id="history-content-${globalIdx}"></div>
         </div>` : `
-        <div class="permit-contact" style="filter: blur(5px);">
-          <a class="contact-btn primary" href="#">(555) 123-4567</a>
-          <button class="contact-btn">Save Lead</button>
-          <button class="contact-btn">Export</button>
+        <div class="permit-contact">
+          <span class="contact-btn primary" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="window.location.href='/pricing'">&#128274; Contact Info</span>
+          <span class="contact-btn" style="color: var(--gray-400); cursor: default;">Save Lead</span>
+          <span class="contact-btn" style="color: var(--gray-400); cursor: default;">Export</span>
         </div>
         <div class="lock-overlay">
-          <a href="/pricing">Upgrade to see contact info for all leads →</a>
+          <a href="/pricing">Upgrade for contact details →</a>
         </div>`}
       </div>
     `;
@@ -1836,6 +1785,18 @@ function getLifecyclePillHtml(stageResult) {
   }
 
   return `<span class="lifecycle-pills">${html}</span>`;
+}
+
+function isValidPhone(phone) {
+  if (!phone) return false;
+  // Remove non-digits
+  const digits = phone.replace(/\D/g, '');
+  // Must have 10 digits
+  if (digits.length !== 10) return false;
+  // Reject obvious fake area codes (555, 000, 111-199)
+  const areaCode = digits.substring(0, 3);
+  if (areaCode === '555' || areaCode === '000' || parseInt(areaCode) < 200) return false;
+  return true;
 }
 
 function escapeHtml(str) {
@@ -2198,14 +2159,19 @@ async function loadViolations() {
 
 function renderViolationsSidebar() {
   const container = document.getElementById('violations-list');
+  const widget = document.getElementById('violations-widget');
 
   // Filter to pre-leads only (no matching permit)
   const preLeads = allViolations.filter(v => v.is_pre_lead).slice(0, 5);
 
   if (preLeads.length === 0) {
-    container.innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">No code violations found</div>';
+    // Hide the widget entirely if no violations
+    widget.style.display = 'none';
     return;
   }
+
+  // Show the widget if we have violations
+  widget.style.display = 'block';
 
   container.innerHTML = preLeads.map(v => `
     <div style="padding: 10px 0; border-bottom: 1px solid var(--gray-100);">

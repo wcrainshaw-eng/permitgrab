@@ -164,6 +164,15 @@ def load_stats():
             return json.load(f)
     return {}
 
+def get_cities_with_data():
+    """Get list of cities that have at least 1 permit in the data."""
+    permits = load_permits()
+    city_names = sorted(set(p.get('city', '') for p in permits if p.get('city')))
+    # Convert city names to city info format with slug for footer links
+    all_cities = get_all_cities_info()
+    city_lookup = {c['name']: c for c in all_cities}
+    return [city_lookup[name] for name in city_names if name in city_lookup]
+
 def load_subscribers():
     """Load subscriber list."""
     if os.path.exists(SUBSCRIBERS_FILE):
@@ -294,7 +303,8 @@ def get_user_saved_leads(user_email):
 @app.route('/')
 def index():
     """Serve the dashboard."""
-    return send_from_directory('.', 'dashboard_production.html')
+    footer_cities = get_cities_with_data()
+    return render_template('dashboard.html', footer_cities=footer_cities)
 
 @app.route('/api/permits')
 @limiter.limit("60 per minute")
@@ -969,7 +979,8 @@ def api_top_contractors():
 @app.route('/contractors')
 def contractors_page():
     """Render the Contractors Intelligence page."""
-    return render_template('contractors.html')
+    footer_cities = get_cities_with_data()
+    return render_template('contractors.html', footer_cities=footer_cities)
 
 
 @app.route('/pricing')
@@ -978,7 +989,8 @@ def pricing_page():
     user = get_current_user()
     cities = get_all_cities_info()
     city_count = get_city_count()
-    return render_template('pricing.html', user=user, cities=cities, city_count=city_count)
+    footer_cities = get_cities_with_data()
+    return render_template('pricing.html', user=user, cities=cities, city_count=city_count, footer_cities=footer_cities)
 
 
 @app.route('/signup')
@@ -987,7 +999,8 @@ def signup_page():
     # Redirect if already logged in
     if get_current_user():
         return redirect('/')
-    return render_template('signup.html')
+    footer_cities = get_cities_with_data()
+    return render_template('signup.html', footer_cities=footer_cities)
 
 
 @app.route('/login')
@@ -996,14 +1009,16 @@ def login_page():
     # Redirect if already logged in
     if get_current_user():
         return redirect('/')
-    return render_template('login.html')
+    footer_cities = get_cities_with_data()
+    return render_template('login.html', footer_cities=footer_cities)
 
 
 @app.route('/get-alerts')
 def get_alerts_page():
     """Render the Get Alerts page."""
-    cities = get_all_cities_info()
-    return render_template('get_alerts.html', cities=cities)
+    cities = get_cities_with_data()  # Only show cities with data
+    footer_cities = cities
+    return render_template('get_alerts.html', cities=cities, footer_cities=footer_cities)
 
 
 # ===========================
@@ -1210,7 +1225,8 @@ def analytics_page():
             </body></html>
         ''')
 
-    return render_template('analytics.html', user=user)
+    footer_cities = get_cities_with_data()
+    return render_template('analytics.html', user=user, footer_cities=footer_cities)
 
 
 # ===========================
@@ -1460,7 +1476,8 @@ def early_intel_page():
             </body></html>
         ''')
 
-    return render_template('early_intel.html', user=user)
+    footer_cities = get_cities_with_data()
+    return render_template('early_intel.html', user=user, footer_cities=footer_cities)
 
 
 # ===========================
@@ -1999,7 +2016,8 @@ def my_leads_page():
         # Redirect to login with message
         return redirect('/login?redirect=my-leads')
 
-    return render_template('my_leads.html', user=user)
+    footer_cities = get_cities_with_data()
+    return render_template('my_leads.html', user=user, footer_cities=footer_cities)
 
 
 # ===========================
@@ -2976,7 +2994,8 @@ def run_initial_collection():
 @app.errorhandler(404)
 def page_not_found(e):
     """Handle 404 errors with a styled page."""
-    return render_template('404.html'), 404
+    footer_cities = get_cities_with_data()
+    return render_template('404.html', footer_cities=footer_cities), 404
 
 
 # ===========================

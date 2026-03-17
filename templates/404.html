@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Page Not Found - PermitGrab</title>
+<meta name="description" content="The page you're looking for doesn't exist. Return to PermitGrab to browse building permit leads.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -101,7 +104,65 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 .error-help a:hover { text-decoration: underline; }
 
-.footer { background: var(--gray-900); color: rgba(255,255,255,.6); padding: 24px 32px; text-align: center; font-size: 14px; border-top: 1px solid rgba(255,255,255,.1); }
+/* SITE FOOTER */
+.site-footer {
+  background: var(--gray-900);
+  color: white;
+  padding: 48px 32px 24px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+.footer-brand { max-width: 300px; }
+.footer-logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 12px;
+}
+.footer-logo span { color: var(--accent); }
+.footer-brand p {
+  font-size: 14px;
+  color: rgba(255,255,255,.5);
+  line-height: 1.6;
+}
+.footer-links h4 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: rgba(255,255,255,.7);
+}
+.footer-links a {
+  display: block;
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 10px;
+  transition: color .2s;
+}
+.footer-links a:hover { color: white; }
+.footer-bottom {
+  max-width: 1200px;
+  margin: 32px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,.4);
+}
+@media (max-width: 768px) {
+  .footer-inner { flex-direction: column; gap: 32px; }
+}
 </style>
 </head>
 <body>
@@ -132,9 +193,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </div>
 </section>
 
-<footer class="footer">
-  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
-</footer>
+{% include 'partials/footer.html' %}
 
 </body>
 </html>

@@ -1,0 +1,37 @@
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="/" class="footer-logo">Permit<span>Grab</span></a>
+      <p>Real-time construction permit leads for contractors. Get the jobs before your competition.</p>
+    </div>
+
+    <div class="footer-links">
+      <h4>Cities</h4>
+      {% if footer_cities %}
+      {% for city in footer_cities[:8] %}
+      <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+      {% endfor %}
+      {% else %}
+      <a href="/permits/new-york">New York</a>
+      <a href="/permits/los-angeles">Los Angeles</a>
+      <a href="/permits/chicago">Chicago</a>
+      <a href="/permits/austin">Austin</a>
+      <a href="/permits/seattle">Seattle</a>
+      <a href="/permits/san-francisco">San Francisco</a>
+      {% endif %}
+    </div>
+
+    <div class="footer-links">
+      <h4>Company</h4>
+      <a href="/">Home</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/get-alerts">Get Alerts</a>
+      <a href="/contractors">Contractors</a>
+      <a href="/login">Log In</a>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    &copy; 2026 PermitGrab. All rights reserved.
+  </div>
+</footer>

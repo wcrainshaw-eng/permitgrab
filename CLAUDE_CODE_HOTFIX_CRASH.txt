@@ -1,0 +1,66 @@
+PERMITGRAB HOTFIX — SITE IS DOWN, CRASH LOOP — PASTE THIS INTO CLAUDE CODE IMMEDIATELY:
+=========================================================================================
+The site is currently DOWN. Render is crash-looping — the Gunicorn worker crashes on startup, Render restarts it, it crashes again, over and over. This has been happening since last night (March 16 ~9PM CT) and is still happening now (March 17 morning). There are 30+ "Instance failed: Exited with status 3" events in Render.
+
+This is a P0 hotfix. Fix it and push BEFORE doing anything else.
+
+========================================================================
+ROOT CAUSE (confirmed from Render service logs)
+========================================================================
+
+The Gunicorn worker traceback shows:
+
+  File "/app/server.py", line 2802, in <module>
+      import markdown
+  ModuleNotFoundError: No module named 'markdown'
+
+The `markdown` Python package is imported at the top level of server.py but is NOT in the project's requirements.txt (or Dockerfile pip install). The Docker image builds successfully (no build error), but when Gunicorn tries to start the Flask app, it hits this import and dies with exit code 3.
+
+There was also a SEPARATE failed deploy yesterday (March 16 ~12:51 PM CT) for commit "Add ArcGIS REST API support for more cities" — that deploy failed during the build step, so those changes (Atlanta, Nashville ArcGIS support) never went live. But the crash-loop is from the CURRENT running code, not that failed deploy.
+
+========================================================================
+FIX — TWO THINGS TO DO
+========================================================================
+
+1. ADD THE MISSING DEPENDENCY:
+
+   Add `markdown` (or `Markdown`) to requirements.txt:
+
+   markdown
+
+   If the project uses a Dockerfile with pip install, also make sure it's included there.
+
+   Then verify: search server.py for `import markdown` and see what it's used for. It's likely used for rendering markdown content (blog posts, descriptions, etc.). Make sure the import is actually needed. If it was added by a recent commit but isn't actually used yet, you can either:
+   a) Add the dependency to requirements.txt (preferred — it'll be needed soon anyway)
+   b) Or remove/comment out the import if it's truly dead code
+
+2. FIX THE FAILED ARCGIS DEPLOY:
+
+   The commit "Add ArcGIS REST API support for more cities" (2c7d40b) failed to deploy. Check what went wrong:
+   - Look at the code in that commit
+   - Check if there are additional missing dependencies or syntax errors
+   - The commit added fetch_permits_arcgis() and configs for Atlanta and Nashville
+   - Make sure any new dependencies (if any) are in requirements.txt
+   - If the code looks fine, the build failure may have been a transient Render issue — just re-pushing should retry
+
+========================================================================
+STEPS
+========================================================================
+
+1. Open requirements.txt and add `markdown` if it's not there
+2. Check server.py line ~2802 — confirm `import markdown` exists and what it's used for
+3. Check Dockerfile (if one exists) for pip install commands — make sure requirements.txt is installed
+4. Search for any OTHER imports in server.py that might also be missing from requirements.txt:
+   - Run: grep "^import\|^from" server.py
+   - Cross-reference against requirements.txt
+   - Add any missing ones
+5. While you're in there, check if the ArcGIS commit code (fetch_permits_arcgis, Atlanta/Nashville configs) is present and correct
+6. Commit with message: "Hotfix: add missing markdown dependency causing crash loop"
+7. Push to main — Render will auto-deploy
+8. Watch the Render deploy logs to confirm it builds AND the worker starts without errors
+9. After deploy completes (~2-5 min), verify the site loads at https://permitgrab.com
+
+========================================================================
+IMPORTANT: DO THIS FIRST, BEFORE ANY OTHER WORK
+========================================================================
+The site has been down for ~8+ hours. Every minute it's down is a bad look if anyone visits. Fix the crash, verify it's live, THEN move on to the site fixes spec (CLAUDE_CODE_SITE_FIXES.txt).
