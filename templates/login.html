@@ -8,6 +8,7 @@
 <link rel="canonical" href="https://permitgrab.com/login">
 <meta name="robots" content="noindex, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -243,16 +244,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <a href="/">Dashboard</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/signup" class="nav-btn">Sign Up</a>
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <div class="auth-container">
   <div class="auth-card">

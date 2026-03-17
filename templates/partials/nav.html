@@ -1,13 +1,131 @@
-<nav class="nav">
-  <div class="nav-inner">
+<style>
+.site-nav {
+  background: linear-gradient(135deg, var(--gray-900, #111827) 0%, #1e3a5f 100%);
+  padding: 0 32px;
+}
+.site-nav-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+}
+.site-nav .logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+.site-nav .logo span { color: var(--accent, #f97316); }
+.site-nav-links {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.site-nav-links > a {
+  color: rgba(255,255,255,.7);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color .2s;
+}
+.site-nav-links > a:hover { color: white; }
+.site-nav .nav-dropdown {
+  position: relative;
+}
+.site-nav .dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255,255,255,.7);
+  font-size: 14px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.site-nav .dropdown-toggle:hover { color: white; }
+.site-nav .dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.15);
+  min-width: 180px;
+  z-index: 1000;
+  margin-top: 12px;
+  padding: 8px 0;
+}
+.site-nav .nav-dropdown:hover .dropdown-menu { display: block; }
+.site-nav .dropdown-menu a {
+  display: block;
+  padding: 10px 16px;
+  color: var(--gray-700, #374151);
+  font-size: 14px;
+  text-decoration: none;
+  transition: all .15s;
+}
+.site-nav .dropdown-menu a:hover {
+  background: var(--gray-50, #f9fafb);
+  color: var(--primary, #2563eb);
+}
+.site-nav .nav-btn {
+  background: var(--accent, #f97316);
+  color: white !important;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: background .2s;
+}
+.site-nav .nav-btn:hover { background: var(--accent-dark, #ea580c); }
+/* Mobile nav */
+@media (max-width: 768px) {
+  .site-nav { padding: 0 16px; }
+  .site-nav-links { display: none; }
+  .site-nav.mobile-open .site-nav-links {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background: var(--gray-900, #111827);
+    padding: 16px;
+    gap: 16px;
+  }
+  .mobile-toggle {
+    display: block;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+  }
+}
+@media (min-width: 769px) {
+  .mobile-toggle { display: none; }
+}
+</style>
+
+<nav class="site-nav" id="site-nav">
+  <div class="site-nav-inner">
     <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
+
+    <button class="mobile-toggle" onclick="document.getElementById('site-nav').classList.toggle('mobile-open')">☰</button>
+
+    <div class="site-nav-links">
       <a href="/">Dashboard</a>
-      <div class="dropdown">
+
+      <div class="nav-dropdown">
         <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
         <div class="dropdown-menu">
-          {% if footer_cities %}
-          {% for city in footer_cities[:10] %}
+          {% if nav_cities %}
+          {% for city in nav_cities[:10] %}
           <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
           {% endfor %}
           {% else %}
@@ -20,27 +138,28 @@
           {% endif %}
         </div>
       </div>
+
       <a href="/contractors">Contractors</a>
+      <a href="/pricing">Pricing</a>
+
       {% if user %}
       <a href="/early-intel">Early Intel</a>
       <a href="/analytics">Analytics</a>
       <a href="/my-leads">My Leads</a>
-      {% endif %}
-      <a href="/pricing">Pricing</a>
-      {% if not user %}
+
+      <div class="nav-dropdown">
+        <button class="dropdown-toggle">{{ user.name or user.email.split('@')[0] }} <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          {% if user.plan == 'pro' %}
+          <a href="/billing">Billing</a>
+          {% endif %}
+          <a href="/logout">Log Out</a>
+        </div>
+      </div>
+      {% else %}
       <a href="/get-alerts">Get Alerts</a>
       <a href="/login">Log In</a>
       <a href="/signup" class="nav-btn">Sign Up</a>
-      {% else %}
-      <div class="dropdown">
-        <button class="dropdown-toggle">{{ user.name or user.email.split('@')[0] }} <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
-        <div class="dropdown-menu">
-          {% if user.tier == 'pro' %}
-          <a href="/billing">Billing</a>
-          {% endif %}
-          <a href="#" onclick="logout(); return false;">Log Out</a>
-        </div>
-      </div>
       {% endif %}
     </div>
   </div>

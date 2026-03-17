@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saved Searches - PermitGrab</title>
+<meta name="description" content="Manage your saved permit searches and daily alert preferences.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --green: #16a34a;
+  --red: #dc2626;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* PAGE HEADER */
+.page-header {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 32px;
+}
+
+.page-header-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.page-header p {
+  color: var(--gray-500);
+  font-size: 15px;
+}
+
+/* MAIN CONTENT */
+.main-content {
+  flex: 1;
+  padding: 32px;
+}
+
+.content-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* SEARCH CARDS */
+.searches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.search-info {
+  flex: 1;
+}
+
+.search-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-tag {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.search-meta {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.search-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.alert-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--gray-600);
+}
+
+.alert-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.delete-btn:hover {
+  color: var(--red);
+}
+
+.run-search-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.run-search-btn:hover {
+  background: var(--primary-dark);
+}
+
+/* EMPTY STATE */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: var(--gray-500);
+  margin-bottom: 24px;
+}
+
+.empty-state a {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.empty-state a:hover {
+  background: var(--primary-dark);
+}
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--gray-900);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 1000;
+  display: none;
+}
+
+.toast.show { display: block; }
+
+/* FOOTER */
+.site-footer {
+  background: var(--gray-900);
+  color: white;
+  padding: 48px 32px 24px;
+  margin-top: auto;
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+
+.footer-brand { max-width: 300px; }
+.footer-logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 12px;
+}
+.footer-logo span { color: var(--accent); }
+.footer-brand p {
+  font-size: 14px;
+  color: rgba(255,255,255,.5);
+  line-height: 1.6;
+}
+.footer-links h4 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: rgba(255,255,255,.7);
+}
+.footer-links a {
+  display: block;
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 10px;
+  transition: color .2s;
+}
+.footer-links a:hover { color: white; }
+.footer-bottom {
+  max-width: 1200px;
+  margin: 32px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,.4);
+}
+
+@media (max-width: 768px) {
+  .search-card {
+    flex-direction: column;
+  }
+  .search-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .footer-inner { flex-direction: column; gap: 32px; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1>Saved Searches</h1>
+    <p>Manage your saved permit searches and daily email alerts</p>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="content-inner">
+    {% if searches %}
+    <div class="searches-list">
+      {% for search in searches %}
+      <div class="search-card" data-search-id="{{ search.id }}">
+        <div class="search-info">
+          <div class="search-name">{{ search.name }}</div>
+          <div class="search-filters">
+            {% if search.city %}<span class="filter-tag">{{ search.city }}</span>{% endif %}
+            {% if search.trade %}<span class="filter-tag">{{ search.trade }}</span>{% endif %}
+            {% if search.value_tier %}<span class="filter-tag">Value: {{ search.value_tier }}</span>{% endif %}
+            {% if search.status %}<span class="filter-tag">Status: {{ search.status }}</span>{% endif %}
+            {% if search.quality %}<span class="filter-tag">Quality: {{ search.quality }}</span>{% endif %}
+          </div>
+          <div class="search-meta">
+            Created {{ search.created_at[:10] }}
+          </div>
+        </div>
+        <div class="search-actions">
+          <label class="alert-toggle">
+            <input type="checkbox" {% if search.daily_alerts %}checked{% endif %} onchange="toggleAlerts('{{ search.id }}', this.checked)">
+            Daily alerts
+          </label>
+          <a href="/?city={{ search.city }}&trade={{ search.trade }}" class="run-search-btn">Run Search</a>
+          <button class="delete-btn" onclick="deleteSearch('{{ search.id }}')">Delete</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h3>No saved searches yet</h3>
+      <p>Save your filter settings from the dashboard to get daily alerts for matching permits.</p>
+      <a href="/">Go to Dashboard</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+{% include 'partials/footer.html' %}
+
+<script>
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function toggleAlerts(searchId, enabled) {
+  try {
+    const resp = await fetch(`/api/saved-searches/${searchId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ daily_alerts: enabled })
+    });
+    if (resp.ok) {
+      showToast(enabled ? 'Daily alerts enabled' : 'Daily alerts disabled');
+    }
+  } catch (err) {
+    showToast('Unable to update alerts');
+  }
+}
+
+async function deleteSearch(searchId) {
+  if (!confirm('Delete this saved search?')) return;
+
+  try {
+    const resp = await fetch(`/api/saved-searches/${searchId}`, {
+      method: 'DELETE'
+    });
+    if (resp.ok) {
+      document.querySelector(`[data-search-id="${searchId}"]`).remove();
+      showToast('Search deleted');
+      // Check if empty
+      if (document.querySelectorAll('.search-card').length === 0) {
+        location.reload();
+      }
+    }
+  } catch (err) {
+    showToast('Unable to delete search');
+  }
+}
+</script>
+
+</body>
+</html>

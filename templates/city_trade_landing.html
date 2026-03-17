@@ -156,37 +156,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <div class="dropdown">
-        <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
-        <div class="dropdown-menu">
-          <a href="/permits/new-york">New York City</a>
-          <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/chicago">Chicago</a>
-          <a href="/permits/san-francisco">San Francisco</a>
-          <a href="/permits/austin">Austin</a>
-          <a href="/permits/seattle">Seattle</a>
-        </div>
-      </div>
-      <div class="dropdown">
-        <button class="dropdown-toggle">Trades <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
-        <div class="dropdown-menu">
-          <a href="/permits/{{ city.slug }}/plumbing">🔧 Plumbing</a>
-          <a href="/permits/{{ city.slug }}/electrical">⚡ Electrical</a>
-          <a href="/permits/{{ city.slug }}/hvac">🌡️ HVAC</a>
-          <a href="/permits/{{ city.slug }}/roofing">🏠 Roofing</a>
-          <a href="/permits/{{ city.slug }}/solar">☀️ Solar</a>
-          <a href="/permits/{{ city.slug }}/general-construction">🏗️ General</a>
-        </div>
-      </div>
-      <a href="/blog">Blog</a>
-      <a href="/pricing">Pricing</a>
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <div class="hero">
   <div class="hero-inner">
@@ -311,9 +281,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </div>
 </div>
 
-<footer class="footer">
-  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
-</footer>
+{% include 'partials/footer.html' %}
 
 </body>
 </html>

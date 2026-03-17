@@ -11,6 +11,8 @@
 <meta property="og:url" content="https://permitgrab.com/blog/{{ post.slug }}">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -77,34 +79,7 @@ article h1 { font-size: 36px; font-weight: 800; color: var(--gray-900); margin-b
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <div class="dropdown">
-        <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
-        <div class="dropdown-menu">
-          <a href="/permits/new-york">New York City</a>
-          <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/chicago">Chicago</a>
-          <a href="/permits/austin">Austin</a>
-          <a href="/permits/seattle">Seattle</a>
-        </div>
-      </div>
-      <div class="dropdown">
-        <button class="dropdown-toggle">Trades <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
-        <div class="dropdown-menu">
-          <a href="/permits/new-york/plumbing">🔧 Plumbing</a>
-          <a href="/permits/new-york/electrical">⚡ Electrical</a>
-          <a href="/permits/new-york/hvac">🌡️ HVAC</a>
-          <a href="/permits/new-york/roofing">🏠 Roofing</a>
-        </div>
-      </div>
-      <a href="/blog">Blog</a>
-      <a href="/pricing">Pricing</a>
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <div class="main">
   <div class="breadcrumb">
@@ -122,13 +97,11 @@ article h1 { font-size: 36px; font-weight: 800; color: var(--gray-900); margin-b
   <div class="cta-box">
     <h3>Ready to Find More Construction Leads?</h3>
     <p>PermitGrab delivers fresh building permit leads daily with contact info and lead scores.</p>
-    <a href="/#signup" class="cta-btn">Start Free &rarr;</a>
+    <a href="/signup" class="cta-btn">Start Free &rarr;</a>
   </div>
 </div>
 
-<footer class="footer">
-  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
-</footer>
+{% include 'partials/footer.html' %}
 
 </body>
 </html>

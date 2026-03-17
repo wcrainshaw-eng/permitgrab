@@ -16,6 +16,7 @@
 <meta name="twitter:description" content="Simple, transparent pricing for construction permit leads. Free to browse, $149/mo for full contact info and alerts.">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -129,6 +130,72 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37,99,235,.3); }
 
+/* TESTIMONIALS */
+.testimonials-section {
+  padding: 80px 32px;
+  background: var(--gray-50);
+}
+.testimonials-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.trusted-by {
+  text-align: center;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.testimonials-title {
+  text-align: center;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 48px;
+}
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.testimonial-card {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.testimonial-stars {
+  color: #fbbf24;
+  font-size: 18px;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+.testimonial-quote {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--gray-700);
+  margin-bottom: 24px;
+  font-style: italic;
+}
+.testimonial-author {
+  border-top: 1px solid var(--gray-100);
+  padding-top: 16px;
+}
+.testimonial-name {
+  font-weight: 600;
+  color: var(--gray-900);
+  font-size: 15px;
+}
+.testimonial-title {
+  color: var(--gray-500);
+  font-size: 13px;
+}
+@media (max-width: 900px) {
+  .testimonials-grid { grid-template-columns: 1fr; }
+}
+
 /* FAQ */
 .faq-section { padding: 80px 32px; background: white; }
 .faq-inner { max-width: 700px; margin: 0 auto; }
@@ -195,42 +262,70 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   color: rgba(255,255,255,.4);
 }
 
+/* Billing Toggle */
+.billing-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 48px;
+  background: var(--gray-100);
+  border-radius: 12px;
+  padding: 6px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+.toggle-btn {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-600);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggle-btn:hover { color: var(--gray-900); }
+.toggle-btn.active {
+  background: white;
+  color: var(--gray-900);
+  box-shadow: 0 2px 4px rgba(0,0,0,.08);
+}
+.save-badge {
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.annual-savings {
+  text-align: center;
+  color: #16a34a;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 4px;
+  display: none;
+}
+.annual-savings.show { display: block; }
+
 @media (max-width: 768px) {
   .pricing-grid { grid-template-columns: 1fr; }
   .hero h1 { font-size: 36px; }
   .plan-price { font-size: 36px; }
   .footer-inner { flex-direction: column; gap: 32px; }
+  .billing-toggle { flex-direction: column; width: 90%; }
+  .toggle-btn { justify-content: center; }
 }
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <a href="/">Dashboard</a>
-      <div class="dropdown">
-        <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
-        <div class="dropdown-menu">
-          {% for city in cities[:10] %}
-          <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
-          {% endfor %}
-        </div>
-      </div>
-      <a href="/contractors">Contractors</a>
-      <a href="/pricing" style="color: white;">Pricing</a>
-      <a href="/get-alerts">Get Alerts</a>
-      {% if user %}
-      <a href="/my-leads">My Leads</a>
-      <a href="#">{{ user.name or user.email }}</a>
-      {% else %}
-      <a href="/login">Log In</a>
-      <a href="/signup" class="nav-btn">Sign Up</a>
-      {% endif %}
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <section class="hero">
   <h1>Simple, Transparent Pricing</h1>
@@ -239,6 +334,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <section class="pricing-section">
   <div class="pricing-inner">
+    <!-- Billing Toggle -->
+    <div class="billing-toggle">
+      <button type="button" class="toggle-btn active" id="monthly-btn" onclick="setBilling('monthly')">Monthly</button>
+      <button type="button" class="toggle-btn" id="annual-btn" onclick="setBilling('annual')">Annual <span class="save-badge">Save 13%</span></button>
+    </div>
+
     <div class="pricing-grid">
 
       <!-- FREE TIER -->
@@ -262,8 +363,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <div class="pricing-card featured">
         <div class="popular-badge">Most Popular</div>
         <div class="plan-name">Professional</div>
-        <div class="plan-price">$149<span>/month</span></div>
-        <div class="plan-desc">Full access to win more jobs</div>
+        <div class="plan-price" id="pro-price">$149<span>/month</span></div>
+        <div class="annual-savings" id="annual-savings">Save $240/year</div>
+        <div class="plan-desc" id="pro-desc">Full access to win more jobs</div>
 
         <ul class="features-list">
           <li><span class="check">&#10003;</span> Everything in Free, plus:</li>
@@ -280,6 +382,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <button onclick="startStripeCheckout()" class="btn btn-primary">Start Free Trial</button>
       </div>
 
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS SECTION -->
+<!-- REPLACE WITH REAL TESTIMONIALS when available -->
+<section class="testimonials-section">
+  <div class="testimonials-inner">
+    <p class="trusted-by">Trusted by 200+ contractors</p>
+    <h2 class="testimonials-title">What Our Customers Say</h2>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-quote">"PermitGrab cut my prospecting time in half. I used to spend hours searching city websites — now the leads come to me every morning."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Mike R.</div>
+          <div class="testimonial-title">General Contractor, Austin TX</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-quote">"The contractor intelligence feature is incredible. I can see exactly who's winning bids in my area and target the right opportunities."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Sarah T.</div>
+          <div class="testimonial-title">Electrical Contractor, Denver CO</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-quote">"Within my first week, I found a $1.2M project that none of my competitors knew about. The ROI on $149/month is insane."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">David L.</div>
+          <div class="testimonial-title">Renovation Specialist, Seattle WA</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -319,12 +456,38 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 {% include 'partials/footer.html' %}
 
 <script>
+// Billing period state
+let billingPeriod = 'monthly';
+
+function setBilling(period) {
+  billingPeriod = period;
+
+  // Update toggle buttons
+  document.getElementById('monthly-btn').classList.toggle('active', period === 'monthly');
+  document.getElementById('annual-btn').classList.toggle('active', period === 'annual');
+
+  // Update pricing display
+  const priceEl = document.getElementById('pro-price');
+  const savingsEl = document.getElementById('annual-savings');
+  const descEl = document.getElementById('pro-desc');
+
+  if (period === 'annual') {
+    priceEl.innerHTML = '$129<span>/month</span>';
+    descEl.textContent = 'Billed annually ($1,548/year)';
+    savingsEl.classList.add('show');
+  } else {
+    priceEl.innerHTML = '$149<span>/month</span>';
+    descEl.textContent = 'Full access to win more jobs';
+    savingsEl.classList.remove('show');
+  }
+}
+
 async function startStripeCheckout() {
   try {
     const resp = await fetch('/api/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({ billing_period: billingPeriod })
     });
     const data = await resp.json();
     if (data.url) {

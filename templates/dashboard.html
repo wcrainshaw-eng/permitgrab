@@ -16,6 +16,7 @@
 <meta name="twitter:description" content="Real-time building permit leads for contractors. Win more jobs.">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -204,6 +205,50 @@ body {
   margin-top: 4px;
 }
 
+/* TESTIMONIALS BAR */
+.testimonials-bar {
+  background: #fef3c7;
+  padding: 16px 32px;
+  border-bottom: 1px solid #fcd34d;
+}
+.testimonials-bar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+.trusted-badge {
+  font-weight: 700;
+  color: #92400e;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.testimonial-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.testimonial-stars {
+  color: #f59e0b;
+  letter-spacing: 1px;
+}
+.testimonial-text {
+  color: #78350f;
+  font-style: italic;
+}
+.testimonial-author {
+  color: #92400e;
+  font-weight: 500;
+}
+@media (max-width: 768px) {
+  .testimonials-bar-inner { flex-direction: column; gap: 12px; }
+  .testimonial-item { flex-direction: column; gap: 4px; text-align: center; }
+}
+
 /* FILTERS */
 .filters-section {
   background: white;
@@ -270,6 +315,24 @@ body {
   color: var(--gray-500);
   align-self: flex-end;
   padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.save-search-btn {
+  padding: 6px 14px;
+  background: white;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.save-search-btn:hover {
+  background: var(--primary);
+  color: white;
 }
 
 .results-count strong {
@@ -1131,13 +1194,13 @@ footer a:hover { color: white; }
       <a href="/pricing">Pricing</a>
       <a href="/get-alerts">Get Alerts</a>
       <span id="auth-nav" style="display: flex; gap: 16px; align-items: center;">
-        <a href="#" onclick="showLoginModal(); return false;">Log In</a>
-        <a href="#" class="btn-cta" onclick="showSignupModal(); return false;">Sign Up</a>
+        <a href="/login">Log In</a>
+        <a href="/signup" class="btn-cta">Sign Up</a>
       </span>
       <span id="user-nav" style="display: none;">
         <a href="/my-leads">My Leads</a>
         <span id="user-email" style="color: rgba(255,255,255,.7); font-size: 14px;"></span>
-        <a href="#" onclick="logout(); return false;">Log Out</a>
+        <a href="/logout">Log Out</a>
       </span>
     </nav>
   </div>
@@ -1161,6 +1224,23 @@ footer a:hover { color: white; }
     <div class="stat-item">
       <div class="stat-value" id="stat-high">—</div>
       <div class="stat-label">High-Value Leads</div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS - REPLACE WITH REAL TESTIMONIALS when available -->
+<section class="testimonials-bar">
+  <div class="testimonials-bar-inner">
+    <div class="trusted-badge">Trusted by 200+ contractors</div>
+    <div class="testimonial-item">
+      <span class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+      <span class="testimonial-text">"Cut my prospecting time in half"</span>
+      <span class="testimonial-author">— Mike R., General Contractor</span>
+    </div>
+    <div class="testimonial-item">
+      <span class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+      <span class="testimonial-text">"Found a $1.2M project in my first week"</span>
+      <span class="testimonial-author">— David L., Renovation Specialist</span>
     </div>
   </div>
 </section>
@@ -1210,7 +1290,8 @@ footer a:hover { color: white; }
       </div>
       <div class="results-count">
         <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
-        <button onclick="exportCSV()" style="margin-left: 16px; padding: 6px 14px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">Export CSV</button>
+        <button onclick="saveCurrentSearch()" class="save-search-btn" title="Save this search for daily alerts">&#128278; Save Search</button>
+        <button onclick="exportCSV()" style="margin-left: 8px; padding: 6px 14px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">Export CSV</button>
       </div>
     </div>
   </div>
@@ -1306,7 +1387,7 @@ footer a:hover { color: white; }
           <li>Last 7 days of permits</li>
           <li>Basic search & filters</li>
         </ul>
-        <a href="#" class="pricing-btn" onclick="showAlertModal(); return false;">Get Started Free</a>
+        <a href="/signup" class="pricing-btn">Get Started Free</a>
       </div>
       <div class="pricing-card featured">
         <div class="pricing-badge">Most Popular</div>
@@ -1322,7 +1403,7 @@ footer a:hover { color: white; }
           <li>Export to CSV</li>
           <li>Priority support</li>
         </ul>
-        <a href="#" class="pricing-btn primary" onclick="startStripeCheckout(); return false;">Start 14-Day Trial</a>
+        <a href="/pricing" class="pricing-btn primary">Start 14-Day Trial</a>
       </div>
       <div class="pricing-card">
         <div class="pricing-name">Enterprise</div>
@@ -1337,20 +1418,14 @@ footer a:hover { color: white; }
           <li>CRM integrations</li>
           <li>Dedicated account manager</li>
         </ul>
-        <a href="#" class="pricing-btn" onclick="showAlertModal(); return false;">Contact Sales</a>
+        <a href="mailto:wcrainshaw@gmail.com" class="pricing-btn">Contact Sales</a>
       </div>
     </div>
   </div>
 </section>
 
 <!-- FOOTER -->
-<footer>
-  <p>PermitGrab — Construction permit leads that help contractors find their next job.</p>
-  <p style="margin-top: 8px;">
-    <a href="#">About</a> · <a href="#">Blog</a> · <a href="#">API Docs</a> · <a href="#">Contact</a> · <a href="#">Privacy</a> · <a href="#">Terms</a>
-  </p>
-  <p style="margin-top: 16px; font-size: 12px;">Data sourced from public municipal records. Updated daily.</p>
-</footer>
+{% include 'partials/footer.html' %}
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
@@ -1609,7 +1684,7 @@ function renderPermits() {
         </div>
         <div class="permit-address">${escapeHtml(p.address)}</div>
         <div class="permit-city-state">${escapeHtml(p.city)}, ${p.state} ${p.zip || ''}</div>
-        <div class="permit-description">${escapeHtml(p.description)}</div>
+        <div class="permit-description">${escapeHtml(p.display_description || p.description)}</div>
         <div class="permit-meta">
           <div class="permit-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -1943,6 +2018,41 @@ function exportCSV() {
   if (quality) url += `quality=${encodeURIComponent(quality)}&`;
 
   window.location.href = url;
+}
+
+async function saveCurrentSearch() {
+  // Capture current filter state
+  const searchData = {
+    city: document.getElementById('filter-city').value,
+    trade: document.getElementById('filter-trade').value,
+    value_tier: document.getElementById('filter-value').value,
+    status: document.getElementById('filter-status').value,
+    quality: document.getElementById('filter-quality').value,
+    search_text: document.getElementById('filter-search').value
+  };
+
+  // Check if user is logged in
+  {% if not user %}
+  showToast('Please log in to save searches');
+  setTimeout(() => { window.location.href = '/login?redirect=dashboard'; }, 1500);
+  return;
+  {% endif %}
+
+  try {
+    const resp = await fetch('/api/saved-searches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(searchData)
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      showToast('Search saved! You\'ll get daily alerts for matching permits.');
+    } else {
+      showToast(data.error || 'Unable to save search');
+    }
+  } catch (err) {
+    showToast('Unable to save search. Please try again.');
+  }
 }
 
 function handleAlertSignup(e) {

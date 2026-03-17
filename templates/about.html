@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About PermitGrab — Construction Permit Leads Platform</title>
+<meta name="description" content="Learn about PermitGrab, the platform helping contractors find construction leads through public permit data.">
+<link rel="canonical" href="https://permitgrab.com/about">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-500: #6b7280;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-800); line-height: 1.7; }
+.header { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%); padding: 16px 32px; }
+.header-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav { display: flex; gap: 24px; align-items: center; }
+.nav a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav a:hover { color: white; }
+.hero { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%); color: white; padding: 64px 32px; text-align: center; }
+.hero h1 { font-size: 42px; margin-bottom: 16px; }
+.hero p { font-size: 18px; opacity: 0.8; max-width: 600px; margin: 0 auto; }
+.content { max-width: 800px; margin: 48px auto; padding: 0 24px; }
+h2 { font-size: 28px; margin: 48px 0 16px; color: var(--gray-900); }
+p { margin-bottom: 16px; }
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin: 32px 0; }
+.feature { background: white; padding: 24px; border-radius: 12px; border: 1px solid var(--gray-100); }
+.feature h3 { font-size: 18px; margin-bottom: 8px; color: var(--gray-900); }
+.feature p { font-size: 14px; color: var(--gray-500); margin: 0; }
+.cta-section { text-align: center; padding: 48px 24px; background: var(--gray-100); border-radius: 12px; margin: 48px 0; }
+.cta-section h2 { margin-top: 0; }
+.cta-btn { display: inline-block; background: var(--primary); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+.cta-btn:hover { background: #1d4ed8; }
+.site-footer { background: var(--gray-900); color: white; padding: 48px 32px 24px; margin-top: 48px; }
+.footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.footer-brand { max-width: 300px; }
+.footer-logo { font-size: 24px; font-weight: 700; color: white; text-decoration: none; display: block; margin-bottom: 12px; }
+.footer-logo span { color: var(--accent); }
+.footer-brand p { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.6; }
+.footer-links h4 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: rgba(255,255,255,.7); }
+.footer-links a { display: block; color: rgba(255,255,255,.5); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+.footer-links a:hover { color: white; }
+.footer-bottom { max-width: 1200px; margin: 32px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.1); text-align: center; font-size: 13px; color: rgba(255,255,255,.4); }
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<div class="hero">
+  <h1>About PermitGrab</h1>
+  <p>Helping contractors find their next job through public permit data</p>
+</div>
+
+<div class="content">
+  <h2>Our Mission</h2>
+  <p>PermitGrab was built with one goal: help contractors and construction professionals find leads faster. Every day, thousands of building permits are filed with city governments — each one representing a potential job opportunity. But finding this data meant navigating dozens of different municipal websites, each with their own search interfaces and data formats.</p>
+  <p>We built PermitGrab to solve this problem. We aggregate permit data from 85+ metro areas across the United States, normalize it into a consistent format, and deliver it to contractors who can actually use it to grow their businesses.</p>
+
+  <h2>How It Works</h2>
+  <div class="features">
+    <div class="feature">
+      <h3>Data Collection</h3>
+      <p>We pull permit data daily from official municipal open data portals, including Socrata, ArcGIS, and CKAN platforms.</p>
+    </div>
+    <div class="feature">
+      <h3>Processing & Enrichment</h3>
+      <p>Raw permit data is cleaned, normalized, and enriched with trade classifications, lead scores, and contact information where available.</p>
+    </div>
+    <div class="feature">
+      <h3>Delivery</h3>
+      <p>Access permits through our web dashboard, receive daily email alerts, or export to CSV for your CRM.</p>
+    </div>
+  </div>
+
+  <h2>Why Contractors Trust Us</h2>
+  <p>Unlike scraped or synthetic data, every permit in PermitGrab comes directly from official government sources. We're transparent about where our data comes from, and we update it daily to ensure you're seeing the freshest leads possible.</p>
+  <p>Our lead scoring algorithm helps you prioritize the best opportunities — high-value projects, recently filed permits, and those with complete contact information rise to the top.</p>
+
+  <div class="cta-section">
+    <h2>Ready to Find Your Next Job?</h2>
+    <p>Browse permits for free, or upgrade to Professional for full contact details and daily alerts.</p>
+    <a href="/signup" class="cta-btn">Get Started Free</a>
+  </div>
+</div>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>

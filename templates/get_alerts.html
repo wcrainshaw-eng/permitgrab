@@ -16,6 +16,7 @@
 <meta name="twitter:description" content="Get building permit leads delivered to your inbox daily. Free for your first metro area.">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -268,17 +269,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <a href="/">Dashboard</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/login">Log In</a>
-      <a href="/signup" class="nav-btn">Sign Up</a>
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <section class="hero">
   <h1>Get Permit Alerts Delivered Daily</h1>

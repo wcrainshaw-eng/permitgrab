@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact Us — PermitGrab</title>
+<meta name="description" content="Get in touch with the PermitGrab team. We're here to help with questions about our construction permit leads platform.">
+<link rel="canonical" href="https://permitgrab.com/contact">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-800); line-height: 1.7; }
+.header { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%); padding: 16px 32px; }
+.header-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav { display: flex; gap: 24px; align-items: center; }
+.nav a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav a:hover { color: white; }
+.content { max-width: 600px; margin: 48px auto; padding: 0 24px; }
+h1 { font-size: 36px; margin-bottom: 8px; color: var(--gray-900); text-align: center; }
+.subtitle { text-align: center; color: var(--gray-500); margin-bottom: 32px; }
+.contact-card { background: white; padding: 32px; border-radius: 12px; border: 1px solid var(--gray-100); }
+.form-group { margin-bottom: 20px; }
+label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: var(--gray-700); }
+input, textarea, select { width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 14px; font-family: inherit; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); }
+textarea { min-height: 120px; resize: vertical; }
+.submit-btn { width: 100%; background: var(--primary); color: white; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.submit-btn:hover { background: #1d4ed8; }
+.email-direct { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--gray-100); }
+.email-direct p { color: var(--gray-500); font-size: 14px; }
+.email-direct a { color: var(--primary); font-weight: 500; }
+.site-footer { background: var(--gray-900); color: white; padding: 48px 32px 24px; margin-top: 48px; }
+.footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.footer-brand { max-width: 300px; }
+.footer-logo { font-size: 24px; font-weight: 700; color: white; text-decoration: none; display: block; margin-bottom: 12px; }
+.footer-logo span { color: var(--accent); }
+.footer-brand p { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.6; }
+.footer-links h4 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: rgba(255,255,255,.7); }
+.footer-links a { display: block; color: rgba(255,255,255,.5); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+.footer-links a:hover { color: white; }
+.footer-bottom { max-width: 1200px; margin: 32px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.1); text-align: center; font-size: 13px; color: rgba(255,255,255,.4); }
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<div class="content">
+  <h1>Contact Us</h1>
+  <p class="subtitle">Have a question? We'd love to hear from you.</p>
+
+  <div class="contact-card">
+    <form id="contact-form" onsubmit="submitContact(event)">
+      <div class="form-group">
+        <label for="name">Your Name</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+      <div class="form-group">
+        <label for="subject">Subject</label>
+        <select id="subject" name="subject">
+          <option value="general">General Inquiry</option>
+          <option value="support">Technical Support</option>
+          <option value="billing">Billing Question</option>
+          <option value="enterprise">Enterprise Sales</option>
+          <option value="partnership">Partnership</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" required placeholder="How can we help?"></textarea>
+      </div>
+      <button type="submit" class="submit-btn">Send Message</button>
+    </form>
+
+    <div class="email-direct">
+      <p>Or email us directly at <a href="mailto:support@permitgrab.com">support@permitgrab.com</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+async function submitContact(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = {
+    name: form.name.value,
+    email: form.email.value,
+    subject: form.subject.value,
+    message: form.message.value
+  };
+
+  try {
+    const resp = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (resp.ok) {
+      alert('Thank you! Your message has been sent. We\'ll get back to you soon.');
+      form.reset();
+    } else {
+      alert('Something went wrong. Please try again or email us directly.');
+    }
+  } catch (err) {
+    alert('Something went wrong. Please email us at support@permitgrab.com');
+  }
+}
+</script>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>

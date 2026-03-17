@@ -10,14 +10,16 @@ import os
 import threading
 import time
 import secrets
+import uuid
 from datetime import datetime
 import stripe
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY
+from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY, TRADE_CATEGORIES
 from lifecycle import get_lifecycle_label
 from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_slugs
+import analytics
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -42,93 +44,103 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 def score_lead(permit):
     """
-    Calculate lead score (0-100) based on recency, value, contacts, stage, and trade.
+    Calculate lead score (0-99) based on value, recency, contacts, status, and project type.
     Returns score and quality tier (hot/warm/standard).
 
-    Scoring breakdown:
-    - Recency (0-30 pts): Based on filing date
-    - Project Value (0-25 pts): Based on estimated cost
-    - Contact Completeness (0-20 pts): Owner name, phone, address
-    - Permit Stage (0-15 pts): Early stage = more valuable
-    - Trade Specificity (0-10 pts): Specific trade vs General
+    Scoring breakdown (max 99 pts):
+    - Value (0-30 pts): Based on estimated cost
+    - Recency (0-25 pts): Based on filing date
+    - Contact Info (0-20 pts): Phone, email, owner name
+    - Status (0-15 pts): Permit status/stage
+    - Project Type (0-9 pts): Type bonus
     """
     score = 0
 
-    # RECENCY (0-30 points)
+    # VALUE COMPONENT (0-30 points)
+    value = permit.get('estimated_cost', 0) or 0
+    if value >= 5000000:
+        score += 30  # $5M+
+    elif value >= 1000000:
+        score += 20  # $1M-$5M
+    elif value >= 500000:
+        score += 15  # $500K-$1M
+    elif value >= 100000:
+        score += 10  # $100K-$500K
+    elif value > 0:
+        score += 5   # $0-$100K
+    else:
+        score += 8   # Unknown value (don't penalize too much)
+
+    # RECENCY COMPONENT (0-25 points)
     filing_date = permit.get('filing_date', '')
     if filing_date:
         try:
             filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
             days_ago = (datetime.now() - filed).days
             if days_ago <= 0:
-                score += 30  # Filed today
+                score += 25  # Filed today
             elif days_ago <= 3:
-                score += 25
+                score += 20  # 1-3 days
             elif days_ago <= 7:
-                score += 20
+                score += 15  # 4-7 days
             elif days_ago <= 14:
-                score += 15
-            elif days_ago <= 30:
-                score += 10
-            elif days_ago <= 60:
-                score += 5
-            # Older than 60 days: 0 pts
+                score += 10  # 1-2 weeks
+            elif days_ago <= 28:
+                score += 5   # 2-4 weeks
+            else:
+                score += 2   # 1+ month ago
         except (ValueError, TypeError):
-            pass
+            score += 2  # Unknown date
 
-    # PROJECT VALUE (0-25 points)
-    value = permit.get('estimated_cost', 0) or 0
-    if value >= 1000000:
-        score += 25  # Over $1M
-    elif value >= 500000:
-        score += 20  # $500K-$1M
-    elif value >= 250000:
-        score += 15  # $250K-$500K
-    elif value >= 100000:
-        score += 10  # $100K-$250K
-    elif value >= 50000:
-        score += 5   # $50K-$100K
-    # Under $50K or unknown: 0 pts
-
-    # CONTACT COMPLETENESS (0-20 points)
-    if permit.get('contact_name'):
-        score += 8   # Has owner name
+    # CONTACT INFO COMPONENT (0-20 points)
     if permit.get('contact_phone'):
-        score += 6   # Has phone number
-    address = permit.get('address', '')
-    # Check for full address (has number and street, not just city)
-    if address and any(c.isdigit() for c in address) and len(address) > 10:
-        score += 6   # Has full address
+        score += 10  # Has phone number
+    if permit.get('contact_email'):
+        score += 5   # Has email
+    if permit.get('contact_name'):
+        score += 5   # Has owner/company name
 
-    # PERMIT STAGE (0-15 points)
+    # STATUS COMPONENT (0-15 points)
     status = (permit.get('status', '') or '').lower()
-    if any(kw in status for kw in ['filed', 'application', 'submitted', 'pending']):
-        score += 15  # Early stage - less competition
-    elif any(kw in status for kw in ['review', 'plan check']):
-        score += 12  # In review
-    elif any(kw in status for kw in ['issued', 'approved', 'active', 'permitted']):
-        score += 10  # Permitted/Issued
-    elif any(kw in status for kw in ['progress', 'partial', 'construction']):
-        score += 5   # In Progress
-    elif any(kw in status for kw in ['final', 'complete', 'closed']):
-        score += 2   # Final/Complete
-    # Denied/Expired/Unknown: 0 pts
+    if any(kw in status for kw in ['issued', 'approved', 'active', 'permitted']):
+        score += 15  # Ready to start - highest intent
+    elif any(kw in status for kw in ['under review', 'plan check', 'reviewing']):
+        score += 10  # Under review
+    elif any(kw in status for kw in ['submitted', 'filed', 'application']):
+        score += 8   # Submitted/Filed
+    elif any(kw in status for kw in ['in review', 'pending']):
+        score += 5   # In review/Pending
+    elif any(kw in status for kw in ['expired', 'voided', 'denied', 'cancelled']):
+        score += 0   # Expired/Voided - no value
+    else:
+        score += 3   # Unknown status
 
-    # TRADE SPECIFICITY (0-10 points)
+    # PROJECT TYPE BONUS (0-9 points)
     trade = permit.get('trade_category', '')
-    if trade and trade not in ['General Construction', 'Other', 'Other / Unclassified', '']:
-        score += 10  # Specific trade
-    elif trade == 'General Construction':
-        score += 3   # General construction
-    # Unknown: 0 pts
+    desc = (permit.get('description', '') or '').lower()
+    work_type = (permit.get('work_type', '') or '').lower()
+    combined_text = f"{trade} {desc} {work_type}".lower()
 
-    # Cap at 100
-    score = min(score, 100)
+    if 'new construction' in combined_text or trade == 'New Construction':
+        score += 9   # New Construction
+    elif value >= 500000 and any(kw in combined_text for kw in ['renovation', 'remodel', 'rehab']):
+        score += 7   # Major Renovation (>$500K)
+    elif 'tenant improvement' in combined_text or 'tenant build' in combined_text:
+        score += 5   # Tenant Improvement
+    elif 'addition' in combined_text or trade == 'Addition':
+        score += 4   # Addition
+    elif any(kw in combined_text for kw in ['renovation', 'remodel', 'interior']):
+        score += 2   # Minor Renovation
+    else:
+        score += 1   # Other
+
+    # Cap at 99 (max possible)
+    score = min(score, 99)
 
     # Determine quality tier
-    if score >= 70:
+    if score >= 75:
         quality = 'hot'
-    elif score >= 40:
+    elif score >= 55:
         quality = 'warm'
     else:
         quality = 'standard'
@@ -146,14 +158,138 @@ def add_lead_scores(permits):
 
 
 # ===========================
+# TRADE CLASSIFICATION
+# ===========================
+def classify_trade(text):
+    """Classify a permit into a trade category based on description text."""
+    if not text:
+        return "General Construction"
+
+    text_lower = text.lower()
+    scores = {}
+
+    for trade, keywords in TRADE_CATEGORIES.items():
+        score = sum(1 for kw in keywords if kw in text_lower)
+        if score > 0:
+            scores[trade] = score
+
+    if not scores:
+        return "General Construction"
+
+    # Priority order for ties
+    priority_trades = [
+        "Electrical", "Plumbing", "HVAC", "Roofing", "Solar", "Fire Protection",
+        "Demolition", "Signage", "Windows & Doors", "Structural",
+        "Interior Renovation", "Landscaping & Exterior",
+        "New Construction", "Addition", "General Construction"
+    ]
+
+    specific_matches = {t: s for t, s in scores.items() if t != "General Construction"}
+
+    if specific_matches:
+        max_score = max(specific_matches.values())
+        top_matches = [t for t, s in specific_matches.items() if s == max_score]
+
+        if len(top_matches) == 1:
+            return top_matches[0]
+
+        for trade in priority_trades:
+            if trade in top_matches:
+                return trade
+
+        return top_matches[0]
+
+    return "General Construction"
+
+
+def reclassify_permit(permit):
+    """Re-classify a permit's trade category based on its description and type fields."""
+    text_parts = [
+        permit.get('description', ''),
+        permit.get('work_type', ''),
+        permit.get('permit_type', '')
+    ]
+    text = ' '.join(filter(None, text_parts))
+    permit['trade_category'] = classify_trade(text)
+    return permit
+
+
+def generate_permit_description(permit):
+    """
+    Generate a unique, factual description based on actual permit data.
+    Falls back to building a description from permit fields if no real description exists,
+    or if the description appears templated (same as others).
+    """
+    existing_desc = permit.get('description', '')
+
+    # Build a factual description from permit data
+    parts = []
+
+    # Permit type
+    permit_type = permit.get('permit_type', '') or permit.get('work_type', '')
+    if permit_type:
+        parts.append(permit_type.strip())
+
+    # Trade category
+    trade = permit.get('trade_category', '')
+    if trade and trade not in ['General Construction', 'Other']:
+        if not any(trade.lower() in p.lower() for p in parts):
+            parts.append(f"({trade})")
+
+    # Address
+    address = permit.get('address', '')
+    if address:
+        parts.append(f"at {address}")
+
+    # Value
+    cost = permit.get('estimated_cost', 0) or 0
+    if cost > 0:
+        if cost >= 1000000:
+            parts.append(f"— ${cost/1000000:.1f}M project")
+        elif cost >= 1000:
+            parts.append(f"— ${cost/1000:.0f}K project")
+        else:
+            parts.append(f"— ${cost:,.0f}")
+
+    # Status
+    status = permit.get('status', '')
+    if status:
+        parts.append(f"[{status}]")
+
+    # Permit number for uniqueness
+    permit_num = permit.get('permit_number', '')
+    if permit_num:
+        parts.append(f"(Permit #{permit_num})")
+
+    # Combine parts
+    generated_desc = ' '.join(parts)
+
+    # Return existing description if it's substantial and unique-looking
+    # (has actual address or permit number in it), otherwise use generated
+    if existing_desc and len(existing_desc) > 30:
+        # Check if existing description contains unique identifiers
+        has_address = address and address[:10] in existing_desc
+        has_permit_num = permit_num and permit_num in existing_desc
+        if has_address or has_permit_num:
+            return existing_desc
+
+    return generated_desc if generated_desc else existing_desc
+
+
+# ===========================
 # DATA LOADING
 # ===========================
 def load_permits():
-    """Load permits from JSON file."""
+    """Load permits from JSON file, re-classify trades, and generate unique descriptions."""
     path = os.path.join(DATA_DIR, 'permits.json')
     if os.path.exists(path):
         with open(path) as f:
-            return json.load(f)
+            permits = json.load(f)
+        # Re-classify trades and generate descriptions on load
+        for permit in permits:
+            reclassify_permit(permit)
+            permit['display_description'] = generate_permit_description(permit)
+        return permits
     return []
 
 def load_stats():
@@ -209,6 +345,60 @@ def get_current_user():
         return None
     users = load_users()
     return next((u for u in users if u['email'] == user_email), None)
+
+
+@app.context_processor
+def inject_nav_context():
+    """Inject user and nav_cities into all templates."""
+    return {
+        'user': get_current_user(),
+        'nav_cities': get_cities_with_data()
+    }
+
+
+# ===========================
+# ANALYTICS HOOKS
+# ===========================
+
+@app.before_request
+def analytics_before_request():
+    """Capture UTM parameters and ensure session ID exists."""
+    try:
+        # Ensure analytics session ID
+        if 'analytics_session_id' not in session:
+            session['analytics_session_id'] = str(uuid.uuid4())
+
+        # Capture UTM parameters
+        utm_params = {}
+        for key in ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']:
+            val = request.args.get(key)
+            if val:
+                utm_params[key] = val
+        if utm_params:
+            session['utm_params'] = utm_params
+    except Exception:
+        pass  # Never break the request
+
+
+@app.after_request
+def analytics_track_page_view(response):
+    """Track page views for all successful page loads."""
+    try:
+        if response.status_code < 400 and request.endpoint:
+            # Don't track static files, API calls, or health endpoint
+            skip_prefixes = ('/static', '/api/', '/health', '/favicon', '/robots', '/sitemap')
+            if not any(request.path.startswith(p) for p in skip_prefixes):
+                analytics.track_event(
+                    event_type='page_view',
+                    page=request.path,
+                    event_data={
+                        'status_code': response.status_code,
+                        'method': request.method
+                    }
+                )
+    except Exception:
+        pass  # Never break the response
+    return response
 
 
 def generate_unsubscribe_token():
@@ -305,6 +495,17 @@ def index():
     """Serve the dashboard."""
     footer_cities = get_cities_with_data()
     return render_template('dashboard.html', footer_cities=footer_cities)
+
+
+@app.route('/health')
+def health_check():
+    """
+    Health check endpoint for keeping the Render instance warm.
+    Configure an external ping service (UptimeRobot, cron-job.org, etc.)
+    to hit this endpoint every 14 minutes.
+    """
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
 
 @app.route('/api/permits')
 @limiter.limit("60 per minute")
@@ -443,6 +644,12 @@ def api_subscribe():
     subs.append(sub)
     save_subscribers(subs)
 
+    # Track alert signup event
+    analytics.track_event('alert_signup', event_data={
+        'city': sub.get('city', ''),
+        'trade': sub.get('trade', '')
+    }, city_filter=sub.get('city'))
+
     return jsonify({
         'message': f'Successfully subscribed {sub["email"]}',
         'subscriber': sub,
@@ -505,6 +712,12 @@ def api_export():
         lines.append(','.join(f'"{v}"' for v in row))
 
     csv_content = '\n'.join(lines)
+
+    # Track CSV export event
+    analytics.track_event('csv_export', event_data={
+        'row_count': len(permits),
+        'filters': {'city': city, 'trade': trade, 'quality': quality}
+    }, city_filter=city, trade_filter=trade)
 
     return Response(
         csv_content,
@@ -582,6 +795,12 @@ def save_lead():
 
     all_leads.append(new_lead)
     save_saved_leads(all_leads)
+
+    # Track lead save event
+    analytics.track_event('lead_save', event_data={
+        'permit_id': data['permit_id'],
+        'permit_value': data.get('permit_value', 0)
+    })
 
     return jsonify({'message': 'Lead saved', 'lead': new_lead}), 201
 
@@ -684,6 +903,122 @@ def export_saved_leads():
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename=permitgrab_my_leads_{datetime.now().strftime("%Y%m%d")}.csv'}
     )
+
+
+# ===========================
+# SAVED SEARCHES API
+# ===========================
+
+SAVED_SEARCHES_FILE = os.path.join(DATA_DIR, 'saved_searches.json')
+
+def load_saved_searches():
+    """Load all saved searches from JSON file."""
+    if os.path.exists(SAVED_SEARCHES_FILE):
+        try:
+            with open(SAVED_SEARCHES_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_saved_searches(searches):
+    """Save all saved searches to JSON file."""
+    with open(SAVED_SEARCHES_FILE, 'w') as f:
+        json.dump(searches, f, indent=2)
+
+def get_user_saved_searches(email):
+    """Get saved searches for a specific user."""
+    all_searches = load_saved_searches()
+    return [s for s in all_searches if s.get('user_email') == email]
+
+@app.route('/api/saved-searches', methods=['GET'])
+def get_saved_searches():
+    """GET /api/saved-searches - Get user's saved searches."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    searches = get_user_saved_searches(user['email'])
+    return jsonify({'searches': searches})
+
+@app.route('/api/saved-searches', methods=['POST'])
+def create_saved_search():
+    """POST /api/saved-searches - Create a new saved search."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Missing search data'}), 400
+
+    # Create the saved search object
+    search = {
+        'id': str(uuid.uuid4()),
+        'user_email': user['email'],
+        'city': data.get('city', ''),
+        'trade': data.get('trade', ''),
+        'value_tier': data.get('value_tier', ''),
+        'status': data.get('status', ''),
+        'quality': data.get('quality', ''),
+        'search_text': data.get('search_text', ''),
+        'daily_alerts': True,  # Default to daily alerts enabled
+        'created_at': datetime.now().isoformat(),
+    }
+
+    # Build a human-readable name for the search
+    parts = []
+    if search['city']:
+        parts.append(search['city'])
+    if search['trade']:
+        parts.append(search['trade'])
+    if search['value_tier']:
+        parts.append(f"Value: {search['value_tier']}")
+    search['name'] = ' | '.join(parts) if parts else 'All Permits'
+
+    all_searches = load_saved_searches()
+    all_searches.append(search)
+    save_saved_searches(all_searches)
+
+    return jsonify({'message': 'Search saved', 'search': search})
+
+@app.route('/api/saved-searches/<search_id>', methods=['DELETE'])
+def delete_saved_search(search_id):
+    """DELETE /api/saved-searches/<id> - Delete a saved search."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    all_searches = load_saved_searches()
+    original_count = len(all_searches)
+    all_searches = [s for s in all_searches if not (s['user_email'] == user['email'] and s['id'] == search_id)]
+
+    if len(all_searches) == original_count:
+        return jsonify({'error': 'Search not found'}), 404
+
+    save_saved_searches(all_searches)
+    return jsonify({'message': 'Search deleted'})
+
+@app.route('/api/saved-searches/<search_id>', methods=['PUT'])
+def update_saved_search(search_id):
+    """PUT /api/saved-searches/<id> - Update a saved search (e.g., toggle alerts)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+
+    data = request.get_json()
+    all_searches = load_saved_searches()
+
+    for search in all_searches:
+        if search['id'] == search_id and search['user_email'] == user['email']:
+            if 'daily_alerts' in data:
+                search['daily_alerts'] = data['daily_alerts']
+            if 'name' in data:
+                search['name'] = data['name']
+            save_saved_searches(all_searches)
+            return jsonify({'message': 'Search updated', 'search': search})
+
+    return jsonify({'error': 'Search not found'}), 404
 
 
 # ===========================
@@ -1019,6 +1354,129 @@ def get_alerts_page():
     cities = get_cities_with_data()  # Only show cities with data
     footer_cities = cities
     return render_template('get_alerts.html', cities=cities, footer_cities=footer_cities)
+
+
+@app.route('/privacy')
+def privacy_page():
+    """Render the Privacy Policy page."""
+    footer_cities = get_cities_with_data()
+    return render_template('privacy.html', footer_cities=footer_cities)
+
+
+@app.route('/terms')
+def terms_page():
+    """Render the Terms of Service page."""
+    footer_cities = get_cities_with_data()
+    return render_template('terms.html', footer_cities=footer_cities)
+
+
+@app.route('/about')
+def about_page():
+    """Render the About page."""
+    footer_cities = get_cities_with_data()
+    return render_template('about.html', footer_cities=footer_cities)
+
+
+@app.route('/contact')
+def contact_page():
+    """Render the Contact page."""
+    footer_cities = get_cities_with_data()
+    return render_template('contact.html', footer_cities=footer_cities)
+
+
+@app.route('/api/contact', methods=['POST'])
+def api_contact():
+    """Handle contact form submissions."""
+    data = request.get_json()
+    if not data or not data.get('email') or not data.get('message'):
+        return jsonify({'error': 'Email and message required'}), 400
+
+    # Store contact message (in production, would email this)
+    contact_file = os.path.join(DATA_DIR, 'contact_messages.json')
+    messages = []
+    if os.path.exists(contact_file):
+        with open(contact_file) as f:
+            messages = json.load(f)
+
+    messages.append({
+        'name': data.get('name', ''),
+        'email': data['email'],
+        'subject': data.get('subject', 'general'),
+        'message': data['message'],
+        'timestamp': datetime.now().isoformat()
+    })
+
+    with open(contact_file, 'w') as f:
+        json.dump(messages, f, indent=2)
+
+    return jsonify({'success': True})
+
+
+@app.route('/onboarding')
+def onboarding_page():
+    """Render the post-signup onboarding flow."""
+    # Require login
+    user = get_current_user()
+    if not user:
+        return redirect('/signup')
+    cities = get_all_cities_info()
+    trades = get_all_trades()
+    return render_template('onboarding.html', cities=cities, trades=trades)
+
+
+@app.route('/api/onboarding', methods=['POST'])
+def api_onboarding():
+    """Save user onboarding preferences (city, trade, alerts)."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Invalid request'}), 400
+
+    city = data.get('city', '')
+    trade = data.get('trade', '')
+    daily_alerts = data.get('daily_alerts', False)
+
+    # Update user preferences
+    users = load_users()
+    for u in users:
+        if u['email'] == user['email']:
+            u['preferred_city'] = city
+            u['preferred_trade'] = trade
+            u['daily_alerts'] = daily_alerts
+            u['onboarding_completed'] = True
+            break
+    save_users(users)
+
+    # If they opted into alerts, add them to subscribers
+    if daily_alerts:
+        subs = load_subscribers()
+        if not any(s.get('email') == user['email'] for s in subs):
+            subs.append({
+                'email': user['email'],
+                'name': user.get('name', ''),
+                'city': city,
+                'trade': trade,
+                'subscribed_at': datetime.now().isoformat()
+            })
+            save_subscribers(subs)
+
+    # Track onboarding complete event
+    analytics.track_event('onboarding_complete', event_data={
+        'city': city,
+        'trade': trade,
+        'daily_alerts': daily_alerts
+    }, city_filter=city, trade_filter=trade)
+
+    return jsonify({'success': True})
+
+
+@app.route('/register')
+def register_redirect():
+    """Redirect /register to /signup."""
+    return redirect('/signup', code=301)
 
 
 # ===========================
@@ -1486,13 +1944,15 @@ def early_intel_page():
 
 # Stripe configuration from environment variables
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
-STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', '')
+STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', '')  # Monthly price ID ($149/mo)
+# REPLACE WITH ANNUAL STRIPE PRICE ID - Create a new price in Stripe for $1,548/year ($129/mo)
+STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:5000')
 
 @app.route('/api/create-checkout-session', methods=['POST'])
 def create_checkout_session():
-    """Create a Stripe Checkout Session for Professional plan ($149/mo)."""
+    """Create a Stripe Checkout Session for Professional plan (monthly or annual)."""
     if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
         return jsonify({'error': 'Stripe not configured'}), 500
 
@@ -1500,12 +1960,27 @@ def create_checkout_session():
 
     data = request.get_json() or {}
     customer_email = data.get('email')
+    billing_period = data.get('billing_period', 'monthly')
+
+    # Choose the correct price based on billing period
+    if billing_period == 'annual' and STRIPE_ANNUAL_PRICE_ID:
+        price_id = STRIPE_ANNUAL_PRICE_ID
+        plan_name = 'professional_annual'
+    else:
+        price_id = STRIPE_PRICE_ID
+        plan_name = 'professional_monthly'
+
+    # Track checkout started event
+    analytics.track_event('checkout_started', event_data={
+        'plan': plan_name,
+        'billing': billing_period
+    })
 
     try:
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
-                'price': STRIPE_PRICE_ID,
+                'price': price_id,
                 'quantity': 1,
             }],
             mode='subscription',
@@ -1513,7 +1988,8 @@ def create_checkout_session():
             cancel_url=f'{SITE_URL}/?payment=cancelled',
             customer_email=customer_email,
             metadata={
-                'plan': 'professional',
+                'plan': plan_name,
+                'billing_period': billing_period,
             },
         )
         return jsonify({'url': checkout_session.url})
@@ -1578,7 +2054,62 @@ def stripe_webhook():
             save_subscribers(subs)
             print(f"[Stripe] Subscriber {customer_email} upgraded to {plan}")
 
+            # Track payment success event
+            analytics.track_event('payment_success', event_data={
+                'plan': plan,
+                'stripe_customer_id': session.get('customer')
+            }, user_id_override=customer_email)
+
     return jsonify({'status': 'success'})
+
+
+@app.route('/api/webhooks/sendgrid', methods=['POST'])
+def sendgrid_webhook():
+    """
+    Handle SendGrid Event Webhooks for email engagement tracking.
+    NOTE: Configure this URL in SendGrid dashboard > Settings > Mail Settings > Event Webhook
+    URL: https://permitgrab.com/api/webhooks/sendgrid
+    Enable events: Delivered, Opened, Clicked, Bounced, Unsubscribed, Spam Report
+    """
+    try:
+        events = request.get_json()
+        if not events or not isinstance(events, list):
+            return '', 200
+
+        for event in events:
+            sg_type = event.get('event')  # 'delivered', 'open', 'click', 'bounce', etc.
+            email = event.get('email', '')
+
+            if not sg_type:
+                continue
+
+            # Find user by email (if exists) for user_id
+            user_id = None
+            if email:
+                users = load_users()
+                user = next((u for u in users if u.get('email', '').lower() == email.lower()), None)
+                if user:
+                    user_id = user.get('email')
+
+            # Track the email event
+            analytics.track_event(
+                event_type=f'email_{sg_type}',  # email_delivered, email_open, email_click, etc.
+                event_data={
+                    'email': email,
+                    'subject': event.get('subject', ''),
+                    'url': event.get('url', ''),  # For click events
+                    'sg_event_id': event.get('sg_event_id', ''),
+                    'sg_message_id': event.get('sg_message_id', ''),
+                    'category': event.get('category', []),
+                    'reason': event.get('reason', ''),  # For bounce/drop events
+                },
+                user_id_override=user_id
+            )
+
+    except Exception as e:
+        print(f"[SendGrid Webhook] Error processing events: {e}")
+
+    return '', 200
 
 
 # ===========================
@@ -1623,6 +2154,9 @@ def api_register():
     # Log in the user
     session['user_email'] = email
 
+    # Track signup event
+    analytics.track_event('signup', event_data={'method': 'email'})
+
     # Return user without password hash
     return jsonify({
         'message': 'Registration successful',
@@ -1656,6 +2190,9 @@ def api_login():
 
     # Log in the user
     session['user_email'] = email
+
+    # Track login event
+    analytics.track_event('login')
 
     return jsonify({
         'message': 'Login successful',
@@ -2005,6 +2542,46 @@ def admin_upgrade_user():
 
 
 # ===========================
+# ADMIN ANALYTICS DASHBOARD
+# ===========================
+
+# Admin emails list - add emails that should have admin access
+ADMIN_EMAILS = os.environ.get('ADMIN_EMAILS', 'wcrainshaw@gmail.com').lower().split(',')
+
+@app.route('/admin/analytics')
+def admin_analytics_page():
+    """Admin analytics dashboard."""
+    # Check admin authentication
+    user = get_current_user()
+    if not user or user.get('email', '').lower() not in ADMIN_EMAILS:
+        if not session.get('admin_authenticated'):
+            return "Unauthorized - Admin access required", 403
+
+    # Gather all analytics data
+    data = {
+        'visitors_today': analytics.get_visitors_today(),
+        'signups_week': analytics.get_signups_this_week(),
+        'active_users_7d': analytics.get_active_users_7d(),
+        'trial_starts_30d': analytics.get_trial_starts_30d(),
+        'daily_traffic': analytics.get_daily_traffic(30),
+        'top_pages': analytics.get_top_pages(7, 20),
+        'funnel': analytics.get_conversion_funnel(30),
+        'event_counts': analytics.get_event_counts(7),
+        'city_engagement': analytics.get_city_engagement(30),
+        'traffic_sources': analytics.get_traffic_sources(30),
+        'health_status': analytics.get_latest_health_status(),
+        'health_failures': analytics.get_health_failures_recent(20),
+        'city_health': analytics.get_city_health_summary(),
+        'route_health': analytics.get_route_health_summary(),
+        'service_health': analytics.get_service_health_status(),
+        'email_perf_7d': analytics.get_email_performance(7),
+        'email_perf_30d': analytics.get_email_performance(30),
+    }
+
+    return render_template('admin_analytics.html', data=data)
+
+
+# ===========================
 # MY LEADS CRM PAGE
 # ===========================
 
@@ -2018,6 +2595,22 @@ def my_leads_page():
 
     footer_cities = get_cities_with_data()
     return render_template('my_leads.html', user=user, footer_cities=footer_cities)
+
+
+# ===========================
+# SAVED SEARCHES PAGE
+# ===========================
+
+@app.route('/saved-searches')
+def saved_searches_page():
+    """Render the Saved Searches page."""
+    user = get_current_user()
+    if not user:
+        return redirect('/login?redirect=saved-searches')
+
+    searches = get_user_saved_searches(user['email'])
+    footer_cities = get_cities_with_data()
+    return render_template('saved_searches.html', user=user, searches=searches, footer_cities=footer_cities)
 
 
 # ===========================
@@ -2755,6 +3348,12 @@ def sitemap():
         {'loc': f"{SITE_URL}/contractors", 'changefreq': 'daily', 'priority': '0.8'},
         {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7'},
         {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
+        {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6'},
+        {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5'},
+        {'loc': f"{SITE_URL}/login", 'changefreq': 'monthly', 'priority': '0.4'},
+        {'loc': f"{SITE_URL}/signup", 'changefreq': 'monthly', 'priority': '0.4'},
+        {'loc': f"{SITE_URL}/privacy", 'changefreq': 'monthly', 'priority': '0.3'},
+        {'loc': f"{SITE_URL}/terms", 'changefreq': 'monthly', 'priority': '0.3'},
     ]
 
     # Add city landing pages

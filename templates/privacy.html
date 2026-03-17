@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — PermitGrab</title>
+<meta name="description" content="PermitGrab privacy policy. Learn how we collect, use, and protect your data.">
+<link rel="canonical" href="https://permitgrab.com/privacy">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-800); line-height: 1.7; }
+.header { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%); padding: 16px 32px; }
+.header-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav { display: flex; gap: 24px; align-items: center; }
+.nav a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav a:hover { color: white; }
+.content { max-width: 800px; margin: 48px auto; padding: 0 24px; }
+h1 { font-size: 36px; margin-bottom: 8px; color: var(--gray-900); }
+.last-updated { color: var(--gray-500); margin-bottom: 32px; }
+h2 { font-size: 24px; margin: 32px 0 16px; color: var(--gray-800); }
+p, ul { margin-bottom: 16px; }
+ul { padding-left: 24px; }
+li { margin-bottom: 8px; }
+a { color: var(--primary); }
+.site-footer { background: var(--gray-900); color: white; padding: 48px 32px 24px; margin-top: 48px; }
+.footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.footer-brand { max-width: 300px; }
+.footer-logo { font-size: 24px; font-weight: 700; color: white; text-decoration: none; display: block; margin-bottom: 12px; }
+.footer-logo span { color: var(--accent); }
+.footer-brand p { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.6; }
+.footer-links h4 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: rgba(255,255,255,.7); }
+.footer-links a { display: block; color: rgba(255,255,255,.5); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+.footer-links a:hover { color: white; }
+.footer-bottom { max-width: 1200px; margin: 32px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.1); text-align: center; font-size: 13px; color: rgba(255,255,255,.4); }
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<div class="content">
+  <h1>Privacy Policy</h1>
+  <p class="last-updated">Last updated: March 2026</p>
+
+  <p>PermitGrab ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services.</p>
+
+  <h2>Information We Collect</h2>
+  <p>We collect information you provide directly to us:</p>
+  <ul>
+    <li><strong>Account Information:</strong> When you create an account, we collect your name, email address, and password.</li>
+    <li><strong>Payment Information:</strong> When you subscribe to our paid plans, payment is processed by Stripe. We do not store your full credit card number.</li>
+    <li><strong>Usage Data:</strong> We collect information about how you use our service, including searches, filters applied, and features accessed.</li>
+    <li><strong>Communications:</strong> If you contact us, we collect the information you provide in your message.</li>
+  </ul>
+
+  <h2>How We Use Your Information</h2>
+  <ul>
+    <li>To provide, maintain, and improve our services</li>
+    <li>To send you daily permit alerts and notifications you've opted into</li>
+    <li>To process payments and manage your subscription</li>
+    <li>To respond to your comments, questions, and support requests</li>
+    <li>To analyze usage patterns and improve user experience</li>
+  </ul>
+
+  <h2>Third-Party Services</h2>
+  <p>We use the following third-party services:</p>
+  <ul>
+    <li><strong>Stripe:</strong> For secure payment processing</li>
+    <li><strong>SendGrid:</strong> For sending email alerts and notifications</li>
+    <li><strong>Municipal Data Sources:</strong> We aggregate public permit data from Socrata, ArcGIS, and other government open data platforms</li>
+  </ul>
+
+  <h2>Data Retention</h2>
+  <p>We retain your account information for as long as your account is active. You can request deletion of your data at any time by contacting us at support@permitgrab.com.</p>
+
+  <h2>Cookies and Tracking</h2>
+  <p>We use cookies and similar technologies to maintain your session and remember your preferences. We may use analytics tools to understand how users interact with our service.</p>
+
+  <h2>California Privacy Rights (CCPA)</h2>
+  <p>If you are a California resident, you have the right to:</p>
+  <ul>
+    <li>Know what personal information we collect about you</li>
+    <li>Request deletion of your personal information</li>
+    <li>Opt out of the sale of your personal information (we do not sell personal information)</li>
+  </ul>
+
+  <h2>Contact Us</h2>
+  <p>If you have questions about this Privacy Policy, please contact us at:</p>
+  <p>Email: support@permitgrab.com</p>
+</div>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>

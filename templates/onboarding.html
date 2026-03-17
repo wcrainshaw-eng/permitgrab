@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome to PermitGrab</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --green: #16a34a;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%); color: var(--gray-700); line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+
+.onboarding-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.onboarding-card {
+  background: white;
+  border-radius: 20px;
+  padding: 48px;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 25px 50px rgba(0,0,0,.25);
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.logo a {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  text-decoration: none;
+}
+.logo a span { color: var(--accent); }
+
+.progress-bar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gray-200);
+  transition: background .3s;
+}
+.progress-dot.active { background: var(--primary); }
+.progress-dot.completed { background: var(--green); }
+
+.step { display: none; }
+.step.active { display: block; }
+
+.step-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.step-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.step-header p {
+  font-size: 16px;
+  color: var(--gray-500);
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+.form-group select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 10px;
+  font-size: 16px;
+  background: white;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.btn {
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+  text-decoration: none;
+  display: inline-block;
+}
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled {
+  background: var(--gray-300);
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  margin-top: 12px;
+}
+.btn-secondary:hover {
+  background: var(--gray-50);
+}
+
+/* Step 2 - Sample Leads */
+.sample-leads {
+  margin-bottom: 24px;
+}
+.sample-lead {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.sample-lead-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.sample-lead-badge {
+  background: var(--primary);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sample-lead-score {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+}
+.sample-lead-address {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+.sample-lead-details {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.sample-lead-contact {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+  filter: blur(4px);
+  user-select: none;
+}
+.sample-lead-contact span {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.upgrade-hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 16px;
+}
+.upgrade-hint a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.alert-opt-in {
+  background: var(--gray-50);
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.alert-opt-in-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.alert-opt-in-header input {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+.alert-opt-in-header label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  cursor: pointer;
+}
+.alert-opt-in p {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-left: 32px;
+}
+
+/* Step 3 - Success */
+.success-icon {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, var(--green) 0%, #22c55e 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+}
+.success-icon svg {
+  width: 40px;
+  height: 40px;
+  stroke: white;
+  stroke-width: 3;
+}
+
+.feature-list {
+  margin: 24px 0;
+}
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.feature-item:last-child { border-bottom: none; }
+.feature-item svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--green);
+  flex-shrink: 0;
+}
+.feature-item span {
+  font-size: 15px;
+  color: var(--gray-700);
+}
+
+@media (max-width: 600px) {
+  .onboarding-card { padding: 32px 24px; }
+  .step-header h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="onboarding-container">
+  <div class="onboarding-card">
+    <div class="logo">
+      <a href="/">Permit<span>Grab</span></a>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-dot active" id="dot-1"></div>
+      <div class="progress-dot" id="dot-2"></div>
+      <div class="progress-dot" id="dot-3"></div>
+    </div>
+
+    <!-- Step 1: City & Trade Selection -->
+    <div class="step active" id="step-1">
+      <div class="step-header">
+        <h1>Welcome to PermitGrab!</h1>
+        <p>Let's set up your personalized feed in 30 seconds</p>
+      </div>
+
+      <div class="form-group">
+        <label for="city">Your Primary City</label>
+        <select id="city" name="city">
+          <option value="">Select a city...</option>
+          {% for city in cities %}
+          <option value="{{ city.slug }}">{{ city.name }}, {{ city.state }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="trade">Your Trade</label>
+        <select id="trade" name="trade">
+          <option value="">Select your trade...</option>
+          {% for trade in trades %}
+          <option value="{{ trade.slug }}">{{ trade.icon }} {{ trade.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-primary" onclick="goToStep2()" id="next-btn">
+        See My Leads
+      </button>
+    </div>
+
+    <!-- Step 2: Sample Leads -->
+    <div class="step" id="step-2">
+      <div class="step-header">
+        <h1>Here are your first leads</h1>
+        <p>Permits matching your preferences in <span id="selected-city-name"></span></p>
+      </div>
+
+      <div class="sample-leads" id="sample-leads-container">
+        <!-- Populated by JS -->
+        <div class="sample-lead" id="sample-1">
+          <div class="sample-lead-header">
+            <span class="sample-lead-badge">Loading...</span>
+            <span class="sample-lead-score">-- pts</span>
+          </div>
+          <div class="sample-lead-address">Loading permits...</div>
+          <div class="sample-lead-details">Please wait</div>
+        </div>
+      </div>
+
+      <div class="upgrade-hint">
+        Contact info blurred? <a href="/pricing">Upgrade to unlock</a>
+      </div>
+
+      <div class="alert-opt-in">
+        <div class="alert-opt-in-header">
+          <input type="checkbox" id="daily-alerts" checked>
+          <label for="daily-alerts">Send me daily email alerts</label>
+        </div>
+        <p>Get new permits matching your filters delivered every morning at 7am</p>
+      </div>
+
+      <button class="btn btn-primary" onclick="goToStep3()">
+        Continue
+      </button>
+      <button class="btn btn-secondary" onclick="goToStep1()">
+        Change Preferences
+      </button>
+    </div>
+
+    <!-- Step 3: Success -->
+    <div class="step" id="step-3">
+      <div class="step-header">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <h1>You're all set!</h1>
+        <p>Your personalized dashboard is ready</p>
+      </div>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Permits filtered to <strong id="summary-city"></strong></span>
+        </div>
+        <div class="feature-item">
+          <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Trade focus: <strong id="summary-trade"></strong></span>
+        </div>
+        <div class="feature-item" id="summary-alerts-row">
+          <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Daily email alerts enabled</span>
+        </div>
+      </div>
+
+      <a href="/" class="btn btn-primary">
+        Go to Dashboard
+      </a>
+      <a href="/pricing" class="btn btn-secondary">
+        See Professional Plan
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedCity = '';
+let selectedCityName = '';
+let selectedTrade = '';
+let selectedTradeName = '';
+
+function goToStep2() {
+  const citySelect = document.getElementById('city');
+  const tradeSelect = document.getElementById('trade');
+
+  selectedCity = citySelect.value;
+  selectedTrade = tradeSelect.value;
+
+  if (!selectedCity || !selectedTrade) {
+    alert('Please select both a city and trade to continue.');
+    return;
+  }
+
+  selectedCityName = citySelect.options[citySelect.selectedIndex].text;
+  selectedTradeName = tradeSelect.options[tradeSelect.selectedIndex].text.replace(/^[^\s]+ /, ''); // Remove emoji
+
+  document.getElementById('selected-city-name').textContent = selectedCityName;
+
+  // Update progress
+  document.getElementById('dot-1').classList.remove('active');
+  document.getElementById('dot-1').classList.add('completed');
+  document.getElementById('dot-2').classList.add('active');
+
+  // Show step 2
+  document.getElementById('step-1').classList.remove('active');
+  document.getElementById('step-2').classList.add('active');
+
+  // Load sample permits
+  loadSamplePermits();
+}
+
+function goToStep1() {
+  document.getElementById('dot-1').classList.add('active');
+  document.getElementById('dot-1').classList.remove('completed');
+  document.getElementById('dot-2').classList.remove('active');
+
+  document.getElementById('step-2').classList.remove('active');
+  document.getElementById('step-1').classList.add('active');
+}
+
+async function loadSamplePermits() {
+  try {
+    const resp = await fetch(`/api/permits?city=${selectedCity}&trade=${selectedTrade}&limit=3`);
+    const data = await resp.json();
+    const permits = data.permits || [];
+
+    const container = document.getElementById('sample-leads-container');
+
+    if (permits.length === 0) {
+      container.innerHTML = `
+        <div class="sample-lead">
+          <div class="sample-lead-address">No permits found for this combination</div>
+          <div class="sample-lead-details">Try selecting a different city or trade</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = permits.slice(0, 3).map(p => `
+      <div class="sample-lead">
+        <div class="sample-lead-header">
+          <span class="sample-lead-badge">${p.trade_category || 'General'}</span>
+          <span class="sample-lead-score">${p.lead_score || 75} pts</span>
+        </div>
+        <div class="sample-lead-address">${p.address || 'Address on file'}</div>
+        <div class="sample-lead-details">${formatValue(p.estimated_cost)} · Filed ${formatDate(p.filing_date)}</div>
+        <div class="sample-lead-contact">
+          <span>Contact: John Smith · (555) 123-4567</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load permits:', err);
+  }
+}
+
+function formatValue(val) {
+  if (!val) return 'Value TBD';
+  return '$' + parseInt(val).toLocaleString();
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'Recently';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return diffDays + ' days ago';
+  return d.toLocaleDateString();
+}
+
+async function goToStep3() {
+  const dailyAlerts = document.getElementById('daily-alerts').checked;
+
+  // Save preferences
+  try {
+    await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        city: selectedCity,
+        trade: selectedTrade,
+        daily_alerts: dailyAlerts
+      })
+    });
+  } catch (err) {
+    console.error('Failed to save preferences:', err);
+  }
+
+  // Update progress
+  document.getElementById('dot-2').classList.remove('active');
+  document.getElementById('dot-2').classList.add('completed');
+  document.getElementById('dot-3').classList.add('active');
+
+  // Show step 3
+  document.getElementById('step-2').classList.remove('active');
+  document.getElementById('step-3').classList.add('active');
+
+  // Update summary
+  document.getElementById('summary-city').textContent = selectedCityName;
+  document.getElementById('summary-trade').textContent = selectedTradeName;
+
+  if (!dailyAlerts) {
+    document.getElementById('summary-alerts-row').style.display = 'none';
+  }
+}
+</script>
+
+</body>
+</html>

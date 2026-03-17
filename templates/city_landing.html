@@ -691,48 +691,7 @@ body {
 </head>
 <body>
 
-<!-- NAV -->
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <div class="dropdown">
-        <button class="dropdown-toggle">
-          Cities
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg>
-        </button>
-        <div class="dropdown-menu">
-          <a href="/permits/new-york">New York City</a>
-          <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/chicago">Chicago</a>
-          <a href="/permits/san-francisco">San Francisco</a>
-          <a href="/permits/austin">Austin</a>
-          <a href="/permits/seattle">Seattle</a>
-          <a href="/permits/new-orleans">New Orleans</a>
-          <a href="/permits/nashville">Nashville</a>
-        </div>
-      </div>
-      <div class="dropdown">
-        <button class="dropdown-toggle">
-          Trades
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg>
-        </button>
-        <div class="dropdown-menu">
-          <a href="/permits/new-york/plumbing">🔧 Plumbing</a>
-          <a href="/permits/new-york/electrical">⚡ Electrical</a>
-          <a href="/permits/new-york/hvac">🌡️ HVAC</a>
-          <a href="/permits/new-york/roofing">🏠 Roofing</a>
-          <a href="/permits/new-york/solar">☀️ Solar</a>
-          <a href="/permits/new-york/general-construction">🏗️ General Construction</a>
-        </div>
-      </div>
-      <a href="/blog">Blog</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/#features">Features</a>
-      <a href="/" class="btn-cta">Browse All Permits</a>
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <!-- HERO -->
 <section class="hero">
@@ -899,34 +858,7 @@ body {
   </div>
 </section>
 
-<!-- FOOTER -->
-<footer class="footer">
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <a href="/" class="logo">Permit<span>Grab</span></a>
-      <p>Real-time construction permit leads for contractors. Get the jobs before your competition.</p>
-    </div>
-
-    <div class="footer-links">
-      <h4>Cities</h4>
-      {% for city in other_cities %}
-      <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
-      {% endfor %}
-    </div>
-
-    <div class="footer-links">
-      <h4>Company</h4>
-      <a href="/">Home</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/#features">Features</a>
-      <a href="/blog">Blog</a>
-    </div>
-  </div>
-
-  <div class="footer-bottom">
-    &copy; {{ current_year }} PermitGrab. All rights reserved.
-  </div>
-</footer>
+{% include 'partials/footer.html' %}
 
 </body>
 </html>

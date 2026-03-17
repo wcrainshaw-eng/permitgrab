@@ -305,6 +305,9 @@ def classify_trade(text):
     Classify a permit into a trade category based on description text.
     Uses keyword matching with priority to avoid over-classifying as General Construction.
     """
+    if not text:
+        return "General Construction"
+
     text_lower = text.lower()
     scores = {}
 
@@ -317,18 +320,34 @@ def classify_trade(text):
     if not scores:
         return "General Construction"
 
-    # If we have matches, prioritize specific trades over General Construction
-    # Only use General Construction if it's the ONLY match or has significantly higher score
-    specific_matches = {t: s for t, s in scores.items() if t != "General Construction"}
+    # Priority order for ties: specific trades > New Construction/Addition > General
+    priority_trades = [
+        "Electrical", "Plumbing", "HVAC", "Roofing", "Solar", "Fire Protection",
+        "Demolition", "Signage", "Windows & Doors", "Structural",
+        "Interior Renovation", "Landscaping & Exterior",
+        "New Construction", "Addition", "General Construction"
+    ]
+
+    # Get all non-General matches
+    specific_matches = {t: s for t, s in scores.items() if t not in ["General Construction"]}
 
     if specific_matches:
         # Return the specific trade with the highest score
-        return max(specific_matches, key=specific_matches.get)
+        # On ties, use priority order
+        max_score = max(specific_matches.values())
+        top_matches = [t for t, s in specific_matches.items() if s == max_score]
+
+        if len(top_matches) == 1:
+            return top_matches[0]
+
+        # Break ties with priority order
+        for trade in priority_trades:
+            if trade in top_matches:
+                return trade
+
+        return top_matches[0]
 
     # Only General Construction matched
-    if "General Construction" in scores:
-        return "General Construction"
-
     return "General Construction"
 
 

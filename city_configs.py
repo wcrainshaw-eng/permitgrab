@@ -2483,58 +2483,86 @@ def get_all_cities_info():
 # Order matters: more specific trades should be checked before General Construction
 TRADE_CATEGORIES = {
     "Electrical": [
-        "electrical", "wiring", "panel", "circuit", "outlet", "lighting",
-        "transformer", "switchgear", "conduit", "ampere", "amp service",
-        "meter base", "electric service", "electric panel"
+        "electrical", "electric", "wiring", "panel", "circuit", "outlet", "lighting",
+        "transformer", "switchgear", "conduit", "ampere", "amp service", "200 amp",
+        "meter base", "electric service", "electric panel", "elec permit", "elec work",
+        "service upgrade", "sub-panel", "subpanel", "light fixture", "receptacle",
+        "low voltage", "generator", "temporary power", "temp power"
     ],
     "Plumbing": [
         "plumbing", "plumb", "sewer", "drain", "water heater", "water line",
         "gas line", "backflow", "fixture", "pipe", "sprinkler system",
-        "irrigation", "septic"
+        "irrigation", "septic", "tankless", "water service", "sewer tap",
+        "water tap", "sanitary", "waste line", "vent pipe", "hot water",
+        "plbg", "gas permit", "gas piping", "rough plumb", "rough-in plumb"
     ],
     "HVAC": [
-        "hvac", "heating", "cooling", "air conditioning", "a/c", "furnace",
-        "ductwork", "heat pump", "boiler", "ventilation", "mini-split",
-        "condensing unit", "mechanical", "ac unit", "thermostat"
+        "hvac", "heating", "cooling", "air conditioning", "a/c", "ac", "furnace",
+        "ductwork", "heat pump", "boiler", "ventilation", "mini-split", "minisplit",
+        "condensing unit", "mechanical", "ac unit", "thermostat", "air handler",
+        "package unit", "split system", "mech permit", "mechanical permit",
+        "exhaust fan", "rooftop unit", "rtu", "vrf", "chiller"
     ],
     "Roofing": [
         "roof", "roofing", "re-roof", "reroof", "shingle", "membrane",
-        "flashing", "gutter", "soffit", "fascia"
+        "flashing", "gutter", "soffit", "fascia", "tpo", "epdm", "torch down",
+        "roof repair", "roof replace", "new roof", "metal roof", "tile roof"
     ],
     "Solar": [
         "solar", "photovoltaic", "pv system", "pv panel", "solar panel",
-        "ev charger", "battery storage"
+        "ev charger", "battery storage", "solar electric", "net metering",
+        "inverter", "solar thermal", "ev charging"
     ],
     "Interior Renovation": [
         "interior renovation", "interior remodel", "kitchen remodel",
         "bathroom remodel", "bath remodel", "tenant improvement", "t.i.",
-        "finish out", "gut remodel", "buildout", "interior alteration"
+        "finish out", "gut remodel", "buildout", "interior alteration",
+        "remodel", "renovation", "kitchen", "bathroom", "interior build",
+        "tenant build", "office build", "retail build"
     ],
     "Windows & Doors": [
         "window", "door", "glazing", "storefront", "curtain wall",
-        "skylight", "glass replacement"
+        "skylight", "glass replacement", "window replacement", "entry door",
+        "overhead door", "garage door", "sliding door"
     ],
     "Demolition": [
         "demo", "demolition", "demolish", "tear down", "abatement",
-        "strip out", "asbestos", "hazmat", "deconstruct"
+        "strip out", "asbestos", "hazmat", "deconstruct", "raze",
+        "partial demo", "interior demo", "full demolition"
     ],
     "Structural": [
         "structural", "foundation", "footing", "retaining wall", "steel",
         "concrete pour", "framing", "load-bearing", "beam", "column",
-        "seismic retrofit"
+        "seismic retrofit", "masonry", "concrete slab", "footer",
+        "pier", "caisson", "basement"
     ],
     "Landscaping & Exterior": [
         "landscape", "landscaping", "fence", "deck", "patio", "driveway",
         "sidewalk", "grading", "pool", "pergola", "exterior", "carport",
-        "garage", "spa"
+        "garage", "spa", "hot tub", "outdoor kitchen", "porch", "awning",
+        "retaining", "pavers", "concrete flatwork"
     ],
     "Fire Protection": [
         "fire alarm", "fire sprinkler", "fire protection", "fire suppression",
-        "smoke detector", "fire escape"
+        "smoke detector", "fire escape", "hood suppression", "ansul",
+        "fire safety", "fire panel", "fa system", "fire alarm system"
+    ],
+    "Signage": [
+        "sign", "signage", "monument sign", "pole sign", "wall sign",
+        "pylon sign", "channel letter", "illuminated sign", "banner"
+    ],
+    "New Construction": [
+        "new construction", "new building", "new commercial", "new residential",
+        "new single family", "new multi family", "ground up", "spec home",
+        "custom home", "new house"
+    ],
+    "Addition": [
+        "addition", "room addition", "home addition", "building addition",
+        "add on", "expansion"
     ],
     "General Construction": [
-        "new construction", "addition", "alteration", "repair", "commercial",
-        "residential", "building permit"
+        "alteration", "repair", "commercial", "residential", "building permit",
+        "miscellaneous", "general permit", "minor work"
     ],
 }
 

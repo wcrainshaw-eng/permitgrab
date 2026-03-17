@@ -7,6 +7,7 @@
 <meta name="description" content="Track and manage your saved construction leads. Update status, add notes, and export to CSV.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -105,7 +106,7 @@ body {
 /* STATS */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
   margin-top: 24px;
 }
@@ -445,19 +446,7 @@ body {
 </head>
 <body>
 
-<!-- NAV -->
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo">Permit<span>Grab</span></a>
-    <div class="nav-links">
-      <a href="/">Dashboard</a>
-      <a href="/my-leads" class="active">My Leads</a>
-      <a href="/pricing">Pricing</a>
-      <span style="color: rgba(255,255,255,.5); font-size: 14px;">{{ user.email }}</span>
-      <a href="#" onclick="logout(); return false;">Log Out</a>
-    </div>
-  </div>
-</nav>
+{% include 'partials/nav.html' %}
 
 <!-- HEADER -->
 <div class="page-header">
@@ -481,6 +470,10 @@ body {
       <div class="stat-card contacted">
         <div class="value" id="stat-contacted">-</div>
         <div class="label">Contacted</div>
+      </div>
+      <div class="stat-card quoted">
+        <div class="value" id="stat-quoted">-</div>
+        <div class="label">Quoted</div>
       </div>
       <div class="stat-card won">
         <div class="value" id="stat-won">-</div>
@@ -593,6 +586,7 @@ async function loadLeads() {
     document.getElementById('stat-value').textContent = '$' + (data.total_value || 0).toLocaleString();
     document.getElementById('stat-new').textContent = data.status_counts?.new || 0;
     document.getElementById('stat-contacted').textContent = data.status_counts?.contacted || 0;
+    document.getElementById('stat-quoted').textContent = data.status_counts?.quoted || 0;
     document.getElementById('stat-won').textContent = data.status_counts?.won || 0;
 
     // Filter by status

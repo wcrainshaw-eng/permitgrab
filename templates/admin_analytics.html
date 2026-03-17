@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics Dashboard - PermitGrab Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --accent: #f97316;
+  --green: #16a34a;
+  --yellow: #eab308;
+  --red: #dc2626;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-100); color: var(--gray-700); line-height: 1.5; }
+
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; }
+.nav-links a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: white; }
+
+.page-header { background: white; border-bottom: 1px solid var(--gray-200); padding: 24px 32px; }
+.page-header-inner { max-width: 1400px; margin: 0 auto; }
+.page-header h1 { font-size: 24px; font-weight: 700; color: var(--gray-900); }
+.page-header p { color: var(--gray-500); font-size: 14px; margin-top: 4px; }
+
+.main { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+/* Metric Cards */
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.metric-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.metric-value { font-size: 36px; font-weight: 800; color: var(--gray-900); }
+.metric-label { font-size: 13px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+/* Section */
+.section { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 24px; }
+.section-title { font-size: 18px; font-weight: 700; color: var(--gray-900); margin-bottom: 20px; }
+
+/* Chart */
+.chart-container { height: 300px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--gray-100); }
+th { font-size: 12px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+td { font-size: 14px; }
+tr:hover { background: var(--gray-50); }
+
+/* Funnel */
+.funnel { display: flex; flex-direction: column; gap: 8px; }
+.funnel-step { display: flex; align-items: center; gap: 16px; }
+.funnel-bar { height: 32px; background: var(--primary); border-radius: 4px; display: flex; align-items: center; padding: 0 12px; color: white; font-weight: 600; font-size: 13px; min-width: 60px; }
+.funnel-label { font-size: 14px; color: var(--gray-700); min-width: 200px; }
+.funnel-pct { font-size: 13px; color: var(--gray-500); }
+
+/* Status Dots */
+.status-ok { color: var(--green); }
+.status-degraded { color: var(--yellow); }
+.status-down, .status-error { color: var(--red); }
+
+/* Grid layouts */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+@media (max-width: 1024px) {
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .metrics-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span> Admin</a>
+    <div class="nav-links">
+      <a href="/admin">Admin Home</a>
+      <a href="/admin/analytics">Analytics</a>
+      <a href="/">Back to Site</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1>Analytics Dashboard</h1>
+    <p>User behavior, conversion metrics, and system health</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- KEY METRICS -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-value">{{ data.visitors_today }}</div>
+      <div class="metric-label">Visitors Today</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ data.signups_week }}</div>
+      <div class="metric-label">Signups This Week</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ data.active_users_7d }}</div>
+      <div class="metric-label">Active Users (7d)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ data.trial_starts_30d }}</div>
+      <div class="metric-label">Trial Starts (30d)</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- TRAFFIC CHART -->
+    <div class="section">
+      <h2 class="section-title">Traffic (Last 30 Days)</h2>
+      <div class="chart-container">
+        <canvas id="trafficChart"></canvas>
+      </div>
+    </div>
+
+    <!-- CONVERSION FUNNEL -->
+    <div class="section">
+      <h2 class="section-title">Conversion Funnel (30 Days)</h2>
+      <div class="funnel">
+        {% for step in data.funnel %}
+        <div class="funnel-step">
+          <div class="funnel-label">{{ step.step }}</div>
+          <div class="funnel-bar" style="width: {{ [step.pct * 3, 100] | min }}%;">{{ step.count }}</div>
+          <div class="funnel-pct">{{ step.pct }}%</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- TOP PAGES -->
+    <div class="section">
+      <h2 class="section-title">Top Pages (7 Days)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Page</th>
+            <th>Views</th>
+            <th>Unique Visitors</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for page in data.top_pages[:10] %}
+          <tr>
+            <td>{{ page.page }}</td>
+            <td>{{ page.views }}</td>
+            <td>{{ page.unique_visitors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- EVENT COUNTS -->
+    <div class="section">
+      <h2 class="section-title">Engagement Events (7 Days)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Event Type</th>
+            <th>Count</th>
+            <th>Unique Users</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in data.event_counts[:10] %}
+          <tr>
+            <td>{{ event.event_type }}</td>
+            <td>{{ event.count }}</td>
+            <td>{{ event.unique_users }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- CITY ENGAGEMENT -->
+    <div class="section">
+      <h2 class="section-title">City Engagement (30 Days)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>City</th>
+            <th>Page Views</th>
+            <th>Filters</th>
+            <th>Leads Saved</th>
+            <th>Alerts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for city in data.city_engagement[:10] %}
+          <tr>
+            <td>{{ city.city }}</td>
+            <td>{{ city.page_views }}</td>
+            <td>{{ city.filter_uses }}</td>
+            <td>{{ city.leads_saved }}</td>
+            <td>{{ city.alerts }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TRAFFIC SOURCES -->
+    <div class="section">
+      <h2 class="section-title">Traffic Sources (30 Days)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Medium</th>
+            <th>Visitors</th>
+            <th>Signups</th>
+            <th>Conv %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for source in data.traffic_sources[:10] %}
+          <tr>
+            <td>{{ source.source }}</td>
+            <td>{{ source.medium }}</td>
+            <td>{{ source.visitors }}</td>
+            <td>{{ source.signups }}</td>
+            <td>{{ source.conversion }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EMAIL PERFORMANCE -->
+  <div class="section">
+    <h2 class="section-title">Email Performance</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Last 7 Days</th>
+          <th>Last 30 Days</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Emails Delivered</td>
+          <td>{{ data.email_perf_7d.delivered }}</td>
+          <td>{{ data.email_perf_30d.delivered }}</td>
+        </tr>
+        <tr>
+          <td>Opens</td>
+          <td>{{ data.email_perf_7d.opens }} ({{ data.email_perf_7d.open_rate }}%)</td>
+          <td>{{ data.email_perf_30d.opens }} ({{ data.email_perf_30d.open_rate }}%)</td>
+        </tr>
+        <tr>
+          <td>Clicks</td>
+          <td>{{ data.email_perf_7d.clicks }} ({{ data.email_perf_7d.click_rate }}%)</td>
+          <td>{{ data.email_perf_30d.clicks }} ({{ data.email_perf_30d.click_rate }}%)</td>
+        </tr>
+        <tr>
+          <td>Bounces</td>
+          <td>{{ data.email_perf_7d.bounces }} ({{ data.email_perf_7d.bounce_rate }}%)</td>
+          <td>{{ data.email_perf_30d.bounces }} ({{ data.email_perf_30d.bounce_rate }}%)</td>
+        </tr>
+        <tr>
+          <td>Unsubscribes</td>
+          <td>{{ data.email_perf_7d.unsubscribes }} ({{ data.email_perf_7d.unsubscribe_rate }}%)</td>
+          <td>{{ data.email_perf_30d.unsubscribes }} ({{ data.email_perf_30d.unsubscribe_rate }}%)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="color: var(--gray-500); font-size: 13px; margin-top: 12px;">
+      Note: Email tracking requires SendGrid Event Webhook configuration.
+    </p>
+  </div>
+
+  <!-- SERVICE STATUS OVERVIEW -->
+  <div class="section" id="health">
+    <h2 class="section-title">Service Status</h2>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
+      {% for service in data.service_health %}
+      <div style="background: var(--gray-50); padding: 12px 20px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+        <span class="status-{{ service.status }}" style="font-size: 20px;">&#9679;</span>
+        <span style="font-weight: 600; text-transform: capitalize;">{{ service.target }}</span>
+        {% if service.response_time_ms %}
+        <span style="color: var(--gray-500); font-size: 12px;">({{ service.response_time_ms }}ms)</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if not data.service_health %}
+      <p style="color: var(--gray-500);">No service health data. Run health checks to populate.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- CITY DATA HEALTH -->
+  <div class="section">
+    <h2 class="section-title">City Data Health</h2>
+    {% if data.city_health %}
+    <table>
+      <thead>
+        <tr>
+          <th>City</th>
+          <th>Status</th>
+          <th>API Response</th>
+          <th>Data Age</th>
+          <th>Permits (24h)</th>
+          <th>Permits (7d)</th>
+          <th>7d Trend</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for city in data.city_health %}
+        <tr>
+          <td style="font-weight: 600;">{{ city.city_name or city.city }}</td>
+          <td class="status-{{ city.overall_status }}">
+            &#9679; {{ city.overall_status | upper }}
+          </td>
+          <td>
+            {% if city.api_response_ms %}
+            {{ city.api_response_ms }}ms
+            {% else %}
+            -
+            {% endif %}
+          </td>
+          <td>
+            {% if city.hours_since_newest is not none %}
+              {% if city.hours_since_newest < 24 %}
+              {{ city.hours_since_newest | round(1) }}h ago
+              {% else %}
+              {{ (city.hours_since_newest / 24) | round(1) }}d ago
+              {% endif %}
+            {% else %}
+            -
+            {% endif %}
+          </td>
+          <td>{{ city.permits_24h }}</td>
+          <td>{{ city.permits_7d }}</td>
+          <td>
+            {% if city.pct_change is not none %}
+              {% if city.pct_change >= 0 %}
+              <span style="color: var(--green);">+{{ city.pct_change }}%</span>
+              {% else %}
+              <span style="color: var(--red);">{{ city.pct_change }}%</span>
+              {% endif %}
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color: var(--gray-500);">No city health data. Run health checks to populate.</p>
+    {% endif %}
+  </div>
+
+  <!-- ROUTE PERFORMANCE -->
+  {% if data.route_health %}
+  <div class="section">
+    <h2 class="section-title">Route Performance (24h)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Route</th>
+          <th>Status</th>
+          <th>Avg Response</th>
+          <th>P95 Response</th>
+          <th>Errors</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for route in data.route_health[:15] %}
+        <tr>
+          <td>{{ route.route }}</td>
+          <td class="status-{{ route.status }}">
+            &#9679; {{ route.status | upper }}
+          </td>
+          <td>{{ route.avg_response_ms }}ms</td>
+          <td>{{ route.p95_response_ms }}ms</td>
+          <td>{% if route.error_count > 0 %}<span style="color: var(--red);">{{ route.error_count }}</span>{% else %}0{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- RECENT FAILURES -->
+  {% if data.health_failures %}
+  <div class="section">
+    <h2 class="section-title">Recent Health Check Failures</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Target</th>
+          <th>Status</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for failure in data.health_failures %}
+        <tr>
+          <td>{{ failure.created_at[:16] }}</td>
+          <td>{{ failure.check_type }}</td>
+          <td>{{ failure.target }}</td>
+          <td class="status-{{ failure.status }}">{{ failure.status | upper }}</td>
+          <td style="font-size: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{{ failure.details | tojson | truncate(80) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Traffic Chart
+const trafficData = {{ data.daily_traffic | tojson }};
+
+const ctx = document.getElementById('trafficChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: trafficData.map(d => d.day),
+    datasets: [
+      {
+        label: 'Page Views',
+        data: trafficData.map(d => d.page_views),
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        fill: true,
+        tension: 0.3,
+      },
+      {
+        label: 'Unique Visitors',
+        data: trafficData.map(d => d.visitors),
+        borderColor: '#f97316',
+        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+        fill: true,
+        tension: 0.3,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      intersect: false,
+      mode: 'index',
+    },
+    scales: {
+      y: { beginAtZero: true },
+      x: {
+        ticks: {
+          maxTicksLimit: 10
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        position: 'bottom'
+      }
+    }
+  }
+});
+</script>
+
+</body>
+</html>

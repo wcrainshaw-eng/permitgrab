@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service — PermitGrab</title>
+<meta name="description" content="PermitGrab terms of service. Read our terms and conditions for using the platform.">
+<link rel="canonical" href="https://permitgrab.com/terms">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-500: #6b7280;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-800); line-height: 1.7; }
+.header { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%); padding: 16px 32px; }
+.header-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav { display: flex; gap: 24px; align-items: center; }
+.nav a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav a:hover { color: white; }
+.content { max-width: 800px; margin: 48px auto; padding: 0 24px; }
+h1 { font-size: 36px; margin-bottom: 8px; color: var(--gray-900); }
+.last-updated { color: var(--gray-500); margin-bottom: 32px; }
+h2 { font-size: 24px; margin: 32px 0 16px; color: var(--gray-800); }
+p, ul { margin-bottom: 16px; }
+ul { padding-left: 24px; }
+li { margin-bottom: 8px; }
+a { color: var(--primary); }
+.site-footer { background: var(--gray-900); color: white; padding: 48px 32px 24px; margin-top: 48px; }
+.footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.footer-brand { max-width: 300px; }
+.footer-logo { font-size: 24px; font-weight: 700; color: white; text-decoration: none; display: block; margin-bottom: 12px; }
+.footer-logo span { color: var(--accent); }
+.footer-brand p { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.6; }
+.footer-links h4 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: rgba(255,255,255,.7); }
+.footer-links a { display: block; color: rgba(255,255,255,.5); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+.footer-links a:hover { color: white; }
+.footer-bottom { max-width: 1200px; margin: 32px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.1); text-align: center; font-size: 13px; color: rgba(255,255,255,.4); }
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<div class="content">
+  <h1>Terms of Service</h1>
+  <p class="last-updated">Last updated: March 2026</p>
+
+  <p>Welcome to PermitGrab. By accessing or using our service, you agree to be bound by these Terms of Service.</p>
+
+  <h2>1. Service Description</h2>
+  <p>PermitGrab is a permit data aggregation platform that collects and presents building permit information from public municipal sources. We help contractors and construction professionals find potential leads by making public permit data more accessible and actionable.</p>
+
+  <h2>2. Account Registration</h2>
+  <p>To use certain features, you must create an account. You agree to:</p>
+  <ul>
+    <li>Provide accurate and complete information</li>
+    <li>Maintain the security of your account credentials</li>
+    <li>Notify us immediately of any unauthorized access</li>
+    <li>Accept responsibility for all activities under your account</li>
+  </ul>
+
+  <h2>3. Subscription and Payment</h2>
+  <ul>
+    <li><strong>Free Plan:</strong> Limited access to permit data at no cost</li>
+    <li><strong>Professional Plan:</strong> $149 per month, billed monthly through Stripe</li>
+    <li>You may cancel your subscription at any time from your account settings</li>
+    <li>Refunds are provided on a case-by-case basis within 14 days of payment</li>
+  </ul>
+
+  <h2>4. Acceptable Use</h2>
+  <p>You agree not to:</p>
+  <ul>
+    <li>Use the service for any unlawful purpose</li>
+    <li>Scrape, copy, or redistribute permit data in bulk</li>
+    <li>Attempt to gain unauthorized access to our systems</li>
+    <li>Interfere with the proper functioning of the service</li>
+    <li>Impersonate any person or entity</li>
+  </ul>
+
+  <h2>5. Data Accuracy Disclaimer</h2>
+  <p>Permit data is sourced from public municipal APIs and open data portals. While we strive for accuracy, we do not guarantee that all information is complete, current, or error-free. Data should be verified with the issuing municipality before taking action.</p>
+
+  <h2>6. Limitation of Liability</h2>
+  <p>PermitGrab is provided "as is" without warranties of any kind. We are not liable for any damages arising from your use of the service, including but not limited to lost profits, business interruption, or loss of data.</p>
+
+  <h2>7. Changes to Terms</h2>
+  <p>We may modify these terms at any time. Continued use of the service after changes constitutes acceptance of the modified terms.</p>
+
+  <h2>8. Governing Law</h2>
+  <p>These terms are governed by the laws of the State of Texas. Any disputes shall be resolved in the courts of Travis County, Texas.</p>
+
+  <h2>9. Contact</h2>
+  <p>Questions about these Terms? Contact us at support@permitgrab.com</p>
+</div>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>

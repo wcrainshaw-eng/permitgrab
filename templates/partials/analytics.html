@@ -1,0 +1,31 @@
+<!-- Google Analytics GA4 -->
+<!-- REPLACE G-XXXXXXXXXX WITH REAL GA4 MEASUREMENT ID -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+
+  // Custom event tracking for key conversions
+  function trackEvent(eventName, eventParams) {
+    gtag('event', eventName, eventParams || {});
+  }
+
+  // Track pricing page views
+  if (window.location.pathname === '/pricing') {
+    trackEvent('view_pricing');
+  }
+
+  // Track signup/login page views
+  if (window.location.pathname === '/signup') {
+    trackEvent('view_signup');
+  }
+  if (window.location.pathname === '/login') {
+    trackEvent('view_login');
+  }
+</script>
+
+<!-- Google Search Console Verification -->
+<!-- REPLACE WITH REAL SEARCH CONSOLE VERIFICATION CODE -->
+<meta name="google-site-verification" content="XXXXX">
