@@ -2751,6 +2751,9 @@ def sitemap():
 
     urls = [
         {'loc': SITE_URL, 'changefreq': 'daily', 'priority': '1.0'},
+        {'loc': f"{SITE_URL}/pricing", 'changefreq': 'weekly', 'priority': '0.9'},
+        {'loc': f"{SITE_URL}/contractors", 'changefreq': 'daily', 'priority': '0.8'},
+        {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7'},
         {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
     ]
 
@@ -2798,6 +2801,12 @@ def sitemap():
     return Response(xml, mimetype='application/xml')
 
 
+@app.route('/logout')
+def logout_page():
+    """Log out and redirect to homepage."""
+    session.clear()
+    return redirect('/')
+
 @app.route('/robots.txt')
 def robots():
     """Serve robots.txt for search engines."""
@@ -2806,6 +2815,8 @@ Allow: /
 Disallow: /admin
 Disallow: /api/
 Disallow: /my-leads
+Disallow: /early-intel
+Disallow: /analytics
 Disallow: /account
 Disallow: /saved-leads
 
