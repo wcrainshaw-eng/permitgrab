@@ -566,7 +566,7 @@ def api_permits():
         permits = [p for p in permits if p.get('city') == city_name]
 
     # Trade filter - handle both slug (from onboarding) and trade category name (from dashboard)
-    if trade:
+    if trade and trade != 'all-trades':
         # Try to resolve trade slug to trade name
         trade_config = get_trade(trade)
         if trade_config:
