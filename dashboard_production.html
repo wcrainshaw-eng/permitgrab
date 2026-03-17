@@ -2065,8 +2065,9 @@ function updateAuthUI() {
 }
 
 function updateFreePreviewLimit() {
-  if (currentUser && (currentUser.plan === 'professional' || currentUser.plan === 'enterprise')) {
-    freePreviewLimit = Infinity; // Paid users see all contact info
+  // Check all Pro plan variants: pro (admin), professional (Stripe), enterprise
+  if (currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise')) {
+    freePreviewLimit = Infinity; // Pro users see all contact info
   } else {
     freePreviewLimit = 5;
   }

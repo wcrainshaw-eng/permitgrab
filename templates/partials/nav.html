@@ -150,7 +150,7 @@
       <div class="nav-dropdown">
         <button class="dropdown-toggle">{{ user.name or user.email.split('@')[0] }} <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
         <div class="dropdown-menu">
-          {% if user.plan == 'pro' %}
+          {% if is_pro %}
           <a href="/billing">Billing</a>
           {% endif %}
           <a href="/logout">Log Out</a>

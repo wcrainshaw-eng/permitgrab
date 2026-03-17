@@ -44,108 +44,130 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 def score_lead(permit):
     """
-    Calculate lead score (0-99) based on value, recency, contacts, status, and project type.
-    Returns score and quality tier (hot/warm/standard).
+    Calculate lead score (40-99) based on value, recency, contacts, status, and project type.
+    Returns score and quality tier (hot/warm/cool).
 
-    Scoring breakdown (max 99 pts):
-    - Value (0-30 pts): Based on estimated cost
-    - Recency (0-25 pts): Based on filing date
-    - Contact Info (0-20 pts): Phone, email, owner name
-    - Status (0-15 pts): Permit status/stage
-    - Project Type (0-9 pts): Type bonus
+    Target distribution:
+    - ~10% scored 90-99 (hot leads)
+    - ~20% scored 75-89 (warm leads)
+    - ~40% scored 55-74 (moderate leads)
+    - ~30% scored 40-54 (cool leads)
+
+    Raw scoring breakdown (max 59 pts, then add base 40):
+    - Value (0-20 pts): Based on estimated cost
+    - Recency (0-15 pts): Based on filing date
+    - Contact Info (0-12 pts): Phone, email, owner name
+    - Status (0-8 pts): Permit status/stage
+    - Project Type (0-4 pts): Type bonus
     """
-    score = 0
+    raw_score = 0
 
-    # VALUE COMPONENT (0-30 points)
+    # VALUE COMPONENT (0-20 points) - wider spread
     value = permit.get('estimated_cost', 0) or 0
     if value >= 5000000:
-        score += 30  # $5M+
+        raw_score += 20  # $5M+
+    elif value >= 2000000:
+        raw_score += 17  # $2M-$5M
     elif value >= 1000000:
-        score += 20  # $1M-$5M
+        raw_score += 14  # $1M-$2M
     elif value >= 500000:
-        score += 15  # $500K-$1M
+        raw_score += 11  # $500K-$1M
+    elif value >= 250000:
+        raw_score += 8   # $250K-$500K
     elif value >= 100000:
-        score += 10  # $100K-$500K
+        raw_score += 5   # $100K-$250K
+    elif value >= 50000:
+        raw_score += 3   # $50K-$100K
     elif value > 0:
-        score += 5   # $0-$100K
+        raw_score += 1   # $0-$50K
     else:
-        score += 8   # Unknown value (don't penalize too much)
+        raw_score += 4   # Unknown value (neutral)
 
-    # RECENCY COMPONENT (0-25 points)
+    # RECENCY COMPONENT (0-15 points) - more granular
     filing_date = permit.get('filing_date', '')
     if filing_date:
         try:
             filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
             days_ago = (datetime.now() - filed).days
             if days_ago <= 0:
-                score += 25  # Filed today
+                raw_score += 15  # Filed today
+            elif days_ago <= 1:
+                raw_score += 14  # Yesterday
             elif days_ago <= 3:
-                score += 20  # 1-3 days
+                raw_score += 12  # 2-3 days
+            elif days_ago <= 5:
+                raw_score += 10  # 4-5 days
             elif days_ago <= 7:
-                score += 15  # 4-7 days
+                raw_score += 8   # 6-7 days
             elif days_ago <= 14:
-                score += 10  # 1-2 weeks
-            elif days_ago <= 28:
-                score += 5   # 2-4 weeks
+                raw_score += 5   # 1-2 weeks
+            elif days_ago <= 21:
+                raw_score += 3   # 2-3 weeks
+            elif days_ago <= 30:
+                raw_score += 1   # 3-4 weeks
             else:
-                score += 2   # 1+ month ago
+                raw_score += 0   # 1+ month ago
         except (ValueError, TypeError):
-            score += 2  # Unknown date
+            raw_score += 3  # Unknown date (neutral)
+    else:
+        raw_score += 3  # No date
 
-    # CONTACT INFO COMPONENT (0-20 points)
+    # CONTACT INFO COMPONENT (0-12 points)
     if permit.get('contact_phone'):
-        score += 10  # Has phone number
+        raw_score += 6   # Has phone number (most valuable)
     if permit.get('contact_email'):
-        score += 5   # Has email
+        raw_score += 3   # Has email
     if permit.get('contact_name'):
-        score += 5   # Has owner/company name
+        raw_score += 3   # Has owner/company name
 
-    # STATUS COMPONENT (0-15 points)
+    # STATUS COMPONENT (0-8 points)
     status = (permit.get('status', '') or '').lower()
     if any(kw in status for kw in ['issued', 'approved', 'active', 'permitted']):
-        score += 15  # Ready to start - highest intent
+        raw_score += 8   # Ready to start - highest intent
     elif any(kw in status for kw in ['under review', 'plan check', 'reviewing']):
-        score += 10  # Under review
+        raw_score += 6   # Under review
     elif any(kw in status for kw in ['submitted', 'filed', 'application']):
-        score += 8   # Submitted/Filed
+        raw_score += 4   # Submitted/Filed
     elif any(kw in status for kw in ['in review', 'pending']):
-        score += 5   # In review/Pending
+        raw_score += 2   # In review/Pending
     elif any(kw in status for kw in ['expired', 'voided', 'denied', 'cancelled']):
-        score += 0   # Expired/Voided - no value
+        raw_score += 0   # Expired/Voided - no value
     else:
-        score += 3   # Unknown status
+        raw_score += 3   # Unknown status (neutral)
 
-    # PROJECT TYPE BONUS (0-9 points)
+    # PROJECT TYPE BONUS (0-4 points)
     trade = permit.get('trade_category', '')
     desc = (permit.get('description', '') or '').lower()
     work_type = (permit.get('work_type', '') or '').lower()
     combined_text = f"{trade} {desc} {work_type}".lower()
 
     if 'new construction' in combined_text or trade == 'New Construction':
-        score += 9   # New Construction
+        raw_score += 4   # New Construction
     elif value >= 500000 and any(kw in combined_text for kw in ['renovation', 'remodel', 'rehab']):
-        score += 7   # Major Renovation (>$500K)
+        raw_score += 4   # Major Renovation (>$500K)
     elif 'tenant improvement' in combined_text or 'tenant build' in combined_text:
-        score += 5   # Tenant Improvement
+        raw_score += 3   # Tenant Improvement
     elif 'addition' in combined_text or trade == 'Addition':
-        score += 4   # Addition
+        raw_score += 2   # Addition
     elif any(kw in combined_text for kw in ['renovation', 'remodel', 'interior']):
-        score += 2   # Minor Renovation
+        raw_score += 1   # Minor Renovation
     else:
-        score += 1   # Other
+        raw_score += 0   # Other
 
-    # Cap at 99 (max possible)
-    score = min(score, 99)
+    # Final score: base 40 + raw score (0-59), capped at 99
+    # This guarantees a 40-99 range
+    final_score = 40 + min(raw_score, 59)
+    final_score = min(final_score, 99)
 
     # Determine quality tier
-    if score >= 75:
+    if final_score >= 90:
         quality = 'hot'
-    elif score >= 55:
+    elif final_score >= 75:
         quality = 'warm'
     else:
         quality = 'standard'
 
-    return score, quality
+    return final_score, quality
 
 
 def add_lead_scores(permits):
@@ -347,11 +369,45 @@ def get_current_user():
     return next((u for u in users if u['email'] == user_email), None)
 
 
+def get_user_plan(user):
+    """
+    Returns 'pro', 'free', or 'anonymous'.
+    Centralizes all plan checking logic to avoid inconsistencies.
+    Recognizes Pro status from:
+    - user.plan == 'pro'
+    - user.plan == 'professional' (Stripe)
+    - user.plan == 'enterprise'
+    - user.stripe_subscription_status == 'active'
+    """
+    if not user:
+        return 'anonymous'
+
+    plan = (user.get('plan') or '').lower()
+
+    # Check admin-set or Stripe-set plans
+    if plan in ('pro', 'professional', 'enterprise'):
+        return 'pro'
+
+    # Check Stripe subscription status
+    if user.get('stripe_subscription_status') == 'active':
+        return 'pro'
+
+    return 'free'
+
+
+def is_pro(user):
+    """Returns True if user has Pro access."""
+    return get_user_plan(user) == 'pro'
+
+
 @app.context_processor
 def inject_nav_context():
-    """Inject user and nav_cities into all templates."""
+    """Inject user, plan status, and nav_cities into all templates."""
+    user = get_current_user()
     return {
-        'user': get_current_user(),
+        'user': user,
+        'user_plan': get_user_plan(user),
+        'is_pro': is_pro(user),
         'nav_cities': get_cities_with_data()
     }
 
@@ -1658,30 +1714,16 @@ def analytics_page():
     """Render the Analytics page (Pro users only)."""
     user = get_current_user()
 
-    # Check if user has Pro plan
-    if not user or user.get('plan') not in ('professional', 'enterprise'):
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html><head>
-                <title>Analytics - PermitGrab</title>
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 60px; text-align: center; background: #f3f4f6; }
-                    .card { background: white; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
-                    h1 { margin-bottom: 16px; }
-                    p { color: #6b7280; margin-bottom: 24px; }
-                    .btn { display: inline-block; background: #2563eb; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; }
-                    .btn:hover { background: #1d4ed8; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h1>Analytics is a Pro Feature</h1>
-                    <p>Upgrade to Professional to access trend analytics, market insights, and contractor intelligence.</p>
-                    <a href="/pricing" class="btn">Upgrade to Pro</a>
-                    <p style="margin-top: 16px;"><a href="/" style="color: #6b7280;">Back to Dashboard</a></p>
-                </div>
-            </body></html>
-        ''')
+    # Check if user has Pro plan using centralized utility
+    if not is_pro(user):
+        footer_cities = get_cities_with_data()
+        return render_template('upgrade_gate.html',
+            title="Analytics",
+            icon="📊",
+            heading="Analytics is a Pro Feature",
+            description="Upgrade to Professional to access trend analytics, market insights, and contractor intelligence.",
+            footer_cities=footer_cities
+        )
 
     footer_cities = get_cities_with_data()
     return render_template('analytics.html', user=user, footer_cities=footer_cities)
@@ -1909,30 +1951,16 @@ def early_intel_page():
     """Render the Early Intel page (Pro users only)."""
     user = get_current_user()
 
-    # Check if user has Pro plan
-    if not user or user.get('plan') not in ('professional', 'enterprise'):
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html><head>
-                <title>Early Intel - PermitGrab</title>
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 60px; text-align: center; background: #f3f4f6; }
-                    .card { background: white; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
-                    h1 { margin-bottom: 16px; }
-                    p { color: #6b7280; margin-bottom: 24px; }
-                    .btn { display: inline-block; background: #2563eb; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; }
-                    .btn:hover { background: #1d4ed8; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h1>Early Intel is a Pro Feature</h1>
-                    <p>Upgrade to Professional to access pre-construction signals, zoning applications, and early-stage filings before permits are issued.</p>
-                    <a href="/pricing" class="btn">Upgrade to Pro</a>
-                    <p style="margin-top: 16px;"><a href="/" style="color: #6b7280;">Back to Dashboard</a></p>
-                </div>
-            </body></html>
-        ''')
+    # Check if user has Pro plan using centralized utility
+    if not is_pro(user):
+        footer_cities = get_cities_with_data()
+        return render_template('upgrade_gate.html',
+            title="Early Intel",
+            icon="🔮",
+            heading="Early Intel is a Pro Feature",
+            description="Upgrade to Professional to access pre-construction signals, zoning applications, and early-stage filings before permits are issued.",
+            footer_cities=footer_cities
+        )
 
     footer_cities = get_cities_with_data()
     return render_template('early_intel.html', user=user, footer_cities=footer_cities)
