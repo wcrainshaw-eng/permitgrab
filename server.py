@@ -1996,15 +1996,8 @@ def my_leads_page():
     """Render the My Leads CRM page."""
     user = get_current_user()
     if not user:
-        return '''
-        <!DOCTYPE html>
-        <html><head><title>Login Required - PermitGrab</title>
-        <style>body{font-family:sans-serif;padding:60px;text-align:center;}</style></head>
-        <body>
-            <h1>Login Required</h1>
-            <p>Please <a href="/">log in</a> to view your saved leads.</p>
-        </body></html>
-        '''
+        # Redirect to login with message
+        return redirect('/login?redirect=my-leads')
 
     return render_template('my_leads.html', user=user)
 
