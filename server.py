@@ -571,7 +571,7 @@ def api_permits():
     Query params: city, trade, value, status, search, quality, page, per_page
     Returns paginated, filtered permit data with lead scores.
 
-    FREEMIUM GATING: Non-Pro users only see contact info for first 5 permits.
+    FREEMIUM GATING: Non-Pro users see masked contact info on ALL permits.
     """
     permits = load_permits()
 
@@ -629,23 +629,18 @@ def api_permits():
     start = (page - 1) * per_page
     page_permits = permits[start:start + per_page]
 
-    # FREEMIUM GATING: Strip contact info for non-Pro users (except first 5 permits)
+    # FREEMIUM GATING: Strip contact info for ALL permits for non-Pro users
     user = get_current_user()
     user_is_pro = is_pro(user)
 
     if not user_is_pro:
-        # Calculate global index for each permit to determine which get contact info
-        for i, permit in enumerate(page_permits):
-            global_idx = start + i
-            if global_idx >= 5:  # Only first 5 permits (indices 0-4) get contact info
-                # Strip contact info and mark as gated
-                permit['contact_phone'] = None
-                permit['contact_name'] = None
-                permit['contact_email'] = None
-                permit['owner_name'] = None
-                permit['is_gated'] = True
-            else:
-                permit['is_gated'] = False
+        # Strip contact info from ALL permits for non-Pro users
+        for permit in page_permits:
+            permit['contact_phone'] = None
+            permit['contact_name'] = None
+            permit['contact_email'] = None
+            permit['owner_name'] = None
+            permit['is_gated'] = True
     else:
         # Pro users get all contact info
         for permit in page_permits:

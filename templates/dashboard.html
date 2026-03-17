@@ -1520,7 +1520,7 @@ let allPermits = [];
 let filteredPermits = [];
 let currentPage = 1;
 const perPage = 50;
-let freePreviewLimit = 5; // Show contact info for first 5 (updated based on user plan)
+let freePreviewLimit = 0; // Non-Pro users get NO free previews (updated based on user plan)
 let currentUser = null;
 
 // ===========================
@@ -2007,6 +2007,14 @@ function exportPermit(id) {
 }
 
 function exportCSV() {
+  // Check if user is Pro
+  const isPro = currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise');
+  if (!isPro) {
+    showToast('Export CSV is a Pro feature. Upgrade to unlock!');
+    setTimeout(() => { window.location.href = '/pricing'; }, 1500);
+    return;
+  }
+
   // Build query params from current filters
   const city = document.getElementById('filter-city').value;
   const trade = document.getElementById('filter-trade').value;
@@ -2021,6 +2029,21 @@ function exportCSV() {
 }
 
 async function saveCurrentSearch() {
+  // Check if user is logged in
+  {% if not user %}
+  showToast('Please log in to save searches');
+  setTimeout(() => { window.location.href = '/login?redirect=dashboard'; }, 1500);
+  return;
+  {% endif %}
+
+  // Check if user is Pro
+  const isPro = currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise');
+  if (!isPro) {
+    showToast('Save Search is a Pro feature. Upgrade to unlock!');
+    setTimeout(() => { window.location.href = '/pricing'; }, 1500);
+    return;
+  }
+
   // Capture current filter state
   const searchData = {
     city: document.getElementById('filter-city').value,
@@ -2030,13 +2053,6 @@ async function saveCurrentSearch() {
     quality: document.getElementById('filter-quality').value,
     search_text: document.getElementById('filter-search').value
   };
-
-  // Check if user is logged in
-  {% if not user %}
-  showToast('Please log in to save searches');
-  setTimeout(() => { window.location.href = '/login?redirect=dashboard'; }, 1500);
-  return;
-  {% endif %}
 
   try {
     const resp = await fetch('/api/saved-searches', {
@@ -2140,7 +2156,7 @@ function updateFreePreviewLimit() {
   if (currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise')) {
     freePreviewLimit = Infinity; // Pro users see all contact info
   } else {
-    freePreviewLimit = 5;
+    freePreviewLimit = 0; // Non-Pro users see NO contact info
   }
   // Re-render permits if already loaded
   if (allPermits.length > 0) {
