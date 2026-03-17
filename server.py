@@ -1666,8 +1666,7 @@ def api_reset_password():
     user_found = False
     for u in users:
         if u['email'].lower() == email.lower():
-            import hashlib
-            u['password_hash'] = hashlib.sha256(new_password.encode()).hexdigest()
+            u['password_hash'] = generate_password_hash(new_password)
             user_found = True
             break
 
@@ -2443,8 +2442,8 @@ def api_register():
 
     users = load_users()
 
-    # Check for duplicate
-    if any(u['email'] == email for u in users):
+    # Check for duplicate (case-insensitive)
+    if any(u['email'].lower() == email for u in users):
         return jsonify({'error': 'Email already registered'}), 409
 
     user = {
@@ -2490,9 +2489,14 @@ def api_login():
         return jsonify({'error': 'Email and password required'}), 400
 
     users = load_users()
-    user = next((u for u in users if u['email'] == email), None)
+    user = next((u for u in users if u['email'].lower() == email), None)
 
-    if not user or not check_password_hash(user['password_hash'], password):
+    if not user:
+        print(f"[Login] No user found for email: {email}")
+        return jsonify({'error': 'Invalid email or password'}), 401
+
+    if not check_password_hash(user['password_hash'], password):
+        print(f"[Login] Invalid password for email: {email}")
         return jsonify({'error': 'Invalid email or password'}), 401
 
     # Log in the user
