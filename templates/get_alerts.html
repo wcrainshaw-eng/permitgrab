@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get Permit Alerts - PermitGrab</title>
+<meta name="description" content="Get building permit leads delivered to your inbox daily. Choose your city and trade for free daily alerts on new construction projects.">
+<link rel="canonical" href="https://permitgrab.com/get-alerts">
+<meta property="og:title" content="Get Permit Alerts - PermitGrab">
+<meta property="og:description" content="Get building permit leads delivered to your inbox daily. Free for your first metro area.">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --green: #16a34a;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* NAV */
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
+.nav-links a:hover { color: white; }
+.nav-btn { background: var(--accent); color: white !important; padding: 8px 16px; border-radius: 6px; font-weight: 600; }
+.nav-btn:hover { background: #ea580c; }
+
+/* HERO */
+.hero {
+  background: linear-gradient(135deg, var(--accent) 0%, #ea580c 100%);
+  color: white;
+  padding: 80px 32px;
+  text-align: center;
+}
+.hero h1 {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  line-height: 1.2;
+}
+.hero p {
+  font-size: 18px;
+  opacity: .9;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* FORM SECTION */
+.form-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.form-card {
+  background: white;
+  border-radius: 16px;
+  padding: 48px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 6px rgba(0,0,0,.05), 0 10px 15px rgba(0,0,0,.1);
+  margin-top: -60px;
+}
+
+.form-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: 6px;
+}
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 15px;
+  transition: border-color .2s, box-shadow .2s;
+  background: white;
+}
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.alert-success {
+  background: #f0fdf4;
+  color: var(--green);
+  border: 1px solid #bbf7d0;
+}
+.alert-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.btn {
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+}
+.btn-accent {
+  background: var(--accent);
+  color: white;
+}
+.btn-accent:hover { background: #ea580c; transform: translateY(-2px); }
+.btn-accent:disabled { background: var(--gray-300); cursor: not-allowed; }
+
+.form-note {
+  text-align: center;
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 16px;
+}
+
+/* BENEFITS */
+.benefits {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 20px 60px;
+}
+.benefits h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  text-align: center;
+  margin-bottom: 24px;
+}
+.benefit-list {
+  display: grid;
+  gap: 16px;
+}
+.benefit-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.benefit-icon {
+  width: 40px;
+  height: 40px;
+  background: #fff7ed;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.benefit-text h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+.benefit-text p {
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+.footer { background: var(--gray-900); color: rgba(255,255,255,.6); padding: 24px 32px; text-align: center; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Permit<span>Grab</span></a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/login">Log In</a>
+      <a href="/signup" class="nav-btn">Sign Up</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Get Permit Alerts Delivered Daily</h1>
+  <p>Choose your city and trade — we'll email you fresh leads every morning. Free for your first metro area.</p>
+</section>
+
+<div class="form-section">
+  <div class="form-card">
+    <div id="alert-container"></div>
+
+    <form id="alert-form" onsubmit="handleSubmit(event)">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="city">City / Metro Area</label>
+        <select id="city" name="city" required>
+          <option value="">Select your city...</option>
+          {% for city in cities %}
+          <option value="{{ city.name }}">{{ city.name }}, {{ city.state }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="trade">Your Trade</label>
+        <select id="trade" name="trade" required>
+          <option value="">Select your trade...</option>
+          <option value="General Construction">General Construction</option>
+          <option value="Roofing">Roofing</option>
+          <option value="HVAC">HVAC</option>
+          <option value="Plumbing">Plumbing</option>
+          <option value="Electrical">Electrical</option>
+          <option value="Solar">Solar Installation</option>
+          <option value="Windows & Doors">Windows & Doors</option>
+          <option value="Landscaping">Landscaping</option>
+          <option value="Interior Renovation">Interior Renovation</option>
+          <option value="Demolition">Demolition</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-accent" id="submit-btn">Start Free Alerts</button>
+
+      <p class="form-note">No credit card required. Upgrade anytime for full contact info.</p>
+    </form>
+  </div>
+</div>
+
+<div class="benefits">
+  <h3>What you'll get</h3>
+  <div class="benefit-list">
+    <div class="benefit-item">
+      <div class="benefit-icon">&#128231;</div>
+      <div class="benefit-text">
+        <h4>Daily Email Digest</h4>
+        <p>Fresh permits matching your criteria delivered every morning at 7am.</p>
+      </div>
+    </div>
+    <div class="benefit-item">
+      <div class="benefit-icon">&#127919;</div>
+      <div class="benefit-text">
+        <h4>Targeted to Your Trade</h4>
+        <p>Only see permits relevant to your specialty — no noise, just leads.</p>
+      </div>
+    </div>
+    <div class="benefit-item">
+      <div class="benefit-icon">&#9889;</div>
+      <div class="benefit-text">
+        <h4>Before Your Competition</h4>
+        <p>Get notified within 24 hours of permit filing — reach them first.</p>
+      </div>
+    </div>
+    <div class="benefit-item">
+      <div class="benefit-icon">&#128176;</div>
+      <div class="benefit-text">
+        <h4>Lead Scoring Included</h4>
+        <p>We rank leads by project value, recency, and contact completeness.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <p>&copy; 2026 PermitGrab. Construction permit leads, updated daily.</p>
+</footer>
+
+<script>
+async function handleSubmit(event) {
+  event.preventDefault();
+
+  const email = document.getElementById('email').value.trim();
+  const city = document.getElementById('city').value;
+  const trade = document.getElementById('trade').value;
+
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Signing up...';
+
+  try {
+    const response = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, city, trade })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showAlert('You\'re signed up! Check your inbox for your first permit digest.', 'success');
+      document.getElementById('alert-form').reset();
+    } else {
+      showAlert(data.error || 'Unable to sign up. Please try again.', 'error');
+    }
+  } catch (err) {
+    showAlert('Unable to sign up. Please try again.', 'error');
+  }
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Start Free Alerts';
+}
+
+function showAlert(message, type) {
+  const container = document.getElementById('alert-container');
+  container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+}
+</script>
+
+</body>
+</html>

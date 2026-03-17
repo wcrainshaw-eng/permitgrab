@@ -965,6 +965,13 @@ def login_page():
     return render_template('login.html')
 
 
+@app.route('/get-alerts')
+def get_alerts_page():
+    """Render the Get Alerts page."""
+    cities = get_all_cities_info()
+    return render_template('get_alerts.html', cities=cities)
+
+
 # ===========================
 # TREND ANALYTICS API
 # ===========================
