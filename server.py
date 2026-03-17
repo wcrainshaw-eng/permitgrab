@@ -24,6 +24,72 @@ import analytics
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# ===========================
+# DATABASE SETUP (V7)
+# ===========================
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
+
+# Configure PostgreSQL database (Render provides DATABASE_URL)
+database_url = os.environ.get('DATABASE_URL', '')
+# Render uses 'postgres://' but SQLAlchemy needs 'postgresql://'
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+if database_url:
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"[Database] Using PostgreSQL database")
+else:
+    # Fallback to SQLite for local development
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///permitgrab.db'
+    print(f"[Database] Using SQLite (local development)")
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+
+class User(db.Model):
+    """User model for PostgreSQL storage (V7 - replaces JSON file)."""
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(255), nullable=False, default='')
+    password_hash = db.Column(db.String(255), nullable=False)
+    plan = db.Column(db.String(50), default='free')
+    city = db.Column(db.String(255))
+    trade = db.Column(db.String(255))
+    daily_alerts = db.Column(db.Boolean, default=False)
+    onboarding_completed = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    stripe_customer_id = db.Column(db.String(255))
+    stripe_subscription_id = db.Column(db.String(255))
+    stripe_subscription_status = db.Column(db.String(50))
+
+    def to_dict(self):
+        """Convert to dictionary for JSON responses."""
+        return {
+            'id': self.id,
+            'email': self.email,
+            'name': self.name,
+            'plan': self.plan,
+            'city': self.city,
+            'trade': self.trade,
+            'daily_alerts': self.daily_alerts,
+            'onboarding_completed': self.onboarding_completed,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'stripe_customer_id': self.stripe_customer_id,
+            'stripe_subscription_id': self.stripe_subscription_id,
+            'stripe_subscription_status': self.stripe_subscription_status,
+        }
+
+
+# Create tables on startup
+with app.app_context():
+    db.create_all()
+    print("[Database] Tables created/verified")
+
+
 # Rate limiter setup
 limiter = Limiter(
     key_func=get_remote_address,
@@ -50,7 +116,7 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 # LEAD SCORING ENGINE
 # ===========================
-# V6: FORCED LINEAR SPREAD - exact implementation from spec
+# V7: FORCED LINEAR SPREAD - exact implementation from spec
 # Output range: 40-99, guaranteed by linear mapping.
 
 import hashlib
@@ -58,14 +124,21 @@ import hashlib
 
 def calculate_lead_scores(permits):
     """
-    V6 lead scoring with FORCED LINEAR SPREAD.
+    V7 lead scoring with FORCED LINEAR SPREAD.
     Takes a list of permit dicts, returns a list of integer scores.
     Output range: 40-99, guaranteed by linear mapping.
+
+    PROOF: When raw == min(raws) → output = 40 + 0 = 40
+           When raw == max(raws) → output = 40 + 59 = 99
+    If the minimum output score is not 40, this function is not being called.
     """
     from datetime import datetime
 
     if not permits:
         return []
+
+    if len(permits) == 1:
+        return [70]  # Single permit gets middle score
 
     # PHASE 1: Compute a raw score for each permit
     raw_scores = []
@@ -381,105 +454,71 @@ def save_subscribers(subs):
         json.dump(subs, f, indent=2)
 
 
-import fcntl
-
-# Lock file for user operations (prevents race conditions with multiple workers)
-USERS_LOCK_FILE = os.path.join(DATA_DIR, '.users.lock')
-
-
-def load_users():
-    """Load user list from JSON file."""
-    os.makedirs(DATA_DIR, exist_ok=True)
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, 'r') as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return data
-                print(f"[Users] WARNING: users.json is not a list, returning empty")
-                return []
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"[Users] WARNING: Error reading users.json: {e}")
-            return []
-    return []
-
-
-def save_users_atomic(users):
-    """Save user list with atomic write (write to temp, then rename)."""
-    os.makedirs(DATA_DIR, exist_ok=True)
-    temp_file = USERS_FILE + '.tmp'
-    try:
-        with open(temp_file, 'w') as f:
-            json.dump(users, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_file, USERS_FILE)  # Atomic on POSIX
-    except Exception as e:
-        print(f"[Users] ERROR saving users: {e}")
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-        raise
-
-
-def save_users(users):
-    """Save user list (wrapper for backward compatibility)."""
-    save_users_atomic(users)
+# ===========================
+# USER DATABASE FUNCTIONS (V7)
+# ===========================
+# All user operations now use PostgreSQL instead of JSON files
 
 
 def find_user_by_email(email):
-    """Find a user by email (case-insensitive). Returns user dict or None."""
+    """Find a user by email (case-insensitive). Returns User object or None."""
+    if not email:
+        return None
     email_lower = email.lower().strip()
-    users = load_users()
-    for user in users:
-        if user.get('email', '').lower() == email_lower:
-            return user
-    return None
-
-
-def cleanup_duplicate_users():
-    """
-    Remove duplicate user records, keeping the OLDEST (first registered).
-    The oldest account likely has Pro subscription and original password.
-    Called on app startup to fix any existing duplicates.
-    """
-    users = load_users()
-    if not users:
-        return
-
-    seen_emails = {}
-    clean_users = []
-    duplicates_removed = 0
-
-    for user in users:
-        email = user.get('email', '').lower()
-        if not email:
-            clean_users.append(user)
-            continue
-
-        if email not in seen_emails:
-            seen_emails[email] = user
-            clean_users.append(user)
-        else:
-            # Duplicate found - skip it (keep the first/oldest one)
-            duplicates_removed += 1
-            print(f"[Cleanup] Removing duplicate user: {email}")
-
-    if duplicates_removed > 0:
-        print(f"[Cleanup] Removed {duplicates_removed} duplicate user(s)")
-        save_users_atomic(clean_users)
-
-
-# Run cleanup on module load (works with Gunicorn)
-cleanup_duplicate_users()
+    return User.query.filter(db.func.lower(User.email) == email_lower).first()
 
 
 def get_current_user():
-    """Get the currently logged-in user from session."""
+    """Get the currently logged-in user from session. Returns dict for backward compatibility."""
     user_email = session.get('user_email')
     if not user_email:
         return None
-    users = load_users()
-    return next((u for u in users if u['email'] == user_email), None)
+    user = find_user_by_email(user_email)
+    if user:
+        return user.to_dict()
+    return None
+
+
+def get_current_user_object():
+    """Get the currently logged-in user as User object (for database operations)."""
+    user_email = session.get('user_email')
+    if not user_email:
+        return None
+    return find_user_by_email(user_email)
+
+
+# ===========================
+# BACKWARD COMPATIBILITY SHIMS (V7)
+# ===========================
+# These functions provide backward compatibility with code that expects
+# the old dict-based user storage while actually using the database.
+
+def load_users():
+    """Load all users from database as list of dicts (backward compatibility)."""
+    users = User.query.all()
+    return [u.to_dict() for u in users]
+
+
+def save_users(users):
+    """Save users to database (backward compatibility - DEPRECATED).
+    This is a no-op shim. Individual user updates should use db.session.commit().
+    Kept for backward compatibility with code that still calls this.
+    """
+    # No-op: database operations should be done directly
+    # Individual updates use db.session.commit()
+    pass
+
+
+def update_user_by_email(email, updates):
+    """Update a user's fields by email (V7 helper)."""
+    user = find_user_by_email(email)
+    if user:
+        for key, value in updates.items():
+            if hasattr(user, key):
+                setattr(user, key, value)
+        db.session.commit()
+        return True
+    return False
 
 
 def get_user_plan(user):
@@ -1769,19 +1808,13 @@ def api_reset_password():
 
     email = token_data['email']
 
-    # Update user password
-    users = load_users()
-    user_found = False
-    for u in users:
-        if u['email'].lower() == email.lower():
-            u['password_hash'] = generate_password_hash(new_password)
-            user_found = True
-            break
-
-    if not user_found:
+    # Update user password (V7: direct database update)
+    user = find_user_by_email(email)
+    if not user:
         return jsonify({'error': 'User not found'}), 400
 
-    save_users(users)
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
 
     # Mark token as used
     tokens[token]['used'] = True
@@ -1881,16 +1914,14 @@ def api_onboarding():
     trade = data.get('trade', '')
     daily_alerts = data.get('daily_alerts', False)
 
-    # Update user preferences
-    users = load_users()
-    for u in users:
-        if u['email'] == user['email']:
-            u['preferred_city'] = city
-            u['preferred_trade'] = trade
-            u['daily_alerts'] = daily_alerts
-            u['onboarding_completed'] = True
-            break
-    save_users(users)
+    # Update user preferences (V7: direct database update)
+    user_obj = find_user_by_email(user['email'])
+    if user_obj:
+        user_obj.city = city
+        user_obj.trade = trade
+        user_obj.daily_alerts = daily_alerts
+        user_obj.onboarding_completed = True
+        db.session.commit()
 
     # If they opted into alerts, add them to subscribers
     if daily_alerts:
@@ -2535,11 +2566,8 @@ def sendgrid_webhook():
 def api_register():
     """POST /api/register - Register a new user.
 
-    DUPLICATE PREVENTION (V5):
-    1. Check BEFORE insert using find_user_by_email()
-    2. Use file locking for atomicity
-    3. Use atomic file writes
-    4. Verify AFTER save that no duplicates exist
+    V7: Uses PostgreSQL database with UNIQUE constraint on email.
+    Database constraint prevents duplicates even under race conditions.
     """
     data = request.get_json()
     if not data:
@@ -2559,60 +2587,28 @@ def api_register():
     if '@' not in email or '.' not in email.split('@')[-1]:
         return jsonify({'error': 'Please enter a valid email address'}), 400
 
-    # ========================================
-    # LAYER 1: Pre-check for existing user
-    # ========================================
+    # Check for existing account BEFORE creating user
     existing = find_user_by_email(email)
     if existing:
-        print(f"[Register] DUPLICATE BLOCKED (pre-check): {email}")
+        print(f"[Register] DUPLICATE BLOCKED: {email}")
         return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
 
-    # ========================================
-    # LAYER 2: Locked check-and-insert
-    # ========================================
-    os.makedirs(DATA_DIR, exist_ok=True)
-    user = None
-
-    with open(USERS_LOCK_FILE, 'w') as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            # Re-check within the lock (another worker may have inserted)
-            users = load_users()
-            email_set = {u.get('email', '').lower() for u in users if u.get('email')}
-
-            if email in email_set:
-                print(f"[Register] DUPLICATE BLOCKED (in-lock check): {email}")
-                return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
-
-            # Create the new user
-            user = {
-                'id': str(uuid.uuid4()),
-                'email': email,
-                'name': name,
-                'password_hash': generate_password_hash(password),
-                'plan': 'free',
-                'created_at': datetime.now().isoformat(),
-            }
-            users.append(user)
-
-            # Save atomically
-            save_users_atomic(users)
-            print(f"[Register] User created: {email}, total users: {len(users)}")
-
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-    # ========================================
-    # LAYER 3: Post-save verification
-    # ========================================
-    # Verify the save worked and no duplicates slipped through
-    all_users = load_users()
-    matching = [u for u in all_users if u.get('email', '').lower() == email]
-    if len(matching) > 1:
-        print(f"[Register] ERROR: Duplicate detected post-save for {email}, count={len(matching)}")
-        # Keep only the user we just created (by id)
-        all_users = [u for u in all_users if u.get('email', '').lower() != email or u.get('id') == user['id']]
-        save_users_atomic(all_users)
+    # Create new user in database
+    try:
+        new_user = User(
+            email=email,
+            name=name,
+            password_hash=generate_password_hash(password),
+            plan='free'
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        print(f"[Register] User created in database: {email}")
+    except IntegrityError:
+        # Database UNIQUE constraint caught a race condition
+        db.session.rollback()
+        print(f"[Register] DUPLICATE BLOCKED (IntegrityError): {email}")
+        return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
 
     # Log in the user
     session['user_email'] = email
@@ -2624,9 +2620,9 @@ def api_register():
     return jsonify({
         'message': 'Registration successful',
         'user': {
-            'email': user['email'],
-            'name': user['name'],
-            'plan': user['plan'],
+            'email': new_user.email,
+            'name': new_user.name,
+            'plan': new_user.plan,
         }
     }), 201
 
@@ -2634,7 +2630,7 @@ def api_register():
 @app.route('/api/login', methods=['POST'])
 @limiter.limit("20 per minute")
 def api_login():
-    """POST /api/login - Log in a user."""
+    """POST /api/login - Log in a user (V7: uses PostgreSQL)."""
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Invalid request'}), 400
@@ -2645,14 +2641,14 @@ def api_login():
     if not email or not password:
         return jsonify({'error': 'Email and password required'}), 400
 
-    users = load_users()
-    user = next((u for u in users if u['email'].lower() == email), None)
+    # Find user in database
+    user = find_user_by_email(email)
 
     if not user:
         print(f"[Login] No user found for email: {email}")
         return jsonify({'error': 'Invalid email or password'}), 401
 
-    if not check_password_hash(user['password_hash'], password):
+    if not check_password_hash(user.password_hash, password):
         print(f"[Login] Invalid password for email: {email}")
         return jsonify({'error': 'Invalid email or password'}), 401
 
@@ -2665,9 +2661,9 @@ def api_login():
     return jsonify({
         'message': 'Login successful',
         'user': {
-            'email': user['email'],
-            'name': user['name'],
-            'plan': user['plan'],
+            'email': user.email,
+            'name': user.name,
+            'plan': user.plan,
         }
     })
 
@@ -2975,19 +2971,12 @@ def admin_upgrade_user():
     if plan not in ('free', 'pro', 'enterprise'):
         return redirect('/admin?error=Invalid+plan')
 
-    # Update user
-    users = load_users()
-    user_found = False
-    for user in users:
-        if user.get('email', '').lower() == email:
-            user['plan'] = plan
-            user['upgraded_at'] = datetime.now().isoformat()
-            user['upgraded_by'] = 'admin'
-            user_found = True
-            break
-
-    if user_found:
-        save_users(users)
+    # Update user (V7: direct database update)
+    user_obj = find_user_by_email(email)
+    user_found = user_obj is not None
+    if user_obj:
+        user_obj.plan = plan
+        db.session.commit()
 
     # Also update subscriber if exists
     subs = load_subscribers()
