@@ -42,51 +42,85 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 def score_lead(permit):
     """
-    Calculate lead score (0-100) based on value, recency, trade, and contact info.
+    Calculate lead score (0-100) based on recency, value, contacts, stage, and trade.
     Returns score and quality tier (hot/warm/standard).
+
+    Scoring breakdown:
+    - Recency (0-30 pts): Based on filing date
+    - Project Value (0-25 pts): Based on estimated cost
+    - Contact Completeness (0-20 pts): Owner name, phone, address
+    - Permit Stage (0-15 pts): Early stage = more valuable
+    - Trade Specificity (0-10 pts): Specific trade vs General
     """
     score = 0
 
-    # Project value scoring
-    value = permit.get('estimated_cost', 0) or 0
-    if value >= 100000:
-        score += 40
-    elif value >= 50000:
-        score += 25
-    elif value >= 25000:
-        score += 15
-    else:
-        score += 5
-
-    # Recency scoring (based on filing_date)
+    # RECENCY (0-30 points)
     filing_date = permit.get('filing_date', '')
     if filing_date:
         try:
             filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
             days_ago = (datetime.now() - filed).days
-            if days_ago <= 3:
-                score += 30
+            if days_ago <= 0:
+                score += 30  # Filed today
+            elif days_ago <= 3:
+                score += 25
             elif days_ago <= 7:
                 score += 20
             elif days_ago <= 14:
+                score += 15
+            elif days_ago <= 30:
                 score += 10
+            elif days_ago <= 60:
+                score += 5
+            # Older than 60 days: 0 pts
         except (ValueError, TypeError):
             pass
 
-    # Trade scoring
-    trade = permit.get('trade_category', '')
-    high_value_trades = ['General Construction', 'HVAC', 'Electrical']
-    medium_value_trades = ['Plumbing', 'Roofing']
-    if trade in high_value_trades:
-        score += 20
-    elif trade in medium_value_trades:
-        score += 15
-    else:
-        score += 10
+    # PROJECT VALUE (0-25 points)
+    value = permit.get('estimated_cost', 0) or 0
+    if value >= 1000000:
+        score += 25  # Over $1M
+    elif value >= 500000:
+        score += 20  # $500K-$1M
+    elif value >= 250000:
+        score += 15  # $250K-$500K
+    elif value >= 100000:
+        score += 10  # $100K-$250K
+    elif value >= 50000:
+        score += 5   # $50K-$100K
+    # Under $50K or unknown: 0 pts
 
-    # Contact info bonus
+    # CONTACT COMPLETENESS (0-20 points)
+    if permit.get('contact_name'):
+        score += 8   # Has owner name
     if permit.get('contact_phone'):
-        score += 10
+        score += 6   # Has phone number
+    address = permit.get('address', '')
+    # Check for full address (has number and street, not just city)
+    if address and any(c.isdigit() for c in address) and len(address) > 10:
+        score += 6   # Has full address
+
+    # PERMIT STAGE (0-15 points)
+    status = (permit.get('status', '') or '').lower()
+    if any(kw in status for kw in ['filed', 'application', 'submitted', 'pending']):
+        score += 15  # Early stage - less competition
+    elif any(kw in status for kw in ['review', 'plan check']):
+        score += 12  # In review
+    elif any(kw in status for kw in ['issued', 'approved', 'active', 'permitted']):
+        score += 10  # Permitted/Issued
+    elif any(kw in status for kw in ['progress', 'partial', 'construction']):
+        score += 5   # In Progress
+    elif any(kw in status for kw in ['final', 'complete', 'closed']):
+        score += 2   # Final/Complete
+    # Denied/Expired/Unknown: 0 pts
+
+    # TRADE SPECIFICITY (0-10 points)
+    trade = permit.get('trade_category', '')
+    if trade and trade not in ['General Construction', 'Other', 'Other / Unclassified', '']:
+        score += 10  # Specific trade
+    elif trade == 'General Construction':
+        score += 3   # General construction
+    # Unknown: 0 pts
 
     # Cap at 100
     score = min(score, 100)
