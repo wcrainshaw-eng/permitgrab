@@ -2010,8 +2010,7 @@ function exportCSV() {
   // Check if user is Pro
   const isPro = currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise');
   if (!isPro) {
-    showToast('Export CSV is a Pro feature. Upgrade to unlock!');
-    setTimeout(() => { window.location.href = '/pricing'; }, 1500);
+    showUpgradeModal('Export CSV');
     return;
   }
 
@@ -2031,16 +2030,14 @@ function exportCSV() {
 async function saveCurrentSearch() {
   // Check if user is logged in
   {% if not user %}
-  showToast('Please log in to save searches');
-  setTimeout(() => { window.location.href = '/login?redirect=dashboard'; }, 1500);
+  showUpgradeModal('Save Search', true);
   return;
   {% endif %}
 
   // Check if user is Pro
   const isPro = currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise');
   if (!isPro) {
-    showToast('Save Search is a Pro feature. Upgrade to unlock!');
-    setTimeout(() => { window.location.href = '/pricing'; }, 1500);
+    showUpgradeModal('Save Search');
     return;
   }
 
@@ -2480,7 +2477,52 @@ if (paymentStatus === 'success') {
 }
 
 loadData();
+
+// ===========================
+// UPGRADE MODAL (V5)
+// ===========================
+function showUpgradeModal(featureName, needsLogin = false) {
+  const descriptions = {
+    'Save Search': 'Save your current filters and get daily email alerts when new matching permits are filed.',
+    'Export CSV': 'Download all matching permits as a spreadsheet with full contact details for your CRM.'
+  };
+
+  const modal = document.getElementById('upgradeModal');
+  const title = document.getElementById('upgradeModalTitle');
+  const desc = document.getElementById('upgradeModalDesc');
+  const ctaBtn = document.getElementById('upgradeModalCta');
+
+  if (needsLogin) {
+    title.textContent = 'Login Required';
+    desc.textContent = 'Please log in to use ' + featureName + '. Already have an account? Log in to continue.';
+    ctaBtn.textContent = 'Log In';
+    ctaBtn.href = '/login?redirect=dashboard';
+  } else {
+    title.textContent = featureName + ' is a Pro Feature';
+    desc.textContent = descriptions[featureName] || 'Upgrade to Pro to unlock this feature.';
+    ctaBtn.textContent = 'Upgrade to Pro — $149/mo';
+    ctaBtn.href = '/pricing';
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeUpgradeModal() {
+  document.getElementById('upgradeModal').style.display = 'none';
+}
 </script>
+
+<!-- Upgrade Modal (V5 - preserves search context) -->
+<div id="upgradeModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:white; border-radius:12px; padding:32px; max-width:420px; width:90%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="font-size:48px; margin-bottom:16px;">🔒</div>
+    <h3 id="upgradeModalTitle" style="margin:0 0 8px; color:#1B3A5C;">Pro Feature</h3>
+    <p id="upgradeModalDesc" style="color:#666; margin:0 0 24px;">Upgrade to Pro to unlock this feature.</p>
+    <a id="upgradeModalCta" href="/pricing" style="display:inline-block; background:#E87722; color:white; padding:12px 32px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:12px;">Upgrade to Pro — $149/mo</a>
+    <br>
+    <a href="#" onclick="closeUpgradeModal(); return false;" style="color:#999; font-size:14px;">Maybe later</a>
+  </div>
+</div>
 
 {% include 'partials/footer.html' %}
 
