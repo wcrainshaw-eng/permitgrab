@@ -1485,6 +1485,204 @@ def login_page():
     return render_template('login.html', footer_cities=footer_cities)
 
 
+# ===========================
+# PASSWORD RESET
+# ===========================
+PASSWORD_RESET_FILE = os.path.join(DATA_DIR, 'password_reset_tokens.json')
+
+
+def load_reset_tokens():
+    """Load password reset tokens from JSON file."""
+    if os.path.exists(PASSWORD_RESET_FILE):
+        with open(PASSWORD_RESET_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def save_reset_tokens(tokens):
+    """Save password reset tokens to JSON file."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(PASSWORD_RESET_FILE, 'w') as f:
+        json.dump(tokens, f, indent=2)
+
+
+def generate_reset_token():
+    """Generate a secure random token for password reset."""
+    return secrets.token_urlsafe(32)
+
+
+def cleanup_expired_tokens():
+    """Remove expired reset tokens."""
+    tokens = load_reset_tokens()
+    now = datetime.now().isoformat()
+    valid_tokens = {k: v for k, v in tokens.items() if v.get('expires', '') > now}
+    save_reset_tokens(valid_tokens)
+    return valid_tokens
+
+
+@app.route('/forgot-password')
+def forgot_password_page():
+    """Render the Forgot Password page."""
+    footer_cities = get_cities_with_data()
+    return render_template('forgot_password.html', footer_cities=footer_cities)
+
+
+@app.route('/api/forgot-password', methods=['POST'])
+@limiter.limit("5 per minute")
+def api_forgot_password():
+    """
+    POST /api/forgot-password - Request a password reset email.
+    Body: { email: string }
+    """
+    data = request.get_json()
+    if not data or not data.get('email'):
+        return jsonify({'error': 'Email is required'}), 400
+
+    email = data['email'].lower().strip()
+
+    # Check if user exists
+    users = load_users()
+    user = next((u for u in users if u['email'].lower() == email), None)
+
+    # Always return success to prevent email enumeration
+    if not user:
+        return jsonify({'success': True, 'message': 'If that email exists, a reset link has been sent.'})
+
+    # Generate token with 1-hour expiry
+    token = generate_reset_token()
+    expires = (datetime.now() + timedelta(hours=1)).isoformat()
+
+    # Save token
+    tokens = load_reset_tokens()
+    tokens[token] = {
+        'email': email,
+        'expires': expires,
+        'used': False
+    }
+    save_reset_tokens(tokens)
+
+    # Send reset email
+    reset_url = f"https://permitgrab.com/reset-password/{token}"
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 40px 20px; }}
+            .logo {{ font-size: 24px; font-weight: 700; color: #111; margin-bottom: 24px; }}
+            .logo span {{ color: #f97316; }}
+            .btn {{ display: inline-block; background: #2563eb; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }}
+            .footer {{ margin-top: 32px; font-size: 13px; color: #666; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="logo">Permit<span>Grab</span></div>
+            <h2>Reset Your Password</h2>
+            <p>We received a request to reset your password. Click the button below to create a new password:</p>
+            <p><a href="{reset_url}" class="btn">Reset Password</a></p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #2563eb;">{reset_url}</p>
+            <p><strong>This link expires in 1 hour.</strong></p>
+            <p>If you didn't request this, you can safely ignore this email.</p>
+            <div class="footer">
+                <p>&copy; 2026 PermitGrab. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    try:
+        from email_alerts import send_email
+        send_email(email, "Reset Your PermitGrab Password", html_body)
+    except Exception as e:
+        print(f"Failed to send password reset email: {e}")
+        # Still return success to prevent email enumeration
+
+    return jsonify({'success': True, 'message': 'If that email exists, a reset link has been sent.'})
+
+
+@app.route('/reset-password/<token>')
+def reset_password_page(token):
+    """Render the Reset Password page."""
+    # Validate token
+    cleanup_expired_tokens()
+    tokens = load_reset_tokens()
+
+    if token not in tokens:
+        return render_template('reset_password.html', error='Invalid or expired reset link. Please request a new one.', token=None)
+
+    token_data = tokens[token]
+    if token_data.get('used'):
+        return render_template('reset_password.html', error='This reset link has already been used.', token=None)
+
+    now = datetime.now().isoformat()
+    if token_data.get('expires', '') < now:
+        return render_template('reset_password.html', error='This reset link has expired. Please request a new one.', token=None)
+
+    footer_cities = get_cities_with_data()
+    return render_template('reset_password.html', token=token, error=None, footer_cities=footer_cities)
+
+
+@app.route('/api/reset-password', methods=['POST'])
+@limiter.limit("10 per minute")
+def api_reset_password():
+    """
+    POST /api/reset-password - Reset password with valid token.
+    Body: { token: string, password: string }
+    """
+    data = request.get_json()
+    if not data or not data.get('token') or not data.get('password'):
+        return jsonify({'error': 'Token and password are required'}), 400
+
+    token = data['token']
+    new_password = data['password']
+
+    # Validate password length
+    if len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+
+    # Validate token
+    cleanup_expired_tokens()
+    tokens = load_reset_tokens()
+
+    if token not in tokens:
+        return jsonify({'error': 'Invalid or expired reset link'}), 400
+
+    token_data = tokens[token]
+    if token_data.get('used'):
+        return jsonify({'error': 'This reset link has already been used'}), 400
+
+    now = datetime.now().isoformat()
+    if token_data.get('expires', '') < now:
+        return jsonify({'error': 'This reset link has expired'}), 400
+
+    email = token_data['email']
+
+    # Update user password
+    users = load_users()
+    user_found = False
+    for u in users:
+        if u['email'].lower() == email.lower():
+            import hashlib
+            u['password_hash'] = hashlib.sha256(new_password.encode()).hexdigest()
+            user_found = True
+            break
+
+    if not user_found:
+        return jsonify({'error': 'User not found'}), 400
+
+    save_users(users)
+
+    # Mark token as used
+    tokens[token]['used'] = True
+    save_reset_tokens(tokens)
+
+    return jsonify({'success': True, 'message': 'Password has been reset. You can now log in.'})
+
+
 @app.route('/get-alerts')
 def get_alerts_page():
     """Render the Get Alerts page."""
