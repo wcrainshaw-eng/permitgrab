@@ -1425,7 +1425,7 @@ footer a:hover { color: white; }
 let allPermits = [];
 let filteredPermits = [];
 let currentPage = 1;
-const perPage = 20;
+const perPage = 50;
 let freePreviewLimit = 5; // Show contact info for first 5 (updated based on user plan)
 let currentUser = null;
 
@@ -1541,8 +1541,17 @@ function debounce(fn, ms) {
 }
 
 function updateResultsCount() {
-  document.getElementById('showing-count').textContent = filteredPermits.length.toLocaleString();
-  document.getElementById('total-count').textContent = allPermits.length.toLocaleString();
+  const start = (currentPage - 1) * perPage + 1;
+  const end = Math.min(currentPage * perPage, filteredPermits.length);
+  const showingEl = document.getElementById('showing-count');
+  const totalEl = document.getElementById('total-count');
+
+  if (filteredPermits.length > perPage) {
+    showingEl.textContent = `${start.toLocaleString()}-${end.toLocaleString()}`;
+  } else {
+    showingEl.textContent = filteredPermits.length.toLocaleString();
+  }
+  totalEl.textContent = allPermits.length.toLocaleString();
 }
 
 // ===========================
@@ -1818,24 +1827,9 @@ function renderPagination() {
 
   if (totalPages <= 1) { pag.innerHTML = ''; return; }
 
-  let html = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>`;
+  let html = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Previous</button>`;
 
-  const startPage = Math.max(1, currentPage - 2);
-  const endPage = Math.min(totalPages, currentPage + 2);
-
-  if (startPage > 1) {
-    html += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
-    if (startPage > 2) html += `<span style="padding: 8px; color: var(--gray-400);">...</span>`;
-  }
-
-  for (let i = startPage; i <= endPage; i++) {
-    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-  }
-
-  if (endPage < totalPages) {
-    if (endPage < totalPages - 1) html += `<span style="padding: 8px; color: var(--gray-400);">...</span>`;
-    html += `<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
-  }
+  html += `<span style="padding: 8px 16px; color: var(--gray-500); font-size: 14px;">Page ${currentPage} of ${totalPages}</span>`;
 
   html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>`;
 
@@ -1847,6 +1841,7 @@ function goToPage(page) {
   if (page < 1 || page > totalPages) return;
   currentPage = page;
   renderPermits();
+  updateResultsCount();
   document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
 }
 

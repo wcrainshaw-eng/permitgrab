@@ -305,7 +305,7 @@ def api_permits():
 
     # Pagination
     page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 20))
+    per_page = int(request.args.get('per_page', 50))
     total = len(permits)
     start = (page - 1) * per_page
     page_permits = permits[start:start + per_page]
