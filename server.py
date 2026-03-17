@@ -2978,6 +2978,15 @@ def run_initial_collection():
 
 
 # ===========================
+# ERROR HANDLERS
+# ===========================
+@app.errorhandler(404)
+def page_not_found(e):
+    """Handle 404 errors with a styled page."""
+    return render_template('404.html'), 404
+
+
+# ===========================
 # MAIN
 # ===========================
 if __name__ == '__main__':
