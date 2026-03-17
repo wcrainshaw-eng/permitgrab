@@ -2480,49 +2480,61 @@ def get_all_cities_info():
 
 
 # Trade classification keywords (moved from config.py for consolidation)
+# Order matters: more specific trades should be checked before General Construction
 TRADE_CATEGORIES = {
-    "Roofing": [
-        "roof", "roofing", "shingle", "membrane", "flashing", "gutter",
-        "soffit", "fascia", "re-roof", "reroof"
-    ],
-    "HVAC": [
-        "hvac", "heating", "cooling", "air condition", "furnace", "boiler",
-        "ductwork", "ventilation", "heat pump", "ac unit", "a/c", "mini split",
-        "thermostat", "refriger"
-    ],
     "Electrical": [
-        "electric", "wiring", "panel", "circuit", "outlet", "lighting",
-        "solar", "photovoltaic", "pv system", "ev charger", "generator",
-        "transformer", "switchgear"
+        "electrical", "wiring", "panel", "circuit", "outlet", "lighting",
+        "transformer", "switchgear", "conduit", "ampere", "amp service",
+        "meter base", "electric service", "electric panel"
     ],
     "Plumbing": [
-        "plumb", "pipe", "sewer", "drain", "water heater", "fixture",
-        "backflow", "septic", "gas line", "water line", "sprinkler"
+        "plumbing", "plumb", "sewer", "drain", "water heater", "water line",
+        "gas line", "backflow", "fixture", "pipe", "sprinkler system",
+        "irrigation", "septic"
     ],
-    "General Construction": [
-        "new building", "new construction", "addition", "alteration",
-        "renovation", "remodel", "tenant improvement", "build out",
-        "commercial build", "residential build", "foundation"
+    "HVAC": [
+        "hvac", "heating", "cooling", "air conditioning", "a/c", "furnace",
+        "ductwork", "heat pump", "boiler", "ventilation", "mini-split",
+        "condensing unit", "mechanical", "ac unit", "thermostat"
     ],
-    "Demolition": [
-        "demolition", "demo", "tear down", "abatement", "asbestos",
-        "hazmat", "deconstruct"
+    "Roofing": [
+        "roof", "roofing", "re-roof", "reroof", "shingle", "membrane",
+        "flashing", "gutter", "soffit", "fascia"
+    ],
+    "Solar": [
+        "solar", "photovoltaic", "pv system", "pv panel", "solar panel",
+        "ev charger", "battery storage"
     ],
     "Interior Renovation": [
-        "interior", "kitchen", "bathroom", "flooring", "drywall",
-        "painting", "cabinet", "countertop", "tile", "finish"
+        "interior renovation", "interior remodel", "kitchen remodel",
+        "bathroom remodel", "bath remodel", "tenant improvement", "t.i.",
+        "finish out", "gut remodel", "buildout", "interior alteration"
     ],
     "Windows & Doors": [
         "window", "door", "glazing", "storefront", "curtain wall",
-        "skylight", "glass"
+        "skylight", "glass replacement"
+    ],
+    "Demolition": [
+        "demo", "demolition", "demolish", "tear down", "abatement",
+        "strip out", "asbestos", "hazmat", "deconstruct"
     ],
     "Structural": [
-        "structural", "beam", "column", "load bearing", "seismic",
-        "retrofit", "reinforc", "steel", "concrete"
+        "structural", "foundation", "footing", "retaining wall", "steel",
+        "concrete pour", "framing", "load-bearing", "beam", "column",
+        "seismic retrofit"
     ],
     "Landscaping & Exterior": [
-        "landscape", "fence", "deck", "patio", "retaining wall",
-        "pool", "spa", "pergola", "awning", "carport", "garage"
+        "landscape", "landscaping", "fence", "deck", "patio", "driveway",
+        "sidewalk", "grading", "pool", "pergola", "exterior", "carport",
+        "garage", "spa"
+    ],
+    "Fire Protection": [
+        "fire alarm", "fire sprinkler", "fire protection", "fire suppression",
+        "smoke detector", "fire escape"
+    ],
+    "General Construction": [
+        "new construction", "addition", "alteration", "repair", "commercial",
+        "residential", "building permit"
     ],
 }
 

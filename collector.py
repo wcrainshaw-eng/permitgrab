@@ -301,17 +301,35 @@ def normalize_permit(raw_record, city_key):
 
 
 def classify_trade(text):
-    """Classify a permit into a trade category based on description text."""
+    """
+    Classify a permit into a trade category based on description text.
+    Uses keyword matching with priority to avoid over-classifying as General Construction.
+    """
     text_lower = text.lower()
     scores = {}
+
+    # Check all trades for keyword matches
     for trade, keywords in TRADE_CATEGORIES.items():
         score = sum(1 for kw in keywords if kw in text_lower)
         if score > 0:
             scores[trade] = score
 
-    if scores:
-        return max(scores, key=scores.get)
-    return "Other / Unclassified"
+    if not scores:
+        return "General Construction"
+
+    # If we have matches, prioritize specific trades over General Construction
+    # Only use General Construction if it's the ONLY match or has significantly higher score
+    specific_matches = {t: s for t, s in scores.items() if t != "General Construction"}
+
+    if specific_matches:
+        # Return the specific trade with the highest score
+        return max(specific_matches, key=specific_matches.get)
+
+    # Only General Construction matched
+    if "General Construction" in scores:
+        return "General Construction"
+
+    return "General Construction"
 
 
 def score_value(cost):
