@@ -505,6 +505,63 @@ body {
   background: var(--gray-100);
 }
 
+/* EXPLORE OTHER CITIES */
+.explore-cities {
+  padding: 60px 32px;
+  background: var(--gray-50);
+}
+.explore-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.explore-cities h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  text-align: center;
+  margin-bottom: 32px;
+}
+.cities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.city-link-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 16px 20px;
+  text-decoration: none;
+  color: var(--gray-700);
+  transition: all .2s;
+}
+.city-link-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(37,99,235,.1);
+}
+.city-link-name {
+  font-weight: 600;
+}
+.city-link-arrow {
+  color: var(--primary);
+  font-size: 18px;
+}
+.view-all-cities {
+  text-align: center;
+  margin-top: 24px;
+}
+.view-all-cities a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.view-all-cities a:hover {
+  text-decoration: underline;
+}
+
 /* FOOTER */
 .footer {
   background: var(--gray-900);
@@ -818,6 +875,26 @@ body {
   <h2>Start Finding {{ city_name }} Leads Today</h2>
   <p>Join thousands of contractors using PermitGrab to find new business. Browse permits free or upgrade for contact info.</p>
   <a href="/?city={{ city_name }}" class="btn-cta">Browse {{ city_name }} Permits Free</a>
+</section>
+
+<!-- EXPLORE OTHER CITIES -->
+<section class="explore-cities">
+  <div class="explore-inner">
+    <h2>Explore Permits in Other Cities</h2>
+    <div class="cities-grid">
+      {% for city in other_cities[:12] %}
+      <a href="/permits/{{ city.slug }}" class="city-link-card">
+        <span class="city-link-name">{{ city.name }}</span>
+        <span class="city-link-arrow">&rarr;</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% if other_cities|length > 12 %}
+    <div class="view-all-cities">
+      <a href="/">View All Cities &rarr;</a>
+    </div>
+    {% endif %}
+  </div>
 </section>
 
 <!-- FOOTER -->
