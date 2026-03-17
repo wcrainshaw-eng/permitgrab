@@ -44,125 +44,94 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 def score_lead(permit):
     """
-    Calculate lead score (40-99) based on value, recency, contacts, status, and project type.
+    Calculate lead score (40-99) based on value, recency, contacts, status, trade, and jitter.
     Returns score and quality tier (hot/warm/cool).
 
-    Target distribution:
-    - ~10% scored 90-99 (hot leads)
-    - ~20% scored 75-89 (warm leads)
-    - ~40% scored 55-74 (moderate leads)
-    - ~30% scored 40-54 (cool leads)
-
-    Raw scoring breakdown (max 59 pts, then add base 40):
-    - Value (0-20 pts): Based on estimated cost
-    - Recency (0-15 pts): Based on filing date
-    - Contact Info (0-12 pts): Phone, email, owner name
-    - Status (0-8 pts): Permit status/stage
-    - Project Type (0-4 pts): Type bonus
+    Formula designed to produce a wide spread across the 40-99 range.
     """
-    raw_score = 0
+    score = 40  # Base score - everyone starts at 40
 
-    # VALUE COMPONENT (0-20 points) - wider spread
+    # 1. PROJECT VALUE (0-20 points)
     value = permit.get('estimated_cost', 0) or 0
-    if value >= 5000000:
-        raw_score += 20  # $5M+
-    elif value >= 2000000:
-        raw_score += 17  # $2M-$5M
-    elif value >= 1000000:
-        raw_score += 14  # $1M-$2M
-    elif value >= 500000:
-        raw_score += 11  # $500K-$1M
-    elif value >= 250000:
-        raw_score += 8   # $250K-$500K
-    elif value >= 100000:
-        raw_score += 5   # $100K-$250K
-    elif value >= 50000:
-        raw_score += 3   # $50K-$100K
-    elif value > 0:
-        raw_score += 1   # $0-$50K
-    else:
-        raw_score += 4   # Unknown value (neutral)
+    if value >= 1_000_000:
+        score += 20
+    elif value >= 500_000:
+        score += 16
+    elif value >= 250_000:
+        score += 12
+    elif value >= 100_000:
+        score += 8
+    elif value >= 50_000:
+        score += 5
+    elif value >= 10_000:
+        score += 2
+    # else: 0 points
 
-    # RECENCY COMPONENT (0-15 points) - more granular
+    # 2. RECENCY (0-18 points)
     filing_date = permit.get('filing_date', '')
     if filing_date:
         try:
-            filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
+            filed = datetime.strptime(str(filing_date)[:10], '%Y-%m-%d')
             days_ago = (datetime.now() - filed).days
-            if days_ago <= 0:
-                raw_score += 15  # Filed today
-            elif days_ago <= 1:
-                raw_score += 14  # Yesterday
+            if days_ago <= 1:
+                score += 18
             elif days_ago <= 3:
-                raw_score += 12  # 2-3 days
-            elif days_ago <= 5:
-                raw_score += 10  # 4-5 days
+                score += 15
             elif days_ago <= 7:
-                raw_score += 8   # 6-7 days
+                score += 12
             elif days_ago <= 14:
-                raw_score += 5   # 1-2 weeks
-            elif days_ago <= 21:
-                raw_score += 3   # 2-3 weeks
+                score += 8
             elif days_ago <= 30:
-                raw_score += 1   # 3-4 weeks
-            else:
-                raw_score += 0   # 1+ month ago
+                score += 4
+            elif days_ago <= 60:
+                score += 2
+            # else: 0 points (older than 60 days)
         except (ValueError, TypeError):
-            raw_score += 3  # Unknown date (neutral)
-    else:
-        raw_score += 3  # No date
+            score += 5  # Unknown date
 
-    # CONTACT INFO COMPONENT (0-12 points)
-    if permit.get('contact_phone'):
-        raw_score += 6   # Has phone number (most valuable)
-    if permit.get('contact_email'):
-        raw_score += 3   # Has email
-    if permit.get('contact_name'):
-        raw_score += 3   # Has owner/company name
-
-    # STATUS COMPONENT (0-8 points)
+    # 3. PERMIT STATUS (0-10 points)
     status = (permit.get('status', '') or '').lower()
-    if any(kw in status for kw in ['issued', 'approved', 'active', 'permitted']):
-        raw_score += 8   # Ready to start - highest intent
-    elif any(kw in status for kw in ['under review', 'plan check', 'reviewing']):
-        raw_score += 6   # Under review
-    elif any(kw in status for kw in ['submitted', 'filed', 'application']):
-        raw_score += 4   # Submitted/Filed
-    elif any(kw in status for kw in ['in review', 'pending']):
-        raw_score += 2   # In review/Pending
-    elif any(kw in status for kw in ['expired', 'voided', 'denied', 'cancelled']):
-        raw_score += 0   # Expired/Voided - no value
+    if any(kw in status for kw in ['active', 'issued', 'approved']):
+        score += 10
+    elif any(kw in status for kw in ['permitted', 'filed', 'pending']):
+        score += 6
+    elif any(kw in status for kw in ['completed', 'closed']):
+        score += 2
     else:
-        raw_score += 3   # Unknown status (neutral)
+        score += 4  # Unknown status
 
-    # PROJECT TYPE BONUS (0-4 points)
-    trade = permit.get('trade_category', '')
-    desc = (permit.get('description', '') or '').lower()
-    work_type = (permit.get('work_type', '') or '').lower()
-    combined_text = f"{trade} {desc} {work_type}".lower()
+    # 4. HAS CONTACT INFO (0-6 points)
+    has_phone = bool(permit.get('contact_phone'))
+    has_name = bool(permit.get('contact_name') or permit.get('owner_name'))
+    if has_phone and has_name:
+        score += 6
+    elif has_phone or has_name:
+        score += 3
 
-    if 'new construction' in combined_text or trade == 'New Construction':
-        raw_score += 4   # New Construction
-    elif value >= 500000 and any(kw in combined_text for kw in ['renovation', 'remodel', 'rehab']):
-        raw_score += 4   # Major Renovation (>$500K)
-    elif 'tenant improvement' in combined_text or 'tenant build' in combined_text:
-        raw_score += 3   # Tenant Improvement
-    elif 'addition' in combined_text or trade == 'Addition':
-        raw_score += 2   # Addition
-    elif any(kw in combined_text for kw in ['renovation', 'remodel', 'interior']):
-        raw_score += 1   # Minor Renovation
+    # 5. TRADE TYPE VALUE (0-6 points)
+    trade = (permit.get('trade_category', '') or permit.get('permit_type', '') or '').lower()
+    high_value_trades = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection', 'structural']
+    mid_value_trades = ['roofing', 'interior renovation', 'general construction', 'demolition', 'addition']
+    if any(t in trade for t in high_value_trades):
+        score += 6
+    elif any(t in trade for t in mid_value_trades):
+        score += 4
     else:
-        raw_score += 0   # Other
+        score += 2
 
-    # Final score: base 40 + raw score (0-59), capped at 99
-    # This guarantees a 40-99 range
-    final_score = 40 + min(raw_score, 59)
-    final_score = min(final_score, 99)
+    # 6. JITTER for visual variety (0-9 points based on permit ID hash)
+    # This prevents identical-looking permits from having the same score
+    permit_id = str(permit.get('id') or permit.get('permit_number') or '')
+    jitter = hash(permit_id) % 10
+    score += jitter
+
+    # Clamp to 40-99 range
+    final_score = max(40, min(99, score))
 
     # Determine quality tier
-    if final_score >= 90:
+    if final_score >= 85:
         quality = 'hot'
-    elif final_score >= 75:
+    elif final_score >= 70:
         quality = 'warm'
     else:
         quality = 'standard'
