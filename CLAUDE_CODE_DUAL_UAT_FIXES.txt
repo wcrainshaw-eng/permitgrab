@@ -1,0 +1,261 @@
+PERMITGRAB — DUAL UAT FIX SPEC
+================================
+Generated: March 17, 2026
+Source: Dual-perspective UAT (Pro user + Anonymous visitor)
+Priority: P0 fixes FIRST, then P1. Do not skip ahead.
+
+CONTEXT:
+- Flask app deployed on Render at permitgrab.com
+- Stripe integration for $149/mo Pro tier (prod_U9zipubLJRSTPP)
+- Freemium model: free users see permit listings but contact info, exports, and save features should be GATED behind paywall
+- Pro users should have full access to everything including /early-intel and /analytics
+- Admin can upgrade users via /admin panel
+- 85 metro areas live
+
+================================================================================
+P0 — PART 1: IMPLEMENT FREEMIUM CONTACT INFO GATING (CRITICAL — REVENUE BLOCKER)
+================================================================================
+
+THE PROBLEM:
+Anonymous/free users currently see ALL contact information (phone numbers, contact
+names), and have full access to Save Lead, Export, Export CSV, and Save Search
+buttons. The entire premium value proposition is exposed for free. No one will
+pay $149/mo when everything is already accessible without an account.
+
+REQUIREMENTS:
+
+1. For anonymous visitors (not logged in) AND free-tier users:
+   - Phone numbers on permit cards must be BLURRED or replaced with "★★★-★★★-★★★★"
+     with an overlay/tooltip saying "Upgrade to Pro for contact details"
+   - Contact names must be BLURRED or replaced with "Upgrade to unlock"
+   - "Save Lead" button must be DISABLED or replaced with an upgrade CTA
+     that links to /pricing or Stripe checkout
+   - "Export" button must be DISABLED or replaced with upgrade CTA
+   - "CSV Export" button must be DISABLED or replaced with upgrade CTA
+   - "Save Search" button must be DISABLED or replaced with upgrade CTA
+
+2. The gating check must use a single, centralized function like:
+   def is_pro_user():
+       if not current_user.is_authenticated:
+           return False
+       # Check BOTH admin-set plan AND Stripe subscription status
+       return current_user.plan == 'pro' or has_active_stripe_subscription(current_user)
+
+3. On the frontend, gated elements should show a consistent upgrade CTA style:
+   - Use a lock icon or blur effect
+   - Link to /pricing
+   - Hover text: "Pro feature — upgrade to unlock"
+
+4. Make sure the gating works in ALL templates that render permit data:
+   - Main permits listing page
+   - City-specific permit pages
+   - Search results
+   - Any AJAX/API endpoints that return contact data — these must also check
+     auth status and strip contact info from the JSON response for free users
+
+5. Test by visiting permit pages in incognito — you should NOT see any phone
+   numbers or contact names. You should see blur/placeholder + upgrade CTAs.
+
+VERIFICATION:
+- Visit /permits or any city page in incognito → phone numbers hidden, names hidden
+- Click Save Lead as anonymous → get upgrade prompt, NOT a save
+- Click Export/CSV as anonymous → get upgrade prompt, NOT a download
+- Log in as Pro user → all contact info visible, all buttons functional
+
+
+================================================================================
+P0 — PART 2: FIX PRO USER PLAN DETECTION ON /early-intel AND /analytics
+================================================================================
+
+THE PROBLEM:
+Users with Pro accounts (set via /admin) visit /early-intel and see "Upgrade to Pro"
+gate. Same for /analytics — shows "Analytics is a Pro Feature" even though the user
+IS Pro. The plan check on these routes is broken.
+
+REQUIREMENTS:
+
+1. Find the route handlers for /early-intel and /analytics
+
+2. The plan check likely only looks at Stripe subscription status and misses
+   admin-set plan upgrades. Fix the check to use the SAME centralized is_pro_user()
+   function from Part 1.
+
+3. The check should recognize a user as Pro if ANY of these are true:
+   - user.plan == 'pro' (admin-set)
+   - user.plan == 'professional' (alternate naming)
+   - User has an active Stripe subscription to prod_U9zipubLJRSTPP
+   - User has stripe_subscription_status == 'active'
+
+4. When a Pro user visits /early-intel or /analytics, they should see the
+   actual feature content, NOT the upgrade gate.
+
+5. Also check: are there any other routes that have similar Pro-gating logic
+   that might have the same bug? Fix them all.
+
+VERIFICATION:
+- Log in as wcrainshaw@gmail.com (Pro via admin) → /early-intel shows content
+- Log in as same user → /analytics shows content
+- Visit both routes logged out → upgrade gate appears (this is correct behavior)
+
+
+================================================================================
+P0 — PART 3: ADD NAV/FOOTER TO /early-intel AND /analytics PAGES
+================================================================================
+
+THE PROBLEM:
+Both /early-intel and /analytics render without the unified nav bar or footer.
+They feel like orphaned stub pages. A user who lands on the upgrade gate has
+no way to navigate back to the rest of the site except the browser back button.
+
+REQUIREMENTS:
+
+1. Both pages must use the same base template / layout that includes:
+   - The unified navigation bar (same as /permits, /contractors, /pricing, etc.)
+   - The unified footer
+
+2. If these pages use their own standalone templates, refactor them to extend
+   the base layout template (likely base.html or layout.html).
+
+3. The nav should show the correct state:
+   - Logged in: show user name, logout, nav links
+   - Logged out: show Login/Sign Up buttons, nav links
+
+VERIFICATION:
+- Visit /early-intel → nav bar at top, footer at bottom
+- Visit /analytics → nav bar at top, footer at bottom
+- Nav links all work from these pages
+
+
+================================================================================
+P0 — PART 4: FIX INCONSISTENT CONTACT INFO DISPLAY FOR PRO USERS
+================================================================================
+
+THE PROBLEM:
+When logged in as a Pro user, SOME permit cards show full contact info while
+OTHERS show "Upgrade for contact details." The gating logic is inconsistent
+across different permit card renders.
+
+REQUIREMENTS:
+
+1. Audit every template/component that renders a permit card or permit detail.
+   There may be multiple templates:
+   - Permit list card (compact view)
+   - Permit detail view
+   - Search result card
+   - AJAX-loaded permit cards
+
+2. ALL of them must use the same is_pro_user() check from Part 1.
+
+3. If some permits genuinely don't have contact data (null/empty in the database),
+   display "No contact info available" — NOT "Upgrade for contact details."
+   The upgrade message should ONLY appear when contact data EXISTS but the user
+   doesn't have access.
+
+4. Ensure the Jinja/template context always includes the user's plan status
+   so the template can make the right decision.
+
+VERIFICATION:
+- Log in as Pro → browse multiple cities → ALL permits with contact data show it
+- No Pro user should ever see "Upgrade for contact details"
+- Permits with no contact data show "No contact info available"
+
+
+================================================================================
+P1 — PART 5: WIDEN LEAD SCORING ALGORITHM TO 40-99 RANGE
+================================================================================
+
+THE PROBLEM:
+Lead scores currently cluster between 64-75 (11-point spread). The spec calls
+for a 40-99 range. A contractor looking at permits all scored 64-75 cannot
+meaningfully prioritize opportunities.
+
+REQUIREMENTS:
+
+1. Find the lead scoring function (likely in a utils or scoring module).
+
+2. The scoring algorithm needs to produce a wider distribution. Approaches:
+   - Normalize the raw score components to use their full ranges
+   - Apply a linear rescaling: new_score = 40 + (raw_score - min) / (max - min) * 59
+   - Or rework the weights so that different permit characteristics actually
+     produce meaningfully different scores
+
+3. Target distribution for a typical city's permits:
+   - ~10% of permits scored 90-99 (hot leads)
+   - ~20% scored 75-89 (warm leads)
+   - ~40% scored 55-74 (moderate leads)
+   - ~30% scored 40-54 (cool leads)
+
+4. Scoring factors that should differentiate permits:
+   - Permit value/cost (higher = hotter)
+   - Recency (newer = hotter)
+   - Permit type (new construction > renovation > repair)
+   - Contact info completeness (has phone + name = hotter)
+   - Project scope indicators in description
+
+5. Do NOT just randomize scores — they should be deterministic and meaningful.
+
+VERIFICATION:
+- Load a city with 20+ permits → scores should span at least 30 points
+- Sort by score → highest scores should correlate with higher-value, newer permits
+- Scores should be deterministic (same permit = same score on reload)
+
+
+================================================================================
+P1 — PART 6: UNIFIED PLAN CHECK UTILITY (TECHNICAL DEBT CLEANUP)
+================================================================================
+
+THE PROBLEM:
+The codebase likely has multiple places checking user plan status with slightly
+different logic — which is what caused the inconsistencies found in UAT.
+
+REQUIREMENTS:
+
+1. Create a single utility function (e.g., in utils.py or auth.py):
+
+   def get_user_plan(user):
+       """Returns 'pro', 'free', or 'anonymous'"""
+       if not user or not user.is_authenticated:
+           return 'anonymous'
+       if user.plan in ('pro', 'professional'):
+           return 'pro'
+       if has_active_stripe_subscription(user):
+           return 'pro'
+       return 'free'
+
+   def is_pro(user):
+       return get_user_plan(user) == 'pro'
+
+2. Search the entire codebase for any plan checks:
+   - grep for: user.plan, .plan ==, plan_type, subscription, is_pro, pro_check
+   - Replace ALL of them with calls to the centralized function
+
+3. Add the user's plan status to the template context globally (e.g., via a
+   context processor or before_request hook) so templates can use:
+   {% if user_plan == 'pro' %}
+
+4. Remove any hardcoded plan checks in templates like:
+   {% if current_user.plan == 'pro' %}
+   Replace with:
+   {% if is_pro %}
+
+VERIFICATION:
+- grep -r "\.plan ==" across all Python and template files → should only find
+  the centralized utility function
+- All gating behavior still works correctly after refactor
+
+
+================================================================================
+EXECUTION ORDER
+================================================================================
+
+1. Do Part 6 FIRST (centralized utility) — it makes all other parts cleaner
+2. Then Part 1 (freemium gating) — uses the new utility
+3. Then Part 2 (Pro detection fix on /early-intel, /analytics)
+4. Then Part 3 (nav/footer on those pages)
+5. Then Part 4 (inconsistent contact display)
+6. Then Part 5 (lead scoring)
+
+After each part, commit with a descriptive message. Push to main after all parts
+are complete.
+
+Total estimated effort: 8-12 hours focused development.

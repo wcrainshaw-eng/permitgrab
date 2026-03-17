@@ -1,0 +1,1243 @@
+PERMITGRAB CUSTOM ANALYTICS — PASTE THIS INTO CLAUDE CODE:
+=============================================================
+Run this AFTER the UAT fixes (CLAUDE_CODE_UAT_FIXES.txt) are complete.
+This builds the custom analytics layer that GA4 can't provide — per-user
+behavior tracking, business metrics, and an admin dashboard.
+
+Read ~/Documents/PermitGrab/CLAUDE_CODE_REFERENCE.txt for full context.
+
+Work through ALL parts in order. Commit after each part.
+
+
+========================================================================================
+PART 1: CREATE THE USER EVENTS TABLE
+========================================================================================
+
+Add a user_events table to the database. This is the foundation everything
+else builds on. Every meaningful user action gets logged here.
+
+Schema (use whatever ORM/migration system the project uses — SQLAlchemy,
+raw SQL, Alembic, etc.):
+
+    CREATE TABLE user_events (
+        id              SERIAL PRIMARY KEY,
+        user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- nullable for anonymous visitors
+        session_id      VARCHAR(64) NOT NULL,     -- generated per browser session (UUID)
+        event_type      VARCHAR(50) NOT NULL,      -- e.g. 'page_view', 'signup', 'lead_save'
+        event_data      JSONB DEFAULT '{}',        -- flexible payload per event type
+        page            VARCHAR(255),              -- URL path, e.g. '/permits/austin'
+        city_filter     VARCHAR(100),              -- active city filter at time of event (if any)
+        trade_filter    VARCHAR(100),              -- active trade filter at time of event (if any)
+        referrer        VARCHAR(500),              -- HTTP referer header
+        user_agent      VARCHAR(500),              -- browser user agent
+        ip_hash         VARCHAR(64),               -- SHA-256 hash of IP (privacy-safe, no raw IPs)
+        created_at      TIMESTAMP DEFAULT NOW()
+    );
+
+Add indexes for the queries we'll run most:
+
+    CREATE INDEX idx_user_events_type ON user_events(event_type);
+    CREATE INDEX idx_user_events_user ON user_events(user_id);
+    CREATE INDEX idx_user_events_created ON user_events(created_at);
+    CREATE INDEX idx_user_events_session ON user_events(session_id);
+    CREATE INDEX idx_user_events_type_created ON user_events(event_type, created_at);
+
+If the project uses SQLAlchemy, also create the corresponding model class.
+
+Test: Run the migration. Verify the table exists with \d user_events in psql
+or by checking the ORM metadata.
+
+
+========================================================================================
+PART 2: BUILD THE EVENT LOGGING UTILITY
+========================================================================================
+
+Create a utility module (e.g., app/analytics.py or utils/analytics.py) with
+a single function that every route can call:
+
+    def track_event(event_type, event_data=None, page=None, city_filter=None,
+                    trade_filter=None):
+        """
+        Log a user event. Call this from any route handler.
+        Automatically captures: user_id (from session/auth), session_id,
+        referrer, user_agent, ip_hash.
+        """
+
+Implementation details:
+  - Get user_id from the Flask session/login context (None if not logged in)
+  - Get or create session_id: check for a 'session_id' cookie. If not present,
+    generate a UUID and set it as a cookie (httponly, 30-day expiry). This
+    tracks anonymous visitors across page views within a session.
+  - Hash the IP: hashlib.sha256(request.remote_addr.encode()).hexdigest()
+  - Get referrer from request.referrer
+  - Get user_agent from request.headers.get('User-Agent')
+  - Insert into user_events table
+  - This function should NEVER raise an exception that breaks the page.
+    Wrap the entire body in try/except and log errors silently. Analytics
+    should never degrade the user experience.
+
+Also create a helper for the session cookie:
+
+    @app.before_request
+    def ensure_session_id():
+        if 'analytics_session_id' not in session:
+            session['analytics_session_id'] = str(uuid.uuid4())
+
+Test: Import track_event in a route, call it, verify a row appears in
+user_events.
+
+
+========================================================================================
+PART 3: INSTRUMENT ALL ROUTES WITH PAGE VIEW TRACKING
+========================================================================================
+
+Add track_event('page_view', page=request.path) to every route handler.
+
+The cleanest way is a @app.after_request decorator or middleware:
+
+    @app.after_request
+    def track_page_view(response):
+        if response.status_code < 400 and request.endpoint:
+            # Don't track static files, API calls, or the health endpoint
+            skip_prefixes = ('/static', '/api/', '/health')
+            if not any(request.path.startswith(p) for p in skip_prefixes):
+                try:
+                    track_event(
+                        event_type='page_view',
+                        page=request.path,
+                        event_data={
+                            'status_code': response.status_code,
+                            'method': request.method
+                        }
+                    )
+                except Exception:
+                    pass  # Never break the response
+        return response
+
+This gives you automatic page view tracking on every route without touching
+individual handlers.
+
+Test: Visit 5 different pages. Check user_events table — should have 5
+page_view rows with correct paths.
+
+
+========================================================================================
+PART 4: INSTRUMENT BUSINESS-CRITICAL EVENTS
+========================================================================================
+
+Add track_event() calls to these specific actions. These are the events
+that actually matter for understanding conversion and retention.
+
+SIGNUP FUNNEL:
+  In the /signup POST handler (after successful account creation):
+    track_event('signup', event_data={
+        'method': 'email'  # or 'google' if OAuth exists
+    })
+
+  In the /login POST handler (after successful login):
+    track_event('login')
+
+  In the onboarding completion handler (after city/trade selection):
+    track_event('onboarding_complete', event_data={
+        'city': selected_city,
+        'trade': selected_trade
+    })
+
+ENGAGEMENT:
+  When a user applies filters on the dashboard:
+    track_event('filter_applied', event_data={
+        'city': city_value,
+        'trade': trade_value,
+        'min_value': min_val,
+        'max_value': max_val,
+        'status': status_val
+    }, city_filter=city_value, trade_filter=trade_value)
+
+  When a user clicks on a permit card to expand/view details:
+    track_event('permit_viewed', event_data={
+        'permit_id': permit_id,
+        'permit_value': value,
+        'permit_trade': trade,
+        'permit_city': city
+    })
+
+  When a user clicks "Upgrade for contact details" (the upsell prompt):
+    track_event('upgrade_prompt_click', event_data={
+        'permit_id': permit_id,
+        'source': 'permit_card'  # or 'dashboard_banner', etc.
+    })
+
+  When a user saves a lead:
+    track_event('lead_save', event_data={
+        'permit_id': permit_id,
+        'permit_value': value
+    })
+
+  When a user exports CSV:
+    track_event('csv_export', event_data={
+        'row_count': num_rows,
+        'filters': current_filters
+    })
+
+  When a user signs up for alerts (/get-alerts POST):
+    track_event('alert_signup', event_data={
+        'city': selected_city,
+        'trade': selected_trade,
+        'email': email  # only if you want — could omit for privacy
+    })
+
+  When a user uses search/pagination:
+    track_event('search', event_data={
+        'query': search_query,
+        'page': page_number,
+        'results_count': num_results
+    })
+
+REVENUE:
+  When Stripe checkout is initiated:
+    track_event('checkout_started', event_data={
+        'plan': 'professional',
+        'billing': 'monthly'  # or 'annual'
+    })
+
+  In the Stripe webhook handler (after successful payment):
+    track_event('payment_success', event_data={
+        'plan': 'professional',
+        'amount': 14900,  # cents
+        'stripe_customer_id': customer_id
+    })
+
+  In the Stripe webhook handler (subscription cancelled):
+    track_event('subscription_cancelled', event_data={
+        'reason': cancellation_reason  # if available
+    })
+
+Test: Perform each action manually and verify the corresponding event
+appears in user_events with correct event_data.
+
+
+========================================================================================
+PART 5: BUILD THE ADMIN ANALYTICS DASHBOARD
+========================================================================================
+
+Create a password-protected route: /admin/analytics
+
+AUTHENTICATION:
+  - Protect with a simple check: only allow if the logged-in user's email
+    matches an admin list (e.g., env var ADMIN_EMAILS="wcrainshaw@gmail.com")
+  - If not authenticated as admin, return 403
+  - Do NOT build a full admin auth system — just check the session user
+
+DASHBOARD LAYOUT:
+  Use the same base template as the rest of the site. Dark nav bar, clean
+  white content area.
+
+SECTION 1 — KEY METRICS (top row, 4 cards):
+
+  Card 1: "Visitors Today"
+    SELECT COUNT(DISTINCT session_id)
+    FROM user_events
+    WHERE event_type = 'page_view'
+    AND created_at >= CURRENT_DATE
+
+  Card 2: "Signups This Week"
+    SELECT COUNT(*)
+    FROM user_events
+    WHERE event_type = 'signup'
+    AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+
+  Card 3: "Active Users (7d)"
+    SELECT COUNT(DISTINCT user_id)
+    FROM user_events
+    WHERE user_id IS NOT NULL
+    AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+
+  Card 4: "Trial Starts"
+    SELECT COUNT(*)
+    FROM user_events
+    WHERE event_type = 'checkout_started'
+    AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+
+SECTION 2 — TRAFFIC (line chart, last 30 days):
+
+  Daily unique visitors (by session_id) and daily page views.
+  X-axis: date. Two lines: visitors and page views.
+
+  Use Chart.js loaded from CDN for the chart. Render it in a <canvas> element.
+
+  Query:
+    SELECT DATE(created_at) as day,
+           COUNT(*) as page_views,
+           COUNT(DISTINCT session_id) as visitors
+    FROM user_events
+    WHERE event_type = 'page_view'
+    AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY DATE(created_at)
+    ORDER BY day
+
+SECTION 3 — TOP PAGES (table, last 7 days):
+
+  | Page               | Views | Unique Visitors |
+  |--------------------|-------|-----------------|
+  | /                  | 1,234 | 567             |
+  | /permits/austin    | 456   | 234             |
+  | /pricing           | 234   | 189             |
+  | ...                |       |                 |
+
+  Query:
+    SELECT page,
+           COUNT(*) as views,
+           COUNT(DISTINCT session_id) as unique_visitors
+    FROM user_events
+    WHERE event_type = 'page_view'
+    AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+    GROUP BY page
+    ORDER BY views DESC
+    LIMIT 20
+
+SECTION 4 — CONVERSION FUNNEL (horizontal funnel visualization):
+
+  Step 1: Visitors (unique sessions, last 30 days)
+  Step 2: Signup Page Viewed (page_view where page='/signup')
+  Step 3: Signups Completed (event_type='signup')
+  Step 4: Onboarding Completed (event_type='onboarding_complete')
+  Step 5: Checkout Started (event_type='checkout_started')
+  Step 6: Payment Success (event_type='payment_success')
+
+  Show each step as a colored bar with the count and % conversion from
+  previous step. This is the single most important view — it tells you
+  exactly where users are dropping off.
+
+  Visual: horizontal bars getting progressively narrower, like a funnel.
+  Each bar shows: "Signups: 45 (12% of visitors)" etc.
+
+SECTION 5 — ENGAGEMENT TABLE (last 7 days):
+
+  | Event Type          | Count | Unique Users |
+  |---------------------|-------|--------------|
+  | filter_applied      | 2,345 | 456          |
+  | permit_viewed       | 1,234 | 345          |
+  | lead_save           | 89    | 34           |
+  | csv_export          | 23    | 12           |
+  | upgrade_prompt_click| 156   | 89           |
+  | alert_signup        | 45    | 45           |
+
+  Query:
+    SELECT event_type,
+           COUNT(*) as total,
+           COUNT(DISTINCT COALESCE(user_id::text, session_id)) as unique_users
+    FROM user_events
+    WHERE event_type NOT IN ('page_view')
+    AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+    GROUP BY event_type
+    ORDER BY total DESC
+
+SECTION 6 — TOP CITIES BY ENGAGEMENT (last 30 days):
+
+  | City      | Page Views | Filter Uses | Leads Saved | Alerts |
+  |-----------|-----------|-------------|-------------|--------|
+  | Austin    | 456       | 234         | 12          | 8      |
+  | New York  | 389       | 198         | 9           | 6      |
+
+  Query: Combine page_view data from /permits/<city> pages with
+  filter_applied events where city_filter is set.
+
+SECTION 7 — RECENT SIGNUPS (last 10):
+
+  | User       | Signed Up     | Onboarded? | City    | Trade       | Events (7d) |
+  |------------|---------------|------------|---------|-------------|-------------|
+  | user@...   | Mar 17, 10am  | Yes        | Austin  | Electrical  | 34          |
+
+  This helps you see: are new users actually engaging after signup?
+
+  Query: Join users table with user_events to get event counts per user.
+
+SECTION 8 — CHURN RISK (users who haven't logged in recently):
+
+  | User       | Last Active   | Days Inactive | Total Events | Plan     |
+  |------------|---------------|---------------|-------------|----------|
+  | user@...   | Mar 3         | 14            | 156         | Pro      |
+
+  Query:
+    SELECT u.email,
+           MAX(ue.created_at) as last_active,
+           COUNT(ue.id) as total_events
+    FROM users u
+    LEFT JOIN user_events ue ON u.id = ue.user_id
+    WHERE u.subscription_status = 'active'  -- adjust to your schema
+    GROUP BY u.id, u.email
+    HAVING MAX(ue.created_at) < CURRENT_DATE - INTERVAL '7 days'
+    ORDER BY MAX(ue.created_at) ASC
+
+Test: Visit /admin/analytics while logged in as wcrainshaw@gmail.com.
+Verify all sections render. Generate some test events by browsing the site
+first, then check that the dashboard reflects them.
+
+
+========================================================================================
+PART 6: SENDGRID WEBHOOK TRACKING (email engagement)
+========================================================================================
+
+If alerts are sent via SendGrid, set up SendGrid Event Webhooks to track
+opens and clicks. This tells you whether your daily alert emails are
+actually being read.
+
+Step A — Create a webhook endpoint:
+  POST /api/webhooks/sendgrid
+
+  SendGrid will POST an array of event objects. Parse and log them:
+
+    @app.route('/api/webhooks/sendgrid', methods=['POST'])
+    def sendgrid_webhook():
+        events = request.get_json()
+        for event in events:
+            # Map SendGrid event to our event types
+            sg_type = event.get('event')  # 'delivered', 'open', 'click', 'bounce', etc.
+            email = event.get('email')
+
+            # Find user by email (if exists)
+            user = User.query.filter_by(email=email).first()
+
+            track_event(
+                event_type=f'email_{sg_type}',  # email_delivered, email_open, email_click
+                event_data={
+                    'email': email,
+                    'subject': event.get('subject', ''),
+                    'url': event.get('url', ''),           # for click events
+                    'sg_event_id': event.get('sg_event_id'),
+                    'sg_message_id': event.get('sg_message_id')
+                },
+                user_id_override=user.id if user else None
+            )
+        return '', 200
+
+Step B — In SendGrid dashboard, configure the Event Webhook URL to:
+  https://permitgrab.com/api/webhooks/sendgrid
+
+  Enable events: Delivered, Opened, Clicked, Bounced, Unsubscribed
+
+  (Leave a comment in the code noting that Wes needs to configure this
+  in the SendGrid dashboard.)
+
+Step C — Add an "Email Performance" section to the admin dashboard:
+
+  | Metric           | Last 7 Days | Last 30 Days |
+  |------------------|-------------|-------------- |
+  | Emails Sent      | 234         | 890           |
+  | Open Rate        | 45%         | 42%           |
+  | Click Rate       | 12%         | 10%           |
+  | Bounce Rate      | 2%          | 2.5%          |
+  | Unsubscribe Rate | 0.5%        | 0.8%          |
+
+Test: Send a test alert email, open it, click a link. Verify the webhook
+fires and events appear in user_events.
+
+
+========================================================================================
+PART 7: UTM PARAMETER TRACKING
+========================================================================================
+
+When users arrive from external links (Google Ads, social media, email
+campaigns), UTM parameters tell you which source drove the traffic.
+
+Step A — Capture UTMs on first page view:
+
+    @app.before_request
+    def capture_utm_params():
+        utm_params = {}
+        for key in ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']:
+            val = request.args.get(key)
+            if val:
+                utm_params[key] = val
+        if utm_params:
+            session['utm_params'] = utm_params
+
+Step B — Include UTMs in the signup event:
+
+    When track_event('signup') is called, include session.get('utm_params')
+    in the event_data. This lets you trace: this user signed up because of
+    [this Google Ad / this blog post / this email campaign].
+
+Step C — Add a "Traffic Sources" section to the admin dashboard:
+
+  | Source         | Medium  | Visitors | Signups | Conversion |
+  |----------------|---------|----------|---------|------------|
+  | google         | organic | 567      | 23      | 4.1%       |
+  | google         | cpc     | 123      | 8       | 6.5%       |
+  | linkedin       | social  | 45       | 2       | 4.4%       |
+  | (direct)       | (none)  | 890      | 12      | 1.3%       |
+
+  For visitors without UTMs, use the HTTP referrer to classify:
+    - Referrer contains "google" → source=google, medium=organic
+    - Referrer contains "bing" → source=bing, medium=organic
+    - Referrer contains "linkedin" → source=linkedin, medium=social
+    - No referrer → source=direct, medium=none
+
+Test: Visit the site with ?utm_source=test&utm_medium=test appended to
+the URL. Sign up. Verify the UTM data appears in the signup event_data.
+
+
+========================================================================================
+PART 8: WEEKLY METRICS EMAIL TO ADMIN
+========================================================================================
+
+Set up a weekly summary email sent every Monday at 8am to the admin email.
+
+Content of the email (plain text or simple HTML):
+
+    Subject: "PermitGrab Weekly Report — Mar 10-17, 2026"
+
+    VISITORS:     1,234 (↑12% vs prior week)
+    SIGNUPS:      23    (↑8%)
+    ACTIVE USERS: 89    (↓3%)
+    TRIALS:       4     (↑100%)
+    REVENUE:      $596  (4 active subscriptions)
+
+    TOP PAGES:
+    1. /permits/austin — 456 views
+    2. / — 389 views
+    3. /pricing — 234 views
+
+    FUNNEL:
+    Visitors → Signup: 1.9%
+    Signup → Onboarding: 78%
+    Onboarding → Trial: 17%
+    Trial → Paid: (not enough data)
+
+    CHURN RISK:
+    2 paid users inactive for 7+ days
+
+Use the existing SendGrid integration to send this email. Set up a
+scheduled task (cron, APScheduler, Celery Beat, or Render Cron Job):
+
+  Schedule: Every Monday at 8:00 AM
+  Task: Query user_events for the prior 7 days, format the email, send via SendGrid
+
+If using Render, you can add a cron job in render.yaml:
+    - type: cron
+      name: weekly-metrics
+      schedule: "0 8 * * 1"
+      buildCommand: pip install -r requirements.txt
+      startCommand: python send_weekly_report.py
+
+Create the send_weekly_report.py script that:
+  1. Queries the metrics
+  2. Compares to prior week for % change
+  3. Formats the email
+  4. Sends via SendGrid
+
+Test: Run the script manually and verify the email is received with
+correct data.
+
+
+========================================================================================
+PART 9: SYSTEM HEALTH CHECKS TABLE + BACKGROUND MONITOR
+========================================================================================
+
+The user_events table tracks what USERS do. This part tracks what the
+SYSTEM is doing — are APIs responding? Is data fresh? Are cities healthy?
+This is your early warning system. If Austin's API starts failing at 2am,
+you should know before a customer emails you at 9am.
+
+Step A — Create the health_checks table:
+
+    CREATE TABLE health_checks (
+        id              SERIAL PRIMARY KEY,
+        check_type      VARCHAR(50) NOT NULL,     -- 'api_fetch', 'page_load', 'db_query', 'stripe', 'sendgrid'
+        target          VARCHAR(255) NOT NULL,     -- what was checked (city slug, URL, service name)
+        status          VARCHAR(20) NOT NULL,      -- 'ok', 'degraded', 'down', 'error'
+        response_time_ms INTEGER,                  -- how long the check took in milliseconds
+        details         JSONB DEFAULT '{}',        -- flexible payload: error messages, counts, etc.
+        created_at      TIMESTAMP DEFAULT NOW()
+    );
+
+    CREATE INDEX idx_health_checks_type ON health_checks(check_type, target);
+    CREATE INDEX idx_health_checks_created ON health_checks(created_at);
+    CREATE INDEX idx_health_checks_status ON health_checks(status, created_at);
+
+Step B — Create the health check runner (e.g., app/health_monitor.py):
+
+This module defines individual check functions and a run_all_checks()
+function that executes them all and inserts results into health_checks.
+
+    import time
+    import requests
+    from datetime import datetime, timedelta
+
+    def check_city_api(city_slug, api_url, api_type):
+        """
+        Hit the actual data API for a city and verify it returns permits.
+        api_type is 'socrata' or 'arcgis' depending on the city's data source.
+        """
+        start = time.time()
+        try:
+            resp = requests.get(api_url, timeout=30, params={'$limit': 1} if api_type == 'socrata' else {'resultRecordCount': 1})
+            elapsed_ms = int((time.time() - start) * 1000)
+
+            if resp.status_code != 200:
+                return {
+                    'status': 'error',
+                    'response_time_ms': elapsed_ms,
+                    'details': {'status_code': resp.status_code, 'body': resp.text[:500]}
+                }
+
+            data = resp.json()
+            # Socrata returns a list, ArcGIS returns {'features': [...]}
+            if api_type == 'socrata':
+                record_count = len(data) if isinstance(data, list) else 0
+            else:
+                record_count = len(data.get('features', []))
+
+            return {
+                'status': 'ok' if record_count > 0 else 'degraded',
+                'response_time_ms': elapsed_ms,
+                'details': {
+                    'record_count': record_count,
+                    'api_type': api_type,
+                    'status_code': 200
+                }
+            }
+        except requests.Timeout:
+            return {'status': 'down', 'response_time_ms': 30000, 'details': {'error': 'timeout'}}
+        except Exception as e:
+            return {'status': 'error', 'response_time_ms': 0, 'details': {'error': str(e)}}
+
+Build the city API config from whatever already exists in the codebase —
+there should be a list of cities with their API endpoints somewhere
+(check for Socrata dataset IDs, ArcGIS FeatureServer URLs, etc.). Build
+a CITY_API_CONFIG dict like:
+
+    CITY_API_CONFIG = {
+        'austin': {
+            'name': 'Austin',
+            'api_url': 'https://data.austintexas.gov/resource/XXXX.json',
+            'api_type': 'socrata'
+        },
+        'new-york': {
+            'name': 'New York',
+            'api_url': 'https://data.cityofnewyork.us/resource/XXXX.json',
+            'api_type': 'socrata'
+        },
+        'los-angeles': {
+            'name': 'Los Angeles',
+            'api_url': 'https://...',
+            'api_type': 'arcgis'
+        },
+        # ... all 8 cities
+    }
+
+Pull this from the existing codebase — don't hardcode duplicate URLs.
+Import the config from wherever the app already stores it.
+
+Test: Run check_city_api for each city and verify results are inserted
+into health_checks.
+
+
+========================================================================================
+PART 10: CITY-LEVEL DATA FRESHNESS MONITORING
+========================================================================================
+
+This is the most important health check. If a city's API stops returning
+new permits, the data goes stale and paying customers see the same leads
+every day. You need to know within hours, not weeks.
+
+Step A — Create a data freshness check function:
+
+    def check_city_data_freshness(city_slug):
+        """
+        Query your OWN database (not the external API) to see when the
+        most recent permit was ingested for this city.
+        """
+        # Adjust the query to match your schema — look for the permits/leads
+        # table and its city/metro column and created_at/ingested_at timestamp
+        result = db.session.execute("""
+            SELECT
+                COUNT(*) as total_permits,
+                MAX(created_at) as newest_permit,
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as permits_24h,
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as permits_7d,
+                MIN(created_at) as oldest_permit
+            FROM permits
+            WHERE city_slug = :city
+        """, {'city': city_slug}).fetchone()
+
+        hours_since_newest = 0
+        if result.newest_permit:
+            hours_since_newest = (datetime.utcnow() - result.newest_permit).total_seconds() / 3600
+
+        # Classify freshness
+        if hours_since_newest <= 24:
+            status = 'ok'
+        elif hours_since_newest <= 72:
+            status = 'degraded'     # no new permits in 1-3 days — might be a weekend or API lag
+        else:
+            status = 'down'         # no new permits in 3+ days — something is broken
+
+        return {
+            'status': status,
+            'response_time_ms': 0,
+            'details': {
+                'total_permits': result.total_permits,
+                'newest_permit': result.newest_permit.isoformat() if result.newest_permit else None,
+                'hours_since_newest': round(hours_since_newest, 1),
+                'permits_last_24h': result.permits_24h,
+                'permits_last_7d': result.permits_7d
+            }
+        }
+
+Step B — Create a permit count trend check:
+
+    def check_city_permit_trend(city_slug):
+        """
+        Compare this week's permit count to last week's. A big drop
+        (>50% decline) signals a data pipeline problem.
+        """
+        result = db.session.execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as this_week,
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '14 days'
+                                 AND created_at < NOW() - INTERVAL '7 days') as last_week
+            FROM permits
+            WHERE city_slug = :city
+        """, {'city': city_slug}).fetchone()
+
+        this_week = result.this_week or 0
+        last_week = result.last_week or 1  # avoid division by zero
+
+        pct_change = ((this_week - last_week) / last_week) * 100
+
+        if pct_change >= -20:
+            status = 'ok'
+        elif pct_change >= -50:
+            status = 'degraded'       # noticeable drop, investigate
+        else:
+            status = 'down'           # >50% drop — pipeline probably broken
+
+        return {
+            'status': status,
+            'response_time_ms': 0,
+            'details': {
+                'permits_this_week': this_week,
+                'permits_last_week': last_week,
+                'pct_change': round(pct_change, 1)
+            }
+        }
+
+Test: Run both checks for every city. Verify results match what you see
+on the live site.
+
+
+========================================================================================
+PART 11: ROUTE & PAGE HEALTH MONITORING
+========================================================================================
+
+Self-check that every route on your own site is responding correctly.
+Catches template errors, broken deploys, and pages that start 500-ing.
+
+    def check_route_health(route, expected_status=200):
+        """
+        Hit a PermitGrab route and verify it returns the expected status.
+        """
+        start = time.time()
+        try:
+            resp = requests.get(
+                f'https://permitgrab.com{route}',
+                timeout=15,
+                allow_redirects=False,
+                headers={'User-Agent': 'PermitGrab-HealthCheck/1.0'}
+            )
+            elapsed_ms = int((time.time() - start) * 1000)
+
+            status = 'ok' if resp.status_code == expected_status else 'error'
+
+            return {
+                'status': status,
+                'response_time_ms': elapsed_ms,
+                'details': {
+                    'status_code': resp.status_code,
+                    'expected': expected_status,
+                    'content_length': len(resp.content)
+                }
+            }
+        except requests.Timeout:
+            return {'status': 'down', 'response_time_ms': 15000, 'details': {'error': 'timeout'}}
+        except Exception as e:
+            return {'status': 'error', 'response_time_ms': 0, 'details': {'error': str(e)}}
+
+    ROUTES_TO_CHECK = [
+        ('/', 200),
+        ('/pricing', 200),
+        ('/login', 200),
+        ('/signup', 200),
+        ('/get-alerts', 200),
+        ('/contractors', 200),
+        ('/early-intel', 200),
+        ('/analytics', 200),
+        ('/permits/austin', 200),
+        ('/permits/new-york', 200),
+        ('/permits/los-angeles', 200),
+        ('/permits/chicago', 200),
+        # add all other city slugs
+        ('/about', 200),
+        ('/privacy', 200),
+        ('/terms', 200),
+        ('/contact', 200),
+        ('/blog', 200),
+        ('/sitemap.xml', 200),
+        ('/robots.txt', 200),
+        ('/health', 200),
+        ('/admin/analytics', 200),  # will get 403 without auth — that's expected
+    ]
+
+Also track response times. A page that normally loads in 200ms but starts
+taking 3 seconds is a sign of trouble even if it returns 200.
+
+Test: Run check_route_health for all routes. Verify results match reality.
+
+
+========================================================================================
+PART 12: THIRD-PARTY SERVICE HEALTH CHECKS
+========================================================================================
+
+The app depends on external services. If any of them go down, features
+break silently. Check each one:
+
+STRIPE:
+    def check_stripe():
+        start = time.time()
+        try:
+            import stripe
+            stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+            # A lightweight read-only call to verify the key works
+            stripe.Product.retrieve('prod_U9zipubLJRSTPP')
+            elapsed_ms = int((time.time() - start) * 1000)
+            return {'status': 'ok', 'response_time_ms': elapsed_ms, 'details': {}}
+        except stripe.error.AuthenticationError:
+            return {'status': 'error', 'response_time_ms': 0, 'details': {'error': 'invalid API key'}}
+        except Exception as e:
+            return {'status': 'error', 'response_time_ms': 0, 'details': {'error': str(e)}}
+
+SENDGRID:
+    def check_sendgrid():
+        start = time.time()
+        try:
+            from sendgrid import SendGridAPIClient
+            sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+            # Check remaining email quota
+            resp = sg.client.stats.get(query_params={'start_date': datetime.utcnow().strftime('%Y-%m-%d')})
+            elapsed_ms = int((time.time() - start) * 1000)
+            return {'status': 'ok', 'response_time_ms': elapsed_ms, 'details': {'status_code': resp.status_code}}
+        except Exception as e:
+            return {'status': 'error', 'response_time_ms': 0, 'details': {'error': str(e)}}
+
+DATABASE:
+    def check_database():
+        start = time.time()
+        try:
+            result = db.session.execute("SELECT 1").fetchone()
+            elapsed_ms = int((time.time() - start) * 1000)
+            status = 'ok' if elapsed_ms < 500 else 'degraded'
+            return {'status': status, 'response_time_ms': elapsed_ms, 'details': {}}
+        except Exception as e:
+            return {'status': 'down', 'response_time_ms': 0, 'details': {'error': str(e)}}
+
+Test: Run each check and verify correct results in health_checks table.
+
+
+========================================================================================
+PART 13: SCHEDULED HEALTH CHECK RUNNER
+========================================================================================
+
+All the check functions from Parts 9-12 need to run on a schedule and
+insert results into the health_checks table.
+
+Create a run_health_checks.py script (or a Flask CLI command):
+
+    def run_all_health_checks():
+        checks = []
+
+        # 1. City API checks — are the external data sources responding?
+        for city_slug, config in CITY_API_CONFIG.items():
+            result = check_city_api(city_slug, config['api_url'], config['api_type'])
+            insert_health_check('api_fetch', city_slug, result)
+            checks.append((f'api:{city_slug}', result['status']))
+
+        # 2. Data freshness — is each city getting new permits?
+        for city_slug in CITY_API_CONFIG.keys():
+            result = check_city_data_freshness(city_slug)
+            insert_health_check('data_freshness', city_slug, result)
+            checks.append((f'freshness:{city_slug}', result['status']))
+
+        # 3. Permit count trends — any city volume dropping off a cliff?
+        for city_slug in CITY_API_CONFIG.keys():
+            result = check_city_permit_trend(city_slug)
+            insert_health_check('permit_trend', city_slug, result)
+            checks.append((f'trend:{city_slug}', result['status']))
+
+        # 4. Route health — is every page on the site responding?
+        for route, expected in ROUTES_TO_CHECK:
+            result = check_route_health(route, expected)
+            insert_health_check('page_load', route, result)
+            checks.append((f'route:{route}', result['status']))
+
+        # 5. Third-party services
+        for name, fn in [('stripe', check_stripe), ('sendgrid', check_sendgrid), ('database', check_database)]:
+            result = fn()
+            insert_health_check('service', name, result)
+            checks.append((f'service:{name}', result['status']))
+
+        # 6. Alert on failures
+        failures = [(name, status) for name, status in checks if status != 'ok']
+        if failures:
+            send_health_alert(failures)
+
+        return checks
+
+    def insert_health_check(check_type, target, result):
+        db.session.execute("""
+            INSERT INTO health_checks (check_type, target, status, response_time_ms, details)
+            VALUES (:type, :target, :status, :time, :details)
+        """, {
+            'type': check_type,
+            'target': target,
+            'status': result['status'],
+            'time': result.get('response_time_ms', 0),
+            'details': json.dumps(result.get('details', {}))
+        })
+        db.session.commit()
+
+    def send_health_alert(failures):
+        """Send an email alert when health checks fail."""
+        subject = f"⚠️ PermitGrab Health Alert — {len(failures)} issue(s)"
+        body = "The following health checks are failing:\n\n"
+        for name, status in failures:
+            body += f"  {status.upper()}: {name}\n"
+        body += f"\nView full details: https://permitgrab.com/admin/analytics#health\n"
+        body += f"Timestamp: {datetime.utcnow().isoformat()}Z\n"
+
+        # Send via SendGrid (reuse existing email sending function)
+        send_email(to='wcrainshaw@gmail.com', subject=subject, body=body)
+
+SCHEDULE:
+  Run every 30 minutes. Use one of:
+  - Render Cron Job (render.yaml):
+      - type: cron
+        name: health-checks
+        schedule: "*/30 * * * *"
+        startCommand: python run_health_checks.py
+  - APScheduler inside the Flask app
+  - A simple while loop in a background thread (least preferred)
+
+Also run on app startup so you get an immediate baseline.
+
+Test: Run run_all_health_checks() manually. Verify health_checks table
+has rows for every city API, every city freshness, every route, and
+every service.
+
+
+========================================================================================
+PART 14: HEALTH DASHBOARD IN /admin/analytics
+========================================================================================
+
+Add three new sections to the admin analytics dashboard (Part 5):
+
+SECTION 9 — SYSTEM STATUS OVERVIEW (top of page, above everything else):
+
+  A row of status indicator cards, one per service/subsystem. Each card
+  shows a green/yellow/red dot and the service name:
+
+  [●] Database        [●] Stripe         [●] SendGrid
+  [●] Austin API      [●] New York API   [●] LA API
+  [●] Chicago API     [●] Denver API     [●] (etc for all cities)
+
+  Pull the most recent health_check row for each target. Color logic:
+    - Green (ok): last check passed
+    - Yellow (degraded): last check returned 'degraded'
+    - Red (down/error): last check failed
+
+  Clicking a card expands to show the last 24 hours of checks for that
+  target (a mini sparkline or just a list of timestamps + status).
+
+SECTION 10 — CITY DATA HEALTH TABLE:
+
+  | City       | Status | API Resp | Newest Permit | Permits 24h | Permits 7d | 7d Trend | Action    |
+  |------------|--------|----------|---------------|-------------|------------|----------|-----------|
+  | Austin     | 🟢 OK  | 234ms    | 2h ago        | 12          | 87         | ↑ +14%   |           |
+  | New York   | 🟢 OK  | 189ms    | 4h ago        | 23          | 156        | ↑ +8%    |           |
+  | LA         | 🟡 WARN | 1,234ms | 52h ago       | 0           | 34         | ↓ -61%   | Investigate|
+  | Chicago    | 🔴 DOWN | timeout  | 5d ago        | 0           | 0          | ↓ -100%  | ALERT     |
+
+  This table combines data from all three city-level checks (API fetch,
+  data freshness, permit trend). Each row tells the full story for one city.
+
+  Column details:
+    - Status: worst of the 3 check statuses (if API is ok but freshness is
+      degraded, show degraded)
+    - API Resp: response time from the most recent api_fetch check
+    - Newest Permit: human-readable time since newest permit (from data_freshness)
+    - Permits 24h/7d: from data_freshness check details
+    - 7d Trend: pct_change from permit_trend check, with ↑/↓ arrow
+    - Action: if status is degraded or down, show an "Investigate" link that
+      expands to show the last 10 health checks for that city with timestamps
+      and error messages
+
+  Sort: put failing cities at the top so problems are immediately visible.
+
+SECTION 11 — ROUTE PERFORMANCE TABLE:
+
+  | Route             | Status | Avg Response | P95 Response | Errors (24h) | Trend   |
+  |-------------------|--------|-------------|-------------- |--------------|---------|
+  | /                 | 🟢 OK  | 187ms       | 340ms         | 0            | stable  |
+  | /permits/austin   | 🟢 OK  | 234ms       | 890ms         | 0            | stable  |
+  | /contractors      | 🟡 SLOW| 1,456ms     | 3,200ms       | 0            | ↑ slower|
+  | /early-intel      | 🟢 OK  | 98ms        | 145ms         | 0            | stable  |
+
+  Queries:
+    -- Average and P95 response time over last 24 hours
+    SELECT target,
+           AVG(response_time_ms) as avg_ms,
+           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_time_ms) as p95_ms,
+           COUNT(*) FILTER (WHERE status != 'ok') as error_count
+    FROM health_checks
+    WHERE check_type = 'page_load'
+    AND created_at >= NOW() - INTERVAL '24 hours'
+    GROUP BY target
+    ORDER BY avg_ms DESC
+
+  Highlight any route where:
+    - Average response > 1000ms (yellow)
+    - Average response > 3000ms (red)
+    - Any errors in last 24h (red)
+    - P95 > 2x average (yellow — high variance suggests intermittent issues)
+
+SECTION 12 — HEALTH CHECK HISTORY (line chart, last 7 days):
+
+  Chart showing:
+    - X-axis: date/time
+    - Y-axis: response time (ms)
+    - One line per city API (color-coded)
+    - Horizontal threshold line at 1000ms and 3000ms
+
+  This lets you spot trends — is Austin's API gradually getting slower?
+  Did LA's API go down and come back? Is there a daily pattern?
+
+  Use Chart.js (already loaded for Part 5's traffic chart).
+
+  Query:
+    SELECT target,
+           DATE_TRUNC('hour', created_at) as hour,
+           AVG(response_time_ms) as avg_ms
+    FROM health_checks
+    WHERE check_type = 'api_fetch'
+    AND created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY target, DATE_TRUNC('hour', created_at)
+    ORDER BY hour
+
+SECTION 13 — ERROR LOG (last 50 failures):
+
+  A scrollable table showing the most recent health check failures:
+
+  | Time              | Type         | Target     | Status | Error Details                          |
+  |-------------------|------------- |------------|--------|----------------------------------------|
+  | Mar 17, 2:30 PM   | api_fetch   | chicago    | down   | timeout after 30000ms                  |
+  | Mar 17, 2:30 PM   | data_freshness| la        | degraded| no new permits in 52 hours             |
+  | Mar 17, 2:00 PM   | page_load   | /pricing   | error  | status_code: 500                       |
+
+  Query:
+    SELECT * FROM health_checks
+    WHERE status != 'ok'
+    ORDER BY created_at DESC
+    LIMIT 50
+
+Test: Verify all 5 new sections render. Manually degrade a check (e.g.,
+use an invalid API URL for one city) and verify it shows as red/degraded
+in the dashboard and appears in the error log.
+
+
+========================================================================================
+PART 15: HEALTH DATA RETENTION + CLEANUP
+========================================================================================
+
+Health checks run every 30 minutes = ~48 rows per target per day. With
+~30 targets (8 cities × 3 checks + 20 routes + 3 services), that's
+~1,440 rows/day or ~43,000 rows/month. Not huge, but should be managed.
+
+Add a data retention job:
+
+    def cleanup_old_health_checks():
+        """
+        Keep detailed data for 30 days, then aggregate to daily summaries.
+        Delete raw data older than 90 days.
+        """
+        # Step 1: Aggregate old data into daily summaries
+        db.session.execute("""
+            INSERT INTO health_check_daily (check_type, target, check_date,
+                         checks_total, checks_ok, checks_degraded, checks_down,
+                         avg_response_ms, p95_response_ms, max_response_ms)
+            SELECT check_type, target, DATE(created_at),
+                   COUNT(*),
+                   COUNT(*) FILTER (WHERE status = 'ok'),
+                   COUNT(*) FILTER (WHERE status = 'degraded'),
+                   COUNT(*) FILTER (WHERE status IN ('down', 'error')),
+                   AVG(response_time_ms),
+                   PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_time_ms),
+                   MAX(response_time_ms)
+            FROM health_checks
+            WHERE created_at < NOW() - INTERVAL '30 days'
+            AND DATE(created_at) NOT IN (
+                SELECT check_date FROM health_check_daily
+                WHERE check_type = health_checks.check_type
+                AND target = health_checks.target
+            )
+            GROUP BY check_type, target, DATE(created_at)
+        """)
+
+        # Step 2: Delete raw data older than 30 days (we have daily summaries now)
+        db.session.execute("""
+            DELETE FROM health_checks
+            WHERE created_at < NOW() - INTERVAL '30 days'
+        """)
+
+        # Step 3: Delete daily summaries older than 1 year
+        db.session.execute("""
+            DELETE FROM health_check_daily
+            WHERE check_date < CURRENT_DATE - INTERVAL '365 days'
+        """)
+
+        db.session.commit()
+
+Create the health_check_daily table:
+
+    CREATE TABLE health_check_daily (
+        id               SERIAL PRIMARY KEY,
+        check_type       VARCHAR(50) NOT NULL,
+        target           VARCHAR(255) NOT NULL,
+        check_date       DATE NOT NULL,
+        checks_total     INTEGER,
+        checks_ok        INTEGER,
+        checks_degraded  INTEGER,
+        checks_down      INTEGER,
+        avg_response_ms  INTEGER,
+        p95_response_ms  INTEGER,
+        max_response_ms  INTEGER,
+        UNIQUE(check_type, target, check_date)
+    );
+
+Also apply the same retention to user_events — keep raw events for 90 days,
+then delete. (User analytics don't need daily aggregation at this scale,
+but you don't want the table growing forever.)
+
+    def cleanup_old_user_events():
+        db.session.execute("""
+            DELETE FROM user_events
+            WHERE created_at < NOW() - INTERVAL '90 days'
+        """)
+        db.session.commit()
+
+Schedule both cleanups: run once daily at 3am (off-peak).
+
+Test: Insert some fake old health_check rows (created_at = 60 days ago).
+Run the cleanup. Verify they're aggregated into health_check_daily and
+removed from health_checks.
+
+
+========================================================================================
+PART 16: ADD CITY + HEALTH DATA TO WEEKLY METRICS EMAIL
+========================================================================================
+
+Extend the weekly email from Part 8 to include health data:
+
+    Subject: "PermitGrab Weekly Report — Mar 10-17, 2026"
+
+    ... (existing sections from Part 8) ...
+
+    CITY DATA HEALTH:
+    Austin:     🟢 OK — 87 permits this week (↑14%), newest 2h ago
+    New York:   🟢 OK — 156 permits this week (↑8%), newest 4h ago
+    LA:         🟡 WARN — 34 permits this week (↓61%), newest 52h ago ← INVESTIGATE
+    Chicago:    🔴 DOWN — 0 permits this week (↓100%), newest 5d ago ← CRITICAL
+
+    SYSTEM UPTIME (last 7 days):
+    Site:     99.8% (1 error in 336 checks)
+    APIs:     97.6% (8 failures across all cities)
+    Stripe:   100%
+    SendGrid: 100%
+    Database: 100%
+
+    SLOW ROUTES (avg >500ms):
+    /contractors: 1,456ms avg (↑ from 890ms last week)
+
+    ERRORS THIS WEEK: 12
+    - 8x Chicago API timeout
+    - 3x /contractors slow (>3s)
+    - 1x /pricing 500 error (Mar 14, resolved)
+
+This gives you the full picture in one email every Monday — user metrics
+AND system health. If something is broken, you know immediately which
+city, which service, or which route.
+
+Test: Run the weekly report script manually and verify the new sections
+appear with correct data.
+
+
+========================================================================================
+FINAL VERIFICATION
+========================================================================================
+
+After completing all parts:
+
+USER ANALYTICS (Parts 1-8):
+1. Browse the site as an anonymous user for 5-10 pages
+   → Verify page_view events in user_events with session_id but no user_id
+
+2. Sign up for a new account
+   → Verify signup event logged
+
+3. Complete onboarding
+   → Verify onboarding_complete event with city and trade
+
+4. Apply filters, view permits, save a lead
+   → Verify filter_applied, permit_viewed, lead_save events
+
+5. Visit /admin/analytics as admin
+   → Verify all user analytics sections render with real data
+   → Verify the funnel shows your test journey
+
+6. Check that no analytics error ever breaks a page
+   → Temporarily break the DB connection and verify pages still load
+
+HEALTH MONITORING (Parts 9-16):
+7. Run the full health check suite manually
+   → Verify health_checks table has rows for every city API, every city
+     freshness check, every route, and every service
+
+8. Check the System Status Overview on /admin/analytics
+   → Verify green/yellow/red dots show for all services and cities
+   → Verify clicking a card shows the last 24h of checks
+
+9. Check the City Data Health table
+   → Verify all 8 cities appear with API response time, newest permit
+     timestamp, permit counts, and trend arrows
+   → Verify cities with issues sort to the top
+
+10. Check the Route Performance table
+    → Verify all monitored routes appear with avg/p95 response times
+    → Verify slow routes are highlighted yellow/red
+
+11. Check the Health Check History chart
+    → Verify city API response times are plotted over 7 days
+
+12. Check the Error Log
+    → Verify recent failures appear with timestamps and details
+
+13. Trigger a deliberate failure (e.g., bad API URL for one city)
+    → Verify it shows as red in the dashboard within 30 minutes
+    → Verify the alert email fires to wcrainshaw@gmail.com
+
+14. Run the weekly report script
+    → Verify the email includes both user metrics AND city health data
+
+15. Run the data retention cleanup
+    → Verify old health_checks are aggregated and deleted
+
+Commit: "Add custom analytics: event tracking, health monitoring, admin dashboard"

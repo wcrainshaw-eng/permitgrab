@@ -1,0 +1,467 @@
+===============================================================================
+CLAUDE CODE HOTFIX SPEC V5 — PERMITGRAB
+March 17, 2026 — POST V4-UAT
+===============================================================================
+
+READ THIS ENTIRE SPEC BEFORE WRITING ANY CODE.
+
+HISTORY OF FAILURES:
+- V3 spec had 5 fixes. 3 worked, 2 failed (duplicate email, lead scoring).
+- V4 spec targeted those 2 remaining failures + 1 new. ALL 3 FAILED AGAIN:
+  * Duplicate email: V4 added fcntl file locking. STILL BROKEN — signup
+    with existing email wcrainshaw@gmail.com succeeds and redirects to
+    /onboarding. The file locking approach did not prevent duplicates.
+  * Lead scoring: V4 switched to percentile-based. MADE IT WORSE — scores
+    compressed from 79-99 range (V3) to 97-99 range (V4). Target is 40-99.
+    Root cause: percentile ranking was applied to only the 50 permits
+    returned by the API, not the full dataset. Ranking 50 pre-filtered
+    high-value results naturally clusters at the top of the range.
+  * Save Search / Export CSV: V4 added redirects. PARTIALLY WORKING — both
+    buttons redirect non-Pro users to /pricing. The spec wanted inline
+    modals, but redirects are acceptable. The real issue is the redirect
+    loses the user's search context.
+
+CASCADING BUG DISCOVERED IN V4 UAT:
+When duplicate email accounts exist, the login system matches the MOST RECENT
+(newest) row. This means:
+  - Original user's password stops working
+  - Pro subscription status is lost (newest row defaults to Free)
+  - User data (name, city, trade) may be overwritten
+This makes Fix 1 even more critical than before.
+
+===============================================================================
+FIX 1: DUPLICATE EMAIL REGISTRATION  [CRITICAL — THIRD ATTEMPT]
+===============================================================================
+
+WHY IT KEEPS FAILING:
+- V3 attempted an application-level check. It didn't work (probably placed
+  after the INSERT, or the check queries a different field/table).
+- V4 attempted fcntl file locking. It didn't work (file locks don't prevent
+  database-level race conditions, and the check itself may still be wrong).
+- The root cause is almost certainly that there is NO database-level
+  enforcement. Application checks alone are insufficient.
+
+STEP-BY-STEP INSTRUCTIONS — DO EXACTLY THIS:
+
+STEP 1: FIND THE SIGNUP ROUTE
+  - Search the entire codebase for the signup/register endpoint:
+      grep -rn "def signup\|def register\|@app.route.*signup\|@app.route.*register" .
+  - Also search for the form action target:
+      grep -rn "action=.*signup\|action=.*register" templates/
+  - PRINT the entire function to the terminal so you can see every line.
+
+STEP 2: FIND THE USER MODEL
+  - Search for the User class/model definition:
+      grep -rn "class User" .
+  - PRINT the entire User model to the terminal.
+  - Look at the email column definition. Note whether it has unique=True.
+
+STEP 3: CHECK THE DATABASE SCHEMA DIRECTLY
+  - Find where the database is configured (look for DATABASE_URL, SQLALCHEMY
+    DATABASE_URI, sqlite, etc).
+  - If using SQLite, find the .db file path and run:
+      python3 -c "
+      import sqlite3
+      conn = sqlite3.connect('PATH_TO_DB_FILE')
+      cursor = conn.cursor()
+      # Show table schema
+      cursor.execute('PRAGMA table_info(users)')
+      print('Schema:', cursor.fetchall())
+      # Check for existing unique index
+      cursor.execute('PRAGMA index_list(users)')
+      print('Indexes:', cursor.fetchall())
+      # Count duplicates
+      cursor.execute('SELECT LOWER(email), COUNT(*) FROM users GROUP BY LOWER(email) HAVING COUNT(*) > 1')
+      dupes = cursor.fetchall()
+      print('Duplicates:', dupes)
+      # Show all user rows
+      cursor.execute('SELECT id, email, name, plan FROM users ORDER BY id')
+      print('All users:', cursor.fetchall())
+      conn.close()
+      "
+  - If using PostgreSQL, use the Render dashboard or psql to run equivalent.
+
+STEP 4: IMPLEMENT THE FIX — ALL THREE LAYERS
+
+  LAYER A — DATABASE CONSTRAINT:
+  This is the MOST IMPORTANT layer. Even if the application check fails,
+  the database itself must reject duplicates.
+
+  For SQLite:
+    -- You cannot ALTER TABLE to add UNIQUE in SQLite. Instead:
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+      ON users (LOWER(email));
+
+  For PostgreSQL:
+    ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (LOWER(email));
+    -- OR if that syntax errors:
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+      ON users (LOWER(email));
+
+  Run this SQL directly against the production database. Do NOT rely on
+  a migration that "should" run on deploy. Execute it manually and verify.
+
+  LAYER B — SQLALCHEMY MODEL:
+  In the User model, add unique=True to the email column:
+    email = db.Column(db.String(255), unique=True, nullable=False)
+  This ensures SQLAlchemy also enforces uniqueness.
+
+  LAYER C — APPLICATION CHECK IN SIGNUP ROUTE:
+  Add this check BEFORE any user creation code. Place it as the FIRST thing
+  after form validation, BEFORE calling User(), db.session.add(), or any
+  INSERT:
+
+    email = request.form.get('email', '').lower().strip()
+
+    # CHECK FOR EXISTING USER — MUST BE BEFORE INSERT
+    existing_user = User.query.filter(
+        db.func.lower(User.email) == email
+    ).first()
+    if existing_user:
+        flash('An account with this email already exists. Please log in instead.', 'error')
+        return redirect(url_for('signup'))
+
+    # NOW create the user (only reached if no duplicate):
+    new_user = User(email=email, ...)
+
+  IMPORTANT: Also wrap the db.session.commit() in a try/except to catch the
+  UNIQUE constraint violation as a fallback:
+
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash('An account with this email already exists. Please log in instead.', 'error')
+        return redirect(url_for('signup'))
+
+  Add this import at the top of the file:
+    from sqlalchemy.exc import IntegrityError
+
+STEP 5: CLEAN UP EXISTING DUPLICATES
+  Run this SQL against the production database:
+
+  -- Show what will be deleted:
+  SELECT * FROM users WHERE id NOT IN (
+    SELECT MIN(id) FROM users GROUP BY LOWER(email)
+  );
+
+  -- Delete duplicates (keep OLDEST account — it has the Pro subscription):
+  DELETE FROM users WHERE id NOT IN (
+    SELECT MIN(id) FROM users GROUP BY LOWER(email)
+  );
+
+  NOTE: We keep the OLDEST (MIN id) because the original account may have
+  Pro status. The V4 UAT confirmed that the NEWEST duplicate had Free
+  status and a different password, which corrupted the original account.
+
+STEP 6: VERIFY
+  1. Try to register with wcrainshaw@gmail.com
+  2. Should see error: "An account with this email already exists..."
+  3. Should NOT redirect to /onboarding
+  4. Run: SELECT LOWER(email), COUNT(*) FROM users GROUP BY LOWER(email) HAVING COUNT(*) > 1
+     Should return ZERO rows
+  5. Try to log in with the original account credentials
+  6. Confirm Pro status is intact
+
+DO NOT PROCEED TO FIX 2 UNTIL FIX 1 IS VERIFIED ON THE LIVE SITE.
+
+
+===============================================================================
+FIX 2: LEAD SCORING — FIXED-BREAKPOINT WITH DATASET AWARENESS  [MEDIUM]
+===============================================================================
+
+WHY V3 AND V4 BOTH FAILED:
+- V3 used absolute thresholds. Result: 79-99 range (20-point spread).
+  The problem was that ALL dashboard permits are recent, high-value, have
+  contact info, and are active — so they all score high.
+- V4 used percentile ranking on 50 returned permits. Result: 97-99 range
+  (2-point spread). WORSE than V3. The problem was that percentile ranking
+  on a pre-filtered dataset compresses to the top — if you rank 50 items
+  that are already in the 80th+ percentile, they all get mapped to 96-100.
+
+THE FIX — FORCED LINEAR SPREAD:
+Do not use percentile ranking on the API results. Do not use absolute
+thresholds. Instead, use a FORCED LINEAR SPREAD that maps the actual
+min/max values in the dataset to the target range.
+
+```python
+def calculate_lead_scores(permits):
+    """
+    Score permits using forced linear spread across 40-99 range.
+    Maps the actual data distribution to guarantee full range usage.
+    """
+    import hashlib
+    from datetime import datetime
+
+    if not permits:
+        return []
+
+    # Step 1: Calculate raw composite scores
+    raw_scores = []
+    for p in permits:
+        raw = 0.0
+
+        # Value component (0-35 points, linear within dataset)
+        value = float(p.get('project_value') or p.get('estimated_cost') or 0)
+        raw += value  # Store actual value; we'll normalize later
+
+        raw_scores.append({
+            'value': value,
+            'filed_date': p.get('filed_date') or p.get('filing_date') or p.get('date'),
+            'status': (p.get('status') or '').lower(),
+            'has_phone': bool(p.get('phone') or p.get('contact_phone')),
+            'has_name': bool(p.get('contact_name') or p.get('owner') or p.get('owner_name')),
+            'trade': (p.get('trade') or p.get('permit_type') or p.get('trade_category') or '').lower(),
+            'permit_id': str(p.get('id') or p.get('permit_number') or str(id(p))),
+        })
+
+    # Step 2: Find min/max for normalization
+    values = [r['value'] for r in raw_scores]
+    min_val = min(values) if values else 0
+    max_val = max(values) if values else 1
+    val_range = max_val - min_val if max_val > min_val else 1
+
+    final_scores = []
+    for i, r in enumerate(raw_scores):
+        score = 0.0
+
+        # Value: normalize to 0-35 within this dataset's range
+        score += ((r['value'] - min_val) / val_range) * 35
+
+        # Recency: 0-25 (days old)
+        filed = r['filed_date']
+        if filed:
+            if isinstance(filed, str):
+                try:
+                    filed = datetime.strptime(filed[:10], '%Y-%m-%d')
+                except:
+                    filed = None
+            if filed:
+                days = (datetime.now() - filed).days
+                score += max(0, 25 - (days * 0.8))  # Gradual decay
+
+        # Status: 0-15
+        status_map = {
+            'filed': 15, 'active': 13, 'issued': 11, 'approved': 11,
+            'permitted': 9, 'pending': 6, 'completed': 3, 'closed': 1
+        }
+        score += status_map.get(r['status'], 7)
+
+        # Contact info: 0-10
+        score += (5 if r['has_phone'] else 0) + (5 if r['has_name'] else 0)
+
+        # Trade: 0-10
+        high = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection']
+        mid = ['roofing', 'interior renovation', 'demolition', 'addition', 'structural']
+        trade = r['trade']
+        if any(t in trade for t in high):
+            score += 10
+        elif any(t in trade for t in mid):
+            score += 7
+        else:
+            score += 4
+
+        # Deterministic jitter from permit ID (0-4)
+        jitter = int(hashlib.md5(r['permit_id'].encode()).hexdigest()[:4], 16) % 5
+        score += jitter
+
+        final_scores.append(score)
+
+    # Step 3: FORCED LINEAR SPREAD — map actual score range to 40-99
+    # This is the key difference from V3/V4. No matter what the raw scores
+    # look like, we force them into the 40-99 output range.
+    raw_min = min(final_scores)
+    raw_max = max(final_scores)
+    raw_range = raw_max - raw_min if raw_max > raw_min else 1
+
+    result = []
+    for s in final_scores:
+        # Linear map: raw_min -> 40, raw_max -> 99
+        normalized = 40 + ((s - raw_min) / raw_range) * 59
+        result.append(max(40, min(99, int(normalized))))
+
+    return result
+```
+
+KEY DIFFERENCE FROM V4:
+The V4 percentile approach used sorted_scores.index(raw) / (n - 1), which
+clusters when there are many tied values. This forced-spread approach uses
+the actual continuous scores and linearly maps them, which preserves the
+relative differences between permits.
+
+The value component is normalized WITHIN the dataset (min/max), so even if
+all permits are $500K-$2M, they get spread across the full 0-35 value
+points. Combined with variation in recency, status, trade, and contact
+info, the raw scores will have genuine variance that gets linearly mapped
+to 40-99.
+
+WHERE TO PUT THIS FUNCTION:
+  grep -rn "def calculate_lead_score\|lead_score\|lead_quality" .
+Find the existing function and replace it entirely with the above.
+
+ALSO: Find where the function is called. It may be called per-permit
+(old V3 style) or per-batch (V4 style). This new function takes a LIST
+of permits and returns a LIST of scores, so update the call site:
+
+  # Old (V3): score = calculate_lead_score(permit)
+  # New (V5): scores = calculate_lead_scores(permits_list)
+  #           then assign: permits_list[i]['lead_score'] = scores[i]
+
+VERIFICATION:
+  1. Load the main permits page
+  2. Check scores across 15+ permits
+  3. Score range MUST span at least 30 points (e.g., 45 to 99)
+  4. The lowest-scoring permit visible should be < 70
+  5. The highest-scoring permit should be > 90
+  6. No more than 5 permits should share the exact same score
+
+
+===============================================================================
+FIX 3: SAVE SEARCH / EXPORT CSV — INLINE MODAL INSTEAD OF REDIRECT  [LOW]
+===============================================================================
+
+CURRENT BEHAVIOR (V4):
+- Anonymous user clicks Save Search → redirects to /login
+- Anonymous user clicks Export CSV → redirects to /pricing
+- Logged-in free user clicks Save Search → redirects to /pricing
+- Logged-in free user clicks Export CSV → redirects to /pricing
+- Pro user → buttons work normally
+
+THE PROBLEM:
+The redirects WORK (non-Pro users can't use the features), but they lose
+the user's search context (city filter, trade filter, etc). The user has
+to re-navigate back and re-apply their filters.
+
+THE FIX:
+Replace the server-side redirects with client-side JavaScript that shows
+an inline upgrade modal. This is a TEMPLATE-ONLY change.
+
+STEP 1: Find the template that renders the Save Search and Export CSV buttons.
+  grep -rn "Save Search\|Export CSV\|save_search\|export_csv" templates/
+
+STEP 2: Find the existing click handler or href for these buttons.
+  It probably looks like one of:
+    <a href="/pricing">Export CSV</a>
+    <button onclick="window.location='/pricing'">Save Search</button>
+    Or a server-side redirect in a route handler.
+
+STEP 3: Replace with this pattern:
+
+  For the button markup (in the Jinja template):
+  ```html
+  {% if current_user.is_authenticated and current_user.plan == 'pro' %}
+    <button onclick="saveSearch()" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-bookmark"></i> Save Search
+    </button>
+    <button onclick="exportCSV()" class="btn btn-primary btn-sm">
+      Export CSV
+    </button>
+  {% else %}
+    <button onclick="showUpgradeModal('Save Search')" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-bookmark"></i> Save Search
+    </button>
+    <button onclick="showUpgradeModal('Export CSV')" class="btn btn-primary btn-sm">
+      Export CSV
+    </button>
+  {% endif %}
+  ```
+
+  Add this modal and script at the bottom of the template (before </body>):
+  ```html
+  <!-- Upgrade Modal -->
+  <div id="upgradeModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:white; border-radius:12px; padding:32px; max-width:420px; width:90%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="font-size:48px; margin-bottom:16px;">🔒</div>
+      <h3 style="margin:0 0 8px; color:#1B3A5C;" id="upgradeFeatureName">Pro Feature</h3>
+      <p style="color:#666; margin:0 0 24px;" id="upgradeFeatureDesc">Upgrade to Pro to unlock this feature.</p>
+      <a href="/pricing" style="display:inline-block; background:#E87722; color:white; padding:12px 32px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:12px;">Upgrade to Pro — $149/mo</a>
+      <br>
+      <a href="#" onclick="document.getElementById('upgradeModal').style.display='none'; return false;" style="color:#999; font-size:14px;">Maybe later</a>
+    </div>
+  </div>
+  <script>
+  function showUpgradeModal(featureName) {
+    var descriptions = {
+      'Save Search': 'Save your current filters and get daily email alerts when new matching permits are filed.',
+      'Export CSV': 'Download all matching permits as a spreadsheet with full contact details.'
+    };
+    document.getElementById('upgradeFeatureName').textContent = featureName + ' is a Pro Feature';
+    document.getElementById('upgradeFeatureDesc').textContent = descriptions[featureName] || 'Upgrade to Pro to unlock this feature.';
+    document.getElementById('upgradeModal').style.display = 'flex';
+  }
+  </script>
+  ```
+
+  If there's a SERVER-SIDE route handler for save_search or export_csv that
+  does the redirect, remove the redirect logic and let the client-side
+  modal handle it instead. The buttons should NOT submit to a server route
+  for non-Pro users — the onclick JavaScript handles everything.
+
+VERIFICATION:
+  1. As anonymous user: click Save Search → modal appears (NOT a redirect)
+  2. As anonymous user: click Export CSV → modal appears (NOT a redirect)
+  3. Click "Maybe later" → modal closes, search context preserved
+  4. As free logged-in user: same behavior
+  5. As Pro user: buttons work normally (no modal)
+
+
+===============================================================================
+EXECUTION ORDER
+===============================================================================
+
+1. FIX 1 (Duplicate Email) — CRITICAL
+   - Find signup route, find User model, check DB schema
+   - Add UNIQUE index to DB
+   - Add application-level check with IntegrityError fallback
+   - Clean up existing duplicates
+   - VERIFY ON LIVE SITE before proceeding
+
+2. FIX 2 (Lead Scoring) — MEDIUM
+   - Find existing scoring function
+   - Replace entirely with forced-spread algorithm
+   - Update call site if function signature changed
+   - VERIFY ON LIVE SITE before proceeding
+
+3. FIX 3 (Save Search / Export CSV Modal) — LOW
+   - Find template with buttons
+   - Replace redirect behavior with inline modal
+   - VERIFY ON LIVE SITE
+
+COMMIT EACH FIX SEPARATELY with descriptive messages.
+Deploy after each fix and verify on permitgrab.com.
+
+===============================================================================
+COMMON MISTAKES TO AVOID (FROM V3 AND V4 FAILURES)
+===============================================================================
+
+1. DO NOT use file locking (fcntl) for duplicate prevention. It failed in V4.
+   Use a DATABASE CONSTRAINT. That's what databases are for.
+
+2. DO NOT apply percentile/ranking scoring to a pre-filtered result set.
+   50 high-value permits will always cluster at 95-99. Use forced linear
+   spread that maps min→40, max→99 regardless of input distribution.
+
+3. DO NOT assume the application check alone prevents duplicates. Race
+   conditions can bypass it. The database UNIQUE constraint is the safety
+   net. Both layers are required.
+
+4. DO NOT keep the NEWEST duplicate when cleaning up. Keep the OLDEST
+   (MIN id) because it may have the Pro subscription and the user's
+   original data.
+
+5. DO NOT redirect non-Pro users to another page for feature gating.
+   Use inline modals that preserve the user's current context.
+
+6. ALWAYS verify on the LIVE site after deploying each fix. Do not rely
+   on local testing alone — the production database may have different
+   state (existing duplicates, different schema, etc).
+
+7. READ the signup route COMPLETELY before modifying it. Print it to the
+   terminal. Understand the full flow. The V3 fix was "added" but didn't
+   work, which means it was likely in the wrong position or checking the
+   wrong thing.
+
+===============================================================================
+END OF SPEC
+===============================================================================

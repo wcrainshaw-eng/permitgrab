@@ -32,7 +32,15 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+# Use Render persistent disk if available, otherwise local data directory
+# Render disk is mounted at /var/data and persists across deploys
+if os.path.isdir('/var/data'):
+    DATA_DIR = '/var/data'
+    print("[Server] Using Render persistent disk at /var/data")
+else:
+    DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+    print(f"[Server] Using local data directory at {DATA_DIR}")
+
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 
@@ -42,105 +50,164 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 # ===========================
 # LEAD SCORING ENGINE
 # ===========================
-# V5: FORCED LINEAR SPREAD - maps actual data distribution to 40-99 range.
-# Unlike V4 percentile ranking (which clustered at 97-99), this approach:
-# 1. Normalizes VALUE within the dataset's actual min/max
-# 2. Uses continuous raw scores (not discrete percentile ranks)
-# 3. Linearly maps raw_min→40, raw_max→99
+# V6: FORCED LINEAR SPREAD - exact implementation from spec
+# Output range: 40-99, guaranteed by linear mapping.
 
 import hashlib
 
 
+def calculate_lead_scores(permits):
+    """
+    V6 lead scoring with FORCED LINEAR SPREAD.
+    Takes a list of permit dicts, returns a list of integer scores.
+    Output range: 40-99, guaranteed by linear mapping.
+    """
+    from datetime import datetime
+
+    if not permits:
+        return []
+
+    # PHASE 1: Compute a raw score for each permit
+    raw_scores = []
+    for p in permits:
+        raw = 0.0
+
+        # Component A: Project value (will be normalized in phase 2)
+        value = 0.0
+        for key in ['project_value', 'estimated_cost', 'value', 'cost', 'amount']:
+            v = p.get(key)
+            if v is not None:
+                try:
+                    value = float(str(v).replace('$', '').replace(',', ''))
+                    break
+                except (ValueError, TypeError):
+                    pass
+        # Store raw value; normalization happens in phase 2
+
+        # Component B: Recency (0-25 points)
+        recency = 12.0  # default if no date found
+        for key in ['filed_date', 'filing_date', 'date', 'created_date', 'issue_date']:
+            d = p.get(key)
+            if d:
+                try:
+                    if isinstance(d, str):
+                        d = datetime.strptime(d[:10], '%Y-%m-%d')
+                    days_old = (datetime.now() - d).days
+                    recency = max(0.0, 25.0 - (days_old * 0.8))
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        # Component C: Status (0-15 points)
+        status_str = ''
+        for key in ['status', 'permit_status', 'state']:
+            s = p.get(key)
+            if s:
+                status_str = str(s).lower().strip()
+                break
+        status_scores = {
+            'filed': 15, 'new': 15, 'active': 13, 'issued': 11,
+            'approved': 11, 'permitted': 9, 'pending': 7, 'review': 7,
+            'in progress': 6, 'completed': 3, 'closed': 1, 'expired': 1
+        }
+        status_pts = status_scores.get(status_str, 7.0)
+
+        # Component D: Contact info (0-10 points)
+        has_phone = False
+        for key in ['phone', 'contact_phone', 'phone_number', 'tel']:
+            if p.get(key):
+                has_phone = True
+                break
+        has_name = False
+        for key in ['contact_name', 'owner', 'owner_name', 'applicant', 'name']:
+            if p.get(key):
+                has_name = True
+                break
+        contact_pts = (5.0 if has_phone else 0.0) + (5.0 if has_name else 0.0)
+
+        # Component E: Trade type (0-10 points)
+        trade_str = ''
+        for key in ['trade', 'permit_type', 'trade_category', 'type', 'work_type']:
+            t = p.get(key)
+            if t:
+                trade_str = str(t).lower()
+                break
+        high_value = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire']
+        mid_value = ['roofing', 'interior', 'demolition', 'addition', 'structural']
+        if any(h in trade_str for h in high_value):
+            trade_pts = 10.0
+        elif any(m in trade_str for m in mid_value):
+            trade_pts = 7.0
+        else:
+            trade_pts = 4.0
+
+        # Component F: Deterministic jitter (0-5 points, from permit ID hash)
+        permit_id_str = ''
+        for key in ['id', 'permit_number', 'permit_id', 'number']:
+            pid = p.get(key)
+            if pid is not None:
+                permit_id_str = str(pid)
+                break
+        if not permit_id_str:
+            permit_id_str = str(id(p))
+        jitter = (int(hashlib.md5(permit_id_str.encode()).hexdigest()[:6], 16) % 50) / 10.0
+
+        raw_scores.append({
+            'value': value,
+            'non_value_score': recency + status_pts + contact_pts + trade_pts + jitter
+        })
+
+    # PHASE 2: Normalize the value component within this dataset
+    values = [r['value'] for r in raw_scores]
+    min_val = min(values)
+    max_val = max(values)
+    val_range = max_val - min_val if max_val != min_val else 1.0
+
+    composite_scores = []
+    for r in raw_scores:
+        normalized_value = ((r['value'] - min_val) / val_range) * 35.0
+        composite = normalized_value + r['non_value_score']
+        composite_scores.append(composite)
+
+    # PHASE 3: FORCED LINEAR SPREAD — THIS IS THE CRITICAL PART
+    # Map the composite scores linearly so that:
+    #   - The permit with the LOWEST composite score gets exactly 40
+    #   - The permit with the HIGHEST composite score gets exactly 99
+    #   - Everything else is evenly distributed between 40 and 99
+    #
+    # THIS IS NON-NEGOTIABLE. If the output min is not ~40, this step is broken.
+
+    score_min = min(composite_scores)
+    score_max = max(composite_scores)
+    score_range = score_max - score_min if score_max != score_min else 1.0
+
+    final_scores = []
+    for cs in composite_scores:
+        # Linear interpolation: score_min → 40, score_max → 99
+        normalized = 40.0 + ((cs - score_min) / score_range) * 59.0
+        final_scores.append(max(40, min(99, round(normalized))))
+
+    return final_scores
+
+
 def add_lead_scores(permits):
     """
-    Score permits using forced linear spread across 40-99 range.
-    Maps the actual data distribution to guarantee full range usage.
-
-    V5 Fix: Replaces V4 percentile ranking which compressed to 97-99.
+    Wrapper that calls calculate_lead_scores and assigns scores to permits.
+    Also assigns lead_quality tier based on score.
     """
     if not permits:
         return permits
 
-    # Step 1: Extract values for normalization
-    values = []
-    for p in permits:
-        val = float(p.get('estimated_cost') or p.get('project_value') or 0)
-        values.append(val)
-
-    min_val = min(values) if values else 0
-    max_val = max(values) if values else 1
-    val_range = max_val - min_val if max_val > min_val else 1
-
-    # Step 2: Calculate raw composite scores with normalized value
-    raw_scores = []
-    for i, p in enumerate(permits):
-        score = 0.0
-
-        # Value: normalize to 0-35 within THIS dataset's range
-        # This ensures $500K-$2M permits get spread across full 35 points
-        val = values[i]
-        score += ((val - min_val) / val_range) * 35
-
-        # Recency: 0-25 (days old, gradual decay)
-        filed_date = p.get('filing_date') or p.get('filed_date') or p.get('date')
-        if filed_date:
-            try:
-                if isinstance(filed_date, str):
-                    filed = datetime.strptime(str(filed_date)[:10], '%Y-%m-%d')
-                else:
-                    filed = filed_date
-                days = (datetime.now() - filed).days
-                score += max(0, 25 - (days * 0.8))  # Gradual decay
-            except (ValueError, TypeError):
-                score += 12  # Unknown date gets middle value
-
-        # Status: 0-15
-        status = (p.get('status') or '').lower()
-        status_map = {
-            'filed': 15, 'active': 13, 'issued': 11, 'approved': 11,
-            'permitted': 9, 'pending': 6, 'completed': 3, 'closed': 1
-        }
-        score += status_map.get(status, 7)
-
-        # Contact info: 0-10
-        has_phone = bool(p.get('contact_phone') or p.get('phone'))
-        has_name = bool(p.get('contact_name') or p.get('owner_name') or p.get('owner'))
-        score += (5 if has_phone else 0) + (5 if has_name else 0)
-
-        # Trade: 0-10
-        trade = (p.get('trade_category') or p.get('permit_type') or p.get('trade') or '').lower()
-        high = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection']
-        mid = ['roofing', 'interior renovation', 'demolition', 'addition', 'structural']
-        if any(t in trade for t in high):
-            score += 10
-        elif any(t in trade for t in mid):
-            score += 7
-        else:
-            score += 4
-
-        # Deterministic jitter from permit ID (0-4)
-        permit_id = str(p.get('id') or p.get('permit_number') or str(id(p)))
-        jitter = int(hashlib.md5(permit_id.encode()).hexdigest()[:4], 16) % 5
-        score += jitter
-
-        raw_scores.append(score)
-
-    # Step 3: FORCED LINEAR SPREAD — map actual score range to 40-99
-    raw_min = min(raw_scores)
-    raw_max = max(raw_scores)
-    raw_range = raw_max - raw_min if raw_max > raw_min else 1
+    scores = calculate_lead_scores(permits)
 
     for i, p in enumerate(permits):
-        # Linear map: raw_min → 40, raw_max → 99
-        normalized = 40 + ((raw_scores[i] - raw_min) / raw_range) * 59
-        final_score = max(40, min(99, int(normalized)))
-
-        p['lead_score'] = final_score
+        score = scores[i] if i < len(scores) else 70
+        p['lead_score'] = score
 
         # Determine quality tier
-        if final_score >= 85:
+        if score >= 85:
             p['lead_quality'] = 'hot'
-        elif final_score >= 70:
+        elif score >= 70:
             p['lead_quality'] = 'warm'
         else:
             p['lead_quality'] = 'standard'

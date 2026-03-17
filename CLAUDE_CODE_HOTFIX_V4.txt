@@ -1,0 +1,251 @@
+===============================================================================
+CLAUDE CODE HOTFIX SPEC V4 — PERMITGRAB REMAINING ISSUES
+Post V3-Hotfix UAT — March 17, 2026
+===============================================================================
+
+CONTEXT:
+Claude Code completed the V3 hotfix spec (5 commits: c395633, 94c70b1, b8818bc,
+df9ee5d). UAT on the live site shows 3 of 5 fixes verified working, but 2 issues
+remain — one CRITICAL (duplicate email) was NOT fixed despite being in the V3 spec.
+
+===============================================================================
+FIX 1: DUPLICATE EMAIL REGISTRATION — STILL BROKEN  [CRITICAL]
+===============================================================================
+
+PROBLEM:
+This was Fix 3 in the V3 spec. Despite commit c395633 claiming to add a
+case-insensitive duplicate email check, the signup form STILL allows creating
+accounts with an email that already exists in the database.
+
+REPRODUCTION STEPS (verified on live site March 17, 2026):
+1. Navigate to permitgrab.com/signup
+2. Enter name: "Test Duplicate User"
+3. Enter email: wcrainshaw@gmail.com (already exists)
+4. Enter password: TestPass123!
+5. Confirm password: TestPass123!
+6. Check "I agree to Terms"
+7. Click "Create Account"
+8. RESULT: Redirects to /onboarding — account was created with NO error
+
+WHAT SHOULD HAPPEN:
+- Should show error: "An account with this email already exists. Please log in instead."
+- Should NOT create a new account
+- Should redirect back to /signup with the error message
+
+DEBUGGING — CHECK THESE SPECIFIC THINGS:
+1. Open the signup route handler in the server code
+2. Look for the duplicate email check that was supposedly added in c395633
+3. Check if the check is BEFORE or AFTER the user creation — it may exist but
+   be in the wrong position (after the insert instead of before)
+4. Check if the email comparison is case-sensitive — the check might use
+   exact match while the stored email has different casing
+5. Check if the UNIQUE constraint was actually added to the database schema:
+   - Look at the User model definition
+   - Look for any migration/schema update that adds UNIQUE to email
+   - If using SQLAlchemy, check for: email = db.Column(db.String, unique=True)
+6. Check the database directly:
+   SELECT email, COUNT(*) FROM users GROUP BY LOWER(email) HAVING COUNT(*) > 1;
+   — This will show if duplicates already exist
+
+THE FIX MUST:
+a) Add a check BEFORE creating the user: query for existing user by email
+b) Normalize email with .lower().strip() before both the check AND the insert
+c) Return a clear error message if the email already exists
+d) Add unique=True to the email column in the SQLAlchemy model
+e) Add a database migration or ALTER TABLE to enforce the UNIQUE constraint
+f) Clean up existing duplicate records (keep the NEWEST per email):
+
+```python
+# In the signup route — this MUST be BEFORE creating the new user:
+email = request.form.get('email', '').lower().strip()
+existing = User.query.filter(db.func.lower(User.email) == email).first()
+if existing:
+    flash('An account with this email already exists. Please log in instead.', 'error')
+    return redirect(url_for('signup'))
+
+# THEN create the user:
+new_user = User(email=email, name=name, ...)
+```
+
+```sql
+-- One-time cleanup of existing duplicates (run in production DB):
+-- First, identify duplicates:
+SELECT email, COUNT(*) FROM users GROUP BY LOWER(email) HAVING COUNT(*) > 1;
+
+-- Then delete all but the newest per email:
+DELETE FROM users WHERE id NOT IN (
+    SELECT MAX(id) FROM users GROUP BY LOWER(email)
+);
+
+-- Add unique constraint:
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (LOWER(email));
+```
+
+VERIFICATION:
+1. Try to sign up with wcrainshaw@gmail.com (existing email)
+2. Should see error message on the signup page
+3. Should NOT redirect to /onboarding
+4. Check DB: SELECT email, COUNT(*) FROM users GROUP BY LOWER(email) HAVING COUNT(*) > 1
+   — Should return 0 rows
+
+
+===============================================================================
+FIX 2: LEAD SCORING — NORMALIZE TO VISIBLE DATASET  [MEDIUM]
+===============================================================================
+
+PROBLEM:
+The V3 scoring formula (commit b8818bc) produces scores in the 79-99 range for
+permits visible on the dashboard. The target was 40-99. The formula itself is
+mathematically correct, but the data characteristics of dashboard permits
+(all recent, mostly active/issued, with contact info, $1K-$1.8M value) mean
+the minimum score is approximately:
+  - Value: 5-30 pts (most are $1K+ so 5-30)
+  - Recency: 15-25 pts (all within 7 days)
+  - Status: 10-15 pts (active/issued/permitted)
+  - Contact: 5-10 pts (most have contact info)
+  - Trade: 4-10 pts
+  - Jitter: 0-9 pts
+  = Minimum ~54, but in practice ~79 because most permits tick all boxes
+
+THE REAL ISSUE:
+The formula uses ABSOLUTE thresholds that don't differentiate within the
+dashboard's data range. A $7,500 plumbing permit from 5 days ago with contact
+info scores 79, and a $1.8M electrical permit from today with contact info
+scores 99. That's only 20 points of spread.
+
+BETTER APPROACH — PERCENTILE-BASED SCORING:
+Instead of absolute thresholds, normalize scores relative to the permits
+currently in the dataset. This guarantees spread across the full range.
+
+```python
+def calculate_lead_scores(permits):
+    """Score permits relative to each other for maximum spread."""
+    import hashlib
+
+    # 1. Calculate raw composite score for each permit
+    raw_scores = []
+    for p in permits:
+        raw = 0
+
+        # Value component (log scale for better distribution)
+        value = p.get('project_value') or p.get('estimated_cost') or 0
+        if value > 0:
+            import math
+            raw += math.log10(max(value, 1)) * 5  # log scale: $1K=15, $100K=25, $1M=30
+
+        # Recency (days old, inverted)
+        from datetime import datetime
+        filed = p.get('filed_date') or p.get('filing_date') or p.get('date')
+        if filed:
+            if isinstance(filed, str):
+                try: filed = datetime.strptime(filed[:10], '%Y-%m-%d')
+                except: filed = None
+            if filed:
+                days = (datetime.now() - filed).days
+                raw += max(0, 30 - days)  # 30 pts for today, 0 for 30+ days
+
+        # Status
+        status = (p.get('status') or '').lower()
+        status_scores = {'filed': 15, 'active': 12, 'issued': 10, 'approved': 10,
+                         'permitted': 8, 'pending': 5, 'completed': 2, 'closed': 1}
+        raw += status_scores.get(status, 5)
+
+        # Contact info
+        has_phone = bool(p.get('phone') or p.get('contact_phone'))
+        has_name = bool(p.get('contact_name') or p.get('owner') or p.get('owner_name'))
+        raw += (5 if has_phone else 0) + (5 if has_name else 0)
+
+        # Trade type
+        trade = (p.get('trade') or p.get('permit_type') or p.get('trade_category') or '').lower()
+        high_trades = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire protection']
+        raw += 10 if any(t in trade for t in high_trades) else 5
+
+        raw_scores.append(raw)
+
+    # 2. Normalize to 40-99 range using percentile ranking
+    if not raw_scores:
+        return []
+
+    sorted_scores = sorted(set(raw_scores))
+    n = len(sorted_scores)
+
+    final_scores = []
+    for i, raw in enumerate(raw_scores):
+        if n <= 1:
+            percentile = 0.5
+        else:
+            rank = sorted_scores.index(raw)
+            percentile = rank / (n - 1)
+
+        # Map percentile to 40-99
+        score = int(40 + percentile * 59)
+
+        # Add small jitter from permit ID
+        permit_id = str(permits[i].get('id') or permits[i].get('permit_number') or '')
+        jitter = int(hashlib.md5(permit_id.encode()).hexdigest()[:4], 16) % 5
+        score = max(40, min(99, score + jitter - 2))
+
+        final_scores.append(score)
+
+    return final_scores
+```
+
+KEY CHANGES:
+- Use PERCENTILE-BASED scoring instead of absolute thresholds
+- This guarantees the full 40-99 range is used regardless of data characteristics
+- The best permit in any dataset gets ~99, the worst gets ~40
+- Use log scale for project value to better differentiate within ranges
+
+VERIFICATION:
+1. Load the main dashboard
+2. Check scores across 15+ permits across different value tiers
+3. Confirm range spans at least 40 points (lowest ~45, highest ~99)
+4. Filter to Standard (<$10K) — should see scores in 40-70 range
+5. Filter to High Value — should see scores in 80-99 range
+
+
+===============================================================================
+FIX 3: SAVE SEARCH / EXPORT CSV BUTTONS — GATE FOR FREE USERS  [LOW]
+===============================================================================
+
+PROBLEM:
+The "Save Search" and "Export CSV" buttons at the top of the permit listing
+are visible to anonymous and free users. These should be Pro-only features.
+
+FIX:
+Option A (hide buttons):
+- In the template, wrap these buttons in a Pro-user check:
+  {% if current_user.is_authenticated and current_user.plan == 'pro' %}
+    <button>Save Search</button>
+    <button>Export CSV</button>
+  {% endif %}
+
+Option B (show with upgrade prompt — RECOMMENDED):
+- Keep buttons visible but modify their click handlers:
+  {% if not current_user.is_authenticated or current_user.plan != 'pro' %}
+    onclick="window.location.href='/pricing'"
+  {% endif %}
+- This teases the feature and drives conversions
+
+VERIFICATION:
+1. Visit as anonymous user — Save Search / Export CSV should prompt upgrade
+2. Visit as free user — same behavior
+3. Visit as Pro user — buttons should function normally
+
+
+===============================================================================
+SUMMARY — PRIORITY ORDER
+===============================================================================
+
+Fix 1: Duplicate email prevention          [CRITICAL] — data integrity, was in V3
+Fix 2: Lead scoring percentile-based       [MEDIUM]   — product quality
+Fix 3: Save Search / Export CSV gating     [LOW]      — revenue protection
+
+EXECUTION ORDER: 1 → 2 → 3
+
+Fix 1 is the highest priority since it was supposed to be fixed in V3 and is
+still broken. It also has a cascading effect on login reliability (Fix 4 from
+V3 works but is fragile with duplicate records).
+
+After ALL fixes, deploy and verify each on the live site.
+===============================================================================

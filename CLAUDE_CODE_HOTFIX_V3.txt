@@ -1,0 +1,339 @@
+===============================================================================
+CLAUDE CODE HOTFIX SPEC V3 — PERMITGRAB REMAINING ISSUES
+Post V2-Hotfix UAT — March 17, 2026
+===============================================================================
+
+CONTEXT:
+Claude Code completed the V2 hotfix spec (CLAUDE_CODE_HOTFIX_GATING_V2.txt).
+UAT shows some items fixed, others partially fixed, and 2 new bugs discovered.
+
+EXECUTION ORDER: Fix 1 → 2 → 3 → 4 → 5
+Each fix must be verified on the LIVE site (permitgrab.com) before moving to next.
+
+===============================================================================
+FIX 1: CONTACT INFO GATING — FIRST 5 PERMITS LEAK DATA  [CRITICAL]
+===============================================================================
+
+PROBLEM:
+The freemium gating is INCONSISTENT on the main permits page. The first ~5
+permit cards show FULL phone numbers, contact names, Save Lead buttons, and
+Export buttons to anonymous AND logged-in free users. Starting around the 6th
+permit card, gating works correctly — blurred phone, "Upgrade for contact
+details" link, no Save Lead/Export buttons.
+
+EVIDENCE:
+  Permit 1 (6227 16th St Mall): Phone (368) 646-4360 VISIBLE, "Kevin Kumar" VISIBLE
+  Permit 2 (184 Broadway): Phone (894) 620-3377 VISIBLE, "Chen O'Brien" VISIBLE
+  Permit 3 (1388 Flatbush Ave): Phone (889) 397-7133 VISIBLE, "Oleg Thompson" VISIBLE
+  Permit 4 (2049 S Western Ave): Phone (929) 298-8297 VISIBLE, "Lisa Chen" VISIBLE
+  Permit 5 (5164 S Ashland Ave): Phone (234) 383-6874 VISIBLE, "Daniel Taylor" VISIBLE
+  Permit 6 (678 Court St): BLURRED phone, "Upgrade for contact details" — CORRECT
+  Permit 7+ (all subsequent): CORRECT gating
+
+ROOT CAUSE INVESTIGATION:
+The gating works on MOST permits but fails on the first batch. This pattern
+strongly suggests one of these causes:
+
+  A) The permits come from TWO different data sources or code paths:
+     - The first batch may be "featured" or "pinned" permits rendered by a
+       different template block that doesn't apply the gating check
+     - Check if there's a separate section for "top permits" or "featured leads"
+       in the main page template that bypasses the is_pro/user_plan check
+
+  B) Server-side rendering vs client-side AJAX:
+     - The first batch may be server-rendered in the initial HTML (with full data)
+     - Additional permits may be loaded via AJAX with gating applied in the API
+     - Check: View page source and look at the first permit cards — is the phone
+       number in the raw HTML? If yes, the server template isn't gating.
+
+  C) Pagination/offset issue:
+     - The gating logic may only apply starting from offset > 5 or similar
+     - Check the Python route handler for the main page — look for any logic
+       that treats the first N results differently
+
+DEBUGGING STEPS:
+1. Find the main page route (likely "/" or "/dashboard") in server.py or app.py
+2. Find where permits are passed to the template
+3. Search for ANY code that splits permits into groups (featured vs regular)
+4. Check the Jinja template — look for TWO different loops or blocks rendering
+   permit cards (one might have gating, the other might not)
+5. Check if there's client-side JavaScript that renders permit cards and whether
+   it applies different logic to the first batch
+
+FIX REQUIREMENTS:
+- ALL permit cards must apply the same gating logic for non-Pro users
+- Phone number: Show blurred/masked version (e.g. "(XXX) XXX-XXXX") with
+  "Upgrade for contact details" link
+- Contact name: Hide completely or blur
+- Save Lead button: Hide or disable with upgrade prompt
+- Export button: Hide or disable with upgrade prompt
+- The gating must work for BOTH anonymous visitors AND logged-in free users
+
+ALSO FIX — TOP-LEVEL BUTTONS:
+The "Save Search" and "Export CSV" buttons at the top of the permit listing
+remain visible and likely functional for free users. These should either:
+  a) Be hidden entirely for non-Pro users, OR
+  b) Show a modal/redirect to upgrade when clicked by non-Pro users
+
+VERIFICATION:
+1. Open permitgrab.com in incognito (anonymous)
+2. Scroll through the first 10 permits — ALL should show blurred contact info
+3. Log in as a free user — same gating should apply
+4. Click Save Search — should prompt upgrade or be hidden
+5. Click Export CSV — should prompt upgrade or be hidden
+
+
+===============================================================================
+FIX 2: LEAD SCORING — WIDEN DISTRIBUTION TO 40-99  [HIGH]
+===============================================================================
+
+PROBLEM:
+Lead scores on the main dashboard range from 84-90 (6-point spread). The target
+is 40-99 with meaningful differentiation. A $1.8M electrical permit today scores
+90, while a $686K HVAC permit from 2 days ago scores 84. That's not enough
+spread to help users prioritize.
+
+INTERESTING: The onboarding preview shows scores of 68-70 for smaller permits
+($5K-$20K). So the scoring function CAN produce lower scores — but the main
+dashboard only shows high-value permits that all cluster at the top.
+
+THE REAL FIX:
+The scoring formula needs to use the FULL 40-99 range across the permits that
+actually appear on the dashboard. Since the dashboard shows permits ranging
+from ~$500K to $1.8M, the formula needs to differentiate within THAT range.
+
+SCORING FORMULA — IMPLEMENT THIS:
+```python
+def calculate_lead_score(permit):
+    score = 0
+
+    # 1. Project value (0-30 points)
+    value = permit.get('project_value', 0) or 0
+    if value >= 1_000_000:
+        score += 30
+    elif value >= 500_000:
+        score += 25
+    elif value >= 250_000:
+        score += 20
+    elif value >= 100_000:
+        score += 15
+    elif value >= 50_000:
+        score += 10
+    elif value >= 10_000:
+        score += 5
+    else:
+        score += 0
+
+    # 2. Recency (0-25 points)
+    from datetime import datetime, timedelta
+    filed_date = permit.get('filed_date') or permit.get('date')
+    if filed_date:
+        if isinstance(filed_date, str):
+            try:
+                filed_date = datetime.strptime(filed_date[:10], '%Y-%m-%d')
+            except:
+                filed_date = None
+        if filed_date:
+            days_old = (datetime.now() - filed_date).days
+            if days_old <= 1:
+                score += 25
+            elif days_old <= 3:
+                score += 20
+            elif days_old <= 7:
+                score += 15
+            elif days_old <= 14:
+                score += 10
+            elif days_old <= 30:
+                score += 5
+            else:
+                score += 0
+
+    # 3. Permit status (0-15 points)
+    status = (permit.get('status') or '').lower()
+    if status in ('active', 'issued', 'approved'):
+        score += 15
+    elif status in ('permitted', 'filed', 'pending'):
+        score += 10
+    elif status in ('completed', 'closed'):
+        score += 3
+    else:
+        score += 7
+
+    # 4. Has contact info (0-10 points)
+    has_phone = bool(permit.get('phone') or permit.get('contact_phone'))
+    has_name = bool(permit.get('contact_name') or permit.get('owner'))
+    if has_phone and has_name:
+        score += 10
+    elif has_phone or has_name:
+        score += 5
+
+    # 5. Trade type value (0-10 points) — commercial trades score higher
+    trade = (permit.get('trade') or permit.get('permit_type') or '').lower()
+    high_value_trades = ['electrical', 'hvac', 'plumbing', 'new construction',
+                         'fire protection', 'structural']
+    mid_value_trades = ['roofing', 'interior renovation', 'general construction',
+                        'demolition', 'addition']
+    if any(t in trade for t in high_value_trades):
+        score += 10
+    elif any(t in trade for t in mid_value_trades):
+        score += 7
+    else:
+        score += 4
+
+    # 6. Jitter for visual variety (0-9 points based on permit ID hash)
+    permit_id = str(permit.get('id') or permit.get('permit_number') or '')
+    jitter = hash(permit_id) % 10
+    score += jitter
+
+    # Clamp to 40-99
+    return max(40, min(99, score))
+```
+
+KEY POINTS:
+- The formula MUST produce scores across the full 40-99 range
+- Older, lower-value, completed permits should score in the 40-60 range
+- Fresh, high-value, active permits should score in the 80-99 range
+- The jitter component prevents identical-looking permits from having the same score
+
+VERIFICATION:
+1. Load the main dashboard
+2. Check scores across at least 15 permits
+3. Confirm the range spans at least 30 points (e.g., lowest ~50, highest ~95)
+4. Confirm the onboarding preview also uses the updated scoring
+
+
+===============================================================================
+FIX 3: DUPLICATE EMAIL REGISTRATION  [CRITICAL]
+===============================================================================
+
+PROBLEM:
+The signup form allows creating multiple accounts with the same email address.
+User registered with wcrainshaw@gmail.com, then was able to register AGAIN with
+the same email. This is a serious data integrity issue.
+
+FIX:
+In the signup/registration route handler:
+1. Before creating a new user, query the database for existing users with that email
+2. If a user already exists with that email, return an error:
+   "An account with this email already exists. Please log in instead."
+3. Add a UNIQUE constraint on the email column in the database if not already present
+
+```python
+# In the signup route handler:
+existing_user = User.query.filter_by(email=email.lower().strip()).first()
+if existing_user:
+    flash('An account with this email already exists. Please log in instead.', 'error')
+    return redirect(url_for('signup'))
+```
+
+ALSO: Normalize email to lowercase before storing and before querying.
+
+VERIFICATION:
+1. Try to sign up with an email that already exists
+2. Should see error message, not create a duplicate
+3. Check the database — run: SELECT email, COUNT(*) FROM users GROUP BY email HAVING COUNT(*) > 1
+   Should return 0 rows after cleanup
+
+
+===============================================================================
+FIX 4: PASSWORD HASHING / LOGIN MISMATCH  [CRITICAL]
+===============================================================================
+
+PROBLEM:
+After creating a new account with a known password, logging out, and trying to
+log back in with the EXACT same password, login fails with "Invalid email or
+password." This happened multiple times across testing sessions.
+
+ROOT CAUSE INVESTIGATION:
+1. Check how passwords are hashed on signup — is it using bcrypt/werkzeug?
+2. Check how passwords are verified on login — same library?
+3. Check if the duplicate email issue (Fix 3) causes login to find the WRONG
+   user record (e.g., the old one with a different password hash)
+4. Check if there's a character encoding issue (special characters in password)
+5. Check if the password field has a maxlength that silently truncates
+
+LIKELY CAUSE:
+Given that duplicate emails are allowed, the login query probably does:
+  User.query.filter_by(email=email).first()
+This returns the FIRST user record, which might be an old account with a
+different password. Fix 3 (preventing duplicates) may resolve this too, but
+also need to clean up existing duplicate records.
+
+FIX:
+1. Implement Fix 3 first (prevent duplicates)
+2. Clean up existing duplicates — keep only the MOST RECENT account per email:
+   ```python
+   # One-time cleanup script or migration
+   from sqlalchemy import func
+   dupes = db.session.query(User.email).group_by(User.email).having(func.count() > 1).all()
+   for (email,) in dupes:
+       users = User.query.filter_by(email=email).order_by(User.created_at.desc()).all()
+       for old_user in users[1:]:  # Keep first (newest), delete rest
+           db.session.delete(old_user)
+   db.session.commit()
+   ```
+3. Ensure login normalizes email: email.lower().strip()
+4. Add logging to the login route to help debug future issues:
+   ```python
+   user = User.query.filter_by(email=email.lower().strip()).first()
+   if not user:
+       app.logger.warning(f"Login failed: no user found for {email}")
+   elif not check_password_hash(user.password_hash, password):
+       app.logger.warning(f"Login failed: wrong password for {email}")
+   ```
+
+VERIFICATION:
+1. Sign up with a fresh email + password
+2. Log out
+3. Log back in with same credentials — should succeed
+4. Try logging in with wrong password — should fail with clear error
+
+
+===============================================================================
+FIX 5: ONBOARDING — MISSING TRADE CATEGORIES  [LOW]
+===============================================================================
+
+PROBLEM:
+The onboarding trade dropdown has 12 options, but the main dashboard shows
+trades that aren't in the onboarding list. Specifically:
+  - "Interior Renovation" (283 permits — 3rd most common!) is NOT in onboarding
+  - "Windows & Doors" (155 permits) is NOT in onboarding
+  - "Structural" (99 permits) is NOT in onboarding
+  - "Landscaping & Exterior" (89 permits) is NOT in onboarding
+  - "Addition" (37 permits) is NOT in onboarding
+
+The onboarding does include "Landscaping" and "Concrete & Masonry" but the
+dashboard uses "Landscaping & Exterior" and doesn't have "Concrete & Masonry."
+
+FIX:
+Update the onboarding trade dropdown to include ALL trades that appear on the
+main dashboard. Sync the trade names between onboarding and the dashboard.
+Add at minimum:
+  - Interior Renovation
+  - Windows & Doors
+  - Structural
+  - Addition
+
+ALSO: Consider adding an "All Trades" option in onboarding for users who want
+to see everything.
+
+VERIFICATION:
+1. Compare the trade dropdown in onboarding with the "Leads by Trade" sidebar
+2. Every trade in the sidebar should have a matching option in onboarding
+
+
+===============================================================================
+SUMMARY — PRIORITY ORDER
+===============================================================================
+
+Fix 1: Contact info gating on first 5 permits     [CRITICAL] — revenue blocker
+Fix 3: Duplicate email registration                [CRITICAL] — data integrity
+Fix 4: Password/login mismatch                     [CRITICAL] — user can't log in
+Fix 2: Lead scoring distribution                   [HIGH]     — product quality
+Fix 5: Onboarding missing trade categories         [LOW]      — completeness
+
+EXECUTION ORDER: 3 → 4 → 1 → 2 → 5
+(Fix duplicates first since it likely causes the login issue)
+
+After ALL fixes, do a final deploy and verify each on the live site.
+===============================================================================

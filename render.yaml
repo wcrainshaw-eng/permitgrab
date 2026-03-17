@@ -1,4 +1,4 @@
-# Deploy to Render.com (free tier available)
+# Deploy to Render.com
 # 1. Push this repo to GitHub
 # 2. Connect to Render.com
 # 3. It auto-deploys from this config
@@ -12,4 +12,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-    plan: free
+    # Persistent disk for user data (survives deploys)
+    disk:
+      name: permitgrab-data
+      mountPath: /var/data
+      sizeGB: 1

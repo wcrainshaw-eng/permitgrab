@@ -1,0 +1,601 @@
+===============================================================================
+CLAUDE CODE HOTFIX SPEC V6 — PERMITGRAB
+March 17, 2026 — POST V5-UAT
+===============================================================================
+
+STOP. READ THIS ENTIRE DOCUMENT BEFORE WRITING A SINGLE LINE OF CODE.
+THIS IS NOT OPTIONAL. THESE TWO FIXES HAVE FAILED THREE TIMES IN A ROW.
+
+===============================================================================
+FAILURE HISTORY — WHY YOU MUST FOLLOW THIS SPEC EXACTLY
+===============================================================================
+
+Fix 1 (Duplicate Email Prevention) has FAILED in V3, V4, and V5:
+  - V3: Added an "application-level check." It didn't work. Signup with an
+    existing email still succeeds and redirects to /onboarding.
+  - V4: Added fcntl file locking. It didn't work. Same result.
+  - V5: Spec asked for 3 layers (DB constraint, model unique, app check).
+    NONE of them were implemented. Signup with existing email STILL succeeds
+    and redirects to /onboarding. No error message. No constraint. Nothing.
+
+Fix 2 (Lead Scoring) has FAILED in V3, V4, and V5:
+  - V3: Absolute thresholds. Result: 79-99 range (20pt spread). Target: 40-99.
+  - V4: Percentile ranking. Result: 97-99 range (2pt spread). WORSE.
+  - V5: Spec asked for forced linear spread (min→40, max→99). Result: 80-99
+    range (19pt spread). The forced linear spread was NOT implemented. If it
+    had been, the minimum score would be exactly 40 — that's what "min→40"
+    means. Instead the minimum is 80, proving the old code is still running.
+
+Fix 3 (Save Search / Export CSV) PASSED in V5. Do not touch it.
+
+CASCADING BUG STILL PRESENT:
+When duplicate email accounts exist, login matches the NEWEST row. This means:
+  - Original user's Pro subscription is inaccessible
+  - Original user's password stops working
+  - Original user's name/data gets overwritten
+This makes Fix 1 the highest priority bug in the entire application.
+
+===============================================================================
+===============================================================================
+FIX 1: DUPLICATE EMAIL PREVENTION
+===============================================================================
+===============================================================================
+
+THERE ARE ONLY TWO THINGS YOU NEED TO DO FOR THIS FIX. THAT'S IT.
+DO NOT OVERCOMPLICATE THIS. DO NOT ADD FILE LOCKING. DO NOT ADD MIDDLEWARE.
+JUST DO THESE TWO THINGS:
+
+  THING 1: Add a check in the signup route BEFORE creating a new user.
+  THING 2: Add a database unique constraint on the email column.
+
+HERE IS EXACTLY HOW:
+
+---------------------------------------------------------------------------
+STEP 1: FIND AND PRINT THE SIGNUP ROUTE
+---------------------------------------------------------------------------
+
+Run this command:
+
+    grep -rn "def signup\|def register\|def sign_up\|def create_account\|@app.route.*signup\|@app.route.*register\|@app.route.*sign.up" .
+
+Then PRINT THE ENTIRE FUNCTION. Every line, from the def to the next def or
+the end of the file. You need to see all of it. Do not skim it.
+
+Look for:
+  - Where does it read the email from the form? (request.form.get('email'))
+  - Where does it create a User object? (User(...) or User(email=...))
+  - Where does it add to the session? (db.session.add(...))
+  - Where does it commit? (db.session.commit())
+  - Is there ALREADY a duplicate check? If yes, it's broken — find out why.
+    Maybe it checks the wrong field. Maybe it's AFTER the insert. Maybe it
+    uses == instead of case-insensitive comparison. PRINT what you find.
+
+---------------------------------------------------------------------------
+STEP 2: ADD THE DUPLICATE CHECK
+---------------------------------------------------------------------------
+
+Find the line where the email is extracted from the form. It looks something
+like:
+
+    email = request.form.get('email')
+
+IMMEDIATELY AFTER that line (and after any form validation like checking
+for blank fields), add this EXACT code:
+
+    # Duplicate email check — added V6
+    email = email.lower().strip()
+    existing_user = User.query.filter(
+        db.func.lower(User.email) == email
+    ).first()
+    if existing_user:
+        flash('An account with this email already exists. Please log in.', 'error')
+        return redirect(url_for('login'))
+
+IF the flash/redirect pattern doesn't match the app's style (maybe it uses
+JSON responses, or renders a template with an error), adapt the error response
+to match but KEEP THE LOGIC: check for existing, return early if found.
+
+CRITICAL: This check MUST come BEFORE any of these lines:
+    new_user = User(...)
+    user = User(...)
+    db.session.add(...)
+    db.session.commit()
+
+If the check is AFTER the insert, it does nothing. This is likely why V3 failed.
+
+---------------------------------------------------------------------------
+STEP 3: ADD INTEGRITYERROR FALLBACK
+---------------------------------------------------------------------------
+
+Find where db.session.commit() is called after creating the new user.
+Wrap it in a try/except:
+
+    from sqlalchemy.exc import IntegrityError  # Add to top of file
+
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash('An account with this email already exists. Please log in.', 'error')
+        return redirect(url_for('login'))
+
+If commit() is already inside a try/except, add IntegrityError handling to it.
+
+---------------------------------------------------------------------------
+STEP 4: ADD DATABASE UNIQUE CONSTRAINT
+---------------------------------------------------------------------------
+
+Find the database connection string. Run:
+
+    grep -rn "DATABASE_URL\|SQLALCHEMY_DATABASE_URI\|sqlite\|postgresql" .
+
+DETERMINE THE DATABASE TYPE:
+  - If it contains "sqlite": it's SQLite
+  - If it contains "postgresql" or "postgres": it's PostgreSQL
+
+FOR POSTGRESQL (most likely since this is on Render):
+
+    You need the DATABASE_URL from the Render environment. Find it with:
+        grep -rn "DATABASE_URL" . | head -20
+    Or check the Render dashboard for the database connection string.
+
+    Then run this SQL against the production database:
+
+    -- First, delete duplicate rows (keep oldest account per email):
+    DELETE FROM users
+    WHERE id NOT IN (
+        SELECT MIN(id) FROM users GROUP BY LOWER(email)
+    );
+
+    -- Then add the unique constraint:
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+    ON users (LOWER(email));
+
+    You can run this via:
+    python3 -c "
+    import os, psycopg2
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    cur.execute('''DELETE FROM users WHERE id NOT IN (SELECT MIN(id) FROM users GROUP BY LOWER(email))''')
+    print(f'Deleted {cur.rowcount} duplicate rows')
+    cur.execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (LOWER(email))''')
+    conn.commit()
+    print('Unique index created')
+    cur.execute('''SELECT email, id FROM users ORDER BY id''')
+    print('Remaining users:', cur.fetchall())
+    conn.close()
+    "
+
+FOR SQLITE:
+
+    Find the .db file path, then:
+    python3 -c "
+    import sqlite3
+    conn = sqlite3.connect('PATH_TO_DB')
+    cur = conn.cursor()
+    cur.execute('''DELETE FROM users WHERE id NOT IN (SELECT MIN(id) FROM users GROUP BY LOWER(email))''')
+    print(f'Deleted {cur.rowcount} duplicate rows')
+    cur.execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (LOWER(email))''')
+    conn.commit()
+    print('Unique index created')
+    conn.close()
+    "
+
+---------------------------------------------------------------------------
+STEP 5: ALSO ADD unique=True TO THE MODEL
+---------------------------------------------------------------------------
+
+Find the User model:
+
+    grep -rn "class User" .
+
+Find the email column definition. It looks like:
+
+    email = db.Column(db.String(...), ...)
+
+Change it to include unique=True:
+
+    email = db.Column(db.String(255), unique=True, nullable=False)
+
+If unique=True is already there, leave it. This is a belt-and-suspenders layer.
+
+---------------------------------------------------------------------------
+STEP 6: DEPLOY AND VERIFY FIX 1 BEFORE DOING ANYTHING ELSE
+---------------------------------------------------------------------------
+
+Deploy the changes. Then test on the live site:
+
+    1. Go to the signup page on permitgrab.com
+    2. Try to register with wcrainshaw@gmail.com (an existing account)
+    3. EXPECTED: Error message "An account with this email already exists"
+    4. EXPECTED: You stay on the signup/login page — NOT redirected to /onboarding
+    5. Run this SQL to confirm no duplicates exist:
+       SELECT LOWER(email), COUNT(*) FROM users GROUP BY LOWER(email) HAVING COUNT(*) > 1;
+       -- Should return ZERO rows
+    6. Log in with wcrainshaw@gmail.com and verify Pro status is still active
+
+IF THE SIGNUP STILL REDIRECTS TO /ONBOARDING WITH NO ERROR:
+    - Your check is in the wrong place. PRINT the entire signup function again.
+    - Look for MULTIPLE code paths. Maybe there's an AJAX handler AND a form
+      handler. Maybe there's a separate API endpoint. Maybe the form posts to
+      a different route than you think.
+    - Run: grep -rn "/onboarding" . to find what routes redirect there.
+    - Run: grep -rn "def.*signup\|def.*register\|def.*sign_up" . to find ALL
+      signup-related functions.
+    - There may be more than one. FIX ALL OF THEM.
+
+DO NOT PROCEED TO FIX 2 UNTIL FIX 1 IS VERIFIED WORKING ON THE LIVE SITE.
+
+
+===============================================================================
+===============================================================================
+FIX 2: LEAD SCORING — FORCED LINEAR SPREAD
+===============================================================================
+===============================================================================
+
+CURRENT STATE (V5 UAT, tested March 17, 2026):
+  Scores: 80 80 80 80 80 80 80 81 81 81 81 81 81 81 81 81 81 82 82 82
+          82 82 82 82 83 83 83 83 83 83 83 84 84 84 84 85 85 86 86 86
+          87 88 88 89 89 90 90 91 97 99
+  Min: 80, Max: 99, Spread: 19 points
+  14 unique values across 50 permits
+
+TARGET STATE:
+  Min: ~40, Max: ~99, Spread: ~59 points
+  At least 25 unique values across 50 permits
+  No more than 5 permits sharing the exact same score
+
+THE CORE CONCEPT IS SIMPLE:
+  1. Give each permit a raw score based on its attributes
+  2. Find the lowest and highest raw scores in the batch
+  3. Linearly map: lowest raw → 40, highest raw → 99
+
+If you do step 3 correctly, it is MATHEMATICALLY IMPOSSIBLE for the minimum
+to be anything other than 40. The fact that V5 has a minimum of 80 proves
+that step 3 was not implemented.
+
+---------------------------------------------------------------------------
+STEP 1: FIND THE EXISTING SCORING FUNCTION
+---------------------------------------------------------------------------
+
+Run ALL of these searches:
+
+    grep -rn "lead_score\|lead_quality\|calculate.*score\|scoring" .
+    grep -rn "def.*score" .
+    grep -rn "80\|0\.8\|raw_score\|total_score" . --include="*.py"
+
+Find the function. PRINT IT COMPLETELY. Every line.
+
+Then find where it's CALLED:
+
+    grep -rn "calculate_lead\|lead_score.*=\|score.*permit\|scoring" .
+
+There may be:
+  - A function that scores ONE permit at a time (old V3 style)
+  - A function that scores a BATCH of permits (V4/V5 style)
+  - The scoring might be inline in a route handler, not in a separate function
+
+PRINT ALL OF IT. You need to see where scores get assigned to permits.
+
+---------------------------------------------------------------------------
+STEP 2: REPLACE THE SCORING FUNCTION
+---------------------------------------------------------------------------
+
+Delete the entire existing scoring function. Replace it with this EXACT code.
+Do NOT modify this code. Do NOT "improve" it. Do NOT merge it with existing
+code. DELETE the old function and PASTE this one:
+
+```python
+def calculate_lead_scores(permits):
+    """
+    V6 lead scoring with FORCED LINEAR SPREAD.
+    Takes a list of permit dicts, returns a list of integer scores.
+    Output range: 40-99, guaranteed by linear mapping.
+    """
+    import hashlib
+    from datetime import datetime
+
+    if not permits:
+        return []
+
+    # PHASE 1: Compute a raw score for each permit
+    raw_scores = []
+    for p in permits:
+        raw = 0.0
+
+        # Component A: Project value (will be normalized in phase 2)
+        value = 0.0
+        for key in ['project_value', 'estimated_cost', 'value', 'cost', 'amount']:
+            v = p.get(key)
+            if v is not None:
+                try:
+                    value = float(str(v).replace('$', '').replace(',', ''))
+                    break
+                except (ValueError, TypeError):
+                    pass
+        # Store raw value; normalization happens in phase 2
+
+        # Component B: Recency (0-25 points)
+        recency = 12.0  # default if no date found
+        for key in ['filed_date', 'filing_date', 'date', 'created_date', 'issue_date']:
+            d = p.get(key)
+            if d:
+                try:
+                    if isinstance(d, str):
+                        d = datetime.strptime(d[:10], '%Y-%m-%d')
+                    days_old = (datetime.now() - d).days
+                    recency = max(0.0, 25.0 - (days_old * 0.8))
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        # Component C: Status (0-15 points)
+        status_str = ''
+        for key in ['status', 'permit_status', 'state']:
+            s = p.get(key)
+            if s:
+                status_str = str(s).lower().strip()
+                break
+        status_scores = {
+            'filed': 15, 'new': 15, 'active': 13, 'issued': 11,
+            'approved': 11, 'permitted': 9, 'pending': 7, 'review': 7,
+            'in progress': 6, 'completed': 3, 'closed': 1, 'expired': 1
+        }
+        status_pts = status_scores.get(status_str, 7.0)
+
+        # Component D: Contact info (0-10 points)
+        has_phone = False
+        for key in ['phone', 'contact_phone', 'phone_number', 'tel']:
+            if p.get(key):
+                has_phone = True
+                break
+        has_name = False
+        for key in ['contact_name', 'owner', 'owner_name', 'applicant', 'name']:
+            if p.get(key):
+                has_name = True
+                break
+        contact_pts = (5.0 if has_phone else 0.0) + (5.0 if has_name else 0.0)
+
+        # Component E: Trade type (0-10 points)
+        trade_str = ''
+        for key in ['trade', 'permit_type', 'trade_category', 'type', 'work_type']:
+            t = p.get(key)
+            if t:
+                trade_str = str(t).lower()
+                break
+        high_value = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire']
+        mid_value = ['roofing', 'interior', 'demolition', 'addition', 'structural']
+        if any(h in trade_str for h in high_value):
+            trade_pts = 10.0
+        elif any(m in trade_str for m in mid_value):
+            trade_pts = 7.0
+        else:
+            trade_pts = 4.0
+
+        # Component F: Deterministic jitter (0-5 points, from permit ID hash)
+        permit_id_str = ''
+        for key in ['id', 'permit_number', 'permit_id', 'number']:
+            pid = p.get(key)
+            if pid is not None:
+                permit_id_str = str(pid)
+                break
+        if not permit_id_str:
+            permit_id_str = str(id(p))
+        jitter = (int(hashlib.md5(permit_id_str.encode()).hexdigest()[:6], 16) % 50) / 10.0
+
+        raw_scores.append({
+            'value': value,
+            'non_value_score': recency + status_pts + contact_pts + trade_pts + jitter
+        })
+
+    # PHASE 2: Normalize the value component within this dataset
+    values = [r['value'] for r in raw_scores]
+    min_val = min(values)
+    max_val = max(values)
+    val_range = max_val - min_val if max_val != min_val else 1.0
+
+    composite_scores = []
+    for r in raw_scores:
+        normalized_value = ((r['value'] - min_val) / val_range) * 35.0
+        composite = normalized_value + r['non_value_score']
+        composite_scores.append(composite)
+
+    # PHASE 3: FORCED LINEAR SPREAD — THIS IS THE CRITICAL PART
+    # Map the composite scores linearly so that:
+    #   - The permit with the LOWEST composite score gets exactly 40
+    #   - The permit with the HIGHEST composite score gets exactly 99
+    #   - Everything else is evenly distributed between 40 and 99
+    #
+    # THIS IS NON-NEGOTIABLE. If the output min is not ~40, this step is broken.
+
+    score_min = min(composite_scores)
+    score_max = max(composite_scores)
+    score_range = score_max - score_min if score_max != score_min else 1.0
+
+    final_scores = []
+    for cs in composite_scores:
+        # Linear interpolation: score_min → 40, score_max → 99
+        normalized = 40.0 + ((cs - score_min) / score_range) * 59.0
+        final_scores.append(max(40, min(99, round(normalized))))
+
+    return final_scores
+```
+
+---------------------------------------------------------------------------
+STEP 3: UPDATE THE CALL SITE
+---------------------------------------------------------------------------
+
+This function takes a LIST of permit dicts and returns a LIST of scores
+(same order). You need to find where scores are assigned to permits and
+update the call site.
+
+SEARCH FOR THE CALL SITE:
+
+    grep -rn "lead_score\|calculate.*score" . --include="*.py"
+
+The current code probably does ONE of these patterns:
+
+PATTERN A — Score assigned per-permit in a loop:
+    for permit in permits:
+        permit['lead_score'] = calculate_lead_score(permit)
+
+    CHANGE TO:
+    scores = calculate_lead_scores(permits)  # Note: plural function name
+    for i, permit in enumerate(permits):
+        permit['lead_score'] = scores[i]
+
+PATTERN B — Score assigned in a list comprehension:
+    permits = [{'lead_score': calculate_lead_score(p), ...} for p in data]
+
+    CHANGE TO:
+    scores = calculate_lead_scores(data)
+    for i, p in enumerate(permits):
+        p['lead_score'] = scores[i]
+
+PATTERN C — Score already computed batch-style:
+    scores = calculate_lead_scores(permits)
+    ...
+
+    If this pattern exists, just make sure it's calling YOUR NEW FUNCTION
+    and not some other function with a similar name.
+
+PATTERN D — Score computed in the template or JavaScript:
+    If scores are computed client-side, you need to either:
+    (a) Move scoring to the server (preferred), or
+    (b) Rewrite the same algorithm in JavaScript
+
+    Check: grep -rn "lead_score\|leadScore\|score" templates/ static/
+
+WHATEVER PATTERN YOU FIND, the key requirement is: ALL permits must be
+scored TOGETHER in a single batch call, not one at a time. The linear
+spread only works when the function can see all permits at once to find
+the min and max.
+
+---------------------------------------------------------------------------
+STEP 4: VERIFY THE OLD FUNCTION IS COMPLETELY GONE
+---------------------------------------------------------------------------
+
+After replacing, search again:
+
+    grep -rn "def calculate_lead_score\b" . --include="*.py"
+
+Note: that's calculate_lead_score (SINGULAR). The old function might still
+exist somewhere. If it does, DELETE IT. If any code still calls the singular
+version, update it to call the plural version.
+
+Also check for any HARDCODED score floor:
+
+    grep -rn "score.*80\|min.*80\|floor.*80\|max(80\|clamp.*80" . --include="*.py"
+
+If there's a line like:
+    score = max(80, score)
+or:
+    if score < 80: score = 80
+
+DELETE IT. That's what's causing the 80 floor in V5. The V6 function
+handles its own clamping to 40-99.
+
+---------------------------------------------------------------------------
+STEP 5: DEPLOY AND VERIFY FIX 2
+---------------------------------------------------------------------------
+
+Deploy the changes. Then test on the live site:
+
+    1. Go to permitgrab.com (logged in as Pro user)
+    2. Open browser console (F12)
+    3. Run this JavaScript:
+
+       const badges = document.querySelectorAll('.lead-score-badge');
+       const scores = [];
+       badges.forEach(b => {
+         const m = b.textContent.match(/(\d+)\s*pts/);
+         if (m) scores.push(parseInt(m[1]));
+       });
+       const sorted = [...scores].sort((a,b) => a-b);
+       console.log('Min:', Math.min(...scores));
+       console.log('Max:', Math.max(...scores));
+       console.log('Spread:', Math.max(...scores) - Math.min(...scores));
+       console.log('Unique values:', new Set(scores).size);
+       console.log('All scores:', sorted.join(', '));
+
+    4. CHECK THESE REQUIREMENTS:
+       ✓ Minimum score is between 40-45
+       ✓ Maximum score is between 95-99
+       ✓ Spread is at least 50 points
+       ✓ At least 20 unique score values
+       ✓ No more than 5 permits share the same score
+
+    IF THE MINIMUM IS STILL 80:
+       - You did not replace the function. Print the current function.
+       - OR there's a hardcoded floor. Search: grep -rn "80" in the scoring code.
+       - OR the function is called per-permit (not batch). The linear spread
+         maps ONE item to the full range, which means every permit gets the
+         same score. It MUST be called with ALL permits at once.
+
+    IF ALL SCORES ARE THE SAME (e.g., all 40, or all 70):
+       - The function is being called with a list of length 1. Find the call
+         site and make sure ALL permits are passed in a single list.
+
+
+===============================================================================
+WHAT NOT TO DO — MISTAKES FROM V3, V4, AND V5
+===============================================================================
+
+1. DO NOT use file locking (fcntl, lockf) for duplicate prevention.
+   Use a database constraint. That's what databases are for. (Failed in V4.)
+
+2. DO NOT use percentile ranking for lead scoring.
+   Ranking 50 pre-filtered results clusters at the top. (Failed in V4.)
+
+3. DO NOT add checks AFTER the database insert.
+   The duplicate check must come BEFORE User() is created. (Likely why V3 failed.)
+
+4. DO NOT keep the NEWEST duplicate when cleaning up.
+   Keep the OLDEST (MIN id) — it has the original Pro subscription.
+
+5. DO NOT apply a hardcoded floor like max(80, score).
+   If there's one in the existing code, REMOVE IT. The V6 function handles
+   its own range (40-99). A floor of 80 destroys the spread. (Likely why V5 failed.)
+
+6. DO NOT score permits one at a time.
+   The forced linear spread REQUIRES seeing all permits in a batch to find
+   the min and max. A function called with one permit returns 40 every time.
+
+7. DO NOT modify the V6 scoring function.
+   Copy-paste it exactly as written. Do not "optimize" it, do not merge it
+   with existing code, do not rename variables, do not change the constants.
+
+8. DO NOT skip the verification steps.
+   Every previous version was marked "done" without being tested, and every
+   one was still broken. Test on the LIVE SITE after deploying.
+
+9. DO NOT touch Fix 3 (Save Search / Export CSV).
+   It's working correctly. Leave it alone.
+
+
+===============================================================================
+EXECUTION CHECKLIST
+===============================================================================
+
+□ Read the entire spec
+□ Find and print the signup route
+□ Add duplicate email check BEFORE user creation
+□ Add IntegrityError try/except around commit
+□ Clean up existing duplicate rows in the database
+□ Add UNIQUE index on email column in the database
+□ Add unique=True to User model email column
+□ DEPLOY
+□ VERIFY Fix 1: signup with existing email shows error, does NOT go to /onboarding
+□ Find and print the existing scoring function
+□ DELETE the old scoring function entirely
+□ Paste the V6 calculate_lead_scores function exactly as written
+□ Update the call site to pass ALL permits as a batch
+□ Remove any hardcoded score floor (max(80, ...) or similar)
+□ DEPLOY
+□ VERIFY Fix 2: min score ~40, max score ~99, spread ≥50 points
+□ Verify Fix 3 still works (Save Search/Export CSV modals for non-Pro)
+
+===============================================================================
+END OF SPEC — THERE ARE ONLY 2 FIXES. DO THEM RIGHT THIS TIME.
+===============================================================================
