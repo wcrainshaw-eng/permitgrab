@@ -440,6 +440,46 @@ def generate_permit_description(permit):
 # ===========================
 # DATA LOADING
 # ===========================
+def format_permit_address(permit):
+    """V12.11: Format address field appropriately.
+
+    For county datasets, addresses may be location/area names (no street number).
+    Detect these and label them as "Location:" instead of pretending they're street addresses.
+    """
+    address = permit.get('address', '') or ''
+    if not address.strip():
+        permit['display_address'] = 'Address not provided'
+        permit['address_type'] = 'none'
+        return
+
+    address_clean = address.strip()
+
+    # Check if it looks like a real street address (has a number at the start)
+    import re
+    has_street_number = bool(re.match(r'^\d+\s', address_clean))
+
+    # Common area/location-only patterns (no street number, short, all caps)
+    is_location_only = (
+        not has_street_number and
+        len(address_clean) < 30 and
+        (address_clean.isupper() or
+         address_clean.upper() in ['MONTGOMERY', 'ROCK SPRING', 'BETHESDA', 'SILVER SPRING',
+                                   'ROCKVILLE', 'WHEATON', 'GERMANTOWN', 'GAITHERSBURG',
+                                   'POTOMAC', 'CHEVY CHASE', 'TAKOMA PARK', 'KENSINGTON'])
+    )
+
+    if is_location_only:
+        permit['display_address'] = f"Area: {address_clean.title()}"
+        permit['address_type'] = 'location'
+    elif not has_street_number and len(address_clean.split()) <= 3:
+        # Short address without number - likely a location name
+        permit['display_address'] = f"Location: {address_clean.title()}"
+        permit['address_type'] = 'location'
+    else:
+        permit['display_address'] = address_clean
+        permit['address_type'] = 'street'
+
+
 def validate_permit_dates(permit):
     """V12.9: Validate and relabel future-dated permits.
 
@@ -497,6 +537,7 @@ def load_permits():
                 try:
                     reclassify_permit(permit)
                     validate_permit_dates(permit)  # V12.9: Fix future-dated permits
+                    format_permit_address(permit)  # V12.11: Fix county address display
                     permit['display_description'] = generate_permit_description(permit)
                 except Exception as e:
                     print(f"[Server] Warning: Failed to process permit: {e}")
@@ -4019,6 +4060,9 @@ def city_landing(city_slug):
     # V12.5: noindex for empty city pages to avoid thin content in Google
     robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
 
+    # V12.11: Coming Soon flag for empty cities
+    is_coming_soon = permit_count == 0
+
     # Trade breakdown
     trade_breakdown = {}
     for p in city_permits:
@@ -4057,10 +4101,19 @@ def city_landing(city_slug):
     # Other cities for footer links
     other_cities = [c for c in ALL_CITIES if c['slug'] != city_slug]
 
+    # V12.11: Nearby cities (same state) for internal linking
+    current_state = config.get('state', '')
+    nearby_cities = [c for c in ALL_CITIES if c.get('state') == current_state and c['slug'] != city_slug]
+    # If fewer than 6 same-state cities, add some from other states
+    if len(nearby_cities) < 6:
+        other_state_cities = [c for c in ALL_CITIES if c.get('state') != current_state][:6 - len(nearby_cities)]
+        nearby_cities = nearby_cities + other_state_cities
+
     return render_template(
         'city_landing.html',
         city_name=config['name'],
         city_slug=city_slug,
+        city_state=current_state,
         meta_title=config['meta_title'],
         meta_description=config['meta_description'],
         seo_content=config['seo_content'],
@@ -4074,7 +4127,9 @@ def city_landing(city_slug):
         trade_breakdown=trade_breakdown,
         permits=sorted_permits,
         other_cities=other_cities,
+        nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
         current_year=datetime.now().year,
+        is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
     )
 
 
@@ -4188,8 +4243,15 @@ def sitemap():
         {'loc': f"{SITE_URL}/terms", 'changefreq': 'monthly', 'priority': '0.3'},
     ]
 
-    # Add city landing pages
+    # V12.11: Only include cities with permits in sitemap (exclude empty/coming soon cities)
+    cities_with_data = get_cities_with_data()
+    cities_with_permits = {c['name'] for c in cities_with_data}
+
     for city in ALL_CITIES:
+        # Skip cities with no permits (these have noindex anyway)
+        if city['name'] not in cities_with_permits:
+            continue
+
         urls.append({
             'loc': f"{SITE_URL}/permits/{city['slug']}",
             'changefreq': 'daily',
@@ -4311,16 +4373,25 @@ def api_change_password():
 
 @app.route('/robots.txt')
 def robots():
-    """Serve robots.txt for search engines."""
+    """V12.11: Serve robots.txt for search engines."""
     content = f"""User-agent: *
 Allow: /
-Disallow: /admin
+Disallow: /admin/
 Disallow: /api/
+Disallow: /dashboard/
 Disallow: /my-leads
 Disallow: /early-intel
 Disallow: /analytics
 Disallow: /account
 Disallow: /saved-leads
+Disallow: /saved-searches
+Disallow: /billing
+Disallow: /onboarding
+Disallow: /logout
+Disallow: /reset-password
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
 
 Sitemap: {SITE_URL}/sitemap.xml
 """

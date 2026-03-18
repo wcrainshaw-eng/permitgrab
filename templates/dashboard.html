@@ -1879,7 +1879,7 @@ function renderPermits() {
           <span class="lead-score-badge ${leadQuality}">${scoreIcon} ${leadScore} pts</span>
           <span class="permit-value ${valueClass}">${cost}</span>
         </div>
-        <div class="permit-address"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address + ', ' + p.city + ', ' + p.state)}" target="_blank" rel="noopener" title="View on Google Maps" style="color: inherit; text-decoration: none;">${escapeHtml(p.address)} <span style="font-size: 12px;">&#128205;</span></a></div>
+        <div class="permit-address"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address + ', ' + p.city + ', ' + p.state)}" target="_blank" rel="noopener" title="View on Google Maps" style="color: inherit; text-decoration: none;">${escapeHtml(p.display_address || p.address)} <span style="font-size: 12px;">&#128205;</span></a></div>
         <div class="permit-city-state">${escapeHtml(p.city)}, ${p.state} ${p.zip || ''}</div>
         <div class="permit-description">${escapeHtml(p.display_description || p.description)}</div>
         <div class="permit-meta">

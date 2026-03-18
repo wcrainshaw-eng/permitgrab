@@ -206,7 +206,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         {% for permit in permits[:7] %}
         <tr>
           <td title="{{ permit.date_label | default('Filed') }}">{{ permit.filing_date[:10] if permit.filing_date else 'N/A' }}</td>
-          <td>{{ permit.address }}</td>
+          <td>{{ permit.display_address or permit.address }}</td>
           <td>{{ permit.description[:50] }}{% if permit.description and permit.description|length > 50 %}...{% endif %}</td>
           <td><span class="value-badge">${{ permit.estimated_cost | int | default(0) | format(',') if permit.estimated_cost else 'N/A' }}</span></td>
           <td>{{ permit.status or 'Filed' }}</td>
@@ -215,7 +215,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         {% for permit in permits[7:10] %}
         <tr class="blur-row">
           <td title="{{ permit.date_label | default('Filed') }}">{{ permit.filing_date[:10] if permit.filing_date else 'N/A' }}</td>
-          <td>{{ permit.address }}</td>
+          <td>{{ permit.display_address or permit.address }}</td>
           <td>{{ permit.description[:50] if permit.description else '' }}</td>
           <td><span class="value-badge">${{ permit.estimated_cost | int | default(0) | format(',') if permit.estimated_cost else 'N/A' }}</span></td>
           <td>{{ permit.status or 'Filed' }}</td>

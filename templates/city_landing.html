@@ -741,7 +741,30 @@ body {
   </div>
 </section>
 
-<!-- PERMITS PREVIEW -->
+<!-- PERMITS PREVIEW or COMING SOON -->
+{% if is_coming_soon %}
+<!-- V12.11: Coming Soon section for cities with no permits yet -->
+<section class="section">
+  <div class="section-header">
+    <h2>{{ city_name }} Permits Coming Soon</h2>
+    <p>We're working on adding permit data for {{ city_name }}. Be the first to know when it's available.</p>
+  </div>
+
+  <div class="permits-preview" style="text-align: center; padding: 60px 32px;">
+    <div style="font-size: 64px; margin-bottom: 24px;">&#128679;</div>
+    <h3 style="font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px;">
+      <span style="background: var(--accent); color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-right: 8px;">COMING SOON</span>
+      {{ city_name }} Permit Data
+    </h3>
+    <p style="color: var(--gray-500); margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto;">
+      We're actively working to add {{ city_name }} to our coverage area. Sign up for alerts and we'll notify you as soon as permit data becomes available.
+    </p>
+    <a href="/get-alerts" class="btn-primary" style="display: inline-block; background: var(--primary); color: white; padding: 14px 32px; border-radius: 8px; font-weight: 600; text-decoration: none;">
+      Get Notified When Available
+    </a>
+  </div>
+</section>
+{% else %}
 <section class="section">
   <div class="section-header">
     <h2>Latest {{ city_name }} Building Permits</h2>
@@ -758,7 +781,7 @@ body {
       <div class="permit-info">
         <h4>
           <span class="permit-trade">{{ permit.trade_category }}</span>
-          {{ permit.address }}
+          {{ permit.display_address or permit.address }}
         </h4>
         <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; {{ permit.date_label | default('Filed') }}: {{ permit.filing_date }}</p>
       </div>
@@ -769,6 +792,7 @@ body {
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
 <!-- ABOUT CITY -->
 <section class="about-section">
@@ -843,9 +867,9 @@ body {
       </div>
     </div>
     <div class="cross-link-box">
-      <h3>Permits in Nearby Cities</h3>
+      <h3>Permits in {{ city_state }} Cities</h3>
       <div class="cross-link-list">
-        {% for city in other_cities[:10] %}
+        {% for city in nearby_cities[:10] %}
         <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
         {% endfor %}
       </div>
