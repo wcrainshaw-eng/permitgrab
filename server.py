@@ -4292,8 +4292,9 @@ def run_initial_collection():
         print(f"[{datetime.now()}] Running initial data collection...")
 
         # Regular permit collection
+        # V12.4: Increased from 60 to 365 days to catch stale datasets
         from collector import collect_all, collect_permit_history
-        collect_all(days_back=60)
+        collect_all(days_back=365)
 
         # Violation collection
         try:

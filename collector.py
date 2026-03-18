@@ -125,6 +125,12 @@ def fetch_arcgis(config, days_back):
     resp.raise_for_status()
     data = resp.json()
 
+    # V12.4: Detect ArcGIS-level errors (HTTP 200 with error JSON body)
+    if "error" in data:
+        error_msg = data["error"].get("message", "Unknown ArcGIS error")
+        error_code = data["error"].get("code", "unknown")
+        raise Exception(f"ArcGIS error {error_code}: {error_msg}")
+
     if "features" in data:
         results = [f["attributes"] for f in data["features"]]
         # If using "none" date_format, filter in Python
@@ -193,6 +199,11 @@ def fetch_carto(config, days_back):
     resp = SESSION.get(endpoint, params=params, timeout=60)
     resp.raise_for_status()
     data = resp.json()
+
+    # V12.4: Detect CARTO SQL errors
+    if "error" in data:
+        error_msgs = data.get("error", [])
+        raise Exception(f"CARTO SQL error: {error_msgs}")
 
     if "rows" in data:
         return data["rows"]

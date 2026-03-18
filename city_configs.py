@@ -456,7 +456,7 @@ CITY_REGISTRY = {
             "description": "DESCRIPTION",
         },
         "date_field": "ISSUE_DATE",
-        "date_format": "epoch",
+        "date_format": "none",  # V12.4: Changed from epoch — may have stale data
         "limit": 2000,
         "active": True,
     },
@@ -485,7 +485,7 @@ CITY_REGISTRY = {
             "description": "Name",
         },
         "date_field": "Opend",
-        "date_format": "epoch",
+        "date_format": "none",  # V12.4: Changed from epoch — data not updated since Dec 2024
         "limit": 2000,
         "active": True,
     },
@@ -539,7 +539,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUED_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Service returns 404 — MD_OpenData/MapServer not found",
     },
 
     "raleigh": {
@@ -551,22 +552,23 @@ CITY_REGISTRY = {
         "dataset_id": "Building_Permits",
         "description": "Building Permits",
         "field_map": {
-            "permit_number": "PERMIT_NUM",
-            "permit_type": "PERMIT_TYPE",
-            "work_type": "WORK_CLASS",
-            "address": "SITE_ADDRESS",
-            "zip": "ZIP_CODE",
-            "owner_name": "OWNER_NAME",
-            "contact_name": "CONTRACTOR_NAME",
-            "filing_date": "ISSUED_DATE",
-            "status": "STATUS",
-            "estimated_cost": "TOTAL_SQFT",
-            "description": "PROJECT_NAME",
+            "permit_number": "permitnum",
+            "permit_type": "permittype",
+            "work_type": "workclass",
+            "address": "originaladdress1",
+            "zip": "originalzip",
+            "owner_name": "parcelownername",
+            "contact_name": "contractorcompanyname",
+            "filing_date": "issueddate",
+            "status": "statuscurrent",
+            "estimated_cost": "estprojectcost",
+            "description": "proposedworkdescription",
         },
-        "date_field": "ISSUED_DATE",
+        "date_field": "issueddate",
         "date_format": "epoch",
         "limit": 2000,
         "active": True,
+        "notes": "V12.4: Fixed field_map with real field names from ArcGIS API",
     },
 
     "phoenix": {
@@ -593,7 +595,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     "san_jose": {
@@ -620,7 +623,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Service returns 404 — endpoint moved or removed",
     },
 
     "san_diego": {
@@ -671,7 +675,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     # =========================================================================
@@ -1206,7 +1211,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     "orlando": {
@@ -1233,7 +1239,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     "tampa": {
@@ -1260,7 +1267,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     "jacksonville": {
@@ -1287,7 +1295,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     "virginia_beach": {
@@ -1314,7 +1323,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Service timeout — endpoint may be down or restricted",
     },
 
     "albuquerque": {
@@ -1341,7 +1351,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     "cleveland": {
@@ -1368,7 +1379,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
     # =========================================================================
