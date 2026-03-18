@@ -702,12 +702,39 @@ def get_user_saved_leads(user_email):
 def index():
     """Serve the dashboard."""
     # V8: Redirect new users to onboarding
+    # V9 Fix: Only redirect truly new users - existing users with preferences or Pro plan skip onboarding
     if 'user_email' in session:
         user = find_user_by_email(session['user_email'])
         if user and not user.onboarding_completed:
-            return redirect('/onboarding')
+            # Existing users who already have preferences or are Pro don't need onboarding
+            has_preferences = user.city or user.trade
+            is_pro = user.plan == 'pro'
+            if has_preferences or is_pro:
+                # Mark as completed so we don't check again
+                user.onboarding_completed = True
+                db.session.commit()
+            else:
+                return redirect('/onboarding')
     footer_cities = get_cities_with_data()
-    return render_template('dashboard.html', footer_cities=footer_cities)
+
+    # V9 Fix 5: Pass user preferences as default filters
+    default_city = ''
+    default_trade = ''
+    if 'user_email' in session:
+        user = find_user_by_email(session['user_email'])
+        if user:
+            default_city = user.city or ''
+            default_trade = user.trade or ''
+
+    return render_template('dashboard.html', footer_cities=footer_cities,
+                          default_city=default_city, default_trade=default_trade)
+
+
+# V9 Fix 9: /dashboard redirects to homepage
+@app.route('/dashboard')
+def dashboard_redirect():
+    """Redirect /dashboard to / for user convenience."""
+    return redirect('/')
 
 
 @app.route('/health')
@@ -1904,7 +1931,8 @@ def onboarding_page():
     user = get_current_user()
     if not user:
         return redirect('/signup')
-    cities = get_all_cities_info()
+    # V9 Fix 10: Only show cities with actual permit data (not all 300+ cities)
+    cities = get_cities_with_data()
     trades = get_all_trades()
     return render_template('onboarding.html', cities=cities, trades=trades)
 
@@ -2692,11 +2720,15 @@ def api_me():
     if not user:
         return jsonify({'user': None})
 
+    # V9 Fix 8: Include daily_alerts and city for alert widget status
     return jsonify({
         'user': {
             'email': user['email'],
             'name': user['name'],
             'plan': user['plan'],
+            'daily_alerts': user.get('daily_alerts', False),
+            'city': user.get('city', ''),
+            'trade': user.get('trade', ''),
         }
     })
 

@@ -697,7 +697,22 @@ function renderSignals(data) {
   const grid = document.getElementById('signals-grid');
 
   if (data.signals.length === 0) {
-    grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1; color: var(--gray-400);">No signals found matching your filters</div>';
+    // V9 Fix 19: Informative empty state for Early Intel
+    const city = document.getElementById('filter-city')?.value || 'your area';
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: white; border-radius: 12px; box-shadow: var(--shadow);">
+        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+        <h3 style="font-size: 20px; color: var(--gray-800); margin-bottom: 12px;">No Early Intel Signals Yet</h3>
+        <p style="color: var(--gray-500); max-width: 500px; margin: 0 auto 16px;">
+          Early Intel signals are generated from pre-permit activity like planning applications,
+          variance requests, and demolition permits. These signals help you identify opportunities
+          before other contractors see them.
+        </p>
+        <p style="color: var(--gray-400); font-size: 14px;">
+          Currently monitoring: <strong>${city}</strong>. Signals will appear here as they're detected.
+        </p>
+      </div>
+    `;
     document.getElementById('pagination').innerHTML = '';
     return;
   }

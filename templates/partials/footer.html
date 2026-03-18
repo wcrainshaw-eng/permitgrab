@@ -36,7 +36,12 @@
       <a href="/blog">Blog</a>
       <a href="/privacy">Privacy Policy</a>
       <a href="/terms">Terms of Service</a>
+      {% if session.get('user_email') %}
+      <a href="/account">Account</a>
+      <a href="/logout">Log Out</a>
+      {% else %}
       <a href="/login">Log In</a>
+      {% endif %}
     </div>
   </div>
 

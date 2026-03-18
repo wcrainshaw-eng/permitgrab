@@ -96,6 +96,9 @@ body {
 
 .hero-nav a:hover { color: white; }
 
+/* Hamburger - hidden on desktop */
+.hamburger { display: none; }
+
 /* Nav Dropdown */
 .nav-dropdown {
   position: relative;
@@ -951,9 +954,42 @@ footer a:hover { color: white; }
   /* Footer */
   .footer-inner { flex-direction: column; gap: 32px; }
 
-  /* Hero nav */
-  .hero-nav { display: none; }
-  .hero-top { justify-content: center; }
+  /* Hero nav - mobile hamburger menu */
+  .hamburger {
+    display: block;
+    cursor: pointer;
+    padding: 8px;
+  }
+  .hamburger span {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background: white;
+    margin: 6px 0;
+    transition: .3s;
+  }
+  .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 6px); }
+  .hamburger.active span:nth-child(2) { opacity: 0; }
+  .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -6px); }
+  .hero-nav {
+    display: none;
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    background: var(--gray-900);
+    padding: 20px;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 999;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+  .hero-nav.mobile-open { display: flex; }
+  .hero-nav a { padding: 10px 0; }
+  .hero-nav .nav-dropdown { position: relative; }
+  .hero-nav .dropdown-menu { position: static; columns: 1; box-shadow: none; padding: 10px 0 10px 20px; }
+  .hero-top { justify-content: space-between; }
 
   /* Free user banner */
   #free-user-banner { flex-direction: column; gap: 12px; text-align: center; }
@@ -1215,7 +1251,12 @@ footer a:hover { color: white; }
 <section class="hero">
   <div class="hero-top">
     <div class="logo">Permit<span>Grab</span></div>
-    <nav class="hero-nav">
+    <div class="hamburger" id="hamburger-menu" onclick="toggleMobileNav()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <nav class="hero-nav" id="mobile-nav">
       <a href="#dashboard">Dashboard</a>
       <div class="nav-dropdown">
         <a href="#" class="dropdown-toggle">Cities <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
@@ -1257,8 +1298,8 @@ footer a:hover { color: white; }
       <div class="stat-label">Active Permits</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-cities">85+</div>
-      <div class="stat-label">Metro Areas</div>
+      <div class="stat-value" id="stat-trades">13</div>
+      <div class="stat-label">Trade Categories</div>
     </div>
     <div class="stat-item">
       <div class="stat-value" id="stat-value">—</div>
@@ -1332,6 +1373,15 @@ footer a:hover { color: white; }
         <input type="text" id="filter-search" placeholder="Address, description, owner..." list="search-suggestions" autocomplete="off">
         <datalist id="search-suggestions"></datalist>
       </div>
+      <div class="filter-group">
+        <label>Sort By</label>
+        <select id="filter-sort" onchange="applyFilters()">
+          <option value="newest">Newest First</option>
+          <option value="value-desc">Highest Value</option>
+          <option value="score-desc">Best Lead Score</option>
+          <option value="oldest">Oldest First</option>
+        </select>
+      </div>
       <div class="results-count">
         <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
         <span id="data-freshness" style="margin-left: 8px; font-size: 12px; color: var(--gray-400);"></span>
@@ -1346,7 +1396,7 @@ footer a:hover { color: white; }
 <div class="main-content">
   <div>
     <!-- V8: Upgrade banner for free users -->
-    <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+    <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; justify-content: space-between; align-items: center;">
       <div>
         <strong>You're viewing 2,000+ leads</strong>
         <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Early Intel, Analytics, and unlimited exports.</span>
@@ -1495,9 +1545,6 @@ footer a:hover { color: white; }
   </div>
 </section>
 
-<!-- FOOTER -->
-{% include 'partials/footer.html' %}
-
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -1595,6 +1642,10 @@ let freePreviewLimit = 0; // Non-Pro users get NO free previews (updated based o
 let currentUser = null;
 let savedLeadIds = new Set();
 
+// V9 Fix 5: User's default filter preferences from onboarding
+const defaultCity = '{{ default_city|default("", true) }}';
+const defaultTrade = '{{ default_trade|default("", true) }}';
+
 // ===========================
 // LOAD DATA
 // ===========================
@@ -1672,6 +1723,14 @@ function populateFilters() {
     alertTrade.add(new Option(t, t));
   });
 
+  // V9 Fix 5: Apply user's default filter preferences from onboarding
+  if (defaultCity && cities.includes(defaultCity)) {
+    citySelect.value = defaultCity;
+  }
+  if (defaultTrade && trades.includes(defaultTrade)) {
+    tradeSelect.value = defaultTrade;
+  }
+
   const statusSelect = document.getElementById('filter-status');
   statuses.forEach(s => {
     statusSelect.add(new Option(s, s));
@@ -1699,12 +1758,13 @@ function updateStats(useFiltered = false) {
   const total = permits.length;
   const totalValue = permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
   const highValue = permits.filter(p => p.lead_score >= 70).length;
-  const uniqueCities = new Set(permits.map(p => p.city)).size;
+  // V9 Fix 11: Show trade categories instead of metro areas to avoid marketing contradiction
+  const uniqueTrades = new Set(permits.map(p => p.trade_category)).size;
 
   document.getElementById('stat-total').textContent = total.toLocaleString();
   document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
-  document.getElementById('stat-cities').textContent = uniqueCities.toLocaleString();
+  document.getElementById('stat-trades').textContent = uniqueTrades.toLocaleString();
 }
 
 // ===========================
@@ -1730,6 +1790,23 @@ function applyFilters() {
       if (!haystack.includes(search)) return false;
     }
     return true;
+  });
+
+  // V9 Fix 12: Apply sorting
+  const sortBy = document.getElementById('filter-sort')?.value || 'newest';
+  filteredPermits.sort((a, b) => {
+    switch (sortBy) {
+      case 'newest':
+        return new Date(b.issue_date || b.filed_date || 0) - new Date(a.issue_date || a.filed_date || 0);
+      case 'oldest':
+        return new Date(a.issue_date || a.filed_date || 0) - new Date(b.issue_date || b.filed_date || 0);
+      case 'value-desc':
+        return (b.estimated_cost || 0) - (a.estimated_cost || 0);
+      case 'score-desc':
+        return (b.lead_score || 0) - (a.lead_score || 0);
+      default:
+        return 0;
+    }
   });
 
   currentPage = 1;
@@ -1799,7 +1876,7 @@ function renderPermits() {
           <span class="lead-score-badge ${leadQuality}">${scoreIcon} ${leadScore} pts</span>
           <span class="permit-value ${valueClass}">${cost}</span>
         </div>
-        <div class="permit-address">${escapeHtml(p.address)}</div>
+        <div class="permit-address"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address + ', ' + p.city + ', ' + p.state)}" target="_blank" rel="noopener" title="View on Google Maps" style="color: inherit; text-decoration: none;">${escapeHtml(p.address)} <span style="font-size: 12px;">&#128205;</span></a></div>
         <div class="permit-city-state">${escapeHtml(p.city)}, ${p.state} ${p.zip || ''}</div>
         <div class="permit-description">${escapeHtml(p.display_description || p.description)}</div>
         <div class="permit-meta">
@@ -1829,8 +1906,24 @@ function renderPermits() {
           </button>
           <button class="contact-btn" onclick="exportPermit('${p.permit_number}')">Export</button>
         </div>
-        <div style="margin-top: 8px;">
+        <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="permit-history-toggle" onclick="togglePermitDetails(${globalIdx})">&#128269; View Details</button>
           <button class="permit-history-toggle" id="history-toggle-${globalIdx}" onclick="togglePermitHistory('${escapeHtml(p.address)}', ${globalIdx})">&#128197; View Permit History</button>
+        </div>
+        <div class="permit-details" id="details-${globalIdx}" style="display: none; margin-top: 12px; padding: 16px; background: var(--gray-50); border-radius: 8px; border: 1px solid var(--gray-200);">
+          <h4 style="font-size: 14px; font-weight: 600; color: var(--gray-800); margin-bottom: 12px;">Permit Details</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px;">
+            <div><strong>Permit #:</strong> ${escapeHtml(p.permit_number)}</div>
+            <div><strong>Type:</strong> ${escapeHtml(p.permit_type || 'N/A')}</div>
+            <div><strong>Status:</strong> ${escapeHtml(p.status)}</div>
+            <div><strong>Filed:</strong> ${p.filing_date || 'N/A'}</div>
+            ${p.issue_date ? `<div><strong>Issued:</strong> ${p.issue_date}</div>` : ''}
+            <div><strong>Value:</strong> ${cost}</div>
+            <div><strong>Lead Score:</strong> ${leadScore} pts (${leadQuality})</div>
+          </div>
+          ${p.description ? `<div style="margin-top: 12px;"><strong>Full Description:</strong><p style="margin-top: 4px; color: var(--gray-600);">${escapeHtml(p.description)}</p></div>` : ''}
+          ${p.contractor_name ? `<div style="margin-top: 12px;"><strong>Contractor:</strong> ${escapeHtml(p.contractor_name)}</div>` : ''}
+          ${p.owner_name ? `<div style="margin-top: 8px;"><strong>Property Owner:</strong> ${escapeHtml(p.owner_name)}</div>` : ''}
         </div>
         <div class="permit-history" id="history-${globalIdx}">
           <div class="permit-history-content" id="history-content-${globalIdx}"></div>
@@ -2609,6 +2702,16 @@ async function fetchViolationsForAddress(address) {
   return violationsCache[address];
 }
 
+// V9 Fix 13: Toggle permit details expansion
+function togglePermitDetails(cardId) {
+  const details = document.getElementById(`details-${cardId}`);
+  if (details.style.display === 'none') {
+    details.style.display = 'block';
+  } else {
+    details.style.display = 'none';
+  }
+}
+
 async function togglePermitHistory(address, cardId) {
   const container = document.getElementById(`history-${cardId}`);
   const content = document.getElementById(`history-content-${cardId}`);
@@ -2691,6 +2794,14 @@ if (paymentStatus === 'success') {
 }
 
 loadData();
+
+// V9 Fix 21: Mobile hamburger menu toggle
+function toggleMobileNav() {
+  const hamburger = document.getElementById('hamburger-menu');
+  const nav = document.getElementById('mobile-nav');
+  hamburger.classList.toggle('active');
+  nav.classList.toggle('mobile-open');
+}
 
 // ===========================
 // UPGRADE MODAL (V5)
