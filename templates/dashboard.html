@@ -1491,7 +1491,7 @@ footer a:hover { color: white; }
   </aside>
 </div>
 
-<!-- PRICING -->
+<!-- PRICING (V10: Hidden for Pro users via JS) -->
 <section class="pricing-section" id="pricing">
   <div class="pricing-inner">
     <h2>Simple Pricing, Real Leads</h2>
@@ -2453,6 +2453,12 @@ function updateFreePreviewLimit() {
   const banner = document.getElementById('free-user-banner');
   if (banner) {
     banner.style.display = (currentUser && !isPro) ? 'flex' : 'none';
+  }
+
+  // V10 Fix 8: Hide pricing section for Pro users
+  const pricingSection = document.getElementById('pricing');
+  if (pricingSection) {
+    pricingSection.style.display = isPro ? 'none' : 'block';
   }
 
   // Re-render permits if already loaded

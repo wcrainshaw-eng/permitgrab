@@ -737,6 +737,13 @@ def dashboard_redirect():
     return redirect('/')
 
 
+# V10 Fix 5: /alerts redirects to account page
+@app.route('/alerts')
+def alerts_redirect():
+    """Redirect /alerts to account page where alert settings live."""
+    return redirect('/account')
+
+
 @app.route('/health')
 def health_check():
     """
