@@ -1378,9 +1378,9 @@ footer a:hover { color: white; }
       <div class="filter-group">
         <label>Sort By</label>
         <select id="filter-sort" onchange="applyFilters()">
+          <option value="score-desc" selected>Best Leads</option>
           <option value="newest">Newest First</option>
           <option value="value-desc">Highest Value</option>
-          <option value="score-desc">Best Lead Score</option>
           <option value="oldest">Oldest First</option>
         </select>
       </div>
@@ -1795,8 +1795,8 @@ function applyFilters() {
     return true;
   });
 
-  // V9 Fix 12: Apply sorting
-  const sortBy = document.getElementById('filter-sort')?.value || 'newest';
+  // V12.10: Default to Best Leads sort
+  const sortBy = document.getElementById('filter-sort')?.value || 'score-desc';
   filteredPermits.sort((a, b) => {
     switch (sortBy) {
       case 'newest':

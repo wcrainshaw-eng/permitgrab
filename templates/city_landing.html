@@ -21,19 +21,30 @@
 <meta name="robots" content="{{ robots_directive | default('index, follow') }}">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 
-<!-- Structured Data -->
+<!-- V12.10: Structured Data - Dataset schema for permit data -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "PermitGrab - {{ city_name }} Building Permits",
+  "@type": "Dataset",
+  "name": "Building Permits in {{ city_name }}",
   "description": "{{ meta_description }}",
   "url": "{{ canonical_url }}",
-  "areaServed": {
-    "@type": "City",
+  "keywords": ["building permits", "{{ city_name }}", "construction permits", "contractor leads"],
+  "temporalCoverage": "{{ current_year - 1 }}/{{ current_year }}",
+  "spatialCoverage": {
+    "@type": "Place",
     "name": "{{ city_name }}"
   },
-  "serviceType": "Construction Permit Lead Generation"
+  "distribution": {
+    "@type": "DataDownload",
+    "encodingFormat": "text/html",
+    "contentUrl": "{{ canonical_url }}"
+  },
+  "provider": {
+    "@type": "Organization",
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
+  }
 }
 </script>
 

@@ -524,13 +524,30 @@ def load_stats():
     return {}
 
 def get_cities_with_data():
-    """Get list of cities that have at least 1 permit in the data."""
+    """V12.10: Get cities sorted by permit volume (top cities first for footer)."""
     permits = load_permits()
-    city_names = sorted(set(p.get('city', '') for p in permits if p.get('city')))
-    # Convert city names to city info format with slug for footer links
+
+    # Count permits per city
+    city_counts = {}
+    for p in permits:
+        city = p.get('city', '')
+        if city:
+            city_counts[city] = city_counts.get(city, 0) + 1
+
+    # Convert to city info format with slug, sorted by permit count
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
-    return [city_lookup[name] for name in city_names if name in city_lookup]
+
+    cities_with_counts = []
+    for name, count in city_counts.items():
+        if name in city_lookup:
+            city_info = city_lookup[name].copy()
+            city_info['permit_count'] = count
+            cities_with_counts.append(city_info)
+
+    # Sort by permit count descending (top cities first)
+    cities_with_counts.sort(key=lambda x: x.get('permit_count', 0), reverse=True)
+    return cities_with_counts
 
 
 def get_suggested_cities(searched_slug, limit=6):
