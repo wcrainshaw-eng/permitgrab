@@ -547,6 +547,8 @@ tr:hover td {
           <div class="label">Cities Active</div>
         </div>
       </div>
+      <h3 style="margin-bottom: 12px; font-size: 16px;">Trade Breakdown</h3>
+      <div id="modal-trade-breakdown" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;"></div>
       <h3 style="margin-bottom: 12px; font-size: 16px;">Recent Permits</h3>
       <div class="permit-list" id="modal-permits-list">
         Loading...
@@ -644,6 +646,18 @@ async function showContractor(name) {
     document.getElementById('modal-permits').textContent = data.total_permits.toLocaleString();
     document.getElementById('modal-value').textContent = '$' + data.total_value.toLocaleString();
     document.getElementById('modal-cities').textContent = data.cities.length;
+
+    // V8: Trade breakdown
+    const tradeCounts = {};
+    data.permits.forEach(p => {
+      const trade = p.trade_category || 'Other';
+      tradeCounts[trade] = (tradeCounts[trade] || 0) + 1;
+    });
+    const tradeBreakdown = Object.entries(tradeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([trade, count]) => `<span style="background: var(--gray-100); padding: 4px 10px; border-radius: 12px; font-size: 13px;">${escapeHtml(trade)} (${count})</span>`)
+      .join('');
+    document.getElementById('modal-trade-breakdown').innerHTML = tradeBreakdown || '<span style="color: var(--gray-400);">No trade data</span>';
 
     document.getElementById('modal-permits-list').innerHTML = data.permits.slice(0, 20).map(p => `
       <div class="permit-item">

@@ -914,12 +914,49 @@ footer a:hover { color: white; }
 
 @media (max-width: 768px) {
   .hero-content h1 { font-size: 28px; }
-  .stats-bar { flex-wrap: wrap; gap: 24px; }
-  .filters-row { flex-direction: column; }
+  .hero-content p { font-size: 14px; }
+  .stats-bar { flex-wrap: wrap; gap: 24px; justify-content: center; }
+  .stat-item { min-width: 100px; }
+
+  /* V8: Mobile filter improvements */
+  .filters-section { padding: 16px; }
+  .filters-row { flex-direction: column; gap: 12px; }
+  .filter-group { width: 100%; }
   .filter-group select, .filter-group input { min-width: auto; width: 100%; }
-  .results-count { margin-left: 0; }
-  .sidebar { grid-template-columns: 1fr; }
+  .results-count {
+    margin-left: 0;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .results-count button { width: 100%; }
+
+  /* Main content stacking */
+  .main-content { display: block !important; }
+  .permits-list { width: 100%; }
+  .permit-card { padding: 16px; }
+
+  /* Sidebar moves below permits on mobile */
+  .sidebar {
+    display: block;
+    width: 100%;
+    margin-top: 24px;
+  }
+  .sidebar-card { margin-bottom: 16px; }
+
+  /* Pagination */
+  .pagination { flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .page-btn { padding: 8px 12px; }
+
+  /* Footer */
   .footer-inner { flex-direction: column; gap: 32px; }
+
+  /* Hero nav */
+  .hero-nav { display: none; }
+  .hero-top { justify-content: center; }
+
+  /* Free user banner */
+  #free-user-banner { flex-direction: column; gap: 12px; text-align: center; }
 }
 
 /* Toast notification */
@@ -1292,10 +1329,12 @@ footer a:hover { color: white; }
       </div>
       <div class="filter-group">
         <label>Search</label>
-        <input type="text" id="filter-search" placeholder="Address, description, owner...">
+        <input type="text" id="filter-search" placeholder="Address, description, owner..." list="search-suggestions" autocomplete="off">
+        <datalist id="search-suggestions"></datalist>
       </div>
       <div class="results-count">
         <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
+        <span id="data-freshness" style="margin-left: 8px; font-size: 12px; color: var(--gray-400);"></span>
         <button onclick="saveCurrentSearch()" class="save-search-btn" title="Save this search for daily alerts">&#128278; Save Search</button>
         <button onclick="exportCSV()" style="margin-left: 8px; padding: 6px 14px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">Export CSV</button>
       </div>
@@ -1306,6 +1345,14 @@ footer a:hover { color: white; }
 <!-- MAIN -->
 <div class="main-content">
   <div>
+    <!-- V8: Upgrade banner for free users -->
+    <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <strong>You're viewing 2,000+ leads</strong>
+        <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Early Intel, Analytics, and unlimited exports.</span>
+      </div>
+      <a href="/pricing" style="background: #f97316; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap;">See Plans →</a>
+    </div>
     <div class="permits-list" id="permits-list">
       <div class="loading">
         <div class="spinner"></div>
@@ -1351,26 +1398,44 @@ footer a:hover { color: white; }
       </div>
     </div>
 
-    <!-- Alert Signup -->
+    <!-- Alert Signup / Status (V8: Different for logged-in) -->
     <div class="sidebar-card" id="get-alerts" style="border-color: var(--accent);">
       <div class="sidebar-card-header" style="background: var(--accent); color: white;">
-        Get Permit Alerts
+        <span id="alerts-header-text">Get Permit Alerts</span>
       </div>
       <div class="sidebar-card-body">
-        <p style="font-size: 14px; color: var(--gray-500); margin-bottom: 12px;">
-          Get matching permits emailed to you daily. Free for your first metro area.
-        </p>
-        <form class="alert-form" onsubmit="handleAlertSignup(event)">
-          <input type="email" placeholder="Your email" required id="alert-email">
-          <select id="alert-city">
-            <option value="">Select your city...</option>
-          </select>
-          <select id="alert-trade">
-            <option value="">Select your trade...</option>
-          </select>
-          <button type="submit">Start Free Alerts</button>
-          <div class="alert-note">Free 14-day trial, no credit card required</div>
-        </form>
+        <!-- Logged-out: Show signup form -->
+        <div id="alerts-signup-form">
+          <p style="font-size: 14px; color: var(--gray-500); margin-bottom: 12px;">
+            Get matching permits emailed to you daily. Free for your first metro area.
+          </p>
+          <form class="alert-form" onsubmit="handleAlertSignup(event)">
+            <input type="email" placeholder="Your email" required id="alert-email">
+            <select id="alert-city">
+              <option value="">Select your city...</option>
+            </select>
+            <select id="alert-trade">
+              <option value="">Select your trade...</option>
+            </select>
+            <button type="submit">Start Free Alerts</button>
+            <div class="alert-note">Free 14-day trial, no credit card required</div>
+          </form>
+        </div>
+        <!-- Logged-in: Show status -->
+        <div id="alerts-status" style="display: none;">
+          <div id="alerts-active-status" style="display: none;">
+            <p style="font-size: 14px; margin-bottom: 12px;">
+              <span style="color: #16a34a;">&#10003;</span> Daily alerts active for <strong id="alerts-city-name">All Cities</strong>
+            </p>
+            <a href="/account#alerts" style="color: var(--primary); font-size: 14px;">Manage Preferences →</a>
+          </div>
+          <div id="alerts-inactive-status" style="display: none;">
+            <p style="font-size: 14px; color: var(--gray-500); margin-bottom: 12px;">
+              You haven't set up daily permit alerts yet.
+            </p>
+            <button onclick="enableQuickAlerts()" style="width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Enable Daily Alerts</button>
+          </div>
+        </div>
       </div>
     </div>
   </aside>
@@ -1551,6 +1616,14 @@ async function loadData() {
     const resp = await fetch('/api/permits?per_page=2000');
     const data = await resp.json();
     allPermits = data.permits;
+
+    // V8: Display data freshness
+    if (data.last_updated) {
+      const freshnessEl = document.getElementById('data-freshness');
+      if (freshnessEl) {
+        freshnessEl.textContent = '• Updated ' + formatTimeAgo(data.last_updated);
+      }
+    }
   } catch (e) {
     console.error('Failed to load permits:', e);
     document.getElementById('permits-list').innerHTML = '<div class="loading">Unable to connect to API. Please refresh.</div>';
@@ -1563,6 +1636,21 @@ async function loadData() {
   updateStats();
   // Initial render
   applyFilters();
+}
+
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return diffMins + ' min ago';
+  if (diffHours < 24) return diffHours + ' hour' + (diffHours > 1 ? 's' : '') + ' ago';
+  return diffDays + ' day' + (diffDays > 1 ? 's' : '') + ' ago';
 }
 
 function populateFilters() {
@@ -1588,28 +1676,35 @@ function populateFilters() {
   statuses.forEach(s => {
     statusSelect.add(new Option(s, s));
   });
+
+  // V8: Populate search suggestions (addresses and owner names)
+  const suggestions = new Set();
+  allPermits.slice(0, 500).forEach(p => {
+    if (p.address) suggestions.add(p.address);
+    if (p.contact_name) suggestions.add(p.contact_name);
+  });
+  const datalist = document.getElementById('search-suggestions');
+  if (datalist) {
+    suggestions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      datalist.appendChild(opt);
+    });
+  }
 }
 
-function updateStats() {
-  const total = allPermits.length;
-  const totalValue = allPermits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
-  const highValue = allPermits.filter(p => p.value_tier === 'high').length;
+function updateStats(useFiltered = false) {
+  // V8: Stats can reflect filtered data when filters are active
+  const permits = useFiltered ? filteredPermits : allPermits;
+  const total = permits.length;
+  const totalValue = permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
+  const highValue = permits.filter(p => p.lead_score >= 70).length;
+  const uniqueCities = new Set(permits.map(p => p.city)).size;
 
   document.getElementById('stat-total').textContent = total.toLocaleString();
   document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
-
-  // Fetch dynamic city count
-  fetch('/api/cities')
-    .then(r => r.json())
-    .then(data => {
-      document.getElementById('stat-cities').textContent = data.count || '20+';
-    })
-    .catch(() => {
-      // Fallback to counting unique cities in permits
-      const uniqueCities = new Set(allPermits.map(p => p.city)).size;
-      document.getElementById('stat-cities').textContent = uniqueCities || '20+';
-    });
+  document.getElementById('stat-cities').textContent = uniqueCities.toLocaleString();
 }
 
 // ===========================
@@ -1641,6 +1736,7 @@ function applyFilters() {
   renderPermits();
   renderSidebar();
   updateResultsCount();
+  updateStats(true); // V8: Update hero stats to reflect filters
 }
 
 // Attach filter listeners
@@ -1956,11 +2052,26 @@ function renderPagination() {
 
   if (totalPages <= 1) { pag.innerHTML = ''; return; }
 
-  let html = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Previous</button>`;
+  // V8: Enhanced pagination with first/last and page jump
+  let html = '';
+  html += `<button class="page-btn" onclick="goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}>« First</button>`;
+  html += `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Prev</button>`;
 
-  html += `<span style="padding: 8px 16px; color: var(--gray-500); font-size: 14px;">Page ${currentPage} of ${totalPages}</span>`;
+  // Show page numbers around current
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, currentPage + 2);
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  }
 
-  html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>`;
+  html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next ›</button>`;
+  html += `<button class="page-btn" onclick="goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>Last »</button>`;
+
+  html += `<span style="margin-left: 16px; font-size: 13px; color: var(--gray-500);">
+    Go to: <input type="number" id="page-jump" min="1" max="${totalPages}" value="${currentPage}"
+    style="width: 60px; padding: 4px 8px; border: 1px solid var(--gray-300); border-radius: 4px;"
+    onchange="goToPage(parseInt(this.value))">
+  </span>`;
 
   pag.innerHTML = html;
 }
@@ -2186,15 +2297,71 @@ function updateAuthUI() {
     authNav.style.display = 'inline';
     userNav.style.display = 'none';
   }
+
+  // V8: Update alert sidebar widget
+  updateAlertWidget();
+}
+
+function updateAlertWidget() {
+  const signupForm = document.getElementById('alerts-signup-form');
+  const statusDiv = document.getElementById('alerts-status');
+  const headerText = document.getElementById('alerts-header-text');
+  const activeStatus = document.getElementById('alerts-active-status');
+  const inactiveStatus = document.getElementById('alerts-inactive-status');
+  const cityName = document.getElementById('alerts-city-name');
+
+  if (currentUser) {
+    // Logged in - show status instead of form
+    signupForm.style.display = 'none';
+    statusDiv.style.display = 'block';
+    headerText.textContent = 'Your Alerts';
+
+    if (currentUser.daily_alerts) {
+      activeStatus.style.display = 'block';
+      inactiveStatus.style.display = 'none';
+      cityName.textContent = currentUser.city || 'All Cities';
+    } else {
+      activeStatus.style.display = 'none';
+      inactiveStatus.style.display = 'block';
+    }
+  } else {
+    // Logged out - show signup form
+    signupForm.style.display = 'block';
+    statusDiv.style.display = 'none';
+    headerText.textContent = 'Get Permit Alerts';
+  }
+}
+
+async function enableQuickAlerts() {
+  const resp = await fetch('/api/account', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ daily_alerts: true })
+  });
+  if (resp.ok) {
+    showToast('Daily alerts enabled!');
+    currentUser.daily_alerts = true;
+    updateAlertWidget();
+  } else {
+    showToast('Failed to enable alerts', true);
+  }
 }
 
 function updateFreePreviewLimit() {
   // Check all Pro plan variants: pro (admin), professional (Stripe), enterprise
-  if (currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise')) {
+  const isPro = currentUser && (currentUser.plan === 'pro' || currentUser.plan === 'professional' || currentUser.plan === 'enterprise');
+  if (isPro) {
     freePreviewLimit = Infinity; // Pro users see all contact info
   } else {
     freePreviewLimit = 0; // Non-Pro users see NO contact info
   }
+
+  // V8: Show upgrade banner for free logged-in users
+  const banner = document.getElementById('free-user-banner');
+  if (banner) {
+    banner.style.display = (currentUser && !isPro) ? 'flex' : 'none';
+  }
+
   // Re-render permits if already loaded
   if (allPermits.length > 0) {
     renderPermits();

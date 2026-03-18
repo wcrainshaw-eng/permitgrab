@@ -701,6 +701,11 @@ def get_user_saved_leads(user_email):
 @app.route('/')
 def index():
     """Serve the dashboard."""
+    # V8: Redirect new users to onboarding
+    if 'user_email' in session:
+        user = find_user_by_email(session['user_email'])
+        if user and not user.onboarding_completed:
+            return redirect('/onboarding')
     footer_cities = get_cities_with_data()
     return render_template('dashboard.html', footer_cities=footer_cities)
 
@@ -798,6 +803,10 @@ def api_permits():
         for permit in page_permits:
             permit['is_gated'] = False
 
+    # V8: Add last_updated timestamp
+    stats = load_stats()
+    last_updated = stats.get('collected_at', '')
+
     return jsonify({
         'permits': page_permits,
         'total': total,
@@ -805,6 +814,7 @@ def api_permits():
         'per_page': per_page,
         'total_pages': (total + per_page - 1) // per_page,
         'user_is_pro': user_is_pro,
+        'last_updated': last_updated,
     })
 
 @app.route('/api/stats')
