@@ -1832,8 +1832,8 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": True,
+        "notes": "V12.7: Reactivated — data.weho.org verified working",
     },
 
     "calgary": {
@@ -1946,7 +1946,7 @@ CITY_REGISTRY = {
             "permit_number": "permit_number",
             "permit_type": "permit_type",
             "work_type": "permit_subtype",
-            "address": "address",
+            "address": "address_1",
             "filing_date": "issued_date",
             "status": "permit_status",
             "estimated_cost": "valuation",
@@ -1954,8 +1954,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": True,
+        "notes": "V12.7: Reactivated — data.cstx.gov verified working",
     },
 
     "cook_county": {
@@ -7815,23 +7815,20 @@ CITY_REGISTRY = {
         "state": "CO",
         "slug": "fort-collins",
         "platform": "socrata",
-        "endpoint": "https://data.fcgov.com/resource/3knz-4kxm.json",
-        "dataset_id": "3knz-4kxm",
-        "description": "Building Permits",
+        "endpoint": "https://opendata.fcgov.com/resource/y6wr-rcc6.json",
+        "dataset_id": "y6wr-rcc6",
+        "description": "Building Permits - New Construction",
         "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
+            "permit_number": "permit_num",
+            "address": "gen_addr",
+            "permit_type": "def_type",
+            "owner_name": "contractor",
             "estimated_cost": "valuation",
-            "description": "description",
         },
-        "date_field": "issue_date",
+        "date_field": "date_issued",
         "limit": 2000,
-        "active": False,
+        "active": True,
+        "notes": "V12.7: Updated to real opendata.fcgov.com endpoint",
     },
 
     "lakewood_co": {
@@ -8166,6 +8163,71 @@ CITY_REGISTRY = {
         "limit": 2000,
         "active": False,
         "notes": "Houston provides aggregated monthly data, not individual permits",
+    },
+
+    # =========================================================================
+    # V12.7 NEW DISCOVERIES
+    # =========================================================================
+
+    "camas": {
+        "name": "Camas",
+        "state": "WA",
+        "slug": "camas",
+        "platform": "socrata",
+        "endpoint": "https://performance.cityofcamas.us/resource/t4q7-r3d4.json",
+        "dataset_id": "t4q7-r3d4",
+        "description": "Residential Construction Permits",
+        "field_map": {
+            "permit_type": "permittype",
+            "address": "location_1",
+        },
+        "date_field": "issuedate",
+        "limit": 2000,
+        "active": True,
+        "notes": "V12.7: Discovered via Socrata sweep",
+    },
+
+    "san_marcos": {
+        "name": "San Marcos",
+        "state": "TX",
+        "slug": "san-marcos",
+        "platform": "arcgis",
+        "endpoint": "https://smgis.sanmarcostx.gov/arcgis/rest/services/Planning/CoSM_BuildingPermits/FeatureServer/0/query",
+        "dataset_id": "CoSM_BuildingPermits",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "PERMIT",
+            "address": "ADDRESS",
+            "description": "DESCRIPTION",
+            "permit_type": "TYPE",
+        },
+        "date_field": "ISSUED",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+        "notes": "V12.7: Discovered via ArcGIS Hub sweep",
+    },
+
+    "leon_county": {
+        "name": "Leon County",
+        "state": "FL",
+        "slug": "leon-county",
+        "platform": "arcgis",
+        "endpoint": "https://intervector.leoncountyfl.gov/intervector/rest/services/MapServices/TLC_OpenData_External/MapServer/27/query",
+        "dataset_id": "TLC_OpenData_External",
+        "description": "Building Permits - Leon County/Tallahassee",
+        "field_map": {
+            "permit_type": "PermitType",
+            "address": "Address",
+            "description": "Description",
+            "estimated_cost": "EstimatedCost",
+            "owner_name": "OwnerName",
+        },
+        "date_field": "COIssuedDate",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+        "notes": "V12.7: Discovered via ArcGIS Hub sweep - covers Tallahassee area",
     },
 
 }

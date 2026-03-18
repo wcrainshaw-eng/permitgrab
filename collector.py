@@ -83,10 +83,19 @@ def fetch_socrata(config, days_back):
     # Calculate date filter
     since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
 
+    where_clause = f"{date_field} > '{since_date}'"
+
+    # V12.7: Add city filter for county/state datasets
+    city_filter = config.get("city_filter")
+    if city_filter:
+        filter_field = city_filter["field"]
+        filter_value = city_filter["value"]
+        where_clause += f" AND upper({filter_field}) = upper('{filter_value}')"
+
     params = {
         "$limit": limit,
         "$order": f"{date_field} DESC",
-        "$where": f"{date_field} > '{since_date}'",
+        "$where": where_clause,
     }
 
     resp = SESSION.get(endpoint, params=params, timeout=60)
@@ -112,6 +121,13 @@ def fetch_arcgis(config, days_back):
     else:
         since_date = since_dt.strftime("%Y-%m-%d")
         where_clause = f"{date_field} >= DATE '{since_date}'"
+
+    # V12.7: Add city filter for county datasets
+    city_filter = config.get("city_filter")
+    if city_filter:
+        filter_field = city_filter["field"]
+        filter_value = city_filter["value"]
+        where_clause += f" AND upper({filter_field}) = upper('{filter_value}')"
 
     params = {
         "where": where_clause,
@@ -173,7 +189,16 @@ def fetch_ckan(config, days_back):
                 date_val = r.get(date_field, "")
                 if date_val and str(date_val)[:10] >= since_date:
                     filtered.append(r)
-            return filtered
+            records = filtered
+
+        # V12.7: Add city filter (Python-side filtering)
+        city_filter = config.get("city_filter")
+        if city_filter and records:
+            filter_field = city_filter["field"]
+            filter_value = city_filter["value"].upper()
+            records = [r for r in records
+                       if str(r.get(filter_field, "")).upper() == filter_value]
+
         return records
     return []
 
