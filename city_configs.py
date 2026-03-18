@@ -435,8 +435,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.3: Reactivated — verified working with V12.2 User-Agent headers",
+        "active": False,
+        "notes": "V12.8: Deactivated - data.denvergov.org domain not responding",
     },
 
     "portland": {
@@ -459,9 +459,10 @@ CITY_REGISTRY = {
             "description": "DESCRIPTION",
         },
         "date_field": "ISSUE_DATE",
-        "date_format": "none",  # V12.4: Changed from epoch — may have stale data
+        "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.8: Deactivated - ArcGIS endpoint returning Invalid URL error",
     },
 
     # =========================================================================
@@ -570,8 +571,8 @@ CITY_REGISTRY = {
         "date_field": "issueddate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.4: Fixed field_map with real field names from ArcGIS API",
+        "active": False,
+        "notes": "V12.8: Deactivated - ArcGIS query returning invalid query parameters error",
     },
 
     "phoenix": {
@@ -648,7 +649,8 @@ CITY_REGISTRY = {
         },
         "date_field": "approval_issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.8: Deactivated - dataset not found on data.sandiego.gov",
     },
 
     "sacramento": {
@@ -980,7 +982,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.8: Deactivated - data.mesaaz.gov returns 404, use mesa_new instead",
     },
 
     "milwaukee": {
@@ -2059,7 +2062,7 @@ CITY_REGISTRY = {
     "nola_verified": {
         "name": "New Orleans",
         "state": "LA",
-        "slug": "new-orleans",
+        "slug": "new-orleans-verified",
         "platform": "socrata",
         "endpoint": "https://data.nola.gov/resource/rcm3-fn58.json",
         "dataset_id": "rcm3-fn58",
@@ -2076,7 +2079,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.8: Deactivated - duplicate of new_orleans using same endpoint",
     },
 
     "edmonton": {
@@ -2325,7 +2329,7 @@ CITY_REGISTRY = {
     "nola_blds": {
         "name": "New Orleans",
         "state": "LA",
-        "slug": "new-orleans",
+        "slug": "new-orleans-blds",
         "platform": "socrata",
         "endpoint": "https://data.nola.gov/resource/72f9-bi28.json",
         "dataset_id": "72f9-bi28",
@@ -2344,8 +2348,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
-        "notes": "Better dataset with more fields",
+        "active": False,
+        "notes": "V12.8: Deactivated - duplicate slug with new_orleans",
     },
 
     "henderson_nv": {
@@ -4198,7 +4202,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.8: Deactivated - dataset sq5r-f8zb not found on data.buffalony.gov",
     },
 
     "rochester": {
@@ -8204,8 +8209,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUED",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.7: Discovered via ArcGIS Hub sweep",
+        "active": False,
+        "notes": "V12.8: Deactivated - ArcGIS endpoint error",
     },
 
     "leon_county": {
@@ -8226,8 +8231,8 @@ CITY_REGISTRY = {
         "date_field": "COIssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.7: Discovered via ArcGIS Hub sweep - covers Tallahassee area",
+        "active": False,
+        "notes": "V12.8: Deactivated - MapServer service not found",
     },
 
 }
