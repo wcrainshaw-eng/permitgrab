@@ -252,6 +252,49 @@ body {
   .testimonial-item { flex-direction: column; gap: 4px; text-align: center; }
 }
 
+/* V12.13: How It Works */
+.how-it-works-section {
+  background: var(--gray-900);
+  padding: 48px 32px;
+}
+.how-it-works-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+  text-align: center;
+}
+.how-it-works-inner h2 {
+  color: white;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 32px;
+}
+.how-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+.how-step {
+  padding: 24px;
+}
+.step-icon {
+  font-size: 36px;
+  margin-bottom: 16px;
+}
+.how-step h3 {
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.how-step p {
+  color: rgba(255,255,255,.6);
+  font-size: 14px;
+  line-height: 1.5;
+}
+@media (max-width: 768px) {
+  .how-steps { grid-template-columns: 1fr; }
+}
+
 /* FILTERS */
 .filters-section {
   background: white;
@@ -1331,6 +1374,30 @@ footer a:hover { color: white; }
   </div>
 </section>
 
+<!-- V12.13: How It Works section -->
+<section class="how-it-works-section">
+  <div class="how-it-works-inner">
+    <h2>How It Works</h2>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="step-icon">&#128451;</div>
+        <h3>We Pull Permits</h3>
+        <p>Fresh data from official city & county building departments, updated daily</p>
+      </div>
+      <div class="how-step">
+        <div class="step-icon">&#9997;</div>
+        <h3>We Organize & Score</h3>
+        <p>Every permit is categorized by trade and scored by lead quality</p>
+      </div>
+      <div class="how-step">
+        <div class="step-icon">&#127942;</div>
+        <h3>You Win Jobs First</h3>
+        <p>Get leads before they're public — reach out while competitors wait</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FILTERS -->
 <section class="filters-section" id="dashboard">
   <div class="filters-inner">
@@ -1387,8 +1454,14 @@ footer a:hover { color: white; }
       <div class="results-count">
         <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
         <span id="data-freshness" style="margin-left: 8px; font-size: 12px; color: var(--gray-400);"></span>
+        <!-- V12.13: Grey out Save/Export for logged-out users -->
+        {% if user %}
         <button onclick="saveCurrentSearch()" class="save-search-btn" title="Save this search for daily alerts">&#128278; Save Search</button>
         <button onclick="exportCSV()" style="margin-left: 8px; padding: 6px 14px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">Export CSV</button>
+        {% else %}
+        <button onclick="saveCurrentSearch()" class="save-search-btn" style="opacity: 0.5; cursor: not-allowed;" title="Sign up to save searches">&#128278; Save Search</button>
+        <button onclick="exportCSV()" style="margin-left: 8px; padding: 6px 14px; background: var(--gray-400); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: not-allowed; opacity: 0.7;" title="Pro feature — upgrade to export">Export CSV</button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -1931,10 +2004,21 @@ function renderPermits() {
         <div class="permit-history" id="history-${globalIdx}">
           <div class="permit-history-content" id="history-content-${globalIdx}"></div>
         </div>` : `
+        <!-- V12.13: Masked contact placeholders -->
+        <div class="permit-meta" style="margin-bottom: 12px;">
+          <div class="permit-meta-item" style="filter: blur(4px); pointer-events: none;">
+            <span style="color: var(--gray-500);">&#128100;</span>
+            Owner: J████ S█████
+          </div>
+          <div class="permit-meta-item" style="filter: blur(4px); pointer-events: none;">
+            <span style="color: var(--gray-500);">&#128222;</span>
+            Phone: (███) ███-████
+          </div>
+        </div>
         <div class="permit-contact">
-          <span class="contact-btn primary" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="window.location.href='/pricing'">&#128274; Contact Info</span>
-          <span class="contact-btn" style="color: var(--gray-400); cursor: default;">Save Lead</span>
-          <span class="contact-btn" style="color: var(--gray-400); cursor: default;">Export</span>
+          <span class="contact-btn primary" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="window.location.href='/pricing'">&#128274; Unlock Contact Info</span>
+          <span class="contact-btn" style="color: var(--gray-400); cursor: default;" title="Sign up to save leads">Save Lead</span>
+          <span class="contact-btn" style="color: var(--gray-400); cursor: default;" title="Pro feature">Export</span>
         </div>
         <div class="lock-overlay">
           <a href="/pricing">Upgrade for contact details →</a>
