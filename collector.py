@@ -207,6 +207,20 @@ def fetch_permits(city_key, days_back=30):
 # NORMALIZATION FUNCTIONS
 # ============================================================================
 
+def sanitize_string(value):
+    """Remove control characters that break JSON parsing."""
+    if not isinstance(value, str):
+        return value
+    # Remove ASCII control chars (0x00-0x1F) except common whitespace
+    # \x09 = tab, \x0A = newline, \x0D = carriage return — keep these
+    sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', value)
+    # Replace newlines and tabs with spaces for single-line fields
+    sanitized = sanitized.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    # Collapse multiple spaces
+    sanitized = re.sub(r'  +', ' ', sanitized)
+    return sanitized.strip()
+
+
 def normalize_permit(raw_record, city_key):
     """Normalize a raw permit record into our standard schema."""
     config = get_city_config(city_key)
@@ -235,6 +249,17 @@ def normalize_permit(raw_record, city_key):
         address_parts.append(get_field("street_name"))
 
     address = " ".join(address_parts) if address_parts else get_field("address")
+
+    # Fallback: try common address field names not in field_map
+    if not address:
+        for fallback_key in ["location", "project_address", "site_address",
+                             "property_address", "address_full", "location_1",
+                             "mapped_location"]:
+            val = str(raw_record.get(fallback_key, "")).strip()
+            if val and val != "None":
+                address = val
+                break
+
     if not address:
         address = "Address not provided"
 
@@ -282,24 +307,32 @@ def normalize_permit(raw_record, city_key):
     contact = get_field("contact_name") or owner
     phone = get_field("owner_phone") or get_field("contact_phone")
 
+    # Handle missing permit numbers with synthetic IDs
+    import hashlib
+    permit_num = get_field("permit_number")
+    if not permit_num:
+        # Generate a synthetic permit number from city + date + hash
+        raw_str = f"{city_key}_{address}_{parsed_date}"
+        permit_num = f"PG-{city_key[:3].upper()}-{hashlib.md5(raw_str.encode()).hexdigest()[:8]}"
+
     return {
-        "id": f"{city_key}_{get_field('permit_number')}",
+        "id": f"{city_key}_{permit_num}",
         "city": config["name"],
         "state": config["state"],
-        "permit_number": get_field("permit_number"),
-        "permit_type": get_field("permit_type"),
-        "work_type": get_field("work_type"),
+        "permit_number": sanitize_string(permit_num),
+        "permit_type": sanitize_string(get_field("permit_type")),
+        "work_type": sanitize_string(get_field("work_type")),
         "trade_category": trade,
-        "address": address,
-        "zip": get_field("zip"),
+        "address": sanitize_string(address),
+        "zip": sanitize_string(get_field("zip")),
         "filing_date": parsed_date,
-        "status": get_field("status"),
+        "status": sanitize_string(get_field("status")),
         "estimated_cost": cost,
         "value_tier": value_tier,
-        "description": desc[:500] if desc else "",
-        "contact_name": contact,
-        "contact_phone": phone,
-        "borough": get_field("borough") if "borough" in fmap else "",
+        "description": sanitize_string(desc[:500]) if desc else "",
+        "contact_name": sanitize_string(contact),
+        "contact_phone": sanitize_string(phone),
+        "borough": sanitize_string(get_field("borough")) if "borough" in fmap else "",
         "source_city": city_key,
     }
 
@@ -646,6 +679,28 @@ def collect_all(days_back=30):
     stats = {}
     active_cities = get_active_cities()
 
+    # V12 Fix 4.2: Skip cities with 10+ consecutive failures to save time
+    failure_tracker_path = os.path.join(DATA_DIR, "city_failures.json")
+    try:
+        with open(failure_tracker_path) as f:
+            failure_tracker = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        failure_tracker = {}
+
+    skipped_count = 0
+    filtered_cities = []
+    for city_key in active_cities:
+        if failure_tracker.get(city_key, 0) >= 10:
+            skipped_count += 1
+        else:
+            filtered_cities.append(city_key)
+
+    if skipped_count > 0:
+        print(f"  Skipping {skipped_count} cities with 10+ consecutive failures")
+        print(f"  (Reset by deleting {failure_tracker_path})")
+
+    active_cities = filtered_cities
+
     print("=" * 60)
     print("PermitGrab - Data Collection")
     print(f"Pulling permits from {len(active_cities)} cities (last {days_back} days)")
@@ -722,6 +777,57 @@ def collect_all(days_back=30):
     }
     with open(stats_file, "w") as f:
         json.dump(collection_stats, f, indent=2)
+
+    # V12 Fix 4.1: Save diagnostic report
+    diagnostic = {
+        "collected_at": datetime.now().isoformat(),
+        "total_active_cities": len(active_cities),
+        "cities_with_permits": sum(1 for s in stats.values() if s.get("normalized", 0) > 0),
+        "cities_with_errors": sum(1 for s in stats.values() if "error" in str(s.get("status", ""))),
+        "cities_timeout": sum(1 for s in stats.values() if s.get("status") == "timeout"),
+        "cities_connection_error": sum(1 for s in stats.values() if s.get("status") == "connection_error"),
+        "cities_zero_permits": sum(1 for s in stats.values() if s.get("status") == "success" and s.get("normalized", 0) == 0),
+        "by_status": {},
+        "failing_cities": [],
+    }
+
+    for key, s in stats.items():
+        status = str(s.get("status", "unknown"))
+        diagnostic["by_status"][status] = diagnostic["by_status"].get(status, 0) + 1
+        if s.get("normalized", 0) == 0:
+            diagnostic["failing_cities"].append({
+                "key": key,
+                "name": s.get("city_name", key),
+                "status": status,
+            })
+
+    diag_file = os.path.join(DATA_DIR, "collection_diagnostic.json")
+    with open(diag_file, "w") as f:
+        json.dump(diagnostic, f, indent=2)
+
+    # V12 Fix 4.2: Track consecutive failures
+    failure_tracker_path = os.path.join(DATA_DIR, "city_failures.json")
+    try:
+        with open(failure_tracker_path) as f:
+            failure_tracker = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        failure_tracker = {}
+
+    for key, s in stats.items():
+        if s.get("normalized", 0) == 0 and s.get("status") != "success":
+            failure_tracker[key] = failure_tracker.get(key, 0) + 1
+        else:
+            failure_tracker[key] = 0  # Reset on success
+
+    with open(failure_tracker_path, "w") as f:
+        json.dump(failure_tracker, f, indent=2)
+
+    # Log cities with 5+ consecutive failures
+    chronic_failures = {k: v for k, v in failure_tracker.items() if v >= 5}
+    if chronic_failures:
+        print(f"\n[WARNING] {len(chronic_failures)} cities have failed 5+ times consecutively:")
+        for k, v in sorted(chronic_failures.items(), key=lambda x: -x[1])[:10]:
+            print(f"  {k}: {v} consecutive failures")
 
     print("\n" + "=" * 60)
     print("COLLECTION COMPLETE")

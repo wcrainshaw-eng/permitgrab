@@ -1398,7 +1398,7 @@ footer a:hover { color: white; }
     <!-- V8: Upgrade banner for free users -->
     <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; justify-content: space-between; align-items: center;">
       <div>
-        <strong>You're viewing 2,000+ leads</strong>
+        <strong>You're viewing <span id="banner-total">—</span>+ leads</strong>
         <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Early Intel, Analytics, and unlimited exports.</span>
       </div>
       <a href="/pricing" style="background: #f97316; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap;">See Plans →</a>
@@ -1762,6 +1762,7 @@ function updateStats(useFiltered = false) {
   const uniqueTrades = new Set(permits.map(p => p.trade_category)).size;
 
   document.getElementById('stat-total').textContent = total.toLocaleString();
+  document.getElementById('banner-total').textContent = total.toLocaleString();
   document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
   document.getElementById('stat-trades').textContent = uniqueTrades.toLocaleString();

@@ -120,6 +120,26 @@ print(f"[Server] DATA_DIR exists: {os.path.isdir(DATA_DIR)}")
 if os.path.isdir(DATA_DIR):
     print(f"[Server] DATA_DIR contents: {os.listdir(DATA_DIR)}")
 
+# V12: One-time cleanup - sanitize existing permits.json if it has control chars
+def _sanitize_permits_file():
+    path = os.path.join(DATA_DIR, 'permits.json')
+    if os.path.exists(path):
+        try:
+            with open(path, 'rb') as f:
+                raw = f.read()
+            # Check for control characters
+            import re
+            if re.search(rb'[\x00-\x08\x0B\x0C\x0E-\x1F]', raw):
+                print("[Server] Found control characters in permits.json, sanitizing...")
+                cleaned = re.sub(rb'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', b'', raw)
+                with open(path, 'wb') as f:
+                    f.write(cleaned)
+                print("[Server] permits.json sanitized successfully.")
+        except Exception as e:
+            print(f"[Server] Warning: Could not sanitize permits.json: {e}")
+
+_sanitize_permits_file()
+
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 
@@ -427,21 +447,37 @@ def load_permits():
     """Load permits from JSON file, re-classify trades, and generate unique descriptions."""
     path = os.path.join(DATA_DIR, 'permits.json')
     if os.path.exists(path):
-        with open(path) as f:
-            permits = json.load(f)
-        # Re-classify trades and generate descriptions on load
-        for permit in permits:
-            reclassify_permit(permit)
-            permit['display_description'] = generate_permit_description(permit)
-        return permits
+        try:
+            with open(path) as f:
+                permits = json.load(f, strict=False)
+            # Re-classify trades and generate descriptions on load
+            for permit in permits:
+                try:
+                    reclassify_permit(permit)
+                    permit['display_description'] = generate_permit_description(permit)
+                except Exception as e:
+                    print(f"[Server] Warning: Failed to process permit: {e}")
+                    continue
+            return permits
+        except json.JSONDecodeError as e:
+            print(f"[Server] ERROR: Failed to parse permits.json: {e}")
+            print(f"[Server] The site will show 0 permits until collector rewrites the file.")
+            return []
+        except Exception as e:
+            print(f"[Server] ERROR: Unexpected error loading permits: {e}")
+            return []
     return []
 
 def load_stats():
     """Load collection stats."""
     path = os.path.join(DATA_DIR, 'collection_stats.json')
     if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
+        try:
+            with open(path) as f:
+                return json.load(f, strict=False)
+        except Exception as e:
+            print(f"[Server] ERROR: Failed to parse collection_stats.json: {e}")
+            return {}
     return {}
 
 def get_cities_with_data():
@@ -2855,6 +2891,16 @@ def admin_page():
     # Count unique cities in permits
     city_count = len(set(p.get('city', '') for p in permits if p.get('city')))
 
+    # V12: Load collection diagnostic
+    diag_path = os.path.join(DATA_DIR, 'collection_diagnostic.json')
+    diagnostic = {}
+    if os.path.exists(diag_path):
+        try:
+            with open(diag_path) as f:
+                diagnostic = json.load(f, strict=False)
+        except Exception:
+            pass
+
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -2957,6 +3003,25 @@ def admin_page():
                     <div class="section-body">
                         <p><strong>Last Updated:</strong> {{ last_updated or 'Never' }}</p>
                         <p><strong>Total Users:</strong> {{ total_users }}</p>
+                        {% if diagnostic %}
+                        <hr style="margin: 16px 0; border: none; border-top: 1px solid #e5e7eb;">
+                        <h4 style="margin-bottom: 12px; color: #374151;">Collection Diagnostic</h4>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+                            <div style="background: #dcfce7; padding: 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #16a34a;">{{ diagnostic.cities_with_permits }}</div>
+                                <div style="font-size: 12px; color: #166534;">Cities With Permits</div>
+                            </div>
+                            <div style="background: #fef9c3; padding: 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #ca8a04;">{{ diagnostic.cities_zero_permits }}</div>
+                                <div style="font-size: 12px; color: #854d0e;">Zero Permits</div>
+                            </div>
+                            <div style="background: #fee2e2; padding: 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #dc2626;">{{ diagnostic.cities_with_errors }}</div>
+                                <div style="font-size: 12px; color: #991b1b;">Errors</div>
+                            </div>
+                        </div>
+                        <p style="font-size: 13px; color: #6b7280;"><strong>Timeouts:</strong> {{ diagnostic.cities_timeout }} | <strong>Connection Errors:</strong> {{ diagnostic.cities_connection_error }}</p>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -3013,6 +3078,8 @@ def admin_page():
         pro_users=len(pro_users),
         last_updated=stats.get('collected_at', ''),
         subscribers=subscribers,
+        total_subscribers=len(subscribers),
+        diagnostic=diagnostic,
         success_msg=request.args.get('success', ''),
         error_msg=request.args.get('error', ''),
     )
