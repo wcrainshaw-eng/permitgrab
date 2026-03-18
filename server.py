@@ -120,25 +120,8 @@ print(f"[Server] DATA_DIR exists: {os.path.isdir(DATA_DIR)}")
 if os.path.isdir(DATA_DIR):
     print(f"[Server] DATA_DIR contents: {os.listdir(DATA_DIR)}")
 
-# V12: One-time cleanup - sanitize existing permits.json if it has control chars
-def _sanitize_permits_file():
-    path = os.path.join(DATA_DIR, 'permits.json')
-    if os.path.exists(path):
-        try:
-            with open(path, 'rb') as f:
-                raw = f.read()
-            # Check for control characters
-            import re
-            if re.search(rb'[\x00-\x08\x0B\x0C\x0E-\x1F]', raw):
-                print("[Server] Found control characters in permits.json, sanitizing...")
-                cleaned = re.sub(rb'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', b'', raw)
-                with open(path, 'wb') as f:
-                    f.write(cleaned)
-                print("[Server] permits.json sanitized successfully.")
-        except Exception as e:
-            print(f"[Server] Warning: Could not sanitize permits.json: {e}")
-
-_sanitize_permits_file()
+# V12.1: Removed _sanitize_permits_file() - raw byte stripping corrupted JSON structure
+# The correct approach is parse-then-rewrite in load_permits() using strict=False
 
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')
@@ -450,6 +433,12 @@ def load_permits():
         try:
             with open(path) as f:
                 permits = json.load(f, strict=False)
+            # V12.1: Re-write clean version (json.dump strips control chars from output)
+            try:
+                with open(path, 'w') as fw:
+                    json.dump(permits, fw, indent=2, default=str)
+            except Exception:
+                pass  # Don't crash if re-write fails
             # Re-classify trades and generate descriptions on load
             for permit in permits:
                 try:
@@ -680,16 +669,24 @@ def load_permit_history():
 def load_violations():
     """Load code violations from JSON file."""
     if os.path.exists(VIOLATIONS_FILE):
-        with open(VIOLATIONS_FILE) as f:
-            return json.load(f)
+        try:
+            with open(VIOLATIONS_FILE) as f:
+                return json.load(f, strict=False)
+        except Exception as e:
+            print(f"[Server] ERROR: Failed to parse violations.json: {e}")
+            return []
     return []
 
 
 def load_signals():
     """Load pre-construction signals from JSON file."""
     if os.path.exists(SIGNALS_FILE):
-        with open(SIGNALS_FILE) as f:
-            return json.load(f)
+        try:
+            with open(SIGNALS_FILE) as f:
+                return json.load(f, strict=False)
+        except Exception as e:
+            print(f"[Server] ERROR: Failed to parse signals.json: {e}")
+            return []
     return []
 
 

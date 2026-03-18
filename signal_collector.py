@@ -201,6 +201,19 @@ SIGNAL_SOURCES = {
 }
 
 
+def sanitize_string(value):
+    """Remove control characters that break JSON parsing."""
+    if not isinstance(value, str):
+        return value
+    # Remove ASCII control chars (0x00-0x1F) except common whitespace
+    sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', value)
+    # Replace newlines and tabs with spaces for single-line fields
+    sanitized = sanitized.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    # Collapse multiple spaces
+    sanitized = re.sub(r'  +', ' ', sanitized)
+    return sanitized.strip()
+
+
 def normalize_address(address, city="", state=""):
     """Normalize an address for consistent matching."""
     if not address:
@@ -378,21 +391,21 @@ def normalize_signal(raw_record, source_key):
         "signal_id": signal_id,
         "city": source["city"],
         "state": source["state"],
-        "address": address,
+        "address": sanitize_string(address),
         "address_normalized": normalize_address(address, source["city"], source["state"]),
         "signal_type": signal_type,
-        "title": title[:200],
-        "description": get_field("description")[:500] if get_field("description") else "",
-        "source_url": get_field("source_url"),
+        "title": sanitize_string(title[:200]),
+        "description": sanitize_string(get_field("description")[:500]) if get_field("description") else "",
+        "source_url": sanitize_string(get_field("source_url")),
         "source_dataset": source_key,
         "date_filed": parsed_date,
         "date_collected": datetime.now().strftime("%Y-%m-%d"),
-        "status": status,
-        "applicant_name": get_field("applicant_name"),
+        "status": sanitize_string(status),
+        "applicant_name": sanitize_string(get_field("applicant_name")),
         "estimated_value": estimated_value,
         "linked_permits": [],
         "metadata": {
-            "units": get_field("metadata_units") if "metadata_units" in fmap else None,
+            "units": sanitize_string(get_field("metadata_units")) if "metadata_units" in fmap else None,
         },
     }
 

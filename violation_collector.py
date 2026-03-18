@@ -102,6 +102,19 @@ VIOLATION_SOURCES = {
 }
 
 
+def sanitize_string(value):
+    """Remove control characters that break JSON parsing."""
+    if not isinstance(value, str):
+        return value
+    # Remove ASCII control chars (0x00-0x1F) except common whitespace
+    sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', value)
+    # Replace newlines and tabs with spaces for single-line fields
+    sanitized = sanitized.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    # Collapse multiple spaces
+    sanitized = re.sub(r'  +', ' ', sanitized)
+    return sanitized.strip()
+
+
 def normalize_address(address):
     """Normalize an address for consistent indexing and matching."""
     if not address:
@@ -204,12 +217,12 @@ def normalize_violation(raw_record, city_key):
         "id": f"{city_key}_{get_field('violation_id')}",
         "city": source["name"],
         "state": source["state"],
-        "address": address,
+        "address": sanitize_string(address),
         "normalized_address": normalize_address(address),
-        "violation_type": get_field("violation_type")[:200],
+        "violation_type": sanitize_string(get_field("violation_type")[:200]),
         "violation_date": parsed_date,
-        "status": status,
-        "borough": get_field("borough") if "borough" in fmap else "",
+        "status": sanitize_string(status),
+        "borough": sanitize_string(get_field("borough")) if "borough" in fmap else "",
         "source_city": city_key,
     }
 
