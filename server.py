@@ -127,6 +127,39 @@ if os.path.isdir(DATA_DIR):
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 
+# V12.12: Startup data loading state
+# Track whether initial data has been loaded from disk
+_initial_data_loaded = False
+_collection_in_progress = False
+
+def preload_data_from_disk():
+    """V12.12: Load existing data from disk on startup BEFORE serving any requests.
+
+    This ensures that even after a deploy, stale data is served immediately
+    rather than showing 0 permits while waiting for collection to complete.
+    """
+    global _initial_data_loaded
+    permits_file = os.path.join(DATA_DIR, 'permits.json')
+    if os.path.exists(permits_file):
+        try:
+            file_size = os.path.getsize(permits_file)
+            print(f"[Server] V12.12: Found permits.json on disk ({file_size} bytes)")
+            # Trigger a load to validate and process the data
+            permits = load_permits()
+            print(f"[Server] V12.12: Preloaded {len(permits)} permits from disk")
+            _initial_data_loaded = True
+        except Exception as e:
+            print(f"[Server] V12.12: Failed to preload permits: {e}")
+    else:
+        print(f"[Server] V12.12: No permits.json found on disk - fresh deploy or disk wiped")
+
+def is_data_loading():
+    """V12.12: Check if we're in a loading state (no data available)."""
+    if _initial_data_loaded:
+        return False
+    permits_file = os.path.join(DATA_DIR, 'permits.json')
+    return not os.path.exists(permits_file) or os.path.getsize(permits_file) < 100
+
 # Admin password from environment
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
@@ -977,11 +1010,28 @@ def alerts_redirect():
 @app.route('/health')
 def health_check():
     """
-    Health check endpoint for keeping the Render instance warm.
-    Configure an external ping service (UptimeRobot, cron-job.org, etc.)
-    to hit this endpoint every 14 minutes.
+    V12.12: Health check endpoint with data availability check.
+    Returns 503 if no permit data is available (fresh deploy/empty disk).
+    This prevents Render from routing traffic to an empty instance.
     """
-    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+    permits = load_permits()
+    permit_count = len(permits)
+
+    if permit_count == 0 and is_data_loading():
+        # No data and we're in a loading state - return unhealthy
+        return jsonify({
+            'status': 'loading',
+            'timestamp': datetime.now().isoformat(),
+            'message': 'Data collection in progress',
+            'permit_count': 0
+        }), 503
+
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat(),
+        'permit_count': permit_count,
+        'data_loaded': _initial_data_loaded
+    }), 200
 
 
 @app.route('/api/permits')
@@ -4038,8 +4088,8 @@ def city_landing(city_slug):
             "name": display_name,
             "raw_name": city_config["name"],  # For filtering permits
             "state": city_config["state"],
-            "meta_title": f"{display_name} Building Permits & Contractor Leads | PermitGrab",
-            "meta_description": f"Browse active building permits in {display_name}. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+            "meta_title": f"{display_name}, {city_config['state']} Building Permits & Contractor Leads | PermitGrab",
+            "meta_description": f"Browse active building permits in {display_name}, {city_config['state']}. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
             "seo_content": f"""
                 <p>Track new building permits in {display_name}, {city_config['state']}. PermitGrab delivers fresh permit data daily, helping contractors find quality leads across the region.</p>
                 <p>Access permit data including project values, contact information, and trade categories. Start browsing {display_name} construction permits today.</p>
@@ -4641,6 +4691,10 @@ def start_collectors():
     collector_thread.start()
 
     print(f"[{datetime.now()}] Collector threads started.")
+
+# V12.12: Preload existing data from disk BEFORE starting collectors
+# This ensures stale data is served immediately rather than showing 0 permits
+preload_data_from_disk()
 
 # Start collectors when module is loaded (works with gunicorn --preload)
 start_collectors()
