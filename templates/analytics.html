@@ -471,17 +471,25 @@ async function loadAnalytics() {
   renderTradesChart(tradesData);
 }
 
+function formatPercentChange(percentage, direction) {
+  // V8: Cap absurd percentages to avoid "+5721.7%" displays
+  const absVal = Math.abs(percentage);
+  if (absVal > 500) {
+    return direction === 'up' ? '↑ Surging' : direction === 'down' ? '↓ Declining' : '→ Stable';
+  }
+  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
+  return `${arrow} ${absVal.toFixed(1)}%`;
+}
+
 function updateTrendStat(elementId, direction, percentage) {
   const el = document.getElementById(elementId);
-  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
-  el.textContent = `${arrow} ${Math.abs(percentage)}%`;
+  el.textContent = formatPercentChange(percentage, direction);
   el.className = 'trend ' + direction;
 }
 
 function updateTrendBadge(elementId, direction, percentage) {
   const el = document.getElementById(elementId);
-  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
-  el.textContent = `${arrow} ${Math.abs(percentage)}%`;
+  el.textContent = formatPercentChange(percentage, direction);
   el.className = 'trend-badge ' + direction;
 }
 

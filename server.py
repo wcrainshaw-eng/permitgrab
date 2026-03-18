@@ -3863,6 +3863,77 @@ def logout_page():
     session.clear()
     return redirect('/')
 
+
+# ===========================
+# ACCOUNT SETTINGS (V8)
+# ===========================
+@app.route('/account')
+def account_page():
+    """Account settings page."""
+    if 'user_email' not in session:
+        return redirect('/login')
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        session.clear()
+        return redirect('/login')
+    footer_cities = get_cities_with_data()
+    is_pro = user.plan in ('pro', 'professional', 'enterprise')
+    return render_template('account.html', user=user, is_pro=is_pro, footer_cities=footer_cities)
+
+
+@app.route('/api/account', methods=['PUT'])
+def api_update_account():
+    """Update account settings."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Invalid request'}), 400
+
+    if 'name' in data:
+        user.name = data['name'].strip()
+    if 'city' in data:
+        user.city = data['city']
+    if 'trade' in data:
+        user.trade = data['trade']
+    if 'daily_alerts' in data:
+        user.daily_alerts = bool(data['daily_alerts'])
+
+    db.session.commit()
+    return jsonify({'success': True, 'user': user.to_dict()})
+
+
+@app.route('/api/change-password', methods=['POST'])
+def api_change_password():
+    """Change user password."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Invalid request'}), 400
+
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+
+    if not check_password_hash(user.password_hash, current_password):
+        return jsonify({'error': 'Current password is incorrect'}), 400
+
+    if len(new_password) < 8:
+        return jsonify({'error': 'New password must be at least 8 characters'}), 400
+
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Password changed successfully'})
+
+
 @app.route('/robots.txt')
 def robots():
     """Serve robots.txt for search engines."""

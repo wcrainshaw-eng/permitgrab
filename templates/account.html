@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Settings - PermitGrab</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --green: #16a34a;
+  --red: #dc2626;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: var(--gray-500);
+  margin-bottom: 32px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+
+.card h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--gray-700);
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+
+.form-group input:disabled {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all .2s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+
+.btn-secondary:hover {
+  background: var(--gray-200);
+}
+
+.subscription-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.subscription-badge.pro {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+}
+
+.subscription-badge.free {
+  background: var(--gray-200);
+  color: var(--gray-700);
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.toggle-row:last-child {
+  border-bottom: none;
+}
+
+.toggle-label {
+  font-weight: 500;
+}
+
+.toggle-desc {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--gray-300);
+  border-radius: 26px;
+  transition: .3s;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: .3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.info-label {
+  color: var(--gray-500);
+}
+
+.info-value {
+  font-weight: 500;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 24px;
+  background: var(--green);
+  color: white;
+  border-radius: 8px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  animation: slideIn .3s ease;
+  z-index: 1000;
+}
+
+.toast.error {
+  background: var(--red);
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<div class="container">
+  <h1>Account Settings</h1>
+  <p class="subtitle">Manage your profile, subscription, and preferences</p>
+
+  <!-- Profile Section -->
+  <div class="card">
+    <h2>Profile</h2>
+    <form id="profile-form">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="name" value="{{ user.name or '' }}">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" value="{{ user.email }}" disabled>
+      </div>
+      <div class="form-group">
+        <label>Member Since</label>
+        <input type="text" value="{{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}" disabled>
+      </div>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </form>
+  </div>
+
+  <!-- Subscription Section -->
+  <div class="card">
+    <h2>Subscription</h2>
+    <div class="info-row">
+      <span class="info-label">Current Plan</span>
+      <span class="subscription-badge {{ 'pro' if is_pro else 'free' }}">
+        {{ 'Pro' if is_pro else 'Free' }}
+      </span>
+    </div>
+    {% if is_pro %}
+    <div class="info-row">
+      <span class="info-label">Status</span>
+      <span class="info-value">Active</span>
+    </div>
+    <a href="/billing" class="btn btn-secondary" style="margin-top: 16px;">Manage Billing</a>
+    {% else %}
+    <p style="margin: 16px 0; color: var(--gray-500);">
+      Upgrade to Pro for full contact info, Early Intel, Analytics, and unlimited exports.
+    </p>
+    <a href="/pricing" class="btn btn-primary">Upgrade to Pro</a>
+    {% endif %}
+  </div>
+
+  <!-- Alert Preferences -->
+  <div class="card" id="alerts">
+    <h2>Alert Preferences</h2>
+    <form id="alerts-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Preferred City</label>
+          <select id="pref-city">
+            <option value="">All Cities</option>
+            {% for city in footer_cities %}
+            <option value="{{ city.slug }}" {{ 'selected' if user.city == city.slug else '' }}>{{ city.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Preferred Trade</label>
+          <select id="pref-trade">
+            <option value="">All Trades</option>
+            <option value="electrical" {{ 'selected' if user.trade == 'electrical' else '' }}>Electrical</option>
+            <option value="plumbing" {{ 'selected' if user.trade == 'plumbing' else '' }}>Plumbing</option>
+            <option value="hvac" {{ 'selected' if user.trade == 'hvac' else '' }}>HVAC</option>
+            <option value="roofing" {{ 'selected' if user.trade == 'roofing' else '' }}>Roofing</option>
+            <option value="general" {{ 'selected' if user.trade == 'general' else '' }}>General Construction</option>
+          </select>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Daily Email Alerts</div>
+          <div class="toggle-desc">Receive new permits matching your preferences daily</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="daily-alerts" {{ 'checked' if user.daily_alerts else '' }}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top: 16px;">Save Preferences</button>
+    </form>
+  </div>
+
+  <!-- Security Section -->
+  <div class="card">
+    <h2>Security</h2>
+    <form id="password-form">
+      <div class="form-group">
+        <label>Current Password</label>
+        <input type="password" id="current-password" required>
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="new-password" required minlength="8">
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" id="confirm-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Change Password</button>
+    </form>
+  </div>
+</div>
+
+{% include 'partials/footer.html' %}
+
+<script>
+function showToast(message, isError = false) {
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (isError ? ' error' : '');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Profile form
+document.getElementById('profile-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('name').value;
+
+  const resp = await fetch('/api/account', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+
+  if (resp.ok) {
+    showToast('Profile updated successfully');
+  } else {
+    const data = await resp.json();
+    showToast(data.error || 'Failed to update profile', true);
+  }
+});
+
+// Alerts form
+document.getElementById('alerts-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const city = document.getElementById('pref-city').value;
+  const trade = document.getElementById('pref-trade').value;
+  const daily_alerts = document.getElementById('daily-alerts').checked;
+
+  const resp = await fetch('/api/account', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city, trade, daily_alerts })
+  });
+
+  if (resp.ok) {
+    showToast('Preferences saved');
+  } else {
+    const data = await resp.json();
+    showToast(data.error || 'Failed to save preferences', true);
+  }
+});
+
+// Password form
+document.getElementById('password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const currentPassword = document.getElementById('current-password').value;
+  const newPassword = document.getElementById('new-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+
+  if (newPassword !== confirmPassword) {
+    showToast('Passwords do not match', true);
+    return;
+  }
+
+  const resp = await fetch('/api/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+  });
+
+  if (resp.ok) {
+    showToast('Password changed successfully');
+    document.getElementById('password-form').reset();
+  } else {
+    const data = await resp.json();
+    showToast(data.error || 'Failed to change password', true);
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1198,9 +1198,15 @@ footer a:hover { color: white; }
         <a href="/signup" class="btn-cta">Sign Up</a>
       </span>
       <span id="user-nav" style="display: none;">
-        <a href="/my-leads">My Leads</a>
-        <span id="user-email" style="color: rgba(255,255,255,.7); font-size: 14px;"></span>
-        <a href="/logout">Log Out</a>
+        <div class="nav-dropdown">
+          <a href="#" class="dropdown-toggle" id="user-dropdown-toggle"><span id="user-name">Account</span> <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
+          <div class="dropdown-menu" style="right: 0; left: auto;">
+            <a href="/my-leads">My Leads</a>
+            <a href="/account">Account</a>
+            <a href="/billing">Billing</a>
+            <a href="/logout">Log Out</a>
+          </div>
+        </div>
       </span>
     </nav>
   </div>
@@ -1522,10 +1528,24 @@ let currentPage = 1;
 const perPage = 50;
 let freePreviewLimit = 0; // Non-Pro users get NO free previews (updated based on user plan)
 let currentUser = null;
+let savedLeadIds = new Set();
 
 // ===========================
 // LOAD DATA
 // ===========================
+async function loadSavedLeads() {
+  if (!currentUser) return;
+  try {
+    const resp = await fetch('/api/saved-leads');
+    if (resp.ok) {
+      const data = await resp.json();
+      savedLeadIds = new Set((data.leads || []).map(l => l.permit_id));
+    }
+  } catch (e) {
+    console.error('Failed to load saved leads:', e);
+  }
+}
+
 async function loadData() {
   try {
     const resp = await fetch('/api/permits?per_page=2000');
@@ -1645,7 +1665,8 @@ function updateResultsCount() {
   } else {
     showingEl.textContent = filteredPermits.length.toLocaleString();
   }
-  totalEl.textContent = allPermits.length.toLocaleString();
+  // Show filtered count, not total (V8 fix)
+  totalEl.textContent = filteredPermits.length.toLocaleString();
 }
 
 // ===========================
@@ -1707,7 +1728,9 @@ function renderPermits() {
         ${!isLocked ? `
         <div class="permit-contact">
           ${p.contact_phone && isValidPhone(p.contact_phone) ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : '<span class="contact-btn" style="color: var(--gray-400); cursor: default;">No phone on file</span>'}
-          <button class="contact-btn" onclick="savePermit('${p.permit_number}')">Save Lead</button>
+          <button class="contact-btn save-lead-btn" data-save-permit="${p.permit_number}" onclick="savePermit('${p.permit_number}', this)"${savedLeadIds.has(p.permit_number) ? ' disabled style="background:#27AE60;color:white;border-color:#27AE60;"' : ''}>
+            ${savedLeadIds.has(p.permit_number) ? '✓ Saved' : 'Save Lead'}
+          </button>
           <button class="contact-btn" onclick="exportPermit('${p.permit_number}')">Export</button>
         </div>
         <div style="margin-top: 8px;">
@@ -1954,12 +1977,15 @@ function goToPage(page) {
 // ===========================
 // ACTIONS
 // ===========================
-async function savePermit(permitNumber) {
+async function savePermit(permitNumber, buttonEl) {
   if (!currentUser) {
     showToast('Please log in to save leads');
     showLoginModal();
     return;
   }
+
+  // Find the button if not passed directly
+  const btn = buttonEl || document.querySelector(`[data-save-permit="${permitNumber}"]`);
 
   try {
     const resp = await fetch('/api/saved-leads', {
@@ -1970,6 +1996,7 @@ async function savePermit(permitNumber) {
 
     if (resp.status === 409) {
       showToast('Lead already saved!');
+      if (btn) markButtonSaved(btn);
       return;
     }
 
@@ -1981,6 +2008,8 @@ async function savePermit(permitNumber) {
 
     if (resp.ok) {
       showToast('Lead saved! View in My Leads');
+      if (btn) markButtonSaved(btn);
+      savedLeadIds.add(permitNumber);
     } else {
       showToast('Error saving lead');
     }
@@ -1988,6 +2017,15 @@ async function savePermit(permitNumber) {
     console.error('Error saving lead:', e);
     showToast('Error saving lead');
   }
+}
+
+function markButtonSaved(btn) {
+  btn.textContent = '✓ Saved';
+  btn.style.backgroundColor = '#27AE60';
+  btn.style.color = 'white';
+  btn.style.borderColor = '#27AE60';
+  btn.disabled = true;
+  btn.onclick = null;
 }
 
 function exportPermit(id) {
@@ -2127,6 +2165,7 @@ async function checkCurrentUser() {
     const data = await resp.json();
     currentUser = data.user;
     updateAuthUI();
+    await loadSavedLeads(); // Load saved leads for button states
     updateFreePreviewLimit();
   } catch (e) {
     console.error('Failed to check user:', e);
@@ -2136,12 +2175,13 @@ async function checkCurrentUser() {
 function updateAuthUI() {
   const authNav = document.getElementById('auth-nav');
   const userNav = document.getElementById('user-nav');
-  const userEmail = document.getElementById('user-email');
+  const userName = document.getElementById('user-name');
 
   if (currentUser) {
     authNav.style.display = 'none';
     userNav.style.display = 'inline';
-    userEmail.textContent = currentUser.email;
+    // Show name if available, otherwise email prefix
+    userName.textContent = currentUser.name || currentUser.email.split('@')[0];
   } else {
     authNav.style.display = 'inline';
     userNav.style.display = 'none';
@@ -2439,7 +2479,14 @@ async function togglePermitHistory(address, cardId) {
         ${history.permits.length > 10 ? `<div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">+ ${history.permits.length - 10} more permits</div>` : ''}
       `;
     } else {
-      content.innerHTML = '<div style="color: var(--gray-400); font-size: 13px;">No previous permits found at this address.</div>';
+      // V8: Improved empty state message
+      content.innerHTML = `
+        <div style="padding: 12px; color: #666; font-size: 14px; background: #f8f9fa; border-radius: 6px;">
+          <strong>First permit at this address</strong> &mdash;
+          No previous construction permits found. This could be a new development opportunity.
+          Save this lead to track future activity.
+        </div>
+      `;
     }
   } else {
     container.classList.add('expanded');

@@ -143,13 +143,14 @@
       <a href="/pricing">Pricing</a>
 
       {% if user %}
-      <a href="/early-intel">Early Intel</a>
-      <a href="/analytics">Analytics</a>
-      <a href="/my-leads">My Leads</a>
+      <a href="/early-intel">Early Intel <span style="font-size: 10px; background: #facc15; color: #111; padding: 2px 6px; border-radius: 10px; margin-left: 2px;">NEW</span></a>
+      <a href="/analytics">Analytics <span style="font-size: 10px; background: #f97316; padding: 2px 6px; border-radius: 10px; margin-left: 2px;">PRO</span></a>
 
       <div class="nav-dropdown">
         <button class="dropdown-toggle">{{ user.name or user.email.split('@')[0] }} <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
         <div class="dropdown-menu">
+          <a href="/my-leads">My Leads</a>
+          <a href="/account">Account</a>
           {% if is_pro %}
           <a href="/billing">Billing</a>
           {% endif %}

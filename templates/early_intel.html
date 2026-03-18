@@ -711,7 +711,7 @@ function renderSignals(data) {
         <span class="signal-type-badge ${s.signal_type}">${signalTypeLabels[s.signal_type] || s.signal_type}</span>
         ${lifecyclePill}
         <span class="status-badge ${s.status}">${s.status}</span>
-      </div>`
+      </div>
       <div class="signal-title">${escapeHtml(s.title)}</div>
       <div class="signal-address">${escapeHtml(s.address)} - ${s.city}, ${s.state}</div>
       ${s.description ? `<div class="signal-description">${escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</div>` : ''}
