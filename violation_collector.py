@@ -9,7 +9,11 @@ import os
 import re
 from datetime import datetime, timedelta
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+# Use Render persistent disk if available, otherwise local
+if os.path.isdir('/var/data'):
+    DATA_DIR = '/var/data'
+else:
+    DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Code violation data sources (Socrata APIs)

@@ -15,7 +15,11 @@ from city_configs import (
     get_active_cities, get_city_config
 )
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+# Use Render persistent disk if available, otherwise local
+if os.path.isdir('/var/data'):
+    DATA_DIR = '/var/data'
+else:
+    DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Rate limiting: 1 second between city pulls
@@ -648,24 +652,37 @@ def collect_all(days_back=30):
     print("=" * 60)
 
     for city_key in active_cities:
-        config = get_city_config(city_key)
-        raw = fetch_permits(city_key, days_back)
-        city_permits = []
+        try:
+            config = get_city_config(city_key)
+            raw = fetch_permits(city_key, days_back)
+            city_permits = []
 
-        for record in raw:
-            try:
-                normalized = normalize_permit(record, city_key)
-                if normalized and normalized["permit_number"]:
-                    city_permits.append(normalized)
-            except Exception:
-                continue
+            for record in raw:
+                try:
+                    normalized = normalize_permit(record, city_key)
+                    if normalized and normalized["permit_number"]:
+                        city_permits.append(normalized)
+                except Exception:
+                    continue
 
-        all_permits.extend(city_permits)
-        stats[city_key] = {
-            "raw": len(raw),
-            "normalized": len(city_permits),
-            "city_name": config["name"],
-        }
+            all_permits.extend(city_permits)
+            stats[city_key] = {
+                "raw": len(raw),
+                "normalized": len(city_permits),
+                "city_name": config["name"],
+                "status": "success",
+            }
+            print(f"  ✓ {config['name']}: {len(city_permits)} permits")
+
+        except requests.exceptions.Timeout:
+            stats[city_key] = {"status": "timeout", "city_name": config.get("name", city_key) if config else city_key}
+            print(f"  ✗ {city_key}: TIMEOUT")
+        except requests.exceptions.ConnectionError:
+            stats[city_key] = {"status": "connection_error", "city_name": config.get("name", city_key) if config else city_key}
+            print(f"  ✗ {city_key}: CONNECTION ERROR")
+        except Exception as e:
+            stats[city_key] = {"status": f"error: {str(e)[:100]}", "city_name": config.get("name", city_key) if config else city_key}
+            print(f"  ✗ {city_key}: {str(e)[:100]}")
 
         # Rate limiting
         time.sleep(RATE_LIMIT_DELAY)

@@ -7,8 +7,8 @@ services:
   - type: web
     name: permitgrab
     runtime: python
-    buildCommand: pip install -r requirements.txt && python generate_sample_data.py
-    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --preload
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"

@@ -2833,10 +2833,14 @@ def admin_page():
     permits = load_permits()
     subscribers = load_subscribers()
     stats = load_stats()
-    users = load_users()
 
-    active_subs = [s for s in subscribers if s.get('active', True)]
-    paid_subs = [s for s in subscribers if s.get('plan') in ('professional', 'enterprise')]
+    # V11 Fix 2.1: Get real user stats from database
+    all_users = User.query.all()
+    pro_users = User.query.filter(User.plan.in_(['pro', 'professional', 'enterprise'])).all()
+    alert_users = User.query.filter_by(daily_alerts=True).all()
+
+    # Count unique cities in permits
+    city_count = len(set(p.get('city', '') for p in permits if p.get('city')))
 
     return render_template_string('''
         <!DOCTYPE html>
@@ -2889,18 +2893,23 @@ def admin_page():
                         <div class="label">Total Permits</div>
                     </div>
                     <div class="stat-card">
-                        <div class="value">{{ total_subscribers }}</div>
-                        <div class="label">Total Subscribers</div>
+                        <div class="value">{{ city_count }}</div>
+                        <div class="label">Active Cities</div>
                     </div>
                     <div class="stat-card">
-                        <div class="value">{{ active_subscribers }}</div>
-                        <div class="label">Active Subscribers</div>
+                        <div class="value">{{ total_users }}</div>
+                        <div class="label">Registered Users</div>
                     </div>
                     <div class="stat-card">
-                        <div class="value">{{ paid_subscribers }}</div>
-                        <div class="label">Paid Subscribers</div>
+                        <div class="value">{{ pro_users }}</div>
+                        <div class="label">Pro Users</div>
                     </div>
                 </div>
+                {% if last_updated %}
+                <div style="text-align: center; margin-bottom: 16px; padding: 8px; background: #dbeafe; border-radius: 6px; font-size: 14px; color: #1e40af;">
+                    Last data collection: {{ last_updated }}
+                </div>
+                {% endif %}
 
                 {% if success_msg %}
                 <div class="alert alert-success">{{ success_msg }}</div>
@@ -2986,10 +2995,9 @@ def admin_page():
         </html>
     ''',
         total_permits=len(permits),
-        total_subscribers=len(subscribers),
-        active_subscribers=len(active_subs),
-        paid_subscribers=len(paid_subs),
-        total_users=len(users),
+        city_count=city_count,
+        total_users=len(all_users),
+        pro_users=len(pro_users),
         last_updated=stats.get('collected_at', ''),
         subscribers=subscribers,
         success_msg=request.args.get('success', ''),
@@ -3002,6 +3010,43 @@ def admin_page():
 def check_admin_logout():
     if request.path == '/admin' and request.args.get('logout'):
         session.pop('admin_authenticated', None)
+
+
+@app.route('/api/collection-status')
+def api_collection_status():
+    """GET /api/collection-status - Check data collection status (admin only)."""
+    if not session.get('admin_authenticated'):
+        return jsonify({'error': 'Admin authentication required'}), 401
+
+    stats = load_stats()
+    permits = load_permits()
+
+    # Check data directory
+    data_files = {}
+    for filename in ['permits.json', 'collection_stats.json', 'violations.json',
+                      'signals.json', 'permit_history.json', 'city_health.json']:
+        filepath = os.path.join(DATA_DIR, filename)
+        if os.path.exists(filepath):
+            data_files[filename] = {
+                'exists': True,
+                'size_kb': round(os.path.getsize(filepath) / 1024, 1),
+                'modified': datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat(),
+            }
+        else:
+            data_files[filename] = {'exists': False}
+
+    # Count unique cities
+    city_count = len(set(p.get('city', '') for p in permits if p.get('city')))
+
+    return jsonify({
+        'data_dir': DATA_DIR,
+        'total_permits': len(permits),
+        'unique_cities': city_count,
+        'last_collection': stats.get('collected_at', 'Never'),
+        'city_stats': stats.get('city_stats', {}),
+        'data_files': data_files,
+        'collector_started': _collector_started,
+    })
 
 
 @app.route('/admin/upgrade-user', methods=['POST'])
@@ -4186,19 +4231,43 @@ def page_not_found(e):
 
 
 # ===========================
-# MAIN
+# STARTUP: DATA COLLECTION
 # ===========================
-if __name__ == '__main__':
+# This runs when gunicorn imports the module (or when running directly).
+# Use a flag to prevent multiple workers from each starting collectors.
+
+_collector_started = False
+
+def start_collectors():
+    """Start background data collection threads. Safe to call multiple times."""
+    global _collector_started
+    if _collector_started:
+        return
+    _collector_started = True
+
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # Run initial collection in a thread (won't block server startup)
+    print(f"[{datetime.now()}] Starting background data collectors...")
+
+    # Initial collection thread
     initial_thread = threading.Thread(target=run_initial_collection, daemon=True)
     initial_thread.start()
 
-    # Start background scheduled collection (daily)
+    # Scheduled daily collection thread
     collector_thread = threading.Thread(target=scheduled_collection, daemon=True)
     collector_thread.start()
 
+    print(f"[{datetime.now()}] Collector threads started.")
+
+# Start collectors when module is loaded (works with gunicorn --preload)
+start_collectors()
+
+
+# ===========================
+# MAIN
+# ===========================
+if __name__ == '__main__':
+    # Local development only (gunicorn handles production)
     print("=" * 50)
     print("PermitGrab Server Starting")
     print(f"Dashboard: http://localhost:5000")
