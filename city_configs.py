@@ -353,8 +353,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
-        "notes": "403 Forbidden - May require app token",
+        "active": True,
+        "notes": "V12.3: Reactivated — verified working with V12.2 User-Agent headers",
     },
 
     "detroit": {
@@ -432,8 +432,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
-        "notes": "Dataset ID needs verification",
+        "active": True,
+        "notes": "V12.3: Reactivated — verified working with V12.2 User-Agent headers",
     },
 
     "portland": {
@@ -1546,7 +1546,7 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "dallas_verified": {
+    "dallas": {
         "name": "Dallas",
         "state": "TX",
         "slug": "dallas",
@@ -1568,6 +1568,7 @@ CITY_REGISTRY = {
         "date_field": "issued_date",
         "limit": 2000,
         "active": True,
+        "notes": "V12.3: Verified working — formerly dallas_verified",
     },
 
     "framingham": {
@@ -2283,29 +2284,6 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "cambridge": {
-        "name": "Cambridge",
-        "state": "MA",
-        "slug": "cambridge",
-        "platform": "socrata",
-        "endpoint": "https://data.cambridgema.gov/resource/9qm7-wbdc.json",
-        "dataset_id": "9qm7-wbdc",
-        "description": "Building Permits: New Construction",
-        "field_map": {
-            "permit_number": "id",
-            "permit_type": "permit_type",
-            "work_type": "construction_type",
-            "address": "full_address",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "building_cost",
-            "description": "description_of_work",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     "nola_blds": {
         "name": "New Orleans",
         "state": "LA",
@@ -2360,81 +2338,6 @@ CITY_REGISTRY = {
     # =========================================================================
     # ADDITIONAL CITIES - BATCH 3 (Socrata)
     # =========================================================================
-
-    "oakland": {
-        "name": "Oakland",
-        "state": "CA",
-        "slug": "oakland",
-        "platform": "socrata",
-        "endpoint": "https://data.oaklandca.gov/resource/26ua-ymha.json",
-        "dataset_id": "26ua-ymha",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "long_beach": {
-        "name": "Long Beach",
-        "state": "CA",
-        "slug": "long-beach",
-        "platform": "socrata",
-        "endpoint": "https://data.longbeach.gov/resource/75xg-4g5s.json",
-        "dataset_id": "75xg-4g5s",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "fresno": {
-        "name": "Fresno",
-        "state": "CA",
-        "slug": "fresno",
-        "platform": "socrata",
-        "endpoint": "https://data.fresno.gov/resource/yf4r-4z3c.json",
-        "dataset_id": "yf4r-4z3c",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "santa_ana": {
         "name": "Santa Ana",
@@ -3020,30 +2923,6 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "tucson": {
-        "name": "Tucson",
-        "state": "AZ",
-        "slug": "tucson",
-        "platform": "socrata",
-        "endpoint": "https://data.tucsonaz.gov/resource/u5pq-k8zh.json",
-        "dataset_id": "u5pq-k8zh",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     "scottsdale": {
         "name": "Scottsdale",
         "state": "AZ",
@@ -3260,32 +3139,6 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "albuquerque": {
-        "name": "Albuquerque",
-        "state": "NM",
-        "slug": "albuquerque",
-        "platform": "socrata",
-        "endpoint": "https://data.cabq.gov/resource/fkrb-5i3d.json",
-        "dataset_id": "fkrb-5i3d",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     "colorado_springs": {
         "name": "Colorado Springs",
         "state": "CO",
@@ -3337,82 +3190,6 @@ CITY_REGISTRY = {
     # =========================================================================
     # ADDITIONAL CITIES - BATCH 5 (Florida & Southeast)
     # =========================================================================
-
-    "jacksonville": {
-        "name": "Jacksonville",
-        "state": "FL",
-        "slug": "jacksonville",
-        "platform": "socrata",
-        "endpoint": "https://data.coj.net/resource/fmnh-rhsp.json",
-        "dataset_id": "fmnh-rhsp",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "tampa": {
-        "name": "Tampa",
-        "state": "FL",
-        "slug": "tampa",
-        "platform": "socrata",
-        "endpoint": "https://data.tampagov.net/resource/bqpc-dj7h.json",
-        "dataset_id": "bqpc-dj7h",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "orlando": {
-        "name": "Orlando",
-        "state": "FL",
-        "slug": "orlando",
-        "platform": "socrata",
-        "endpoint": "https://data.cityoforlando.net/resource/ryhf-m453.json",
-        "dataset_id": "ryhf-m453",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "st_petersburg": {
         "name": "St. Petersburg",
@@ -3637,30 +3414,6 @@ CITY_REGISTRY = {
         "platform": "socrata",
         "endpoint": "https://data.coralsprings.org/resource/x5bm-4jzv.json",
         "dataset_id": "x5bm-4jzv",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "gainesville": {
-        "name": "Gainesville",
-        "state": "FL",
-        "slug": "gainesville",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofgainesville.org/resource/6kmn-vqh4.json",
-        "dataset_id": "6kmn-vqh4",
         "description": "Building Permits",
         "field_map": {
             "permit_number": "permit_number",
@@ -3942,59 +3695,9 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "little_rock": {
-        "name": "Little Rock",
-        "state": "AR",
-        "slug": "little-rock",
-        "platform": "socrata",
-        "endpoint": "https://data.littlerock.gov/resource/5gvz-4n8q.json",
-        "dataset_id": "5gvz-4n8q",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     # =========================================================================
     # ADDITIONAL CITIES - BATCH 6 (Midwest)
     # =========================================================================
-
-    "omaha": {
-        "name": "Omaha",
-        "state": "NE",
-        "slug": "omaha",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofomaha.org/resource/xvq3-8h9m.json",
-        "dataset_id": "xvq3-8h9m",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "lincoln": {
         "name": "Lincoln",
@@ -4116,32 +3819,6 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "milwaukee": {
-        "name": "Milwaukee",
-        "state": "WI",
-        "slug": "milwaukee",
-        "platform": "socrata",
-        "endpoint": "https://data.milwaukee.gov/resource/fwx3-hq2d.json",
-        "dataset_id": "fwx3-hq2d",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     "grand_rapids": {
         "name": "Grand Rapids",
         "state": "MI",
@@ -4214,32 +3891,6 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "cleveland": {
-        "name": "Cleveland",
-        "state": "OH",
-        "slug": "cleveland",
-        "platform": "socrata",
-        "endpoint": "https://data.clevelandohio.gov/resource/e3h8-fm2k.json",
-        "dataset_id": "e3h8-fm2k",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     "toledo": {
         "name": "Toledo",
         "state": "OH",
@@ -4302,32 +3953,6 @@ CITY_REGISTRY = {
             "work_type": "work_class",
             "address": "address",
             "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "st_louis": {
-        "name": "St. Louis",
-        "state": "MO",
-        "slug": "st-louis",
-        "platform": "socrata",
-        "endpoint": "https://data.stlouis-mo.gov/resource/k5pm-h7qz.json",
-        "dataset_id": "k5pm-h7qz",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
             "filing_date": "issue_date",
             "status": "status",
             "estimated_cost": "valuation",
@@ -4521,30 +4146,6 @@ CITY_REGISTRY = {
         "platform": "socrata",
         "endpoint": "https://data.syrgov.net/resource/2mnk-8qph.json",
         "dataset_id": "2mnk-8qph",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "albany": {
-        "name": "Albany",
-        "state": "NY",
-        "slug": "albany",
-        "platform": "socrata",
-        "endpoint": "https://data.albanyny.gov/resource/k4qz-7rxm.json",
-        "dataset_id": "k4qz-7rxm",
         "description": "Building Permits",
         "field_map": {
             "permit_number": "permit_number",
@@ -5004,32 +4605,6 @@ CITY_REGISTRY = {
         "active": True,
     },
 
-    "salt_lake_city": {
-        "name": "Salt Lake City",
-        "state": "UT",
-        "slug": "salt-lake-city",
-        "platform": "socrata",
-        "endpoint": "https://data.slc.gov/resource/5qkm-8xzn.json",
-        "dataset_id": "5qkm-8xzn",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
     "provo": {
         "name": "Provo",
         "state": "UT",
@@ -5075,7 +4650,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "anchorage": {
@@ -5100,7 +4675,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
     "billings": {
@@ -5124,7 +4700,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "missoula": {
@@ -5148,7 +4724,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
     "cheyenne": {
@@ -5220,136 +4797,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
     # BATCH 9 - North Carolina
     # =========================================================================
-
-    "charlotte": {
-        "name": "Charlotte",
-        "state": "NC",
-        "slug": "charlotte",
-        "platform": "socrata",
-        "endpoint": "https://data.charlottenc.gov/resource/3qnz-8kxm.json",
-        "dataset_id": "3qnz-8kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "raleigh": {
-        "name": "Raleigh",
-        "state": "NC",
-        "slug": "raleigh",
-        "platform": "socrata",
-        "endpoint": "https://data.raleighnc.gov/resource/4qnz-9kxm.json",
-        "dataset_id": "4qnz-9kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "durham": {
-        "name": "Durham",
-        "state": "NC",
-        "slug": "durham",
-        "platform": "socrata",
-        "endpoint": "https://data.durhamnc.gov/resource/5qnz-7kxm.json",
-        "dataset_id": "5qnz-7kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "greensboro": {
-        "name": "Greensboro",
-        "state": "NC",
-        "slug": "greensboro",
-        "platform": "socrata",
-        "endpoint": "https://data.greensboro-nc.gov/resource/6qnz-8kxm.json",
-        "dataset_id": "6qnz-8kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "winston_salem": {
-        "name": "Winston-Salem",
-        "state": "NC",
-        "slug": "winston-salem",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofws.org/resource/7qnz-9kxm.json",
-        "dataset_id": "7qnz-9kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "fayetteville_nc": {
         "name": "Fayetteville",
@@ -5372,7 +4825,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "cary": {
@@ -5396,7 +4849,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "wilmington_nc": {
@@ -5420,7 +4873,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -5450,31 +4903,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "columbia_sc": {
-        "name": "Columbia",
-        "state": "SC",
-        "slug": "columbia-sc",
-        "platform": "socrata",
-        "endpoint": "https://data.columbiasc.gov/resource/4rnz-8kxm.json",
-        "dataset_id": "4rnz-8kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "greenville_sc": {
@@ -5498,7 +4927,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "myrtle_beach": {
@@ -5522,7 +4951,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "richmond": {
@@ -5548,7 +4977,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "norfolk": {
@@ -5572,31 +5001,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "virginia_beach": {
-        "name": "Virginia Beach",
-        "state": "VA",
-        "slug": "virginia-beach",
-        "platform": "socrata",
-        "endpoint": "https://data.vbgov.com/resource/9rnz-7kxm.json",
-        "dataset_id": "9rnz-7kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "chesapeake": {
@@ -5620,7 +5025,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "arlington_va": {
@@ -5644,7 +5049,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "alexandria_va": {
@@ -5668,33 +5073,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "baltimore": {
-        "name": "Baltimore",
-        "state": "MD",
-        "slug": "baltimore",
-        "platform": "socrata",
-        "endpoint": "https://data.baltimorecity.gov/resource/5snz-5kxm.json",
-        "dataset_id": "5snz-5kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "annapolis": {
@@ -5718,7 +5097,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "rockville": {
@@ -5742,64 +5121,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
     # BATCH 11 - Pennsylvania, DC, Delaware, West Virginia
     # =========================================================================
-
-    "philadelphia": {
-        "name": "Philadelphia",
-        "state": "PA",
-        "slug": "philadelphia",
-        "platform": "socrata",
-        "endpoint": "https://data.phila.gov/resource/8snz-8kxm.json",
-        "dataset_id": "8snz-8kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "pittsburgh": {
-        "name": "Pittsburgh",
-        "state": "PA",
-        "slug": "pittsburgh",
-        "platform": "socrata",
-        "endpoint": "https://data.wprdc.org/resource/9snz-9kxm.json",
-        "dataset_id": "9snz-9kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "allentown": {
         "name": "Allentown",
@@ -5822,7 +5149,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "erie": {
@@ -5846,7 +5173,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "scranton": {
@@ -5870,33 +5197,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "washington_dc": {
-        "name": "Washington",
-        "state": "DC",
-        "slug": "washington-dc",
-        "platform": "socrata",
-        "endpoint": "https://opendata.dc.gov/resource/5tnz-6kxm.json",
-        "dataset_id": "5tnz-6kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "wilmington_de": {
@@ -5920,7 +5221,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "dover": {
@@ -5944,7 +5245,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "charleston_wv": {
@@ -5968,38 +5269,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
     # BATCH 12 - Indiana, Kentucky, Tennessee, Alabama, Mississippi
     # =========================================================================
-
-    "indianapolis": {
-        "name": "Indianapolis",
-        "state": "IN",
-        "slug": "indianapolis",
-        "platform": "socrata",
-        "endpoint": "https://data.indy.gov/resource/9tnz-2kxm.json",
-        "dataset_id": "9tnz-2kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "fort_wayne": {
         "name": "Fort Wayne",
@@ -6022,7 +5297,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "evansville": {
@@ -6046,7 +5321,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "south_bend": {
@@ -6070,33 +5345,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "louisville": {
-        "name": "Louisville",
-        "state": "KY",
-        "slug": "louisville",
-        "platform": "socrata",
-        "endpoint": "https://data.louisvilleky.gov/resource/5unz-6kxm.json",
-        "dataset_id": "5unz-6kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "lexington": {
@@ -6120,7 +5369,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "bowling_green_ky": {
@@ -6144,59 +5393,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "memphis": {
-        "name": "Memphis",
-        "state": "TN",
-        "slug": "memphis",
-        "platform": "socrata",
-        "endpoint": "https://data.memphistn.gov/resource/8unz-9kxm.json",
-        "dataset_id": "8unz-9kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "nashville": {
-        "name": "Nashville",
-        "state": "TN",
-        "slug": "nashville",
-        "platform": "socrata",
-        "endpoint": "https://data.nashville.gov/resource/9unz-2kxm.json",
-        "dataset_id": "9unz-2kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "knoxville": {
@@ -6220,7 +5417,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "chattanooga": {
@@ -6244,33 +5441,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "birmingham": {
-        "name": "Birmingham",
-        "state": "AL",
-        "slug": "birmingham",
-        "platform": "socrata",
-        "endpoint": "https://data.birminghamal.gov/resource/4vnz-5kxm.json",
-        "dataset_id": "4vnz-5kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "huntsville": {
@@ -6294,55 +5465,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "montgomery": {
-        "name": "Montgomery",
-        "state": "AL",
-        "slug": "montgomery",
-        "platform": "socrata",
-        "endpoint": "https://data.montgomeryal.gov/resource/6vnz-7kxm.json",
-        "dataset_id": "6vnz-7kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "mobile": {
-        "name": "Mobile",
-        "state": "AL",
-        "slug": "mobile",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofmobile.org/resource/7vnz-8kxm.json",
-        "dataset_id": "7vnz-8kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "jackson_ms": {
@@ -6366,7 +5489,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "gulfport": {
@@ -6390,62 +5513,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
     # BATCH 13 - Louisiana, Arkansas, Oklahoma, Kansas, Minnesota
     # =========================================================================
-
-    "new_orleans": {
-        "name": "New Orleans",
-        "state": "LA",
-        "slug": "new-orleans",
-        "platform": "socrata",
-        "endpoint": "https://data.nola.gov/resource/2wnz-3kxm.json",
-        "dataset_id": "2wnz-3kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "baton_rouge": {
-        "name": "Baton Rouge",
-        "state": "LA",
-        "slug": "baton-rouge",
-        "platform": "socrata",
-        "endpoint": "https://data.brla.gov/resource/3wnz-4kxm.json",
-        "dataset_id": "3wnz-4kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "shreveport": {
         "name": "Shreveport",
@@ -6468,7 +5541,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "lafayette_la": {
@@ -6492,33 +5565,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "little_rock": {
-        "name": "Little Rock",
-        "state": "AR",
-        "slug": "little-rock",
-        "platform": "socrata",
-        "endpoint": "https://data.littlerock.gov/resource/6wnz-7kxm.json",
-        "dataset_id": "6wnz-7kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "fayetteville_ar": {
@@ -6542,33 +5589,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "oklahoma_city": {
-        "name": "Oklahoma City",
-        "state": "OK",
-        "slug": "oklahoma-city",
-        "platform": "socrata",
-        "endpoint": "https://data.okc.gov/resource/8wnz-9kxm.json",
-        "dataset_id": "8wnz-9kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "tulsa": {
@@ -6594,7 +5615,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "norman": {
@@ -6618,7 +5639,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "kansas_city_mo": {
@@ -6644,7 +5665,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "kansas_city_ks": {
@@ -6668,7 +5689,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "overland_park": {
@@ -6692,7 +5713,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "topeka": {
@@ -6716,7 +5737,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "minneapolis": {
@@ -6742,7 +5763,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "st_paul": {
@@ -6768,7 +5789,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "rochester_mn": {
@@ -6792,7 +5813,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "duluth": {
@@ -6816,86 +5837,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
     # BATCH 14 - Hawaii and More Georgia
     # =========================================================================
-
-    "honolulu": {
-        "name": "Honolulu",
-        "state": "HI",
-        "slug": "honolulu",
-        "platform": "socrata",
-        "endpoint": "https://data.honolulu.gov/resource/3ynz-4kxm.json",
-        "dataset_id": "3ynz-4kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "savannah": {
-        "name": "Savannah",
-        "state": "GA",
-        "slug": "savannah",
-        "platform": "socrata",
-        "endpoint": "https://data.savannahga.gov/resource/4ynz-5kxm.json",
-        "dataset_id": "4ynz-5kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "augusta": {
-        "name": "Augusta",
-        "state": "GA",
-        "slug": "augusta",
-        "platform": "socrata",
-        "endpoint": "https://data.augustaga.gov/resource/5ynz-6kxm.json",
-        "dataset_id": "5ynz-6kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "macon": {
         "name": "Macon",
@@ -6918,7 +5865,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "athens_ga": {
@@ -6942,7 +5889,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -6970,7 +5917,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "hayward": {
@@ -6994,7 +5941,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "sunnyvale": {
@@ -7018,7 +5965,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pasadena": {
@@ -7042,7 +5989,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "torrance": {
@@ -7066,7 +6013,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pomona": {
@@ -7090,7 +6037,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "escondido": {
@@ -7114,7 +6061,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "salinas": {
@@ -7138,7 +6085,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "lancaster_ca": {
@@ -7162,7 +6109,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "palmdale": {
@@ -7186,7 +6133,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "elk_grove": {
@@ -7210,31 +6157,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "corona": {
-        "name": "Corona",
-        "state": "CA",
-        "slug": "corona",
-        "platform": "socrata",
-        "endpoint": "https://data.coronaca.gov/resource/3bnz-4kxm.json",
-        "dataset_id": "3bnz-4kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "victorville": {
@@ -7258,7 +6181,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "concord": {
@@ -7282,31 +6205,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "roseville": {
-        "name": "Roseville",
-        "state": "CA",
-        "slug": "roseville",
-        "platform": "socrata",
-        "endpoint": "https://data.roseville.ca.us/resource/6bnz-7kxm.json",
-        "dataset_id": "6bnz-7kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "vallejo": {
@@ -7330,7 +6229,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "berkeley": {
@@ -7354,7 +6253,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "daly_city": {
@@ -7378,7 +6277,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "el_monte": {
@@ -7402,7 +6301,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "downey": {
@@ -7426,7 +6325,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -7454,7 +6353,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "midland": {
@@ -7478,7 +6377,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "odessa": {
@@ -7502,7 +6401,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "beaumont": {
@@ -7526,7 +6425,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "abilene": {
@@ -7550,7 +6449,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "waco": {
@@ -7574,7 +6473,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "tyler": {
@@ -7598,31 +6497,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "college_station": {
-        "name": "College Station",
-        "state": "TX",
-        "slug": "college-station",
-        "platform": "socrata",
-        "endpoint": "https://data.cstx.gov/resource/3dnz-4kxm.json",
-        "dataset_id": "3dnz-4kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "round_rock": {
@@ -7646,7 +6521,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pearland": {
@@ -7670,84 +6545,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
     # BATCH 17 - More Florida Cities
     # =========================================================================
-
-    "port_st_lucie": {
-        "name": "Port St. Lucie",
-        "state": "FL",
-        "slug": "port-st-lucie",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofpsl.com/resource/6dnz-7kxm.json",
-        "dataset_id": "6dnz-7kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "cape_coral": {
-        "name": "Cape Coral",
-        "state": "FL",
-        "slug": "cape-coral",
-        "platform": "socrata",
-        "endpoint": "https://data.capecoral.gov/resource/7dnz-8kxm.json",
-        "dataset_id": "7dnz-8kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "pembroke_pines": {
-        "name": "Pembroke Pines",
-        "state": "FL",
-        "slug": "pembroke-pines",
-        "platform": "socrata",
-        "endpoint": "https://data.ppines.com/resource/8dnz-9kxm.json",
-        "dataset_id": "8dnz-9kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
 
     "hollywood_fl": {
         "name": "Hollywood",
@@ -7770,55 +6573,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "miramar": {
-        "name": "Miramar",
-        "state": "FL",
-        "slug": "miramar",
-        "platform": "socrata",
-        "endpoint": "https://data.miramarfl.gov/resource/2enz-3kxm.json",
-        "dataset_id": "2enz-3kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-    },
-
-    "coral_springs": {
-        "name": "Coral Springs",
-        "state": "FL",
-        "slug": "coral-springs",
-        "platform": "socrata",
-        "endpoint": "https://data.coralsprings.org/resource/3enz-4kxm.json",
-        "dataset_id": "3enz-4kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "gainesville_fl": {
@@ -7842,7 +6597,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "lehigh_acres": {
@@ -7866,7 +6621,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "palm_bay": {
@@ -7890,7 +6645,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "lakeland": {
@@ -7914,7 +6669,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -7942,7 +6697,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "avondale": {
@@ -7966,7 +6721,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "goodyear": {
@@ -7990,7 +6745,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "buckeye": {
@@ -8014,7 +6769,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "casa_grande": {
@@ -8038,31 +6793,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "north_las_vegas": {
-        "name": "North Las Vegas",
-        "state": "NV",
-        "slug": "north-las-vegas",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofnorthlasvegas.com/resource/5fnz-6kxm.json",
-        "dataset_id": "5fnz-6kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "sparks": {
@@ -8086,7 +6817,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "rio_rancho": {
@@ -8110,7 +6841,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "las_cruces": {
@@ -8134,7 +6865,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "santa_fe": {
@@ -8158,7 +6889,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -8186,7 +6917,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "kenosha": {
@@ -8210,7 +6941,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "racine": {
@@ -8234,7 +6965,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "appleton": {
@@ -8258,7 +6989,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "davenport": {
@@ -8282,7 +7013,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "sioux_city": {
@@ -8306,7 +7037,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "iowa_city": {
@@ -8330,7 +7061,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "council_bluffs": {
@@ -8354,7 +7085,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "grand_island": {
@@ -8378,7 +7109,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "kearney": {
@@ -8402,7 +7133,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -8430,7 +7161,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "camden": {
@@ -8454,7 +7185,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "elizabeth": {
@@ -8478,7 +7209,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "clifton": {
@@ -8502,7 +7233,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "new_brunswick": {
@@ -8526,7 +7257,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "cambridge_ma": {
@@ -8550,7 +7281,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "quincy_ma": {
@@ -8574,7 +7305,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "newton_ma": {
@@ -8598,31 +7329,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-    },
-
-    "somerville": {
-        "name": "Somerville",
-        "state": "MA",
-        "slug": "somerville",
-        "platform": "socrata",
-        "endpoint": "https://data.somervillema.gov/resource/4inz-5kxm.json",
-        "dataset_id": "4inz-5kxm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "waterbury": {
@@ -8646,7 +7353,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "danbury": {
@@ -8670,7 +7377,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "norwalk": {
@@ -8694,7 +7401,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "meriden": {
@@ -8718,7 +7425,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -8746,7 +7453,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "utica": {
@@ -8770,7 +7477,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "binghamton": {
@@ -8794,7 +7501,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "troy": {
@@ -8818,7 +7525,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "new_rochelle": {
@@ -8842,7 +7549,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "mount_vernon": {
@@ -8866,7 +7573,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "white_plains": {
@@ -8890,7 +7597,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "cranston": {
@@ -8914,7 +7621,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "warwick_ri": {
@@ -8938,7 +7645,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pawtucket": {
@@ -8962,7 +7669,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -8990,7 +7697,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "lakewood_co": {
@@ -9014,7 +7721,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "thornton": {
@@ -9038,7 +7745,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "westminster_co": {
@@ -9062,7 +7769,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "arvada": {
@@ -9086,7 +7793,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pueblo": {
@@ -9110,7 +7817,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "boulder": {
@@ -9134,7 +7841,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "ogden": {
@@ -9158,7 +7865,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "layton": {
@@ -9182,7 +7889,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "st_george": {
@@ -9206,7 +7913,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "meridian": {
@@ -9230,7 +7937,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "nampa": {
@@ -9254,7 +7961,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "idaho_falls": {
@@ -9278,7 +7985,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pocatello": {
@@ -9302,27 +8009,15 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
     # =========================================================================
     # INACTIVE / PENDING CITIES
     # =========================================================================
 
-    "dallas": {
-        "name": "Dallas",
-        "state": "TX",
-        "slug": "dallas",
-        "platform": "socrata",
-        "endpoint": "",
-        "dataset_id": "",
-        "description": "Building Permits - Pending API availability",
-        "field_map": {},
-        "date_field": "",
-        "limit": 2000,
-        "active": False,
-        "notes": "Dallas open data portal needs further investigation for permit API",
-    },
+    # V12.3: Removed empty "dallas" entry — use "dallas" (formerly dallas_verified) instead
 
     "houston": {
         "name": "Houston",
@@ -9339,20 +8034,6 @@ CITY_REGISTRY = {
         "notes": "Houston provides aggregated monthly data, not individual permits",
     },
 
-    "minneapolis": {
-        "name": "Minneapolis",
-        "state": "MN",
-        "slug": "minneapolis",
-        "platform": "socrata",
-        "endpoint": "",
-        "dataset_id": "",
-        "description": "Building Permits - Pending API availability",
-        "field_map": {},
-        "date_field": "",
-        "limit": 2000,
-        "active": False,
-        "notes": "Minneapolis data may be regional (Twin Cities area)",
-    },
 }
 
 
