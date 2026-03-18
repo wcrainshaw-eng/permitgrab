@@ -3870,6 +3870,9 @@ def city_landing(city_slug):
     total_value = sum(p.get('estimated_cost', 0) for p in city_permits)
     high_value_count = len([p for p in city_permits if p.get('value_tier') == 'high'])
 
+    # V12.5: noindex for empty city pages to avoid thin content in Google
+    robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
+
     # Trade breakdown
     trade_breakdown = {}
     for p in city_permits:
@@ -3890,6 +3893,7 @@ def city_landing(city_slug):
         meta_description=config['meta_description'],
         seo_content=config['seo_content'],
         canonical_url=f"{SITE_URL}/permits/{city_slug}",
+        robots_directive=robots_directive,  # V12.5: noindex empty pages
         permit_count=permit_count,
         total_value=total_value,
         high_value_count=high_value_count,
@@ -3969,6 +3973,9 @@ def city_trade_landing(city_slug, trade_slug):
     # Other cities for cross-linking (exclude current)
     other_cities = [{"name": c['name'], "slug": c['slug']} for c in ALL_CITIES if c['slug'] != city_slug]
 
+    # V12.5: noindex for empty city×trade pages
+    robots_directive = "noindex, follow" if len(matching_permits) == 0 else "index, follow"
+
     return render_template(
         'city_trade_landing.html',
         city=city_dict,
@@ -3977,6 +3984,7 @@ def city_trade_landing(city_slug, trade_slug):
         stats=stats,
         other_trades=other_trades,
         other_cities=other_cities,
+        robots_directive=robots_directive,
     )
 
 
