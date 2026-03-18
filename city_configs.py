@@ -112,22 +112,23 @@ CITY_REGISTRY = {
         "state": "TX",
         "slug": "austin",
         "platform": "socrata",
-        "endpoint": "https://data.austintexas.gov/resource/3syk-w9eu.json",
+        "endpoint": "https://datahub.austintexas.gov/resource/3syk-w9eu.json",
         "dataset_id": "3syk-w9eu",
         "description": "Issued Construction Permits",
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "permit_type_desc",
             "work_type": "work_class",
-            "address": "original_address1",
+            "address": "permit_location",
             "filing_date": "issue_date",
-            "status": "status_current",
+            "status": "",
             "estimated_cost": "",
             "description": "description",
         },
         "date_field": "issue_date",
         "limit": 2000,
         "active": True,
+        "notes": "V12.6: Fixed domain to datahub.austintexas.gov",
     },
 
     "san_francisco": {
@@ -160,7 +161,7 @@ CITY_REGISTRY = {
         "state": "WA",
         "slug": "seattle",
         "platform": "socrata",
-        "endpoint": "https://data.seattle.gov/resource/76t5-zqzr.json",
+        "endpoint": "https://cos-data.seattle.gov/resource/76t5-zqzr.json",
         "dataset_id": "76t5-zqzr",
         "description": "Building Permits",
         "field_map": {
@@ -176,6 +177,7 @@ CITY_REGISTRY = {
         "date_field": "issueddate",
         "limit": 2000,
         "active": True,
+        "notes": "V12.6: Fixed domain to cos-data.seattle.gov",
     },
 
     "new_orleans": {
@@ -202,6 +204,7 @@ CITY_REGISTRY = {
         "date_field": "issuedate",
         "limit": 2000,
         "active": True,
+        "notes": "V12.6: Verified working — data.nola.gov",
     },
 
     "baton_rouge": {
@@ -264,20 +267,19 @@ CITY_REGISTRY = {
         "dataset_id": "9qm7-wbdc",
         "description": "Building Permits: New Construction",
         "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_type",
-            "address": "address",
-            "zip": "zip",
+            "permit_number": "special_permit_number",
+            "permit_type": "proposed_building_use",
+            "work_type": "construction_type",
+            "address": "full_address",
             "filing_date": "issue_date",
             "status": "status",
-            "estimated_cost": "estimated_cost",
-            "description": "description",
+            "estimated_cost": "",
+            "description": "proposed_building_use",
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
-        "notes": "Field mapping needs verification",
+        "active": True,
+        "notes": "V12.6: Verified working — data.cambridgema.gov",
     },
 
     "washington_dc": {
@@ -353,7 +355,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "V12.3: Reactivated — verified working with V12.2 User-Agent headers",
     },
 
@@ -763,7 +766,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "charlotte": {
@@ -788,7 +792,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "columbus": {
@@ -814,7 +819,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "fort_worth": {
@@ -840,7 +846,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "honolulu": {
@@ -865,7 +872,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "indianapolis": {
@@ -891,7 +899,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "louisville": {
@@ -917,7 +926,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "memphis": {
@@ -943,7 +953,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "mesa": {
@@ -995,7 +1006,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "oakland": {
@@ -1021,7 +1033,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "oklahoma_city": {
@@ -1047,7 +1060,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "omaha": {
@@ -1073,7 +1087,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "st_louis": {
@@ -1099,7 +1114,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "tucson": {
@@ -1125,7 +1141,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "long_beach": {
@@ -1151,7 +1168,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "fresno": {
@@ -1177,7 +1195,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -1670,7 +1689,8 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "new_jersey_state": {
@@ -1742,7 +1762,8 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "collin_county": {
@@ -1811,7 +1832,8 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "calgary": {
@@ -1834,7 +1856,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "Calgary, Alberta, Canada",
     },
 
@@ -1860,7 +1883,8 @@ CITY_REGISTRY = {
         },
         "date_field": "application_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "norfolk_new": {
@@ -1882,7 +1906,8 @@ CITY_REGISTRY = {
         },
         "date_field": "inspection_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "frederick": {
@@ -1929,7 +1954,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "cook_county": {
@@ -1952,7 +1978,8 @@ CITY_REGISTRY = {
         },
         "date_field": "date_issued",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "bloomington_in": {
@@ -1975,7 +2002,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "asotin": {
@@ -2000,7 +2028,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "honolulu_verified": {
@@ -2070,7 +2099,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "Edmonton, Alberta, Canada",
     },
 
@@ -2094,7 +2124,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "Winnipeg, Manitoba, Canada",
     },
 
@@ -2168,7 +2199,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "salt_lake_city": {
@@ -2241,7 +2273,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "dumfries": {
@@ -2337,7 +2370,8 @@ CITY_REGISTRY = {
         },
         "date_field": "applydate",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -2365,7 +2399,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "anaheim": {
@@ -2389,7 +2424,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "riverside": {
@@ -2413,7 +2449,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "stockton": {
@@ -2437,7 +2474,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "irvine": {
@@ -2461,7 +2499,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "chula_vista": {
@@ -2485,7 +2524,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "santa_clarita": {
@@ -2509,7 +2549,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "modesto": {
@@ -2533,7 +2574,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "glendale": {
@@ -2557,7 +2599,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "huntington_beach": {
@@ -2581,7 +2624,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "fremont": {
@@ -2605,7 +2649,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "san_bernardino": {
@@ -2629,7 +2674,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "fontana": {
@@ -2653,7 +2699,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -2683,7 +2730,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "arlington": {
@@ -2709,7 +2757,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "plano": {
@@ -2733,7 +2782,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "corpus_christi": {
@@ -2757,7 +2807,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "laredo": {
@@ -2781,7 +2832,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "lubbock": {
@@ -2805,7 +2857,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "irving": {
@@ -2829,7 +2882,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "garland": {
@@ -2853,7 +2907,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "grand_prairie": {
@@ -2877,7 +2932,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "mckinney": {
@@ -2901,7 +2957,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "frisco": {
@@ -2925,7 +2982,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "scottsdale": {
@@ -2949,7 +3007,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "chandler": {
@@ -2973,7 +3032,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "gilbert": {
@@ -2997,7 +3057,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "tempe": {
@@ -3021,7 +3082,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "glendale_az": {
@@ -3045,7 +3107,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "peoria": {
@@ -3069,7 +3132,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "henderson": {
@@ -3093,7 +3157,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "north_las_vegas": {
@@ -3117,7 +3182,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "reno": {
@@ -3141,7 +3207,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "colorado_springs": {
@@ -3165,7 +3232,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "aurora_co": {
@@ -3189,7 +3257,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -3217,7 +3286,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "hialeah": {
@@ -3241,7 +3311,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "port_st_lucie": {
@@ -3265,7 +3336,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "cape_coral": {
@@ -3289,7 +3361,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "tallahassee": {
@@ -3313,7 +3386,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "fort_lauderdale": {
@@ -3337,7 +3411,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "pembroke_pines": {
@@ -3361,7 +3436,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "hollywood": {
@@ -3385,7 +3461,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "miramar": {
@@ -3409,7 +3486,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "coral_springs": {
@@ -3433,7 +3511,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "savannah": {
@@ -3457,7 +3536,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "augusta": {
@@ -3481,7 +3561,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "charleston": {
@@ -3505,7 +3586,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "columbia_sc": {
@@ -3529,7 +3611,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "durham": {
@@ -3553,7 +3636,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "greensboro": {
@@ -3577,7 +3661,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "winston_salem": {
@@ -3601,7 +3686,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "birmingham": {
@@ -3625,7 +3711,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "montgomery": {
@@ -3649,7 +3736,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "mobile": {
@@ -3673,7 +3761,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "jackson": {
@@ -3697,7 +3786,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -3725,7 +3815,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "wichita": {
@@ -3749,7 +3840,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "des_moines": {
@@ -3773,7 +3865,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "cedar_rapids": {
@@ -3797,7 +3890,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "madison": {
@@ -3821,7 +3915,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "grand_rapids": {
@@ -3845,7 +3940,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "ann_arbor": {
@@ -3869,7 +3965,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "lansing": {
@@ -3893,7 +3990,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "toledo": {
@@ -3917,7 +4015,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "akron": {
@@ -3941,7 +4040,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "dayton": {
@@ -3965,7 +4065,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "springfield_mo": {
@@ -3989,7 +4090,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -4019,7 +4121,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "jersey_city": {
@@ -4043,7 +4146,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "paterson": {
@@ -4067,7 +4171,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "buffalo": {
@@ -4117,7 +4222,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "yonkers": {
@@ -4141,7 +4247,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "syracuse": {
@@ -4165,7 +4272,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "providence": {
@@ -4190,7 +4298,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "worcester": {
@@ -4214,7 +4323,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "springfield_ma": {
@@ -4238,7 +4348,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "lowell": {
@@ -4262,7 +4373,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "hartford": {
@@ -4287,7 +4399,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "new_haven": {
@@ -4311,7 +4424,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "bridgeport": {
@@ -4335,7 +4449,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "stamford": {
@@ -4359,7 +4474,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "manchester": {
@@ -4383,7 +4499,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "burlington": {
@@ -4407,7 +4524,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "portland_me": {
@@ -4431,7 +4549,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     # =========================================================================
@@ -4461,7 +4580,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "spokane": {
@@ -4485,7 +4605,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "bellevue": {
@@ -4509,7 +4630,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "vancouver_wa": {
@@ -4533,7 +4655,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "eugene": {
@@ -4557,7 +4680,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "salem": {
@@ -4581,7 +4705,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "boise": {
@@ -4607,7 +4732,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "provo": {
@@ -4631,7 +4757,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "west_valley_city": {
@@ -4754,7 +4881,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "sioux_falls": {
@@ -4778,7 +4906,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
     "fargo": {
