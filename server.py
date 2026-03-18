@@ -45,6 +45,11 @@ else:
     print(f"[Database] Using SQLite (local development)")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# V11 Hotfix: pool_pre_ping verifies connections, pool_recycle prevents stale connections
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 db = SQLAlchemy(app)
 
 
@@ -106,6 +111,14 @@ if os.path.isdir('/var/data'):
 else:
     DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
     print(f"[Server] Using local data directory at {DATA_DIR}")
+
+# V11 Hotfix: Diagnostic logging for data directory
+print(f"[Server] /var/data exists: {os.path.isdir('/var/data')}")
+print(f"[Server] /var/data contents: {os.listdir('/var/data') if os.path.isdir('/var/data') else 'N/A'}")
+print(f"[Server] DATA_DIR = {DATA_DIR}")
+print(f"[Server] DATA_DIR exists: {os.path.isdir(DATA_DIR)}")
+if os.path.isdir(DATA_DIR):
+    print(f"[Server] DATA_DIR contents: {os.listdir(DATA_DIR)}")
 
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')

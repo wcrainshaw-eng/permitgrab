@@ -651,7 +651,7 @@ def collect_all(days_back=30):
     print(f"Pulling permits from {len(active_cities)} cities (last {days_back} days)")
     print("=" * 60)
 
-    for city_key in active_cities:
+    for i, city_key in enumerate(active_cities):
         try:
             config = get_city_config(city_key)
             raw = fetch_permits(city_key, days_back)
@@ -686,6 +686,13 @@ def collect_all(days_back=30):
 
         # Rate limiting
         time.sleep(RATE_LIMIT_DELAY)
+
+        # Save intermediate results every 50 cities so data appears gradually
+        if (i + 1) % 50 == 0 and all_permits:
+            output_file = os.path.join(DATA_DIR, "permits.json")
+            with open(output_file, "w") as f:
+                json.dump(all_permits, f, indent=2, default=str)
+            print(f"  [Intermediate save: {len(all_permits)} permits after {i+1} cities]")
 
     # Trade category breakdown
     trade_counts = {}
