@@ -1832,30 +1832,7 @@ CITY_REGISTRY = {
         "notes": "Calgary, Alberta, Canada",
     },
 
-    "orlando_new": {
-        "name": "Orlando",
-        "state": "FL",
-        "slug": "orlando",
-        "platform": "socrata",
-        "endpoint": "https://data.cityoforlando.net/resource/ryhf-m453.json",
-        "dataset_id": "ryhf-m453",
-        "description": "Permit Applications",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "application_type",
-            "work_type": "worktype",
-            "address": "permit_address",
-            "owner_name": "property_owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "permit_issued_date",
-            "status": "permit_status",
-            "estimated_cost": "total_value",
-            "description": "permit_description",
-        },
-        "date_field": "permit_issued_date",
-        "limit": 2000,
-        "active": True,
-    },
+    # V12.2: Removed duplicate "orlando_new" entry (identical to "orlando")
 
     "somerville": {
         "name": "Somerville",

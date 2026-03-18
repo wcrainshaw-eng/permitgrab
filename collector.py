@@ -25,6 +25,50 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Rate limiting: 1 second between city pulls
 RATE_LIMIT_DELAY = 1.0
 
+# V12.2: Shared session with proper headers — required for Socrata to not block us
+SESSION = requests.Session()
+SESSION.headers.update({
+    "User-Agent": "PermitGrab/1.0 (permit lead aggregator; contact@permitgrab.com)",
+    "Accept": "application/json",
+    "Accept-Encoding": "gzip, deflate",
+})
+
+# Optional: Socrata app token for higher rate limits
+SOCRATA_APP_TOKEN = os.environ.get("SOCRATA_APP_TOKEN", "")
+if SOCRATA_APP_TOKEN:
+    SESSION.headers["X-App-Token"] = SOCRATA_APP_TOKEN
+    print(f"[Collector] Using Socrata app token: {SOCRATA_APP_TOKEN[:8]}...")
+
+# V12.2: Collection lock to prevent concurrent runs
+COLLECTION_LOCK_FILE = os.path.join(DATA_DIR, ".collection_lock")
+
+
+def _acquire_lock():
+    """Prevent concurrent collection runs."""
+    if os.path.exists(COLLECTION_LOCK_FILE):
+        try:
+            with open(COLLECTION_LOCK_FILE) as f:
+                lock_data = json.load(f)
+            lock_time = datetime.fromisoformat(lock_data["started"])
+            # If lock is older than 2 hours, assume it's stale
+            if (datetime.now() - lock_time).total_seconds() < 7200:
+                print(f"  [SKIP] Collection already running since {lock_data['started']}")
+                return False
+        except Exception:
+            pass
+
+    with open(COLLECTION_LOCK_FILE, "w") as f:
+        json.dump({"started": datetime.now().isoformat(), "pid": os.getpid()}, f)
+    return True
+
+
+def _release_lock():
+    """Release collection lock."""
+    try:
+        os.remove(COLLECTION_LOCK_FILE)
+    except FileNotFoundError:
+        pass
+
 
 # ============================================================================
 # PLATFORM-SPECIFIC FETCHERS
@@ -45,7 +89,7 @@ def fetch_socrata(config, days_back):
         "$where": f"{date_field} > '{since_date}'",
     }
 
-    resp = requests.get(endpoint, params=params, timeout=30)
+    resp = SESSION.get(endpoint, params=params, timeout=60)
     resp.raise_for_status()
     return resp.json()
 
@@ -77,7 +121,7 @@ def fetch_arcgis(config, days_back):
         "f": "json",
     }
 
-    resp = requests.get(endpoint, params=params, timeout=30)
+    resp = SESSION.get(endpoint, params=params, timeout=60)
     resp.raise_for_status()
     data = resp.json()
 
@@ -110,7 +154,7 @@ def fetch_ckan(config, days_back):
     if date_field:
         params["sort"] = f"{date_field} desc"
 
-    resp = requests.get(endpoint, params=params, timeout=30)
+    resp = SESSION.get(endpoint, params=params, timeout=60)
     resp.raise_for_status()
     data = resp.json()
 
@@ -146,7 +190,7 @@ def fetch_carto(config, days_back):
 
     params = {"q": sql, "format": "json"}
 
-    resp = requests.get(endpoint, params=params, timeout=30)
+    resp = SESSION.get(endpoint, params=params, timeout=60)
     resp.raise_for_status()
     data = resp.json()
 
@@ -156,51 +200,68 @@ def fetch_carto(config, days_back):
 
 
 def fetch_permits(city_key, days_back=30):
-    """Fetch recent permits from a city's API using the appropriate platform fetcher."""
+    """Fetch recent permits from a city's API using the appropriate platform fetcher.
+
+    V12.2: Returns (data, status_string) tuple for proper failure tracking.
+    """
     config = get_city_config(city_key)
     if not config:
         print(f"  [SKIP] Unknown city: {city_key}")
-        return []
+        return [], "skip"
 
     if not config.get("active", False):
         print(f"  [SKIP] Inactive city: {city_key}")
-        return []
+        return [], "skip"
 
     platform = config.get("platform", "socrata")
     print(f"  Fetching {config['name']} permits (last {days_back} days) via {platform}...")
 
-    try:
-        if platform == "socrata":
-            raw = fetch_socrata(config, days_back)
-        elif platform == "arcgis":
-            raw = fetch_arcgis(config, days_back)
-        elif platform == "ckan":
-            raw = fetch_ckan(config, days_back)
-        elif platform == "carto":
-            raw = fetch_carto(config, days_back)
-        else:
-            print(f"  [ERROR] Unknown platform: {platform}")
-            return []
+    max_retries = 3
+    last_error = None
 
-        print(f"  Got {len(raw)} raw permits from {config['name']}")
+    for attempt in range(max_retries):
+        try:
+            if platform == "socrata":
+                raw = fetch_socrata(config, days_back)
+            elif platform == "arcgis":
+                raw = fetch_arcgis(config, days_back)
+            elif platform == "ckan":
+                raw = fetch_ckan(config, days_back)
+            elif platform == "carto":
+                raw = fetch_carto(config, days_back)
+            else:
+                print(f"  [ERROR] Unknown platform: {platform}")
+                return [], "error_unknown_platform"
 
-        # Warn if we hit the limit (might be more data available)
-        if len(raw) >= config.get("limit", 2000):
-            print(f"  [WARNING] Hit limit of {config.get('limit', 2000)} - there may be more permits available")
+            print(f"  Got {len(raw)} raw permits from {config['name']}")
 
-        return raw
-    except requests.exceptions.HTTPError as e:
-        print(f"  [ERROR] HTTP {e.response.status_code} for {config['name']}: {e}")
-        return []
-    except requests.exceptions.ConnectionError:
-        print(f"  [ERROR] Connection failed for {config['name']}")
-        return []
-    except requests.exceptions.Timeout:
-        print(f"  [ERROR] Timeout for {config['name']}")
-        return []
-    except Exception as e:
-        print(f"  [ERROR] {config['name']}: {e}")
-        return []
+            if len(raw) >= config.get("limit", 2000):
+                print(f"  [WARNING] Hit limit of {config.get('limit', 2000)}")
+
+            return raw, "success"
+
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else "unknown"
+            print(f"  [ERROR] HTTP {status_code} for {config['name']} (attempt {attempt+1}/{max_retries})")
+            last_error = f"http_{status_code}"
+            if status_code in (403, 404):
+                break  # Don't retry 403/404
+        except requests.exceptions.ConnectionError as e:
+            print(f"  [ERROR] Connection failed for {config['name']} (attempt {attempt+1}/{max_retries}): {str(e)[:80]}")
+            last_error = "connection_error"
+        except requests.exceptions.Timeout:
+            print(f"  [ERROR] Timeout for {config['name']} (attempt {attempt+1}/{max_retries})")
+            last_error = "timeout"
+        except Exception as e:
+            print(f"  [ERROR] {config['name']}: {str(e)[:100]} (attempt {attempt+1}/{max_retries})")
+            last_error = f"error_{str(e)[:50]}"
+
+        if attempt < max_retries - 1:
+            wait_time = 2 ** attempt  # 1s, 2s, 4s
+            print(f"  Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+
+    return [], last_error
 
 
 # ============================================================================
@@ -675,6 +736,18 @@ def collect_permit_history(years_back=3):
 
 def collect_all(days_back=30):
     """Collect permits from all active cities."""
+    # V12.2: Prevent concurrent collection runs
+    if not _acquire_lock():
+        return [], {}
+
+    try:
+        return _collect_all_inner(days_back)
+    finally:
+        _release_lock()
+
+
+def _collect_all_inner(days_back=30):
+    """Inner implementation of collect_all (called with lock held)."""
     all_permits = []
     stats = {}
     active_cities = get_active_cities()
@@ -709,7 +782,7 @@ def collect_all(days_back=30):
     for i, city_key in enumerate(active_cities):
         try:
             config = get_city_config(city_key)
-            raw = fetch_permits(city_key, days_back)
+            raw, fetch_status = fetch_permits(city_key, days_back)
             city_permits = []
 
             for record in raw:
@@ -721,22 +794,40 @@ def collect_all(days_back=30):
                     continue
 
             all_permits.extend(city_permits)
-            stats[city_key] = {
-                "raw": len(raw),
-                "normalized": len(city_permits),
-                "city_name": config["name"],
-                "status": "success",
-            }
-            print(f"  ✓ {config['name']}: {len(city_permits)} permits")
 
-        except requests.exceptions.Timeout:
-            stats[city_key] = {"status": "timeout", "city_name": config.get("name", city_key) if config else city_key}
-            print(f"  ✗ {city_key}: TIMEOUT")
-        except requests.exceptions.ConnectionError:
-            stats[city_key] = {"status": "connection_error", "city_name": config.get("name", city_key) if config else city_key}
-            print(f"  ✗ {city_key}: CONNECTION ERROR")
+            # V12.2: Use the ACTUAL fetch status, not always "success"
+            if fetch_status == "success":
+                stats[city_key] = {
+                    "raw": len(raw),
+                    "normalized": len(city_permits),
+                    "city_name": config["name"],
+                    "status": "success" if len(city_permits) > 0 else "success_empty",
+                }
+                print(f"  ✓ {config['name']}: {len(city_permits)} permits")
+            elif fetch_status == "skip":
+                stats[city_key] = {
+                    "raw": 0,
+                    "normalized": 0,
+                    "city_name": config["name"] if config else city_key,
+                    "status": "skip",
+                }
+            else:
+                stats[city_key] = {
+                    "raw": 0,
+                    "normalized": 0,
+                    "city_name": config["name"] if config else city_key,
+                    "status": fetch_status,
+                }
+                print(f"  ✗ {config['name'] if config else city_key}: FAILED ({fetch_status})")
+
         except Exception as e:
-            stats[city_key] = {"status": f"error: {str(e)[:100]}", "city_name": config.get("name", city_key) if config else city_key}
+            config_name = config.get("name", city_key) if config else city_key
+            stats[city_key] = {
+                "raw": 0,
+                "normalized": 0,
+                "city_name": config_name,
+                "status": f"error: {str(e)[:100]}",
+            }
             print(f"  ✗ {city_key}: {str(e)[:100]}")
 
         # Rate limiting
@@ -813,11 +904,20 @@ def collect_all(days_back=30):
     except (FileNotFoundError, json.JSONDecodeError):
         failure_tracker = {}
 
+    # V12.2: Fixed failure tracker logic
     for key, s in stats.items():
-        if s.get("normalized", 0) == 0 and s.get("status") != "success":
-            failure_tracker[key] = failure_tracker.get(key, 0) + 1
+        status = str(s.get("status", "unknown"))
+        if status.startswith("success") and s.get("normalized", 0) > 0:
+            failure_tracker[key] = 0  # Reset on actual data received
+        elif status == "success_empty":
+            # API responded but returned 0 permits — don't count as failure
+            # (might just have no recent permits)
+            pass
+        elif status == "skip":
+            # Intentionally skipped — don't count
+            pass
         else:
-            failure_tracker[key] = 0  # Reset on success
+            failure_tracker[key] = failure_tracker.get(key, 0) + 1
 
     with open(failure_tracker_path, "w") as f:
         json.dump(failure_tracker, f, indent=2)

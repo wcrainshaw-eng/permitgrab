@@ -3126,6 +3126,25 @@ def api_collection_status():
     })
 
 
+@app.route('/admin/trigger-collection', methods=['POST'])
+def admin_trigger_collection():
+    """V12.2: Manually trigger data collection (admin only)."""
+    if not session.get('admin_authenticated'):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    import threading
+    from collector import collect_all
+
+    # Run in background thread so it doesn't block
+    thread = threading.Thread(target=collect_all, kwargs={"days_back": 60}, daemon=True)
+    thread.start()
+
+    return jsonify({
+        "status": "Collection triggered",
+        "message": "Running in background. Check /api/stats in a few minutes."
+    })
+
+
 @app.route('/admin/upgrade-user', methods=['POST'])
 def admin_upgrade_user():
     """POST /admin/upgrade-user - Upgrade a user's subscription plan."""
@@ -4208,7 +4227,11 @@ def blog_post(slug):
 # SCHEDULED DATA COLLECTION
 # ===========================
 def scheduled_collection():
-    """Run data collection every 24 hours."""
+    """Run data collection every 24 hours. Waits for initial collection first."""
+    # V12.2: Wait for initial collection to finish (sleep 30 minutes on first boot)
+    print(f"[{datetime.now()}] Scheduled collector waiting 30 minutes for initial collection...")
+    time.sleep(1800)  # 30 minutes
+
     # Track when we last ran permit history (run weekly)
     last_history_run = None
 
@@ -4315,6 +4338,29 @@ def page_not_found(e):
 
 _collector_started = False
 
+
+def _test_outbound_connectivity():
+    """V12.2: Quick test of outbound API access on startup."""
+    import requests
+    test_session = requests.Session()
+    test_session.headers.update({
+        "User-Agent": "PermitGrab/1.0 (permit lead aggregator; contact@permitgrab.com)",
+        "Accept": "application/json",
+    })
+    test_urls = [
+        "https://data.cityofnewyork.us/resource/rbx6-tga4.json?$limit=1",
+        "https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=1",
+        "https://data.lacity.org/resource/yv23-pmwf.json?$limit=1",
+    ]
+    print(f"[{datetime.now()}] Testing outbound API connectivity...")
+    for url in test_urls:
+        try:
+            resp = test_session.get(url, timeout=15)
+            print(f"  [NET TEST] {url[:50]}... → {resp.status_code} ({len(resp.content)} bytes)")
+        except Exception as e:
+            print(f"  [NET TEST] {url[:50]}... → FAILED: {type(e).__name__}: {str(e)[:80]}")
+
+
 def start_collectors():
     """Start background data collection threads. Safe to call multiple times."""
     global _collector_started
@@ -4323,6 +4369,9 @@ def start_collectors():
     _collector_started = True
 
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    # V12.2: Test network connectivity before starting threads
+    _test_outbound_connectivity()
 
     print(f"[{datetime.now()}] Starting background data collectors...")
 
