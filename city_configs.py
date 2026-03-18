@@ -9477,12 +9477,98 @@ def get_all_cities_info():
         if config.get("active", False):
             cities.append({
                 "key": key,
-                "name": config["name"],
+                "name": format_city_name(config["name"]),
                 "state": config["state"],
                 "slug": config["slug"],
                 "platform": config["platform"],
+                "active": True,
             })
     return sorted(cities, key=lambda x: x["name"])
+
+
+# V12.9: City name overrides for proper capitalization
+CITY_NAME_OVERRIDES = {
+    "mckinney": "McKinney",
+    "desoto": "DeSoto",
+    "el paso": "El Paso",
+    "las vegas": "Las Vegas",
+    "los angeles": "Los Angeles",
+    "san antonio": "San Antonio",
+    "san diego": "San Diego",
+    "san francisco": "San Francisco",
+    "san jose": "San Jose",
+    "san marcos": "San Marcos",
+    "san rafael": "San Rafael",
+    "san anselmo": "San Anselmo",
+    "san geronimo": "San Geronimo",
+    "san quentin": "San Quentin",
+    "st paul": "St. Paul",
+    "st. paul": "St. Paul",
+    "ft collins": "Fort Collins",
+    "fort collins": "Fort Collins",
+    "pt reyes station": "Point Reyes Station",
+    "point reyes station": "Point Reyes Station",
+    "new york city": "New York City",
+    "new orleans": "New Orleans",
+    "new jersey": "New Jersey",
+    "la mesa": "La Mesa",
+    "la jolla": "La Jolla",
+    "el cajon": "El Cajon",
+    "del mar": "Del Mar",
+    "mt airy": "Mount Airy",
+    "mount airy": "Mount Airy",
+    "glen echo": "Glen Echo",
+    "chevy chase": "Chevy Chase",
+    "takoma park": "Takoma Park",
+    "sandy spring": "Sandy Spring",
+    "cabin john": "Cabin John",
+    "garrett park": "Garrett Park",
+    "silver spring": "Silver Spring",
+    "north bethesda": "North Bethesda",
+    "north potomac": "North Potomac",
+    "van alstyne": "Van Alstyne",
+    "blue ridge": "Blue Ridge",
+    "royse city": "Royse City",
+    "forest knolls": "Forest Knolls",
+    "stinson beach": "Stinson Beach",
+    "dillon beach": "Dillon Beach",
+    "muir beach": "Muir Beach",
+    "marin city": "Marin City",
+    "corte madera": "Corte Madera",
+    "mill valley": "Mill Valley",
+    "washington grove": "Washington Grove",
+    "montgomery village": "Montgomery Village",
+}
+
+
+def format_city_name(name):
+    """V12.9: Properly capitalize city names with special handling for prefixes.
+
+    Handles:
+    - Mc/Mac prefixes (McKinney, MacArthur)
+    - Multi-word names (San Francisco, New York)
+    - Override dictionary for special cases
+    """
+    if not name:
+        return name
+
+    # Check override first
+    name_lower = name.lower()
+    if name_lower in CITY_NAME_OVERRIDES:
+        return CITY_NAME_OVERRIDES[name_lower]
+
+    # Apply title case first
+    result = name.title()
+
+    # Fix Mc/Mac prefixes (Mckinney -> McKinney)
+    import re
+    result = re.sub(r'\bMc([a-z])', lambda m: 'Mc' + m.group(1).upper(), result)
+    result = re.sub(r'\bMac([a-z])', lambda m: 'Mac' + m.group(1).upper(), result)
+
+    # Fix common prefixes that should stay lowercase
+    result = re.sub(r'\bDe ([A-Z])', lambda m: 'De' + m.group(1), result)
+
+    return result
 
 
 # Trade classification keywords (moved from config.py for consolidation)

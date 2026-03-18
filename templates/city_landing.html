@@ -703,6 +703,7 @@ body {
       <div class="hero-stat-value">{{ permit_count }}+</div>
       <div class="hero-stat-label">Active Permits</div>
     </div>
+    {% if total_value > 0 %}
     <div class="hero-stat">
       <div class="hero-stat-value">${{ "{:,.0f}".format(total_value) }}</div>
       <div class="hero-stat-label">Total Project Value</div>
@@ -711,6 +712,16 @@ body {
       <div class="hero-stat-value">{{ high_value_count }}</div>
       <div class="hero-stat-label">High-Value Leads</div>
     </div>
+    {% else %}
+    <div class="hero-stat">
+      <div class="hero-stat-value">{{ new_this_month | default(permit_count) }}+</div>
+      <div class="hero-stat-label">Permits This Month</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-value">{{ unique_contractors | default('50+') }}</div>
+      <div class="hero-stat-label">Active Contractors</div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="hero-cta">
@@ -738,7 +749,7 @@ body {
           <span class="permit-trade">{{ permit.trade_category }}</span>
           {{ permit.address }}
         </h4>
-        <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; Filed: {{ permit.filing_date }}</p>
+        <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; {{ permit.date_label | default('Filed') }}: {{ permit.filing_date }}</p>
       </div>
       <div class="permit-value {{ permit.value_tier }}">
         {% if permit.estimated_cost %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% else %}N/A{% endif %}

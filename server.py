@@ -4,7 +4,8 @@ Flask app that serves the dashboard and API endpoints
 Deploy to any VPS (DigitalOcean, Railway, Render, etc.)
 """
 
-from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response, redirect
+from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response, redirect, abort, g
+from difflib import SequenceMatcher
 import json
 import os
 import threading
@@ -16,7 +17,7 @@ import stripe
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY, TRADE_CATEGORIES
+from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY, TRADE_CATEGORIES, format_city_name
 from lifecycle import get_lifecycle_label
 from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_slugs
 import analytics
@@ -214,6 +215,19 @@ def calculate_lead_scores(permits):
                 break
         contact_pts = (5.0 if has_phone else 0.0) + (5.0 if has_name else 0.0)
 
+        # V12.9: Component D2: Address quality (0-10 points)
+        # Penalize permits without addresses - they're low-quality leads
+        address = p.get('address', '') or ''
+        address_clean = address.strip().lower()
+        if not address_clean or address_clean in ['not provided', 'address not provided', 'n/a', 'none', '']:
+            address_pts = 0.0
+        elif len(address_clean) < 10:  # Very short addresses (just area names)
+            address_pts = 3.0
+        elif any(char.isdigit() for char in address_clean):  # Has street number
+            address_pts = 10.0
+        else:  # Has address but no street number
+            address_pts = 5.0
+
         # Component E: Trade type (0-10 points)
         trade_str = ''
         for key in ['trade', 'permit_type', 'trade_category', 'type', 'work_type']:
@@ -243,7 +257,7 @@ def calculate_lead_scores(permits):
 
         raw_scores.append({
             'value': value,
-            'non_value_score': recency + status_pts + contact_pts + trade_pts + jitter
+            'non_value_score': recency + status_pts + contact_pts + trade_pts + address_pts + jitter
         })
 
     # PHASE 2: Normalize the value component within this dataset
@@ -426,6 +440,45 @@ def generate_permit_description(permit):
 # ===========================
 # DATA LOADING
 # ===========================
+def validate_permit_dates(permit):
+    """V12.9: Validate and relabel future-dated permits.
+
+    If filing_date is >30 days in the future, it's likely an expiration date,
+    not a filing date. Relabel it appropriately.
+    """
+    filing_date_str = permit.get('filing_date', '')
+    if not filing_date_str:
+        return
+
+    try:
+        filing_date = datetime.strptime(str(filing_date_str)[:10], '%Y-%m-%d')
+        days_from_now = (filing_date - datetime.now()).days
+
+        if days_from_now > 30:
+            # This is likely an expiration/completion date, not a filing date
+            permit['expiration_date'] = filing_date_str
+            permit['date_label'] = 'Expires'
+            # Try to find an alternative filing date
+            for alt_key in ['issued_date', 'issue_date', 'created_date', 'application_date']:
+                alt_date = permit.get(alt_key)
+                if alt_date:
+                    try:
+                        alt_parsed = datetime.strptime(str(alt_date)[:10], '%Y-%m-%d')
+                        if (alt_parsed - datetime.now()).days <= 30:
+                            permit['filing_date'] = str(alt_date)[:10]
+                            permit['date_label'] = 'Filed'
+                            return
+                    except:
+                        pass
+            # No alternative found, keep expiration date but mark it
+            permit['filing_date'] = filing_date_str
+            permit['date_label'] = 'Expires'
+        else:
+            permit['date_label'] = 'Filed'
+    except (ValueError, TypeError):
+        permit['date_label'] = 'Filed'  # Default label
+
+
 def load_permits():
     """Load permits from JSON file, re-classify trades, and generate unique descriptions."""
     path = os.path.join(DATA_DIR, 'permits.json')
@@ -443,6 +496,7 @@ def load_permits():
             for permit in permits:
                 try:
                     reclassify_permit(permit)
+                    validate_permit_dates(permit)  # V12.9: Fix future-dated permits
                     permit['display_description'] = generate_permit_description(permit)
                 except Exception as e:
                     print(f"[Server] Warning: Failed to process permit: {e}")
@@ -477,6 +531,78 @@ def get_cities_with_data():
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
     return [city_lookup[name] for name in city_names if name in city_lookup]
+
+
+def get_suggested_cities(searched_slug, limit=6):
+    """V12.9: Get similar city suggestions for 404 page using fuzzy matching."""
+    all_cities = get_all_cities_info()
+    active_cities = [c for c in all_cities if c.get('active', True)]
+
+    # Calculate similarity scores
+    suggestions = []
+    searched_lower = searched_slug.lower().replace('-', ' ')
+
+    for city in active_cities:
+        slug_lower = city['slug'].lower().replace('-', ' ')
+        name_lower = city['name'].lower()
+
+        # Check multiple matching criteria
+        slug_score = SequenceMatcher(None, searched_lower, slug_lower).ratio()
+        name_score = SequenceMatcher(None, searched_lower, name_lower).ratio()
+
+        # Boost if searched term is contained in name
+        contains_boost = 0.3 if searched_lower in name_lower or name_lower in searched_lower else 0
+
+        best_score = max(slug_score, name_score) + contains_boost
+        if best_score > 0.3:  # Only include if somewhat similar
+            suggestions.append((city, best_score))
+
+    # Sort by score, take top matches
+    suggestions.sort(key=lambda x: -x[1])
+    return [s[0] for s in suggestions[:limit]]
+
+
+def get_popular_cities(limit=12):
+    """V12.9: Get popular cities for 404 page based on permit count."""
+    permits = load_permits()
+    # Count permits per city
+    city_counts = {}
+    for p in permits:
+        city = p.get('city', '')
+        if city:
+            city_counts[city] = city_counts.get(city, 0) + 1
+
+    # Get city info and sort by count
+    all_cities = get_all_cities_info()
+    city_lookup = {c['name']: c for c in all_cities}
+
+    popular = []
+    for name, count in sorted(city_counts.items(), key=lambda x: -x[1]):
+        if name in city_lookup:
+            city_info = city_lookup[name].copy()
+            city_info['permit_count'] = count
+            popular.append(city_info)
+            if len(popular) >= limit:
+                break
+
+    return popular
+
+
+def render_city_not_found(searched_slug):
+    """V12.9: Render branded 404 page with city suggestions."""
+    suggestions = get_suggested_cities(searched_slug)
+    popular_cities = get_popular_cities()
+    footer_cities = get_cities_with_data()
+
+    return render_template(
+        '404.html',
+        searched_slug=searched_slug,
+        suggestions=suggestions,
+        popular_cities=popular_cities,
+        footer_cities=footer_cities,
+        show_city_suggestions=True,
+    ), 404
+
 
 def load_subscribers():
     """Load subscriber list."""
@@ -3847,23 +3973,26 @@ def city_landing(city_slug):
         # Try to get city from city_configs for dynamic fallback
         city_key, city_config = get_city_by_slug(city_slug)
         if not city_config:
-            return "City not found", 404
-        # Generate basic SEO config
+            return render_city_not_found(city_slug)
+        # Generate basic SEO config with properly formatted city name
+        display_name = format_city_name(city_config["name"])
         config = {
-            "name": city_config["name"],
+            "name": display_name,
+            "raw_name": city_config["name"],  # For filtering permits
             "state": city_config["state"],
-            "meta_title": f"{city_config['name']} Building Permits & Contractor Leads | PermitGrab",
-            "meta_description": f"Browse active building permits in {city_config['name']}. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+            "meta_title": f"{display_name} Building Permits & Contractor Leads | PermitGrab",
+            "meta_description": f"Browse active building permits in {display_name}. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
             "seo_content": f"""
-                <p>Track new building permits in {city_config['name']}, {city_config['state']}. PermitGrab delivers fresh permit data daily, helping contractors find quality leads across the region.</p>
-                <p>Access permit data including project values, contact information, and trade categories. Start browsing {city_config['name']} construction permits today.</p>
+                <p>Track new building permits in {display_name}, {city_config['state']}. PermitGrab delivers fresh permit data daily, helping contractors find quality leads across the region.</p>
+                <p>Access permit data including project values, contact information, and trade categories. Start browsing {display_name} construction permits today.</p>
             """
         }
 
     permits = load_permits()
 
-    # Filter permits for this city
-    city_permits = [p for p in permits if p.get('city') == config['name']]
+    # Filter permits for this city (use raw_name if available for matching)
+    filter_name = config.get('raw_name', config['name'])
+    city_permits = [p for p in permits if p.get('city') == filter_name]
 
     # Calculate stats
     permit_count = len(city_permits)
@@ -3882,6 +4011,32 @@ def city_landing(city_slug):
     # Sort permits by value for preview
     sorted_permits = sorted(city_permits, key=lambda x: x.get('estimated_cost', 0), reverse=True)
 
+    # V12.9: Calculate alternative stats for cities without value data
+    new_this_month = permit_count  # Fallback to total count
+    unique_contractors = 0
+    if total_value == 0:
+        # Count permits from last 30 days
+        from datetime import timedelta
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        recent_permits = []
+        contractors_set = set()
+        for p in city_permits:
+            # Check filing date
+            filing_date_str = p.get('filing_date', '')
+            if filing_date_str:
+                try:
+                    filing_date = datetime.strptime(filing_date_str, '%Y-%m-%d')
+                    if filing_date >= thirty_days_ago:
+                        recent_permits.append(p)
+                except:
+                    pass
+            # Count unique contractors
+            contractor = p.get('contractor_name') or p.get('applicant_name')
+            if contractor and contractor.strip():
+                contractors_set.add(contractor.strip().lower())
+        new_this_month = len(recent_permits) if recent_permits else permit_count
+        unique_contractors = len(contractors_set) if contractors_set else '50+'
+
     # Other cities for footer links
     other_cities = [c for c in ALL_CITIES if c['slug'] != city_slug]
 
@@ -3897,6 +4052,8 @@ def city_landing(city_slug):
         permit_count=permit_count,
         total_value=total_value,
         high_value_count=high_value_count,
+        new_this_month=new_this_month,
+        unique_contractors=unique_contractors,
         trade_breakdown=trade_breakdown,
         permits=sorted_permits,
         other_cities=other_cities,
@@ -3910,7 +4067,7 @@ def city_trade_landing(city_slug, trade_slug):
     # Get city from config
     city_key, city_config = get_city_by_slug(city_slug)
     if not city_config:
-        return "City not found", 404
+        return render_city_not_found(city_slug)
 
     # Get trade from config
     trade = get_trade(trade_slug)
@@ -3919,7 +4076,10 @@ def city_trade_landing(city_slug, trade_slug):
 
     permits = load_permits()
 
-    # Filter permits for this city and trade
+    # V12.9: Format city name for display
+    display_name = format_city_name(city_config['name'])
+
+    # Filter permits for this city and trade (use raw name for matching)
     city_permits = [p for p in permits if p.get('city') == city_config['name']]
 
     # Match permits to this trade based on keywords
@@ -3954,9 +4114,9 @@ def city_trade_landing(city_slug, trade_slug):
     values = [p.get('estimated_cost', 0) for p in matching_permits if p.get('estimated_cost')]
     avg_value = int(sum(values) / len(values)) if values else 0
 
-    # Build city dict for template
+    # Build city dict for template with formatted name
     city_dict = {
-        "name": city_config['name'],
+        "name": display_name,
         "state": city_config['state'],
         "slug": city_slug,
     }

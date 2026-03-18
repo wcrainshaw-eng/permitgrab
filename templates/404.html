@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Page Not Found - PermitGrab</title>
+<title>{% if show_city_suggestions %}City Not Found{% else %}Page Not Found{% endif %} - PermitGrab</title>
 <meta name="description" content="The page you're looking for doesn't exist. Return to PermitGrab to browse building permit leads.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
@@ -34,18 +34,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 /* 404 HERO */
 .error-hero {
-  flex: 1;
   background: linear-gradient(135deg, var(--gray-900) 0%, #374151 100%);
   color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   text-align: center;
   padding: 60px 32px;
 }
-.error-content { max-width: 500px; }
+.error-content { max-width: 600px; margin: 0 auto; }
 .error-code {
-  font-size: 120px;
+  font-size: 100px;
   font-weight: 800;
   line-height: 1;
   margin-bottom: 16px;
@@ -55,14 +51,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   background-clip: text;
 }
 .error-title {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   margin-bottom: 12px;
 }
 .error-message {
   font-size: 16px;
   color: rgba(255,255,255,.7);
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 .error-buttons {
   display: flex;
@@ -93,16 +89,82 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 .btn-outline:hover { border-color: white; background: rgba(255,255,255,.1); }
 
-.error-help {
-  margin-top: 40px;
-  font-size: 14px;
-  color: rgba(255,255,255,.5);
+/* SUGGESTIONS SECTION */
+.suggestions-section {
+  background: var(--gray-100);
+  padding: 48px 32px;
 }
-.error-help a {
-  color: rgba(255,255,255,.7);
+.suggestions-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.suggestions-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 24px;
+  text-align: center;
+}
+.city-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.city-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
   text-decoration: none;
+  color: var(--gray-700);
+  transition: all .2s;
+  border: 1px solid var(--gray-200);
 }
-.error-help a:hover { text-decoration: underline; }
+.city-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0,0,0,.1);
+  border-color: var(--primary);
+}
+.city-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+.city-card-state {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.city-card-count {
+  font-size: 12px;
+  color: var(--primary);
+  margin-top: 8px;
+}
+
+/* ALERT CTA */
+.alert-cta {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  border: 2px dashed var(--gray-200);
+  max-width: 500px;
+  margin: 0 auto;
+}
+.alert-cta h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.alert-cta p {
+  font-size: 14px;
+  color: var(--gray-500);
+  margin-bottom: 16px;
+}
+.alert-cta .btn {
+  padding: 12px 24px;
+}
 
 /* SITE FOOTER */
 .site-footer {
@@ -110,6 +172,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   color: white;
   padding: 48px 32px 24px;
   border-top: 1px solid rgba(255,255,255,.1);
+  margin-top: auto;
 }
 .footer-inner {
   max-width: 1200px;
@@ -162,6 +225,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 @media (max-width: 768px) {
   .footer-inner { flex-direction: column; gap: 32px; }
+  .city-grid { grid-template-columns: repeat(2, 1fr); }
+  .error-code { font-size: 80px; }
 }
 </style>
 </head>
@@ -172,15 +237,58 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <section class="error-hero">
   <div class="error-content">
     <div class="error-code">404</div>
+    {% if show_city_suggestions %}
+    <h1 class="error-title">City Not Found</h1>
+    <p class="error-message">We couldn't find "{{ searched_slug | replace('-', ' ') | title }}" in our coverage area.</p>
+    {% else %}
     <h1 class="error-title">Page Not Found</h1>
     <p class="error-message">The page you're looking for doesn't exist or has been moved.</p>
+    {% endif %}
     <div class="error-buttons">
-      <a href="/" class="btn btn-primary">Back to Dashboard</a>
-      <a href="/pricing" class="btn btn-outline">Browse Cities</a>
+      <a href="/" class="btn btn-primary">Browse All Permits</a>
+      <a href="/pricing" class="btn btn-outline">View Coverage</a>
     </div>
-    <p class="error-help">Looking for something? Try <a href="/">searching for permits</a> on the dashboard.</p>
   </div>
 </section>
+
+{% if show_city_suggestions %}
+<section class="suggestions-section">
+  <div class="suggestions-inner">
+    {% if suggestions %}
+    <h2 class="suggestions-title">Did you mean one of these?</h2>
+    <div class="city-grid">
+      {% for city in suggestions %}
+      <a href="/permits/{{ city.slug }}" class="city-card">
+        <div class="city-card-name">{{ city.name }}</div>
+        <div class="city-card-state">{{ city.state }}</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if popular_cities %}
+    <h2 class="suggestions-title">Popular Cities</h2>
+    <div class="city-grid">
+      {% for city in popular_cities %}
+      <a href="/permits/{{ city.slug }}" class="city-card">
+        <div class="city-card-name">{{ city.name }}</div>
+        <div class="city-card-state">{{ city.state }}</div>
+        {% if city.permit_count %}
+        <div class="city-card-count">{{ city.permit_count }} active permits</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="alert-cta">
+      <h3>Can't find your city?</h3>
+      <p>Get notified when we add coverage for your area.</p>
+      <a href="/get-alerts" class="btn btn-primary">Set Up Alerts</a>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% include 'partials/footer.html' %}
 
