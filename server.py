@@ -34,6 +34,61 @@ def google_verification():
 
 
 # ===========================
+# V12.19: ADMIN ENDPOINTS FOR DATA RECOVERY
+# ===========================
+
+@app.route('/api/admin/reset-permits', methods=['POST'])
+def admin_reset_permits():
+    """Delete corrupted permits.json so next collection writes clean data."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # DATA_DIR is defined later, use the same logic
+    data_dir = '/var/data' if os.path.isdir('/var/data') else os.path.join(os.path.dirname(__file__), 'data')
+    filepath = os.path.join(data_dir, 'permits.json')
+    deleted = False
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        deleted = True
+        print(f"[Admin] Deleted corrupted permits.json at {filepath}")
+
+    return jsonify({
+        'deleted': deleted,
+        'path': filepath,
+        'message': 'File deleted. Next collection cycle will write clean data.'
+    })
+
+
+@app.route('/api/admin/force-collection', methods=['POST'])
+def admin_force_collection():
+    """Trigger data collection immediately instead of waiting for scheduler."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    import threading
+    def run_collection():
+        try:
+            from collector import collect_all
+            print("[Admin] Starting forced collection...")
+            collect_all(days_back=60)
+            print("[Admin] Forced collection complete.")
+        except Exception as e:
+            print(f"[Admin] Force collection error: {e}")
+
+    thread = threading.Thread(target=run_collection, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'message': 'Collection started in background',
+        'note': 'Data will appear on homepage within 15-20 minutes'
+    })
+
+
+# ===========================
 # DATABASE SETUP (V7)
 # ===========================
 from flask_sqlalchemy import SQLAlchemy
@@ -145,6 +200,8 @@ def preload_data_from_disk():
 
     This ensures that even after a deploy, stale data is served immediately
     rather than showing 0 permits while waiting for collection to complete.
+
+    V12.19: Auto-deletes corrupted files so next collection writes clean data.
     """
     global _initial_data_loaded
     permits_file = os.path.join(DATA_DIR, 'permits.json')
@@ -154,8 +211,20 @@ def preload_data_from_disk():
             print(f"[Server] V12.12: Found permits.json on disk ({file_size} bytes)")
             # Trigger a load to validate and process the data
             permits = load_permits()
-            print(f"[Server] V12.12: Preloaded {len(permits)} permits from disk")
-            _initial_data_loaded = True
+            if permits:
+                print(f"[Server] V12.12: Preloaded {len(permits)} permits from disk")
+                _initial_data_loaded = True
+            else:
+                # load_permits returned empty - file may be corrupted
+                print(f"[Server] V12.19: load_permits returned empty, checking file...")
+        except json.JSONDecodeError as e:
+            print(f"[Server] V12.19: CORRUPTED permits.json detected: {e}")
+            print(f"[Server] V12.19: AUTO-DELETING corrupted file at {permits_file}")
+            try:
+                os.remove(permits_file)
+                print(f"[Server] V12.19: Deleted corrupted file. Next collection will write clean data.")
+            except OSError as del_err:
+                print(f"[Server] V12.19: Failed to delete corrupted file: {del_err}")
         except Exception as e:
             print(f"[Server] V12.12: Failed to preload permits: {e}")
     else:
@@ -590,7 +659,13 @@ def load_permits():
             return permits
         except json.JSONDecodeError as e:
             print(f"[Server] ERROR: Failed to parse permits.json: {e}")
-            print(f"[Server] The site will show 0 permits until collector rewrites the file.")
+            # V12.19: Auto-delete corrupted file so next collection writes clean data
+            print(f"[Server] V12.19: AUTO-DELETING corrupted permits.json")
+            try:
+                os.remove(path)
+                print(f"[Server] V12.19: Deleted corrupted file at {path}")
+            except OSError as del_err:
+                print(f"[Server] V12.19: Failed to delete: {del_err}")
             return []
         except Exception as e:
             print(f"[Server] ERROR: Unexpected error loading permits: {e}")
