@@ -528,6 +528,87 @@ def score_value(cost):
     return "low"
 
 
+def score_permit_quality(permit):
+    """
+    V12.22: Score a permit's data quality for deduplication.
+    Higher score = better data (prefer keeping this one).
+    """
+    score = 0
+
+    # Has a real address (not placeholder)
+    address = permit.get('address', '') or ''
+    address_clean = address.strip().lower()
+    if address_clean and address_clean not in ['not provided', 'address not provided', 'n/a', 'none', '']:
+        score += 30
+        # Bonus for having a street number
+        if any(c.isdigit() for c in address_clean[:5]):
+            score += 10
+
+    # Has estimated cost
+    if permit.get('estimated_cost', 0) > 0:
+        score += 20
+
+    # Has contact info
+    if permit.get('contact_name'):
+        score += 15
+    if permit.get('contact_phone'):
+        score += 15
+
+    # Has description
+    if permit.get('description'):
+        score += 5
+
+    # Has city assigned
+    if permit.get('city'):
+        score += 5
+
+    return score
+
+
+def deduplicate_permits(permits):
+    """
+    V12.22: Remove duplicate permits by permit_number.
+    When duplicates exist (same permit collected under multiple city filters),
+    keep the one with the best data quality.
+    """
+    if not permits:
+        return permits
+
+    seen = {}  # permit_number -> best permit
+    duplicates_found = 0
+
+    for permit in permits:
+        permit_num = permit.get('permit_number', '')
+        if not permit_num:
+            # No permit number - can't dedupe, keep it
+            continue
+
+        if permit_num in seen:
+            duplicates_found += 1
+            # Compare quality scores and keep the better one
+            existing = seen[permit_num]
+            existing_score = score_permit_quality(existing)
+            new_score = score_permit_quality(permit)
+
+            if new_score > existing_score:
+                seen[permit_num] = permit
+        else:
+            seen[permit_num] = permit
+
+    # Build deduplicated list
+    deduped = list(seen.values())
+
+    # Also include permits without permit_number (rare edge case)
+    for permit in permits:
+        if not permit.get('permit_number'):
+            deduped.append(permit)
+
+    if duplicates_found > 0:
+        print(f"  [V12.22] Removed {duplicates_found} duplicate permits")
+
+    return deduped
+
+
 def normalize_address(address):
     """Normalize an address for consistent indexing and matching."""
     if not address:
@@ -907,6 +988,14 @@ def _collect_all_inner(days_back=30):
             output_file = os.path.join(DATA_DIR, "permits.json")
             atomic_write_json(output_file, all_permits)
             print(f"  [Intermediate save: {len(all_permits)} permits after {i+1} cities]")
+
+    # V12.22: Deduplicate permits by permit_number
+    # County datasets split by city_filter can cause the same permit to appear
+    # under multiple cities if the filter doesn't match exactly
+    original_count = len(all_permits)
+    all_permits = deduplicate_permits(all_permits)
+    if original_count != len(all_permits):
+        print(f"  [V12.22] Final count: {len(all_permits)} unique permits (was {original_count})")
 
     # Trade category breakdown
     trade_counts = {}
