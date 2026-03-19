@@ -1,0 +1,366 @@
+{
+  "new_york": {
+    "name": "New York City",
+    "state": "NY",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "chicago": {
+    "name": "Chicago",
+    "state": "IL",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "los_angeles": {
+    "name": "Los Angeles",
+    "state": "CA",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "austin": {
+    "name": "Austin",
+    "state": "TX",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "san_francisco": {
+    "name": "San Francisco",
+    "state": "CA",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "seattle": {
+    "name": "Seattle",
+    "state": "WA",
+    "status": "success",
+    "raw_count": 1351,
+    "platform": "socrata"
+  },
+  "new_orleans": {
+    "name": "New Orleans",
+    "state": "LA",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "baton_rouge": {
+    "name": "Baton Rouge",
+    "state": "LA",
+    "status": "success",
+    "raw_count": 1758,
+    "platform": "socrata"
+  },
+  "cincinnati": {
+    "name": "Cincinnati",
+    "state": "OH",
+    "status": "success",
+    "raw_count": 488,
+    "platform": "socrata"
+  },
+  "cambridge": {
+    "name": "Cambridge",
+    "state": "MA",
+    "status": "success",
+    "raw_count": 10,
+    "platform": "socrata"
+  },
+  "denver": {
+    "name": "Denver",
+    "state": "CO",
+    "status": "error_Expecting value: line 1 column 1 (char 0)",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "portland": {
+    "name": "Portland",
+    "state": "OR",
+    "status": "error_ArcGIS error 400: Invalid URL",
+    "raw_count": 0,
+    "platform": "arcgis"
+  },
+  "atlanta": {
+    "name": "Atlanta",
+    "state": "GA",
+    "status": "success",
+    "raw_count": 1380,
+    "platform": "arcgis"
+  },
+  "nashville": {
+    "name": "Nashville",
+    "state": "TN",
+    "status": "success",
+    "raw_count": 1000,
+    "platform": "arcgis"
+  },
+  "raleigh": {
+    "name": "Raleigh",
+    "state": "NC",
+    "status": "error_ArcGIS error 400: Cannot perform query. Invalid qu",
+    "raw_count": 0,
+    "platform": "arcgis"
+  },
+  "san_jose": {
+    "name": "San Jose",
+    "state": "CA",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "ckan"
+  },
+  "san_diego": {
+    "name": "San Diego",
+    "state": "CA",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "boston": {
+    "name": "Boston",
+    "state": "MA",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "ckan"
+  },
+  "philadelphia": {
+    "name": "Philadelphia",
+    "state": "PA",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "carto"
+  },
+  "mesa": {
+    "name": "Mesa",
+    "state": "AZ",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "orlando": {
+    "name": "Orlando",
+    "state": "FL",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "marin_county": {
+    "name": "Marin County",
+    "state": "CA",
+    "status": "success",
+    "raw_count": 969,
+    "platform": "socrata"
+  },
+  "gainesville": {
+    "name": "Gainesville",
+    "state": "FL",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "mesa_new": {
+    "name": "Mesa",
+    "state": "AZ",
+    "status": "success",
+    "raw_count": 1257,
+    "platform": "socrata"
+  },
+  "corona": {
+    "name": "Corona",
+    "state": "CA",
+    "status": "success",
+    "raw_count": 821,
+    "platform": "socrata"
+  },
+  "montgomery_county_md": {
+    "name": "Montgomery County",
+    "state": "MD",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "williamson_county_tx": {
+    "name": "Williamson County",
+    "state": "TX",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "dallas": {
+    "name": "Dallas",
+    "state": "TX",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "framingham": {
+    "name": "Framingham",
+    "state": "MA",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "parker": {
+    "name": "Parker",
+    "state": "CO",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "albany": {
+    "name": "Albany",
+    "state": "NY",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "new_jersey_state": {
+    "name": "New Jersey",
+    "state": "NJ",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "howard_county": {
+    "name": "Howard County",
+    "state": "MD",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "collin_county": {
+    "name": "Collin County",
+    "state": "TX",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "summit_county_ut": {
+    "name": "Summit County",
+    "state": "UT",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "west_hollywood": {
+    "name": "West Hollywood",
+    "state": "CA",
+    "status": "success",
+    "raw_count": 1,
+    "platform": "socrata"
+  },
+  "frederick": {
+    "name": "Frederick",
+    "state": "MD",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "college_station": {
+    "name": "College Station",
+    "state": "TX",
+    "status": "success",
+    "raw_count": 1690,
+    "platform": "socrata"
+  },
+  "honolulu_verified": {
+    "name": "Honolulu",
+    "state": "HI",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "nola_verified": {
+    "name": "New Orleans",
+    "state": "LA",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "kansas_city_historical": {
+    "name": "Kansas City",
+    "state": "MO",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "little_rock": {
+    "name": "Little Rock",
+    "state": "AR",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "salt_lake_city": {
+    "name": "Salt Lake City",
+    "state": "UT",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "clarkston": {
+    "name": "Clarkston",
+    "state": "WA",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "dumfries": {
+    "name": "Dumfries",
+    "state": "VA",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "pierce_county": {
+    "name": "Pierce County",
+    "state": "WA",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "nola_blds": {
+    "name": "New Orleans",
+    "state": "LA",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "buffalo": {
+    "name": "Buffalo",
+    "state": "NY",
+    "status": "http_unknown",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "fort_collins": {
+    "name": "Fort Collins",
+    "state": "CO",
+    "status": "success",
+    "raw_count": 2000,
+    "platform": "socrata"
+  },
+  "camas": {
+    "name": "Camas",
+    "state": "WA",
+    "status": "success",
+    "raw_count": 0,
+    "platform": "socrata"
+  },
+  "san_marcos": {
+    "name": "San Marcos",
+    "state": "TX",
+    "status": "error_ArcGIS error 400: Unable to complete operation.",
+    "raw_count": 0,
+    "platform": "arcgis"
+  },
+  "leon_county": {
+    "name": "Leon County",
+    "state": "FL",
+    "status": "error_ArcGIS error 500: Service MapServices/TLC_OpenData",
+    "raw_count": 0,
+    "platform": "arcgis"
+  }
+}

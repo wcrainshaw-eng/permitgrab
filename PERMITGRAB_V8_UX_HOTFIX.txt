@@ -1,0 +1,976 @@
+================================================================================
+PERMITGRAB V8 UX HOTFIX — COMPREHENSIVE IMPLEMENTATION SPEC
+================================================================================
+Date: March 17, 2026
+Author: Claude (AI-Assisted UX Review)
+Repo: wcrainshaw-eng/permitgrab | Branch: main
+Deploy: Render.com | Web Service: srv-d6s1tvsr85hc73em9ch0
+Database: PostgreSQL on Render (Oregon US West)
+Primary File: server.py (~3956 lines)
+Templates: templates/ (25 HTML files + 3 partials)
+================================================================================
+
+CONTEXT:
+This spec comes from a full customer-perspective UX audit of permitgrab.com,
+conducted both logged-out and logged-in as a Pro user (wcrainshaw@gmail.com).
+Every page was visited, every feature was tested, every link was clicked.
+V7 hotfix (DB migration, duplicate email, lead scoring) is CONFIRMED PASSING.
+This V8 spec addresses 17 findings: 4 bugs, 8 UX issues, 5 strategic items.
+
+PRIORITY: Items are ordered by severity. Do them in order.
+
+================================================================================
+FIX 1: EARLY INTEL JAVASCRIPT ERROR (BUG-001 — CRITICAL)
+================================================================================
+
+WHAT'S BROKEN:
+The Early Intel page (/early-intel) is completely non-functional. When a Pro
+user navigates to it, they see "Loading signals..." with an infinite spinner.
+The page never loads any content. The stat cards (Total Signals, High Potential,
+Pre-Permit, Linked to Permits) all show dashes.
+
+ROOT CAUSE:
+Browser console shows: SyntaxError: Unexpected token 'class' at line 880 of
+the early_intel.html template. This means there's a JavaScript syntax error
+that kills the entire script block, so the fetch() call to /api/signals never
+executes.
+
+FILE TO FIX: templates/early_intel.html
+
+HOW TO FIX:
+1. Open templates/early_intel.html
+2. Go to approximately line 880 (the exact line may vary)
+3. Look for a JavaScript 'class' keyword being used in a context where
+   the browser's JS engine doesn't support it. Common causes:
+   - Using a class declaration inside a script block without proper scoping
+   - Using ES6+ class syntax without proper transpilation
+   - A stray 'class' keyword from an HTML class attribute leaking into JS
+   - A template variable rendering HTML where JS is expected
+
+4. The fix will depend on what exactly is wrong. The most common pattern is:
+   - If it's a class declaration: Convert to a function constructor or
+     ensure the script type is "module" or the syntax is correct
+   - If it's a Jinja template rendering issue: Wrap the template variable
+     in proper escaping: {{ variable|tojson }}
+   - If it's an unescaped HTML class attribute inside a JS template literal:
+     Ensure backtick strings properly handle the word 'class'
+
+5. After fixing the syntax error, verify that:
+   - The fetch('/api/signals') call actually executes
+   - The /api/signals endpoint in server.py returns valid JSON
+   - The stat cards populate with actual numbers (or show "0" if no data)
+   - The spinner disappears after data loads (or shows "No signals found")
+
+ALSO CHECK:
+- In server.py, find the /api/signals route. Make sure it returns proper JSON
+  even when there are no signals. It should return:
+  {"signals": [], "total": 0, "high_potential": 0, "pre_permit": 0, "linked": 0}
+  NOT an error or empty response.
+
+- Add error handling in the frontend JavaScript:
+  ```javascript
+  fetch('/api/signals')
+    .then(res => res.json())
+    .then(data => {
+      // populate UI
+    })
+    .catch(err => {
+      document.getElementById('loading-spinner').style.display = 'none';
+      document.getElementById('error-message').style.display = 'block';
+      document.getElementById('error-message').textContent =
+        'Unable to load signals. Please try refreshing the page.';
+    });
+  ```
+
+VERIFICATION:
+- Navigate to /early-intel while logged in as Pro user
+- Page should load without console errors
+- Stat cards should show numbers (even if 0)
+- Spinner should stop (either show data or "No signals found" message)
+- No JavaScript errors in browser console
+
+
+================================================================================
+FIX 2: PRIVACY POLICY & TERMS OF SERVICE 404s (BUG-002 — HIGH)
+================================================================================
+
+WHAT'S BROKEN:
+Footer links "Privacy Policy" and "Terms of Service" both return 404 errors.
+These links appear on EVERY page of the site via templates/partials/footer.html.
+
+CURRENT STATE:
+- /privacy-policy → 404
+- /terms-of-service → 404
+- templates/privacy.html EXISTS but may be at a different route
+- templates/terms.html EXISTS but may be at a different route
+
+FILE TO CHECK FIRST: templates/partials/footer.html
+Look at the href values for Privacy Policy and Terms of Service links.
+
+FILE TO FIX: server.py (routes) and/or templates/partials/footer.html (links)
+
+HOW TO FIX (Option A — Fix the routes to match the footer links):
+In server.py, add or fix these routes:
+
+```python
+@app.route('/privacy-policy')
+def privacy_policy():
+    return render_template('privacy.html')
+
+@app.route('/terms-of-service')
+def terms_of_service():
+    return render_template('terms.html')
+```
+
+HOW TO FIX (Option B — Fix the footer links to match existing routes):
+If server.py already has routes at /privacy and /terms, then update
+templates/partials/footer.html to use those URLs instead:
+
+Change: href="/privacy-policy" → href="/privacy"
+Change: href="/terms-of-service" → href="/terms"
+
+IMPORTANT — CHECK CONTENT:
+Open templates/privacy.html and templates/terms.html. If they are placeholder
+files with lorem ipsum or minimal content, they need real content:
+
+PRIVACY POLICY must cover (at minimum):
+- What data PermitGrab collects (email, name, payment info via Stripe)
+- How data is used (lead delivery, email alerts, analytics)
+- Third-party services (Stripe for payments, SendGrid for email)
+- Cookie usage
+- User rights (data deletion, opt-out)
+- Contact info for privacy inquiries
+- California/GDPR compliance notice
+
+TERMS OF SERVICE must cover (at minimum):
+- Service description
+- Account responsibilities
+- Subscription terms and billing ($149/month, cancellation policy)
+- Acceptable use
+- Data accuracy disclaimer (permit data comes from municipal sources)
+- Limitation of liability
+- Termination
+- Governing law
+
+If these templates are empty/placeholder, generate professional content.
+Use the company context: PermitGrab, construction permit leads SaaS,
+$149/month Pro plan via Stripe, email alerts via SendGrid.
+
+VERIFICATION:
+- Click "Privacy Policy" in footer → page loads (not 404)
+- Click "Terms of Service" in footer → page loads (not 404)
+- Content is real, not placeholder text
+- Both pages have proper nav/footer (use base template)
+
+
+================================================================================
+FIX 3: SAVE LEAD BUTTON — NO VISUAL FEEDBACK (UX-001 — HIGH)
+================================================================================
+
+WHAT'S BROKEN:
+When a logged-in user clicks "Save Lead" on a permit card, the API call
+succeeds (POST /api/saved-leads returns 201) but the button gives ZERO
+visual feedback. The button text stays "Save Lead", no color change, no
+toast notification. Users don't know if the click worked.
+
+FILE TO FIX: templates/dashboard.html (the main homepage template)
+
+FIND: The JavaScript function that handles the "Save Lead" button click.
+It likely does a fetch() to /api/saved-leads and doesn't update the UI
+on success.
+
+HOW TO FIX:
+1. Find the saveLead() or equivalent function in dashboard.html's script
+
+2. After the successful fetch response, update the button:
+```javascript
+function saveLead(permitId, button) {
+  fetch('/api/saved-leads', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({permit_id: permitId})
+  })
+  .then(res => {
+    if (res.ok) {
+      // Update button appearance
+      button.textContent = '✓ Saved';
+      button.style.backgroundColor = '#27AE60';
+      button.style.color = 'white';
+      button.style.borderColor = '#27AE60';
+      button.disabled = true;
+
+      // Show toast notification
+      showToast('Lead saved to My Leads');
+    } else if (res.status === 409) {
+      // Already saved
+      button.textContent = '✓ Already Saved';
+      button.style.backgroundColor = '#95a5a6';
+      button.style.color = 'white';
+      button.disabled = true;
+    } else {
+      showToast('Failed to save lead. Please try again.', 'error');
+    }
+  })
+  .catch(err => {
+    showToast('Network error. Please try again.', 'error');
+  });
+}
+```
+
+3. Add a toast notification system if one doesn't exist:
+```javascript
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification toast-' + type;
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    z-index: 10000;
+    animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+    background: ${type === 'error' ? '#E74C3C' : '#27AE60'};
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+```
+
+4. Add the CSS animation:
+```css
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+```
+
+5. ALSO: On page load, check which permits are already saved and mark
+   those buttons as "✓ Saved" from the start. The /api/saved-leads GET
+   endpoint should return the user's saved permit IDs, and dashboard.html
+   should cross-reference them:
+```javascript
+// On page load, fetch saved leads and mark buttons
+fetch('/api/saved-leads')
+  .then(res => res.json())
+  .then(data => {
+    const savedIds = new Set(data.leads.map(l => l.permit_id));
+    document.querySelectorAll('[data-permit-id]').forEach(card => {
+      if (savedIds.has(card.dataset.permitId)) {
+        const btn = card.querySelector('.save-lead-btn');
+        if (btn) {
+          btn.textContent = '✓ Saved';
+          btn.style.backgroundColor = '#27AE60';
+          btn.style.color = 'white';
+          btn.disabled = true;
+        }
+      }
+    });
+  });
+```
+
+VERIFICATION:
+- Click "Save Lead" on a permit → button changes to "✓ Saved" (green)
+- Toast appears: "Lead saved to My Leads"
+- Refresh page → that same permit's button still shows "✓ Saved"
+- Navigate to /my-leads → the saved permit appears in the list
+- Click "Save Lead" on an already-saved permit → shows "✓ Already Saved"
+
+
+================================================================================
+FIX 4: NAVIGATION INCONSISTENCY (UX-002 — HIGH)
+================================================================================
+
+WHAT'S BROKEN:
+The nav bar renders differently on the homepage vs. inner pages:
+
+HOMEPAGE (templates/dashboard.html — likely has its own nav):
+  PermitGrab | Dashboard | Cities ▼ | Contractors | Early Intel [NEW] |
+  Analytics [PRO] | Pricing | Get Alerts | My Leads | wcrainshaw@gmail.com | Log Out
+
+INNER PAGES (templates/partials/nav.html):
+  PermitGrab | Dashboard | Cities ▼ | Contractors | Pricing | Early Intel |
+  Analytics | My Leads | Wes Crainshaw ▼ (dropdown: Billing, Log Out)
+
+DIFFERENCES:
+1. Homepage shows email address; inner pages show display name
+2. Homepage has flat "Log Out" link; inner pages have dropdown
+3. Homepage shows NEW/PRO badges; inner pages don't
+4. Homepage shows "Get Alerts" in nav; inner pages don't
+
+FILES TO FIX:
+- templates/partials/nav.html (the shared nav partial)
+- templates/dashboard.html (the homepage — may have its own inline nav)
+
+HOW TO FIX:
+1. Make dashboard.html use the SAME nav partial as all other pages.
+   Find where dashboard.html has its own nav HTML and replace it with:
+   {% include 'partials/nav.html' %}
+
+2. Update templates/partials/nav.html to be the single source of truth:
+   - Show user's display name (not email) in a dropdown
+   - Dropdown contains: My Leads, Billing, Log Out
+   - Keep Early Intel (NEW) and Analytics (PRO) badges for all pages
+   - Include "Get Alerts" link on all pages (or move it to the dropdown)
+
+3. The unified nav should look like this when logged in:
+   PermitGrab | Dashboard | Cities ▼ | Contractors | Early Intel [NEW] |
+   Analytics [PRO] | Pricing | Get Alerts | [User Name] ▼
+                                                        → My Leads
+                                                        → Saved Searches
+                                                        → Billing
+                                                        → Log Out
+
+4. When logged OUT, the nav should show:
+   PermitGrab | Dashboard | Cities ▼ | Contractors | Pricing |
+   Get Alerts | Log In | [Sign Up button]
+
+VERIFICATION:
+- Visit homepage logged in → nav matches inner pages exactly
+- Visit /contractors → nav is identical to homepage
+- Visit /analytics → nav is identical
+- Visit /early-intel → nav is identical
+- All pages show the user dropdown (not flat email/logout links)
+- Early Intel and Analytics badges show on all pages
+
+
+================================================================================
+FIX 5: FILTERED PERMIT COUNT NOT UPDATING (BUG-003 — MEDIUM)
+================================================================================
+
+WHAT'S BROKEN:
+When a user selects a filter (e.g., City: "New York City"), the permit
+cards correctly filter to show only NYC permits, but the count text still
+reads "1-50 of 2,000 permits" instead of showing the filtered total like
+"1-50 of 601 permits".
+
+FILE TO FIX: templates/dashboard.html
+
+FIND: The JavaScript that handles filter changes and the element displaying
+the permit count (look for text like "of X permits" or a span/element
+that holds the total count).
+
+The filters are likely client-side (all 2,000 permits are loaded, then
+filtered in JavaScript). The count display needs to update after filtering.
+
+HOW TO FIX:
+1. Find the filter function (likely triggered by onchange on the dropdowns)
+2. After filtering, count the visible/matching permits
+3. Update the count display:
+
+```javascript
+function applyFilters() {
+  // ... existing filter logic ...
+
+  const filteredPermits = allPermits.filter(permit => {
+    // existing filter conditions
+    return matchesCity && matchesTrade && matchesValue && matchesStatus && matchesQuality && matchesSearch;
+  });
+
+  // UPDATE THE COUNT DISPLAY
+  const total = filteredPermits.length;
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, total);
+  document.getElementById('permit-count').textContent =
+    `${start}-${end} of ${total.toLocaleString()} permits`;
+
+  // Update pagination
+  const totalPages = Math.ceil(total / pageSize);
+  updatePagination(totalPages);
+
+  // Render the current page of filtered results
+  renderPermits(filteredPermits.slice(start - 1, end));
+}
+```
+
+3. Also update the pagination controls to reflect the filtered total:
+   - Total pages should be based on filtered count, not 2,000
+   - "Page X of Y" should update
+   - Next/Prev buttons should respect the filtered set
+
+VERIFICATION:
+- Load homepage (All Cities) → shows "1-50 of 2,000 permits"
+- Select City: "New York City" → shows "1-50 of 601 permits" (or actual NYC count)
+- Select Trade: "HVAC" within NYC → count updates to show HVAC-in-NYC count
+- Clear all filters → reverts to "1-50 of 2,000 permits"
+- Pagination pages should change when filters narrow results
+
+
+================================================================================
+FIX 6: ACCOUNT SETTINGS PAGE (UX-003 — MEDIUM)
+================================================================================
+
+WHAT'S BROKEN:
+The "Wes Crainshaw" dropdown only has "Billing" and "Log Out". There's no
+way for a user to:
+- View their subscription status (Free vs Pro)
+- Change their password
+- Update their name
+- Manage alert preferences (city, trade, frequency)
+- View/manage saved searches
+- See their email on file
+
+FILES TO CREATE/MODIFY:
+- NEW: templates/account.html (account settings page)
+- MODIFY: server.py (add /account route and /api/account endpoint)
+- MODIFY: templates/partials/nav.html (add "Account" to dropdown)
+
+HOW TO FIX:
+
+1. Add route in server.py:
+```python
+@app.route('/account')
+def account():
+    if 'user_email' not in session:
+        return redirect('/login')
+    user = User.query.filter_by(email=session['user_email']).first()
+    return render_template('account.html', user=user)
+
+@app.route('/api/account', methods=['PUT'])
+def update_account():
+    if 'user_email' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    user = User.query.filter_by(email=session['user_email']).first()
+    data = request.json
+
+    if 'name' in data:
+        user.name = data['name'].strip()
+    if 'city' in data:
+        user.city = data['city']
+    if 'trade' in data:
+        user.trade = data['trade']
+    if 'daily_alerts' in data:
+        user.daily_alerts = bool(data['daily_alerts'])
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    if 'user_email' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    user = User.query.filter_by(email=session['user_email']).first()
+    data = request.json
+
+    if not check_password_hash(user.password_hash, data.get('current_password', '')):
+        return jsonify({'error': 'Current password is incorrect'}), 400
+
+    user.password_hash = generate_password_hash(data['new_password'])
+    db.session.commit()
+    return jsonify({'success': True})
+```
+
+2. Create templates/account.html with sections:
+   - Profile: Name, Email (read-only), Member since date
+   - Subscription: Plan (Free/Pro), Status, Manage Billing link
+   - Alert Preferences: City selection, Trade selection, Daily alerts toggle
+   - Security: Change password form
+   - Danger Zone: Delete account (with confirmation)
+
+3. Update nav dropdown to include "Account" link:
+   Dropdown items: Account, My Leads, Saved Searches, Billing, Log Out
+
+VERIFICATION:
+- Click user name dropdown → "Account" option appears
+- /account page loads with correct user info
+- Can update name → saves to database
+- Can change password → old password required, new password works on next login
+- Can toggle daily alerts on/off
+- Subscription status shows correctly (Free or Pro)
+
+
+================================================================================
+FIX 7: ANALYTICS PERCENTAGE DISPLAY (UX-004 — MEDIUM)
+================================================================================
+
+WHAT'S BROKEN:
+The Analytics page (/analytics) shows "+5721.7%" for Permit Volume change.
+This is technically correct (data ramped from near-zero) but looks absurd
+and damages credibility. Same potential issue with Value Trends "+74.1%".
+
+FILE TO FIX: templates/analytics.html (or the template used for /analytics)
+
+FIND: The JavaScript that calculates and displays percentage changes.
+
+HOW TO FIX:
+Add a display cap for percentage changes:
+
+```javascript
+function formatPercentChange(pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return '';
+  if (Math.abs(pct) > 999) {
+    // Don't show absurd percentages
+    return pct > 0 ? '↑ New trend' : '↓ Declining';
+  }
+  const sign = pct > 0 ? '↑' : '↓';
+  return `${sign} ${Math.abs(pct).toFixed(1)}%`;
+}
+```
+
+OR alternatively, when the baseline period had fewer than N permits/value,
+show "New" instead of a percentage:
+
+```javascript
+function formatPercentChange(current, previous) {
+  if (previous < 10) return 'New';  // Not enough baseline data
+  const pct = ((current - previous) / previous) * 100;
+  if (Math.abs(pct) > 500) return current > previous ? '↑ Surging' : '↓ Declining';
+  const sign = pct > 0 ? '↑' : '↓';
+  return `${sign} ${Math.abs(pct).toFixed(1)}%`;
+}
+```
+
+VERIFICATION:
+- Visit /analytics → percentage badges show reasonable numbers
+- No percentage exceeds 999% (or shows "New"/"Surging" label instead)
+- Existing reasonable percentages (like +74.1%) still display normally
+
+
+================================================================================
+FIX 8: PERMIT HISTORY EMPTY STATE (UX-005 — MEDIUM)
+================================================================================
+
+WHAT'S BROKEN:
+"View Permit History" on most permit cards expands to show:
+"No previous permits found at this address."
+This is unhelpful and makes the feature feel broken/useless.
+
+FILE TO FIX: templates/dashboard.html
+
+FIND: The section that renders permit history results (likely in a toggle
+section that appears when "View Permit History" is clicked).
+
+HOW TO FIX:
+Replace the empty state message with something more useful:
+
+```javascript
+// When no history found
+if (historyData.length === 0) {
+  historyContainer.innerHTML = `
+    <div style="padding: 12px; color: #666; font-size: 14px;
+         background: #f8f9fa; border-radius: 6px; margin-top: 8px;">
+      <strong>First permit at this address</strong> —
+      No previous construction permits found. This could be a new
+      development opportunity. Save this lead to track future activity.
+    </div>
+  `;
+}
+```
+
+This makes the empty state feel intentional and informative rather than
+broken. It also encourages the user to save the lead.
+
+VERIFICATION:
+- Click "View Permit History" on a permit with no history
+- Shows: "First permit at this address — No previous construction permits found..."
+- The message is styled, not just plain text
+- Click "View Permit History" on a permit WITH history → still shows history normally
+
+
+================================================================================
+FIX 9: HERO STATS DON'T REFLECT FILTERS (BUG-004 — LOW)
+================================================================================
+
+WHAT'S BROKEN:
+The hero section shows "2,000 Active Permits | 319 Metro Areas | $442M |
+705 High-Value Leads" and these numbers never change when filters are applied.
+A user who selects "Austin" still sees the global totals.
+
+FILE TO FIX: templates/dashboard.html
+
+HOW TO FIX (Simple approach — add label):
+If you don't want to make the stats dynamic, at minimum label them clearly:
+
+Change from:
+  2,000 ACTIVE PERMITS
+
+To:
+  2,000 ACROSS ALL CITIES
+  (or hide the stats section entirely when a filter is active)
+
+HOW TO FIX (Better approach — make stats dynamic):
+When filters change, recalculate the stats from the filtered dataset:
+
+```javascript
+function updateHeroStats(filteredPermits) {
+  const total = filteredPermits.length;
+  const totalValue = filteredPermits.reduce((sum, p) => sum + (p.value || 0), 0);
+  const highValue = filteredPermits.filter(p => p.lead_score >= 70).length;
+  const cities = new Set(filteredPermits.map(p => p.city)).size;
+
+  document.getElementById('stat-permits').textContent = total.toLocaleString();
+  document.getElementById('stat-areas').textContent = cities.toLocaleString();
+  document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
+  document.getElementById('stat-high-value').textContent = highValue.toLocaleString();
+}
+```
+
+VERIFICATION:
+- Load page with no filters → global stats show
+- Select City: Austin → stats update to Austin-specific numbers
+  (or label changes to "ACROSS ALL CITIES" to avoid confusion)
+
+
+================================================================================
+FIX 10: CONTRACTOR MODAL ENHANCEMENT (UX-006 — LOW)
+================================================================================
+
+WHAT'S BROKEN:
+Clicking a contractor name on /contractors opens a modal with basic info:
+Total Permits, Total Value, Cities Active, and a list of Recent Permits.
+But no trade breakdown, no trend data, no way to set alerts for this
+contractor's activity.
+
+FILE TO FIX: templates/contractors.html
+
+HOW TO FIX:
+Enhance the contractor modal to include:
+
+1. Trade Distribution (mini bar chart or tag cloud showing what trades
+   they pull permits for — already have the data)
+
+2. Activity Trend (text like "3 permits this month, up from 1 last month")
+
+3. "Watch this Contractor" button (saves to a list, future feature)
+
+This is a lower priority enhancement but adds real competitive intelligence
+value that justifies the Pro subscription.
+
+```html
+<!-- Enhanced contractor modal -->
+<div class="contractor-detail">
+  <h3>Sandra Nguyen</h3>
+  <div class="stats-row">
+    <div class="stat">6<br><small>Total Permits</small></div>
+    <div class="stat">$1.16M<br><small>Total Value</small></div>
+    <div class="stat">4<br><small>Cities</small></div>
+  </div>
+
+  <h4>Trade Breakdown</h4>
+  <div class="trade-tags">
+    <span class="tag">Roofing (4)</span>
+    <span class="tag">Demolition (1)</span>
+    <span class="tag">Windows & Doors (1)</span>
+  </div>
+
+  <h4>Recent Permits</h4>
+  <!-- existing permit list -->
+</div>
+```
+
+
+================================================================================
+FIX 11: SEARCH AUTOCOMPLETE (UX-007 — LOW)
+================================================================================
+
+WHAT'S BROKEN:
+The search box has placeholder text "Address, description, owner..." but no
+autocomplete, no search suggestions, and no recent searches. Just a plain
+text input.
+
+FILE TO FIX: templates/dashboard.html
+
+HOW TO FIX:
+Add basic datalist-based autocomplete for contractor names and addresses:
+
+```html
+<input type="text" id="search-input" list="search-suggestions"
+       placeholder="Address, description, owner...">
+<datalist id="search-suggestions">
+  <!-- Populated dynamically from current permits -->
+</datalist>
+```
+
+```javascript
+// Build suggestions from loaded permits
+const suggestions = new Set();
+allPermits.forEach(p => {
+  if (p.address) suggestions.add(p.address);
+  if (p.owner_name) suggestions.add(p.owner_name);
+});
+const datalist = document.getElementById('search-suggestions');
+suggestions.forEach(s => {
+  const option = document.createElement('option');
+  option.value = s;
+  datalist.appendChild(option);
+});
+```
+
+
+================================================================================
+FIX 12: PAGINATION IMPROVEMENTS (UX-008 — LOW)
+================================================================================
+
+WHAT'S BROKEN:
+Client-side pagination with 40 pages. No "jump to page" input, no
+first/last buttons. Users must click Next/Prev repeatedly.
+
+FILE TO FIX: templates/dashboard.html
+
+HOW TO FIX:
+Add a page jump input and first/last buttons to the pagination controls:
+
+```html
+<div class="pagination">
+  <button onclick="goToPage(1)">« First</button>
+  <button onclick="goToPage(currentPage - 1)">‹ Prev</button>
+
+  <!-- Page numbers (show 5 around current) -->
+  <span class="page-numbers" id="page-numbers"></span>
+
+  <button onclick="goToPage(currentPage + 1)">Next ›</button>
+  <button onclick="goToPage(totalPages)">Last »</button>
+
+  <span style="margin-left: 16px;">
+    Go to: <input type="number" id="page-jump" min="1"
+            style="width: 60px;" onchange="goToPage(parseInt(this.value))">
+  </span>
+</div>
+```
+
+
+================================================================================
+FIX 13: USER ONBOARDING FLOW (STR-001 — STRATEGIC)
+================================================================================
+
+WHAT'S NEEDED:
+New Pro users land on the homepage with 2,000 permits and zero guidance.
+There's an onboarding.html template and an /onboarding route in server.py
+with an onboarding_completed flag on the User model — but it's unclear if
+this is actually being triggered.
+
+FILES TO CHECK/FIX:
+- server.py: Check if the root route (/) redirects new users to /onboarding
+- templates/onboarding.html: Check if it has useful content
+- User model: onboarding_completed field exists
+
+HOW TO FIX:
+1. In the root route (/), check if onboarding is completed:
+```python
+@app.route('/')
+def index():
+    if 'user_email' in session:
+        user = User.query.filter_by(email=session['user_email']).first()
+        if user and not user.onboarding_completed:
+            return redirect('/onboarding')
+    # ... existing dashboard logic ...
+```
+
+2. The onboarding flow should:
+   - Welcome the user by name
+   - Ask their primary city (save to user.city)
+   - Ask their primary trade (save to user.trade)
+   - Explain key features: filters, Save Lead, Export, Alerts
+   - Set user.onboarding_completed = True on completion
+   - Redirect to homepage with their city pre-filtered
+
+3. After onboarding, the homepage should pre-filter to their selected city
+   so they immediately see relevant leads, not all 2,000.
+
+
+================================================================================
+FIX 14: FREE-TO-PRO UPGRADE PATH (STR-002 — STRATEGIC)
+================================================================================
+
+WHAT'S NEEDED:
+Free users see blurred phone numbers but the path to understanding what
+they're missing is weak. The only prompt is the blurred data itself.
+
+FILES TO FIX:
+- templates/dashboard.html (add Pro preview banners)
+- templates/upgrade_gate.html (may already exist — enhance it)
+
+HOW TO FIX:
+1. When a free user tries to click a blurred phone number, show a modal:
+   "Unlock Full Contact Info with PermitGrab Pro"
+   - Show what Pro includes (bullet list)
+   - Show the specific permit they tried to access
+   - "Start 14-Day Free Trial" CTA → links to /pricing or Stripe checkout
+
+2. Add a subtle banner at the top of the permit list for free users:
+   "You're viewing 2,000 leads. Upgrade to Pro to unlock phone numbers,
+   Early Intel, Analytics, and unlimited exports. [See Plans →]"
+
+3. Periodically (every 10th permit card), insert an upsell card:
+   "This lead has a 97-point score. Pro members can see the full
+   contact info and call this property owner directly. [Upgrade →]"
+
+
+================================================================================
+FIX 15: EMAIL ALERTS CTA FOR LOGGED-IN USERS (STR-004 — STRATEGIC)
+================================================================================
+
+WHAT'S BROKEN:
+The sidebar "Get Permit Alerts" widget shows on the homepage even for
+logged-in Pro users who may already have alerts configured. It redundantly
+asks for their email (which we already have).
+
+FILE TO FIX: templates/dashboard.html
+
+HOW TO FIX:
+For logged-in users, replace the alert signup widget with an alert status widget:
+
+```html
+{% if current_user %}
+  <div class="sidebar-card">
+    <h3>Your Alerts</h3>
+    {% if current_user.daily_alerts %}
+      <p>✅ Daily alerts active for <strong>{{ current_user.city or 'All Cities' }}</strong></p>
+      <a href="/account#alerts">Manage Preferences →</a>
+    {% else %}
+      <p>You haven't set up daily permit alerts yet.</p>
+      <button onclick="enableAlerts()">Enable Daily Alerts</button>
+    {% endif %}
+  </div>
+{% else %}
+  <!-- existing signup widget for logged-out users -->
+{% endif %}
+```
+
+
+================================================================================
+FIX 16: DATA FRESHNESS INDICATOR (STR-005 — STRATEGIC)
+================================================================================
+
+WHAT'S NEEDED:
+No indicator of when permit data was last updated. Contractors need to
+trust the data is current.
+
+FILES TO FIX:
+- server.py (expose last collection timestamp to template)
+- templates/dashboard.html (display the timestamp)
+
+HOW TO FIX:
+1. In server.py, the data collection process likely stores a timestamp.
+   Check data/collection_stats.json for the last collection time.
+   Pass it to the dashboard template.
+
+2. Display near the permit count:
+   "1-50 of 2,000 permits • Last updated: 2 hours ago"
+
+```python
+# In the route that serves the dashboard
+import json, os
+from datetime import datetime
+
+stats_path = 'data/collection_stats.json'
+last_updated = None
+if os.path.exists(stats_path):
+    with open(stats_path) as f:
+        stats = json.load(f)
+        last_updated = stats.get('last_collection_time')
+
+return render_template('dashboard.html', last_updated=last_updated, ...)
+```
+
+```html
+<span class="permit-count">1-50 of 2,000 permits</span>
+{% if last_updated %}
+  <span class="last-updated" style="color: #888; font-size: 13px;">
+    • Data updated {{ last_updated | timeago }}
+  </span>
+{% endif %}
+```
+
+
+================================================================================
+FIX 17: MOBILE RESPONSIVENESS CHECK (STR-003 — STRATEGIC)
+================================================================================
+
+WHAT'S NEEDED:
+The filter bar has 6 dropdowns + search box + 2 buttons all in one row.
+This likely breaks on mobile screens. Not tested in this review but
+flagged for attention.
+
+FILES TO FIX: templates/dashboard.html (CSS/responsive styles)
+
+HOW TO FIX:
+1. Test the site at 375px width (iPhone) and 768px (iPad)
+2. The filter bar should collapse to a "Filters" button that opens a
+   slide-out panel or modal on mobile
+3. Permit cards should stack to single-column
+4. The sidebar (Market Leaders, Leads by Trade) should move below the
+   permit list on mobile, not disappear
+
+Add media queries:
+```css
+@media (max-width: 768px) {
+  .filter-bar { flex-wrap: wrap; }
+  .filter-bar select { width: 48%; margin-bottom: 8px; }
+  .filter-bar input[type="text"] { width: 100%; }
+  .sidebar { display: none; }  /* or move below */
+  .permit-card { padding: 12px; }
+}
+```
+
+
+================================================================================
+TESTING CHECKLIST — RUN AFTER ALL FIXES
+================================================================================
+
+LOGGED-OUT TESTS:
+[ ] Homepage loads, hero section displays
+[ ] All 6 filter dropdowns work
+[ ] Permit cards show with blurred phone numbers
+[ ] Clicking blurred number shows upgrade prompt (Fix 14)
+[ ] "Sign Up" and "Log In" nav links work
+[ ] All city dropdown pages load (/permits/austin, etc.)
+[ ] /contractors page loads, contractor names clickable
+[ ] /pricing page loads with Free vs Pro comparison
+[ ] /about, /contact, /blog all load
+[ ] /privacy-policy loads (not 404) — Fix 2
+[ ] /terms-of-service loads (not 404) — Fix 2
+[ ] Footer links all work (no 404s)
+[ ] Registration flow works → redirects to onboarding (Fix 13)
+
+LOGGED-IN (PRO) TESTS:
+[ ] Login works, redirects to homepage
+[ ] Nav is consistent across ALL pages (Fix 4)
+[ ] User dropdown shows: Account, My Leads, Saved Searches, Billing, Log Out
+[ ] Early Intel page loads without JS errors (Fix 1)
+[ ] Analytics page loads, no absurd percentages (Fix 7)
+[ ] My Leads page loads
+[ ] Save Lead button gives visual feedback (Fix 3)
+[ ] Saved leads appear in My Leads page
+[ ] Filter by city → count updates correctly (Fix 5)
+[ ] Export CSV downloads a CSV file
+[ ] Save Search saves and appears in Saved Searches
+[ ] Contractor modal shows trade breakdown (Fix 10)
+[ ] Account page accessible and functional (Fix 6)
+[ ] Pagination has first/last/jump controls (Fix 12)
+[ ] Alert status widget shows in sidebar (Fix 15)
+[ ] Data freshness timestamp visible (Fix 16)
+[ ] Log Out works, redirects to homepage
+
+================================================================================
+END OF V8 SPEC
+================================================================================
+
+DEPLOY NOTES:
+- All changes are in server.py and templates/ — no database migrations needed
+- The User model already has all required fields (name, city, trade,
+  daily_alerts, onboarding_completed, stripe fields)
+- Test locally before pushing to Render
+- Render auto-deploys from main branch
+- Monitor Render logs after deploy for any Python errors
+- Test with both a Pro account and a Free account
+
+RENDER DETAILS:
+- Web Service ID: srv-d6s1tvsr85hc73em9ch0
+- Repo: wcrainshaw-eng/permitgrab
+- Branch: main
+- Database URL: stored in DATABASE_URL environment variable on Render
+- Build: pip install -r requirements.txt && python generate_sample_data.py
+- Start: gunicorn server:app
+
+ADMIN ACCESS:
+- URL: /admin
+- Password: PermitGrab!Admin2026

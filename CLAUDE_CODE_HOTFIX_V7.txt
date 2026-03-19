@@ -1,0 +1,608 @@
+===============================================================================
+CLAUDE CODE HOTFIX SPEC V7 — PERMITGRAB
+March 17, 2026 — POST V6-UAT
+===============================================================================
+
+STOP. READ THIS ENTIRE DOCUMENT BEFORE WRITING A SINGLE LINE OF CODE.
+THIS IS NOT OPTIONAL. THESE TWO FIXES HAVE FAILED FOUR TIMES IN A ROW.
+
+===============================================================================
+CRITICAL DISCOVERY FROM V6 UAT
+===============================================================================
+
+V6 UAT REVEALED THE ROOT CAUSE OF ALL PREVIOUS FAILURES:
+
+The app does NOT use a real database. It stores user data in a JSON file
+(users.json) on Render's ephemeral filesystem. Render's free tier WIPES
+the filesystem on every deploy. This means:
+
+  - Every deploy deletes ALL user accounts
+  - The duplicate check can never find an existing user, because the
+    data file was just wiped by the deploy that included the check
+  - Pro subscriptions are lost on every deploy
+  - All previous "fixes" (V3 application check, V4 file locking, V5
+    3-layer approach, V6 persistent disk) failed because they all
+    assumed user data would persist across deploys. It doesn't.
+
+V6 attempted to solve this with a Render persistent disk, but that
+requires a paid Render plan. On the free tier, it's a no-op.
+
+THE FIX: Migrate from JSON file storage to a REAL DATABASE.
+Render offers a free PostgreSQL database. This is Fix 0 — a prerequisite
+for Fix 1 (duplicate emails) and must be done FIRST.
+
+V6 UAT RESULTS:
+  Fix 1 (Duplicate Email): FAIL — 4th consecutive failure
+    - Signup with wcrainshaw@gmail.com → redirected to /onboarding
+    - No error message displayed
+    - Root cause: JSON file wiped by deploy, no users to check against
+
+  Fix 2 (Lead Scoring): FAIL — 4th consecutive failure
+    - Scores: 83-99 (16pt spread). WORSE than V5 (80-99, 19pt spread)
+    - Target: 40-99 (59pt spread)
+    - Forced linear spread was NOT implemented
+    - Root cause: scoring function not replaced
+
+  Fix 3 (Save Search / Export CSV): Not re-tested (passed in V5, not touched)
+
+
+===============================================================================
+===============================================================================
+FIX 0: MIGRATE FROM JSON FILE TO POSTGRESQL DATABASE  [PREREQUISITE]
+===============================================================================
+===============================================================================
+
+This fix MUST be completed before Fix 1 can work. Without a real database,
+user accounts are wiped on every deploy and duplicate checks are meaningless.
+
+---------------------------------------------------------------------------
+STEP 0A: CREATE A FREE POSTGRESQL DATABASE ON RENDER
+---------------------------------------------------------------------------
+
+1. Log in to the Render dashboard (https://dashboard.render.com)
+2. Click "New" → "PostgreSQL"
+3. Settings:
+   - Name: permitgrab-db
+   - Region: same as the web service (check the web service settings)
+   - PostgreSQL Version: 16 (or latest)
+   - Plan: Free
+4. Click "Create Database"
+5. Wait for it to provision. Copy the "Internal Database URL" — it looks like:
+   postgresql://user:password@host/dbname
+6. Go to the permitgrab web service → Environment → add environment variable:
+   Key: DATABASE_URL
+   Value: (paste the Internal Database URL)
+
+---------------------------------------------------------------------------
+STEP 0B: FIND ALL USER DATA CODE
+---------------------------------------------------------------------------
+
+Search the entire codebase for how users are currently stored:
+
+    grep -rn "users\.json\|json\.load\|json\.dump\|open.*users\|with open.*user" .
+    grep -rn "def.*save_user\|def.*load_user\|def.*get_user\|def.*find_user" .
+    grep -rn "def.*signup\|def.*register\|def.*login\|def.*authenticate" .
+
+PRINT EVERY FUNCTION that reads or writes user data. You need the full picture.
+
+Look for patterns like:
+    with open('users.json', 'r') as f:
+        users = json.load(f)
+    with open('users.json', 'w') as f:
+        json.dump(users, f)
+
+---------------------------------------------------------------------------
+STEP 0C: ADD SQLALCHEMY AND CREATE THE USER MODEL
+---------------------------------------------------------------------------
+
+Add to requirements.txt:
+    Flask-SQLAlchemy
+    psycopg2-binary
+
+Add to the main app file (app.py or similar):
+
+    from flask_sqlalchemy import SQLAlchemy
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', '').replace('postgres://', 'postgresql://')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    db = SQLAlchemy(app)
+
+    class User(db.Model):
+        __tablename__ = 'users'
+        id = db.Column(db.Integer, primary_key=True)
+        name = db.Column(db.String(255), nullable=False)
+        email = db.Column(db.String(255), unique=True, nullable=False)
+        password_hash = db.Column(db.String(255), nullable=False)
+        plan = db.Column(db.String(50), default='free')
+        city = db.Column(db.String(255))
+        trade = db.Column(db.String(255))
+        created_at = db.Column(db.DateTime, default=db.func.now())
+        stripe_customer_id = db.Column(db.String(255))
+        stripe_subscription_id = db.Column(db.String(255))
+
+NOTE: Look at the existing JSON structure to see what fields are stored.
+The model above covers common fields, but MATCH it to whatever the JSON
+currently stores. If there are additional fields like "onboarding_complete",
+"saved_searches", etc., include them.
+
+Add table creation at startup:
+
+    with app.app_context():
+        db.create_all()
+
+---------------------------------------------------------------------------
+STEP 0D: REPLACE ALL JSON FILE OPERATIONS WITH DATABASE QUERIES
+---------------------------------------------------------------------------
+
+This is the most important step. Every place that reads/writes users.json
+must be converted to SQLAlchemy queries.
+
+SIGNUP — Find the function that creates a new user. Replace:
+    # OLD (JSON):
+    users = load_users()
+    users.append({'email': email, 'name': name, 'password': hashed, ...})
+    save_users(users)
+
+    # NEW (PostgreSQL):
+    from werkzeug.security import generate_password_hash
+    new_user = User(
+        name=name,
+        email=email.lower().strip(),
+        password_hash=generate_password_hash(password),
+        plan='free'
+    )
+    db.session.add(new_user)
+    db.session.commit()
+
+LOGIN — Find the function that authenticates users. Replace:
+    # OLD (JSON):
+    users = load_users()
+    for user in users:
+        if user['email'] == email and check_password(user['password'], password):
+            ...
+
+    # NEW (PostgreSQL):
+    from werkzeug.security import check_password_hash
+    user = User.query.filter(db.func.lower(User.email) == email.lower().strip()).first()
+    if user and check_password_hash(user.password_hash, password):
+        # Login success
+        session['user_id'] = user.id
+        ...
+
+LOADING USER BY SESSION — Find where the current user is looked up:
+    # OLD (JSON):
+    users = load_users()
+    current_user = next((u for u in users if u['id'] == session['user_id']), None)
+
+    # NEW (PostgreSQL):
+    current_user = User.query.get(session.get('user_id'))
+
+UPDATING USER (e.g., upgrading to Pro):
+    # OLD (JSON):
+    users = load_users()
+    for user in users:
+        if user['email'] == email:
+            user['plan'] = 'pro'
+    save_users(users)
+
+    # NEW (PostgreSQL):
+    user = User.query.filter(db.func.lower(User.email) == email.lower()).first()
+    if user:
+        user.plan = 'pro'
+        db.session.commit()
+
+ADMIN PANEL — Any admin operations that read/modify users need updating too.
+
+DELETE the load_users() and save_users() functions entirely once migrated.
+DELETE the users.json file from the repo if it's committed.
+
+---------------------------------------------------------------------------
+STEP 0E: MIGRATE EXISTING USER DATA
+---------------------------------------------------------------------------
+
+If there are important user accounts (like Wes's Pro account), you need to
+seed them into the database. Create a seed script or add to app startup:
+
+    with app.app_context():
+        db.create_all()
+        # Seed the primary account if it doesn't exist
+        if not User.query.filter_by(email='wcrainshaw@gmail.com').first():
+            from werkzeug.security import generate_password_hash
+            admin_user = User(
+                name='Wes Crainshaw',
+                email='wcrainshaw@gmail.com',
+                password_hash=generate_password_hash('THE_ORIGINAL_PASSWORD'),
+                plan='pro',
+                city='New York City',
+                trade='General'
+            )
+            db.session.add(admin_user)
+            db.session.commit()
+            print('Seeded admin user')
+
+IMPORTANT: You need to know the original password. Check the existing
+users.json or the codebase for any default passwords. If unsure, set a
+known password and tell the user to change it.
+
+---------------------------------------------------------------------------
+STEP 0F: VERIFY DATABASE MIGRATION
+---------------------------------------------------------------------------
+
+Deploy and verify:
+
+    1. Go to permitgrab.com/signup and create a test account
+    2. Log out and log back in — account should persist
+    3. Deploy AGAIN (trigger a manual deploy or push a trivial change)
+    4. Log in again — account should STILL persist after deploy
+       THIS IS THE KEY TEST. If the account is gone after deploy,
+       the migration didn't work.
+    5. Check the Render PostgreSQL dashboard to see if the users table has data
+
+DO NOT PROCEED TO FIX 1 UNTIL THE DATABASE MIGRATION IS VERIFIED.
+
+
+===============================================================================
+===============================================================================
+FIX 1: DUPLICATE EMAIL PREVENTION
+===============================================================================
+===============================================================================
+
+Now that user data is in PostgreSQL (which persists across deploys), the
+duplicate check will actually work.
+
+---------------------------------------------------------------------------
+STEP 1: ADD DUPLICATE CHECK TO SIGNUP ROUTE
+---------------------------------------------------------------------------
+
+In the signup route, AFTER extracting the email and BEFORE creating the User:
+
+    email = request.form.get('email', '').lower().strip()
+
+    # Check for existing account
+    existing = User.query.filter(db.func.lower(User.email) == email).first()
+    if existing:
+        flash('An account with this email already exists. Please log in.', 'error')
+        return redirect(url_for('login'))
+
+    # Only AFTER this check, create the user:
+    new_user = User(email=email, ...)
+
+This is straightforward IF the database is working. The reason it failed
+four times is NOT because the check is complicated — it's because the
+JSON file kept getting wiped so there was never an existing user to find.
+
+---------------------------------------------------------------------------
+STEP 2: ADD INTEGRITYERROR FALLBACK
+---------------------------------------------------------------------------
+
+The User model already has unique=True on email (from Step 0C). Add a
+try/except as a safety net:
+
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash('An account with this email already exists. Please log in.', 'error')
+        return redirect(url_for('login'))
+
+---------------------------------------------------------------------------
+STEP 3: VERIFY FIX 1
+---------------------------------------------------------------------------
+
+    1. Sign up with a NEW email (e.g., test123@example.com)
+    2. Should succeed → redirected to /onboarding
+    3. Log out
+    4. Try to sign up AGAIN with the SAME email (test123@example.com)
+    5. EXPECTED: Error message, NOT redirected to /onboarding
+    6. Also try with wcrainshaw@gmail.com (seeded Pro account)
+    7. EXPECTED: Same error message
+
+    CRITICAL: Also test AFTER a deploy:
+    8. Push a trivial change and let it deploy
+    9. Try to sign up with test123@example.com again
+    10. EXPECTED: Still blocked — because the database persists across deploys
+
+
+===============================================================================
+===============================================================================
+FIX 2: LEAD SCORING — FORCED LINEAR SPREAD
+===============================================================================
+===============================================================================
+
+CURRENT STATE (V6 UAT, tested March 17, 2026):
+  Scores: 83 83 83 83 83 83 83 84 84 84 84 84 85 85 85 85 85 85 85 86
+          86 87 87 87 87 87 88 88 88 89 89 89 89 89 90 90 91 91 91 91
+          94 95 95 96 96 96 97 97 97 99
+  Min: 83, Max: 99, Spread: 16 points (WORSE than V5)
+  14 unique values across 50 permits
+
+TARGET STATE:
+  Min: ~40, Max: ~99, Spread: ~59 points
+  At least 20 unique values across 50 permits
+
+THE PROOF THAT THE FUNCTION WAS NOT REPLACED:
+  The forced linear spread formula is: output = 40 + ((raw - raw_min) / (raw_max - raw_min)) * 59
+  When raw == raw_min: output = 40 + 0 = 40
+  When raw == raw_max: output = 40 + 59 = 99
+
+  The MINIMUM output is ALWAYS 40 by mathematical definition.
+  The current minimum is 83. Therefore the formula is not in the code.
+
+---------------------------------------------------------------------------
+STEP 1: FIND THE SCORING CODE
+---------------------------------------------------------------------------
+
+Run these searches and PRINT everything you find:
+
+    grep -rn "lead_score\|lead_quality\|calculate.*score\|scoring" . --include="*.py"
+    grep -rn "def.*score" . --include="*.py"
+
+Also check if scoring happens in JavaScript on the client side:
+
+    grep -rn "lead.score\|leadScore\|score.*badge\|pts" templates/ static/
+
+PRINT THE FULL FUNCTION. Do not summarize. Do not skip lines.
+
+---------------------------------------------------------------------------
+STEP 2: DELETE THE OLD FUNCTION AND PASTE THIS ONE
+---------------------------------------------------------------------------
+
+Find the existing scoring function. DELETE IT COMPLETELY — every line.
+Then paste this EXACT function in its place:
+
+```python
+def calculate_lead_scores(permits):
+    """
+    V7 lead scoring with FORCED LINEAR SPREAD.
+    Takes a list of permit dicts, returns a list of integer scores.
+    Output range: 40-99, guaranteed by linear mapping.
+
+    PROOF: When raw == min(raws) → output = 40 + 0 = 40
+           When raw == max(raws) → output = 40 + 59 = 99
+    If the minimum output score is not 40, this function is not being called.
+    """
+    import hashlib
+    from datetime import datetime
+
+    if not permits:
+        return []
+
+    if len(permits) == 1:
+        return [70]  # Single permit gets middle score
+
+    # PHASE 1: Compute a raw score for each permit
+    raw_scores = []
+    for p in permits:
+        # Component A: Project value (raw, will be normalized later)
+        value = 0.0
+        for key in ['project_value', 'estimated_cost', 'value', 'cost', 'amount']:
+            v = p.get(key)
+            if v is not None:
+                try:
+                    value = float(str(v).replace('$', '').replace(',', ''))
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        # Component B: Recency (0-25 points)
+        recency = 12.0
+        for key in ['filed_date', 'filing_date', 'date', 'created_date', 'issue_date']:
+            d = p.get(key)
+            if d:
+                try:
+                    if isinstance(d, str):
+                        d = datetime.strptime(d[:10], '%Y-%m-%d')
+                    days_old = (datetime.now() - d).days
+                    recency = max(0.0, 25.0 - (days_old * 0.8))
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        # Component C: Status (0-15 points)
+        status_str = ''
+        for key in ['status', 'permit_status', 'state']:
+            s = p.get(key)
+            if s:
+                status_str = str(s).lower().strip()
+                break
+        status_scores = {
+            'filed': 15, 'new': 15, 'active': 13, 'issued': 11,
+            'approved': 11, 'permitted': 9, 'pending': 7, 'review': 7,
+            'in progress': 6, 'completed': 3, 'closed': 1, 'expired': 1
+        }
+        status_pts = status_scores.get(status_str, 7.0)
+
+        # Component D: Contact info (0-10 points)
+        has_phone = any(p.get(k) for k in ['phone', 'contact_phone', 'phone_number', 'tel'])
+        has_name = any(p.get(k) for k in ['contact_name', 'owner', 'owner_name', 'applicant', 'name'])
+        contact_pts = (5.0 if has_phone else 0.0) + (5.0 if has_name else 0.0)
+
+        # Component E: Trade type (0-10 points)
+        trade_str = ''
+        for key in ['trade', 'permit_type', 'trade_category', 'type', 'work_type']:
+            t = p.get(key)
+            if t:
+                trade_str = str(t).lower()
+                break
+        high_value = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire']
+        mid_value = ['roofing', 'interior', 'demolition', 'addition', 'structural']
+        if any(h in trade_str for h in high_value):
+            trade_pts = 10.0
+        elif any(m in trade_str for m in mid_value):
+            trade_pts = 7.0
+        else:
+            trade_pts = 4.0
+
+        # Component F: Deterministic jitter from permit ID (0-5 points)
+        permit_id_str = ''
+        for key in ['id', 'permit_number', 'permit_id', 'number']:
+            pid = p.get(key)
+            if pid is not None:
+                permit_id_str = str(pid)
+                break
+        if not permit_id_str:
+            permit_id_str = str(id(p))
+        jitter = (int(hashlib.md5(permit_id_str.encode()).hexdigest()[:6], 16) % 50) / 10.0
+
+        raw_scores.append({
+            'value': value,
+            'non_value_score': recency + status_pts + contact_pts + trade_pts + jitter
+        })
+
+    # PHASE 2: Normalize value component within this dataset
+    values = [r['value'] for r in raw_scores]
+    min_val = min(values)
+    max_val = max(values)
+    val_range = max_val - min_val if max_val != min_val else 1.0
+
+    composite_scores = []
+    for r in raw_scores:
+        normalized_value = ((r['value'] - min_val) / val_range) * 35.0
+        composite = normalized_value + r['non_value_score']
+        composite_scores.append(composite)
+
+    # PHASE 3: FORCED LINEAR SPREAD
+    # This maps the raw composite range to exactly 40-99.
+    # The math guarantees: min output = 40, max output = 99.
+    score_min = min(composite_scores)
+    score_max = max(composite_scores)
+    score_range = score_max - score_min if score_max != score_min else 1.0
+
+    final_scores = []
+    for cs in composite_scores:
+        normalized = 40.0 + ((cs - score_min) / score_range) * 59.0
+        final_scores.append(max(40, min(99, round(normalized))))
+
+    return final_scores
+```
+
+---------------------------------------------------------------------------
+STEP 3: UPDATE THE CALL SITE
+---------------------------------------------------------------------------
+
+Find where lead scores are assigned. Search:
+
+    grep -rn "lead_score" . --include="*.py"
+
+The function takes a LIST and returns a LIST. Update the call site:
+
+    # Score ALL permits in one batch call
+    scores = calculate_lead_scores(permits_list)
+    for i, permit in enumerate(permits_list):
+        permit['lead_score'] = scores[i]
+
+If the old code scored permits one at a time in a loop, CHANGE IT to the
+batch pattern above. The linear spread REQUIRES all permits at once.
+
+---------------------------------------------------------------------------
+STEP 4: REMOVE ANY HARDCODED SCORE FLOOR
+---------------------------------------------------------------------------
+
+Search for any line that clamps scores to a minimum:
+
+    grep -rn "max(8\|min(8\|>= 8\|score.*8[0-9]\|floor\|clamp" . --include="*.py"
+
+If you find ANYTHING like:
+    score = max(80, score)
+    score = max(83, score)
+    if score < 80: score = 80
+
+DELETE IT. The function already handles clamping to 40-99.
+
+---------------------------------------------------------------------------
+STEP 5: VERIFY FIX 2
+---------------------------------------------------------------------------
+
+Deploy and test on the live site. Open browser console and run:
+
+    const badges = document.querySelectorAll('.lead-score-badge');
+    const scores = [];
+    badges.forEach(b => {
+      const m = b.textContent.match(/(\d+)\s*pts/);
+      if (m) scores.push(parseInt(m[1]));
+    });
+    const sorted = [...scores].sort((a,b) => a-b);
+    console.log('Min:', Math.min(...scores));
+    console.log('Max:', Math.max(...scores));
+    console.log('Spread:', Math.max(...scores) - Math.min(...scores));
+    console.log('Unique values:', new Set(scores).size);
+    console.log('All scores:', sorted.join(', '));
+
+CHECK:
+    ✓ Minimum score is between 40-45  (MUST be ~40, not 80+)
+    ✓ Maximum score is between 95-99
+    ✓ Spread is at least 50 points
+    ✓ At least 20 unique score values
+
+IF THE MINIMUM IS STILL ABOVE 70:
+    You did not replace the function, or there is a hardcoded floor, or
+    the function is being called one permit at a time instead of as a batch.
+    Go back to Step 1 and print the code that's actually running.
+
+
+===============================================================================
+WHAT NOT TO DO — MISTAKES FROM V3, V4, V5, AND V6
+===============================================================================
+
+1. DO NOT store users in a JSON file on Render's ephemeral filesystem.
+   Every deploy wipes it. Use PostgreSQL. (Root cause of V3-V6 Fix 1 failures.)
+
+2. DO NOT use file locking (fcntl) for duplicate prevention. (Failed in V4.)
+
+3. DO NOT use a Render persistent disk on the free tier. It's not available.
+   (V6 attempted this — it's a no-op on the free plan.)
+
+4. DO NOT use percentile ranking for lead scoring. (Failed in V4.)
+
+5. DO NOT apply a hardcoded score floor like max(80, score) or max(83, score).
+   (Likely why V5 and V6 still show high minimums.)
+
+6. DO NOT score permits one at a time. The linear spread needs the full batch.
+
+7. DO NOT modify the V7 scoring function. Paste it exactly as written.
+
+8. DO NOT skip verification. Test on the LIVE SITE after deploying.
+
+9. DO NOT touch Fix 3 (Save Search / Export CSV). It works. Leave it alone.
+
+10. DO NOT assume the database migration is done just because you added the
+    code. VERIFY that data persists across deploys.
+
+
+===============================================================================
+EXECUTION ORDER — DO NOT SKIP STEPS
+===============================================================================
+
+PHASE 1: DATABASE MIGRATION (Fix 0)
+  □ Create free PostgreSQL on Render dashboard
+  □ Add DATABASE_URL environment variable to web service
+  □ Add Flask-SQLAlchemy + psycopg2-binary to requirements.txt
+  □ Create User model with unique email constraint
+  □ Replace ALL JSON file read/write with SQLAlchemy queries
+  □ Seed wcrainshaw@gmail.com as Pro user
+  □ Delete users.json and all JSON file I/O code
+  □ DEPLOY
+  □ VERIFY: Create account, deploy again, account still exists
+
+PHASE 2: DUPLICATE EMAIL (Fix 1)
+  □ Add duplicate check BEFORE user creation in signup route
+  □ Add IntegrityError fallback around db.session.commit()
+  □ DEPLOY
+  □ VERIFY: Signup with existing email shows error, stays on signup page
+
+PHASE 3: LEAD SCORING (Fix 2)
+  □ Find and DELETE old scoring function
+  □ Paste V7 calculate_lead_scores function exactly as written
+  □ Update call site to batch-score ALL permits at once
+  □ Remove any hardcoded score floor (max(80,...) etc.)
+  □ DEPLOY
+  □ VERIFY: Min score ~40, max ~99, spread ≥50 points
+
+DO NOT combine phases. Deploy and verify each phase separately.
+
+===============================================================================
+END OF SPEC
+===============================================================================

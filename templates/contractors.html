@@ -539,7 +539,7 @@ tr:hover td {
           <div class="label">Total Permits</div>
         </div>
         <div class="modal-stat">
-          <div class="value" id="modal-value">$0</div>
+          <div class="value" id="modal-value">—</div>
           <div class="label">Total Value</div>
         </div>
         <div class="modal-stat">
@@ -663,7 +663,7 @@ async function showContractor(name) {
     document.getElementById('modal-permits-list').innerHTML = data.permits.slice(0, 20).map(p => `
       <div class="permit-item">
         <div class="address">${escapeHtml(p.address)}</div>
-        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '—'}</div>
+        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '<span style="color: #9ca3af; font-style: italic;">Not listed</span>'}</div>
       </div>
     `).join('') || '<div style="color: var(--gray-400);">No permits found</div>';
 
@@ -724,9 +724,9 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// V12.19: Format large values as $X.XM or $X.XB
+// V12.19: Format large values as $X.XM or $X.XB, show "Not listed" for missing
 function formatValue(value) {
-  if (!value) return '—';
+  if (!value) return '<span style="color: #9ca3af; font-style: italic;">Not listed</span>';
   if (value >= 1000000000) {
     return '$' + (value / 1000000000).toFixed(1) + 'B';
   } else if (value >= 1000000) {

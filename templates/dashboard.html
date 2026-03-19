@@ -502,6 +502,7 @@ body {
 .value-high { color: var(--red); }
 .value-medium { color: var(--accent); }
 .value-low { color: var(--gray-500); }
+.value-not-listed { color: var(--gray-400); font-weight: 400; font-size: 13px; font-style: italic; }
 
 .permit-address {
   font-size: 16px;
@@ -1966,8 +1967,8 @@ function renderPermits() {
     const isLocked = globalIdx >= freePreviewLimit;
     const tradeClass = getTradeClass(p.trade_category);
     const valueClass = p.value_tier === 'high' ? 'value-high' : p.value_tier === 'medium' ? 'value-medium' : 'value-low';
-    // V12.17: Show dash instead of "N/A" for missing values (cleaner display)
-    const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '—';
+    // V12.19: Show "Not listed on permit" for missing values (clearer messaging)
+    const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '<span class="value-not-listed">Not listed</span>';
     const leadScore = p.lead_score || 0;
     const leadQuality = p.lead_quality || 'standard';
     const scoreIcon = leadQuality === 'hot' ? '&#128293;' : leadQuality === 'warm' ? '&#128293;' : '';
@@ -2882,7 +2883,7 @@ async function togglePermitHistory(address, cardId) {
               <div class="date">${p.filing_date || 'N/A'}</div>
               ${p.contractor ? `<div class="contractor">${escapeHtml(p.contractor)}</div>` : ''}
             </div>
-            <div class="value">${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '—'}</div>
+            <div class="value">${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '<span class="value-not-listed">Not listed</span>'}</div>
           </div>
         `).join('')}
         ${history.permits.length > 10 ? `<div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">+ ${history.permits.length - 10} more permits</div>` : ''}

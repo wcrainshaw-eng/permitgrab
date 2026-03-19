@@ -618,7 +618,7 @@ function renderLeadCard(lead) {
   const p = lead.permit || {};
   const score = p.lead_score || 0;
   const quality = p.lead_quality || 'standard';
-  const value = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A';
+  const value = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '<span style="color: #9ca3af; font-style: italic;">Not listed</span>';
   const lifecycleStage = getLifecycleStage(p);
   const lifecyclePill = getLifecyclePillHtml(lifecycleStage);
 
