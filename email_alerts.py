@@ -89,7 +89,8 @@ def build_email_html(subscriber, permits):
 
     # Value summary
     total_value = sum(p.get('estimated_cost', 0) for p in permits)
-    high_value = len([p for p in permits if p.get('value_tier') == 'high'])
+    # V12.17: Use lead_score >= 60 for high-value count consistency
+    high_value = len([p for p in permits if p.get('lead_score', 0) >= 60])
 
     permit_rows = ''
     for p in permits[:20]:  # Limit to 20 per email

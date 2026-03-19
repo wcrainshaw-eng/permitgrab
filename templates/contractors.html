@@ -602,10 +602,10 @@ function renderTable(data) {
     <tr>
       <td><span class="contractor-name" onclick="showContractor('${escapeHtml(c.name)}')">${escapeHtml(c.name)}</span></td>
       <td>${c.total_permits.toLocaleString()}</td>
-      <td class="value-cell">$${c.total_value.toLocaleString()}</td>
+      <td class="value-cell">${c.total_value ? '$' + c.total_value.toLocaleString() : '—'}</td>
       <td class="cities-cell">${c.cities.slice(0, 3).join(', ')}${c.cities.length > 3 ? ` +${c.cities.length - 3}` : ''}</td>
       <td><span class="trade-badge">${escapeHtml(c.primary_trade)}</span></td>
-      <td>${c.most_recent_date || 'N/A'}</td>
+      <td>${c.most_recent_date || '—'}</td>
     </tr>
   `).join('');
 
@@ -644,7 +644,8 @@ async function showContractor(name) {
     const data = await resp.json();
 
     document.getElementById('modal-permits').textContent = data.total_permits.toLocaleString();
-    document.getElementById('modal-value').textContent = '$' + data.total_value.toLocaleString();
+    // V12.17: Show dash instead of $0 for contractors without value data
+    document.getElementById('modal-value').textContent = data.total_value ? '$' + data.total_value.toLocaleString() : '—';
     document.getElementById('modal-cities').textContent = data.cities.length;
 
     // V8: Trade breakdown
@@ -662,7 +663,7 @@ async function showContractor(name) {
     document.getElementById('modal-permits-list').innerHTML = data.permits.slice(0, 20).map(p => `
       <div class="permit-item">
         <div class="address">${escapeHtml(p.address)}</div>
-        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || 'N/A'} | $${(p.estimated_cost || 0).toLocaleString()}</div>
+        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '—'}</div>
       </div>
     `).join('') || '<div style="color: var(--gray-400);">No permits found</div>';
 

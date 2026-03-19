@@ -385,6 +385,26 @@ body {
   margin-right: 8px;
 }
 
+/* V12.17: NEW badge for recent permits */
+.new-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  color: white;
+  margin-right: 8px;
+  animation: pulse-new 2s ease-in-out infinite;
+}
+
+@keyframes pulse-new {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
 /* ABOUT SECTION */
 .about-section {
   background: white;
@@ -744,7 +764,7 @@ body {
     </div>
     <div class="hero-stat">
       <div class="hero-stat-value">{{ high_value_count }}</div>
-      <div class="hero-stat-label">High-Value Leads</div>
+      <div class="hero-stat-label">High-Value Lead{{ 's' if high_value_count != 1 else '' }}</div>
     </div>
     {% else %}
     <div class="hero-stat">
@@ -808,12 +828,13 @@ body {
       <div class="permit-info">
         <h4>
           <span class="permit-trade">{{ permit.trade_category }}</span>
+          {% if permit.is_new %}<span class="new-badge">NEW</span>{% endif %}
           {{ permit.display_address or permit.address }}
         </h4>
         <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; {{ permit.date_label | default('Filed') }}: {{ permit.filing_date }}</p>
       </div>
       <div class="permit-value {{ permit.value_tier }}">
-        {% if permit.estimated_cost %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% else %}N/A{% endif %}
+        {% if permit.estimated_cost %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% else %}—{% endif %}
       </div>
     </div>
     {% endfor %}

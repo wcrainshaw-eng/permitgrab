@@ -479,6 +479,26 @@ body {
   color: var(--gray-500);
 }
 
+/* V12.17: NEW THIS WEEK badge */
+.new-this-week-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  color: white;
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
 .value-high { color: var(--red); }
 .value-medium { color: var(--accent); }
 .value-low { color: var(--gray-500); }
@@ -1350,7 +1370,7 @@ footer a:hover { color: white; }
     </div>
     <div class="stat-item">
       <div class="stat-value" id="stat-high">—</div>
-      <div class="stat-label">High-Value Leads</div>
+      <div class="stat-label" id="stat-high-label">High-Value Leads</div>
     </div>
   </div>
 </section>
@@ -1737,11 +1757,16 @@ async function loadSavedLeads() {
   }
 }
 
+// V12.17: Store true total from API for accurate stats
+let totalPermitCount = 0;
+
 async function loadData() {
   try {
-    const resp = await fetch('/api/permits?per_page=2000');
+    // V12.17: Increase limit to 10000 to load more permits across 146+ cities
+    const resp = await fetch('/api/permits?per_page=10000');
     const data = await resp.json();
     allPermits = data.permits;
+    totalPermitCount = data.total; // True total from API
 
     // V8: Display data freshness
     if (data.last_updated) {
@@ -1830,9 +1855,11 @@ function populateFilters() {
 function updateStats(useFiltered = false) {
   // V8: Stats can reflect filtered data when filters are active
   const permits = useFiltered ? filteredPermits : allPermits;
-  const total = permits.length;
+  // V12.17: Use true total from API when showing all permits, filtered count when filtering
+  const total = useFiltered ? permits.length : (totalPermitCount || permits.length);
   const totalValue = permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
-  const highValue = permits.filter(p => p.lead_score >= 70).length;
+  // V12.17: Lower threshold from 70 to 60 so addressless permits (capped at 65) still count
+  const highValue = permits.filter(p => p.lead_score >= 60).length;
   // V9 Fix 11: Show trade categories instead of metro areas to avoid marketing contradiction
   const uniqueTrades = new Set(permits.map(p => p.trade_category)).size;
 
@@ -1840,6 +1867,8 @@ function updateStats(useFiltered = false) {
   document.getElementById('banner-total').textContent = total.toLocaleString();
   document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
+  // V12.17: Singular/plural grammar
+  document.getElementById('stat-high-label').textContent = highValue === 1 ? 'High-Value Lead' : 'High-Value Leads';
   document.getElementById('stat-trades').textContent = uniqueTrades.toLocaleString();
 }
 
@@ -1937,17 +1966,22 @@ function renderPermits() {
     const isLocked = globalIdx >= freePreviewLimit;
     const tradeClass = getTradeClass(p.trade_category);
     const valueClass = p.value_tier === 'high' ? 'value-high' : p.value_tier === 'medium' ? 'value-medium' : 'value-low';
-    const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A';
+    // V12.17: Show dash instead of "N/A" for missing values (cleaner display)
+    const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '—';
     const leadScore = p.lead_score || 0;
     const leadQuality = p.lead_quality || 'standard';
     const scoreIcon = leadQuality === 'hot' ? '&#128293;' : leadQuality === 'warm' ? '&#128293;' : '';
     const lifecycleStage = getLifecycleStage(p, p.has_violations);
     const lifecyclePill = getLifecyclePillHtml(lifecycleStage);
+    // V12.17: NEW THIS WEEK badge for permits filed in last 7 days
+    const isNewThisWeek = isWithinDays(p.filing_date, 7);
+    const newBadge = isNewThisWeek ? '<span class="new-this-week-badge">NEW</span>' : '';
 
     return `
       <div class="permit-card ${isLocked ? 'locked' : ''}">
         <div class="permit-card-header">
           <span class="permit-trade ${tradeClass}">${getTradeIcon(p.trade_category)} ${p.trade_category}</span>
+          ${newBadge}
           ${lifecyclePill}
           <span class="lead-score-badge ${leadQuality}">${scoreIcon} ${leadScore} pts</span>
           <span class="permit-value ${valueClass}">${cost}</span>
@@ -2016,12 +2050,14 @@ function renderPermits() {
           </div>
         </div>
         <div class="permit-contact">
-          <span class="contact-btn primary" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="window.location.href='/pricing'">&#128274; Unlock Contact Info</span>
-          <span class="contact-btn" style="color: var(--gray-400); cursor: default;" title="Sign up to save leads">Save Lead</span>
+          <span class="contact-btn primary" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="window.location.href='${currentUser ? '/pricing' : '/signup'}'">&#128274; ${currentUser ? 'Unlock Contact Info' : 'Sign Up Free'}</span>
+          <span class="contact-btn" style="color: var(--gray-400); cursor: default;" title="${currentUser ? 'Pro feature' : 'Sign up to save leads'}">Save Lead</span>
           <span class="contact-btn" style="color: var(--gray-400); cursor: default;" title="Pro feature">Export</span>
         </div>
         <div class="lock-overlay">
-          <a href="/pricing">Upgrade for contact details →</a>
+          ${currentUser
+            ? '<a href="/pricing">Upgrade to Pro for full contact info →</a>'
+            : '<a href="/signup">Sign up free to see contacts →</a>'}
         </div>`}
       </div>
     `;
@@ -2178,6 +2214,16 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// V12.17: Check if a date is within the last N days
+function isWithinDays(dateStr, days) {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= days;
 }
 
 // ===========================
@@ -2836,7 +2882,7 @@ async function togglePermitHistory(address, cardId) {
               <div class="date">${p.filing_date || 'N/A'}</div>
               ${p.contractor ? `<div class="contractor">${escapeHtml(p.contractor)}</div>` : ''}
             </div>
-            <div class="value">${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : 'N/A'}</div>
+            <div class="value">${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '—'}</div>
           </div>
         `).join('')}
         ${history.permits.length > 10 ? `<div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">+ ${history.permits.length - 10} more permits</div>` : ''}

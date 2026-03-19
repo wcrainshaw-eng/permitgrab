@@ -22,8 +22,16 @@ from lifecycle import get_lifecycle_label
 from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_slugs
 import analytics
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+# V12.17: static_url_path='' serves static files from root (needed for GSC verification)
+app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
+
+# V12.17: Google Search Console verification - MUST be registered first before any catch-alls
+@app.route('/google3ef154d70f8049a0.html')
+def google_verification():
+    return Response('google-site-verification: google3ef154d70f8049a0.html', mimetype='text/html')
+
 
 # ===========================
 # DATABASE SETUP (V7)
@@ -1151,7 +1159,8 @@ def api_stats():
     return jsonify({
         'total_permits': len(permits),
         'total_value': sum(p.get('estimated_cost', 0) for p in permits),
-        'high_value_count': len([p for p in permits if p.get('value_tier') == 'high']),
+        # V12.17: Use lead_score >= 60 instead of value_tier to match dashboard JS
+        'high_value_count': len([p for p in permits if p.get('lead_score', 0) >= 60]),
         'cities': len(set(p.get('city') for p in permits)),
         'trade_breakdown': stats.get('trade_breakdown', {}),
         'value_breakdown': stats.get('value_breakdown', {}),
@@ -4116,7 +4125,8 @@ def city_landing(city_slug):
     # Calculate stats
     permit_count = len(city_permits)
     total_value = sum(p.get('estimated_cost', 0) for p in city_permits)
-    high_value_count = len([p for p in city_permits if p.get('value_tier') == 'high'])
+    # V12.17: Use lead_score >= 60 instead of value_tier for consistency
+    high_value_count = len([p for p in city_permits if p.get('lead_score', 0) >= 60])
 
     # V12.5: noindex for empty city pages to avoid thin content in Google
     robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
@@ -4132,6 +4142,19 @@ def city_landing(city_slug):
 
     # Sort permits by value for preview
     sorted_permits = sorted(city_permits, key=lambda x: x.get('estimated_cost', 0), reverse=True)
+
+    # V12.17: Add "is_new" flag for permits filed in last 7 days
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    for p in sorted_permits:
+        filing_date_str = p.get('filing_date', '')
+        if filing_date_str:
+            try:
+                filing_date = datetime.strptime(filing_date_str, '%Y-%m-%d')
+                p['is_new'] = filing_date >= seven_days_ago
+            except (ValueError, TypeError):
+                p['is_new'] = False
+        else:
+            p['is_new'] = False
 
     # V12.9: Calculate alternative stats for cities without value data
     new_this_month = permit_count  # Fallback to total count
@@ -4159,15 +4182,16 @@ def city_landing(city_slug):
         new_this_month = len(recent_permits) if recent_permits else permit_count
         unique_contractors = len(contractors_set) if contractors_set else '50+'
 
-    # Other cities for footer links
-    other_cities = [c for c in ALL_CITIES if c['slug'] != city_slug]
+    # V12.17: Other cities for footer links - sorted by permit volume
+    cities_by_volume = get_cities_with_data()  # Pre-sorted by permit count descending
+    other_cities = [c for c in cities_by_volume if c['slug'] != city_slug]
 
-    # V12.11: Nearby cities (same state) for internal linking
+    # V12.17: Nearby cities sorted by permit volume (not alphabetical)
     current_state = config.get('state', '')
-    nearby_cities = [c for c in ALL_CITIES if c.get('state') == current_state and c['slug'] != city_slug]
-    # If fewer than 6 same-state cities, add some from other states
+    nearby_cities = [c for c in cities_by_volume if c.get('state') == current_state and c['slug'] != city_slug]
+    # If fewer than 6 same-state cities, add top cities from other states
     if len(nearby_cities) < 6:
-        other_state_cities = [c for c in ALL_CITIES if c.get('state') != current_state][:6 - len(nearby_cities)]
+        other_state_cities = [c for c in cities_by_volume if c.get('state') != current_state][:6 - len(nearby_cities)]
         nearby_cities = nearby_cities + other_state_cities
 
     return render_template(
