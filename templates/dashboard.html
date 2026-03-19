@@ -1858,8 +1858,8 @@ function updateStats(useFiltered = false) {
   // V12.17: Use true total from API when showing all permits, filtered count when filtering
   const total = useFiltered ? permits.length : (totalPermitCount || permits.length);
   const totalValue = permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
-  // V12.17: Lower threshold from 70 to 60 so addressless permits (capped at 65) still count
-  const highValue = permits.filter(p => p.lead_score >= 60).length;
+  // V12.18: High-value = $100K+ projects (more meaningful to contractors than lead score)
+  const highValue = permits.filter(p => (p.estimated_cost || 0) >= 100000).length;
   // V9 Fix 11: Show trade categories instead of metro areas to avoid marketing contradiction
   const uniqueTrades = new Set(permits.map(p => p.trade_category)).size;
 

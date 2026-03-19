@@ -1004,6 +1004,18 @@ def _collect_all_inner(days_back=30):
     print(f"  Standard (<$10K): {value_counts['low']}")
     print(f"\nData saved to: {output_file}")
 
+    # V12.18: Hot-reload data in the running server without restart
+    # Since collector runs in the same process via APScheduler, we can
+    # directly call the server's reload function to refresh in-memory data
+    try:
+        from server import preload_data_from_disk
+        preload_data_from_disk()
+        print(f"[V12.18] Hot-reloaded {len(all_permits)} permits into server memory")
+    except ImportError as e:
+        print(f"[V12.18] Could not hot-reload server data: {e}")
+    except Exception as e:
+        print(f"[V12.18] Hot-reload error: {e}")
+
     return all_permits, collection_stats
 
 

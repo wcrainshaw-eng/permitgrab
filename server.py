@@ -1159,8 +1159,8 @@ def api_stats():
     return jsonify({
         'total_permits': len(permits),
         'total_value': sum(p.get('estimated_cost', 0) for p in permits),
-        # V12.17: Use lead_score >= 60 instead of value_tier to match dashboard JS
-        'high_value_count': len([p for p in permits if p.get('lead_score', 0) >= 60]),
+        # V12.18: High-value = $100K+ projects (more meaningful to contractors than lead score)
+        'high_value_count': len([p for p in permits if p.get('estimated_cost', 0) >= 100000]),
         'cities': len(set(p.get('city') for p in permits)),
         'trade_breakdown': stats.get('trade_breakdown', {}),
         'value_breakdown': stats.get('value_breakdown', {}),
@@ -4125,8 +4125,8 @@ def city_landing(city_slug):
     # Calculate stats
     permit_count = len(city_permits)
     total_value = sum(p.get('estimated_cost', 0) for p in city_permits)
-    # V12.17: Use lead_score >= 60 instead of value_tier for consistency
-    high_value_count = len([p for p in city_permits if p.get('lead_score', 0) >= 60])
+    # V12.18: High-value = $100K+ projects (more meaningful to contractors)
+    high_value_count = len([p for p in city_permits if p.get('estimated_cost', 0) >= 100000])
 
     # V12.5: noindex for empty city pages to avoid thin content in Google
     robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
