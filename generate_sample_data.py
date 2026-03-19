@@ -299,10 +299,20 @@ def generate_permits(count=2000):
 
 def save_data(permits):
     """Save generated data and compute stats."""
-    # Save permits
+    import tempfile
+    # Save permits (atomic write for safety)
     output_file = os.path.join(DATA_DIR, "permits.json")
-    with open(output_file, "w") as f:
-        json.dump(permits, f, indent=2)
+    fd, temp_path = tempfile.mkstemp(suffix='.tmp', dir=DATA_DIR)
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(permits, f, indent=2)
+        os.rename(temp_path, output_file)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
 
     # Compute stats
     trade_counts = {}

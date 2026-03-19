@@ -575,12 +575,8 @@ def load_permits():
         try:
             with open(path) as f:
                 permits = json.load(f, strict=False)
-            # V12.1: Re-write clean version (json.dump strips control chars from output)
-            try:
-                with open(path, 'w') as fw:
-                    json.dump(permits, fw, indent=2, default=str)
-            except Exception:
-                pass  # Don't crash if re-write fails
+            # V12.19: REMOVED re-write on load - this caused race conditions with collector
+            # The collector already writes clean JSON via atomic_write_json()
             # Re-classify trades and generate descriptions on load
             for permit in permits:
                 try:
