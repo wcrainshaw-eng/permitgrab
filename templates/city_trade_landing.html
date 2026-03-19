@@ -208,7 +208,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <td title="{{ permit.date_label | default('Filed') }}">{{ permit.filing_date[:10] if permit.filing_date else 'N/A' }}</td>
           <td>{{ permit.display_address or permit.address }}</td>
           <td>{{ permit.description[:50] }}{% if permit.description and permit.description|length > 50 %}...{% endif %}</td>
-          <td><span class="value-badge">{% if permit.estimated_cost %}${{ permit.estimated_cost | int | format(',') }}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 12px;">Not listed</span>{% endif %}</span></td>
+          <td><span class="value-badge">{% if permit.estimated_cost %}{% if permit.estimated_cost >= 1000000 %}${{ "%.1f" | format(permit.estimated_cost / 1000000) }}M{% else %}${{ permit.estimated_cost | int | format(',') }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 12px;">Not listed on permit</span>{% endif %}</span></td>
           <td>{{ permit.status or 'Filed' }}</td>
         </tr>
         {% endfor %}
@@ -217,7 +217,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <td title="{{ permit.date_label | default('Filed') }}">{{ permit.filing_date[:10] if permit.filing_date else 'N/A' }}</td>
           <td>{{ permit.display_address or permit.address }}</td>
           <td>{{ permit.description[:50] if permit.description else '' }}</td>
-          <td><span class="value-badge">{% if permit.estimated_cost %}${{ permit.estimated_cost | int | format(',') }}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 12px;">Not listed</span>{% endif %}</span></td>
+          <td><span class="value-badge">{% if permit.estimated_cost %}{% if permit.estimated_cost >= 1000000 %}${{ "%.1f" | format(permit.estimated_cost / 1000000) }}M{% else %}${{ permit.estimated_cost | int | format(',') }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 12px;">Not listed on permit</span>{% endif %}</span></td>
           <td>{{ permit.status or 'Filed' }}</td>
         </tr>
         {% endfor %}

@@ -396,6 +396,11 @@ def normalize_permit(raw_record, city_key):
     except (ValueError, TypeError):
         cost = 0
 
+    # V12.21: Sanity check - cap outlier values at $50M (likely data entry errors)
+    MAX_REASONABLE_COST = 50_000_000  # $50M
+    if cost > MAX_REASONABLE_COST:
+        cost = MAX_REASONABLE_COST
+
     # Parse date
     date_str = get_field("filing_date")
     parsed_date = ""

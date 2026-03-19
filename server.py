@@ -420,12 +420,13 @@ def add_lead_scores(permits):
     for i, p in enumerate(permits):
         score = scores[i] if i < len(scores) else 70
 
-        # V12.15: Hard cap for permits without addresses
-        # These are low-quality leads that shouldn't appear at top of "Best Leads"
+        # V12.21: Address quality penalty (replaces hard cap that clustered 95% at 65)
+        # Use a percentage reduction to maintain differentiation between permits
         address = p.get('address', '') or ''
         address_clean = address.strip().lower()
         if not address_clean or address_clean in ['not provided', 'address not provided', 'n/a', 'none', '', 'location']:
-            score = min(score, 65)  # Cap at 65 regardless of linear spread
+            # Reduce score by 25% for missing address (maintains relative ordering)
+            score = max(40, round(score * 0.75))
 
         p['lead_score'] = score
 
@@ -657,6 +658,9 @@ def load_permits():
                     validate_permit_dates(permit)  # V12.9: Fix future-dated permits
                     format_permit_address(permit)  # V12.11: Fix county address display
                     permit['display_description'] = generate_permit_description(permit)
+                    # V12.21: Sanity check - cap outlier values at $50M (likely data entry errors)
+                    if permit.get('estimated_cost', 0) > 50_000_000:
+                        permit['estimated_cost'] = 50_000_000
                 except Exception as e:
                     print(f"[Server] Warning: Failed to process permit: {e}")
                     continue

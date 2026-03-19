@@ -1856,8 +1856,16 @@ function populateFilters() {
 function updateStats(useFiltered = false) {
   // V8: Stats can reflect filtered data when filters are active
   const permits = useFiltered ? filteredPermits : allPermits;
-  // V12.17: Use true total from API when showing all permits, filtered count when filtering
-  const total = useFiltered ? permits.length : (totalPermitCount || permits.length);
+  // V12.21: Check if ANY filter is actually active
+  const city = document.getElementById('filter-city')?.value || '';
+  const trade = document.getElementById('filter-trade')?.value || '';
+  const value = document.getElementById('filter-value')?.value || '';
+  const status = document.getElementById('filter-status')?.value || '';
+  const quality = document.getElementById('filter-quality')?.value || '';
+  const search = document.getElementById('filter-search')?.value || '';
+  const filtersActive = city || trade || value || status || quality || search;
+  // V12.21: Use true total from API unless filters are actually applied
+  const total = (useFiltered && filtersActive) ? permits.length : (totalPermitCount || permits.length);
   const totalValue = permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
   // V12.18: High-value = $100K+ projects (more meaningful to contractors than lead score)
   const highValue = permits.filter(p => (p.estimated_cost || 0) >= 100000).length;
@@ -1866,7 +1874,10 @@ function updateStats(useFiltered = false) {
 
   document.getElementById('stat-total').textContent = total.toLocaleString();
   document.getElementById('banner-total').textContent = total.toLocaleString();
-  document.getElementById('stat-value').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
+  // V12.20: Format as billions if >= $1B, otherwise millions
+  document.getElementById('stat-value').textContent = totalValue >= 1000000000
+    ? '$' + (totalValue / 1000000000).toFixed(1) + 'B'
+    : '$' + (totalValue / 1000000).toFixed(0) + 'M';
   document.getElementById('stat-high').textContent = highValue.toLocaleString();
   // V12.17: Singular/plural grammar
   document.getElementById('stat-high-label').textContent = highValue === 1 ? 'High-Value Lead' : 'High-Value Leads';
@@ -1967,8 +1978,14 @@ function renderPermits() {
     const isLocked = globalIdx >= freePreviewLimit;
     const tradeClass = getTradeClass(p.trade_category);
     const valueClass = p.value_tier === 'high' ? 'value-high' : p.value_tier === 'medium' ? 'value-medium' : 'value-low';
-    // V12.19: Show "Not listed on permit" for missing values (clearer messaging)
-    const cost = p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '<span class="value-not-listed">Not listed</span>';
+    // V12.20: Format values with abbreviations, show "Not listed on permit" for missing
+    const cost = p.estimated_cost
+      ? (p.estimated_cost >= 1000000000
+          ? '$' + (p.estimated_cost / 1000000000).toFixed(1) + 'B'
+          : p.estimated_cost >= 1000000
+            ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M'
+            : '$' + p.estimated_cost.toLocaleString())
+      : '<span class="value-not-listed">Not listed on permit</span>';
     const leadScore = p.lead_score || 0;
     const leadQuality = p.lead_quality || 'standard';
     const scoreIcon = leadQuality === 'hot' ? '&#128293;' : leadQuality === 'warm' ? '&#128293;' : '';
@@ -2796,7 +2813,7 @@ function renderMarketLeaders(contractors, cityLabel) {
           <div style="font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(c.name)}</div>
           <div style="font-size: 11px; color: var(--gray-500);">${c.permits} permits</div>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--green);">$${(c.value / 1000).toFixed(0)}K</div>
+        <div style="font-size: 13px; font-weight: 600; color: ${c.value ? 'var(--green)' : 'var(--gray-400)'};">${c.value ? (c.value >= 1000000000 ? '$' + (c.value / 1000000000).toFixed(1) + 'B' : c.value >= 1000000 ? '$' + (c.value / 1000000).toFixed(1) + 'M' : '$' + (c.value / 1000).toFixed(0) + 'K') : '<span style="font-style: italic; font-weight: 400;">Not listed</span>'}</div>
       </div>
     `).join('')}
   `;
@@ -2883,7 +2900,9 @@ async function togglePermitHistory(address, cardId) {
               <div class="date">${p.filing_date || 'N/A'}</div>
               ${p.contractor ? `<div class="contractor">${escapeHtml(p.contractor)}</div>` : ''}
             </div>
-            <div class="value">${p.estimated_cost ? '$' + p.estimated_cost.toLocaleString() : '<span class="value-not-listed">Not listed</span>'}</div>
+            <div class="value">${p.estimated_cost
+              ? (p.estimated_cost >= 1000000 ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M' : '$' + p.estimated_cost.toLocaleString())
+              : '<span class="value-not-listed">Not listed on permit</span>'}</div>
           </div>
         `).join('')}
         ${history.permits.length > 10 ? `<div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">+ ${history.permits.length - 10} more permits</div>` : ''}
