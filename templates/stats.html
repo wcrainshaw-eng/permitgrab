@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building Permit Statistics 2026 | PermitGrab</title>
+<meta name="description" content="Real-time building permit statistics across {{ city_count }}+ US cities. {{ "{:,}".format(total_permits) }} active permits worth ${{ "%.1f" | format(total_value / 1000000000) }}B tracked daily.">
+<link rel="canonical" href="https://permitgrab.com/stats">
+<meta property="og:title" content="Building Permit Statistics 2026 | PermitGrab">
+<meta property="og:description" content="Live construction permit data from {{ city_count }}+ cities. Updated daily from official sources.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://permitgrab.com/stats">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+<!-- V12.23 SEO: Statistics page structured data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  "name": "US Building Permit Data",
+  "description": "Real-time building permit data across {{ city_count }}+ US cities",
+  "url": "https://permitgrab.com/stats",
+  "creator": {
+    "@type": "Organization",
+    "name": "PermitGrab"
+  },
+  "dateModified": "{{ last_updated }}",
+  "temporalCoverage": "2024/2026"
+}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --green: #16a34a;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+
+/* HERO */
+.stats-hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #374151 100%);
+  color: white;
+  padding: 60px 32px;
+  text-align: center;
+}
+.stats-hero h1 {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.stats-hero p {
+  font-size: 18px;
+  color: rgba(255,255,255,.8);
+  max-width: 600px;
+  margin: 0 auto 32px;
+}
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  color: rgba(255,255,255,.9);
+}
+.trust-badge svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* BIG STATS */
+.big-stats {
+  display: flex;
+  justify-content: center;
+  gap: 60px;
+  padding: 60px 32px;
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  flex-wrap: wrap;
+}
+.big-stat {
+  text-align: center;
+}
+.big-stat-value {
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+.big-stat-label {
+  font-size: 14px;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 8px;
+}
+
+/* SECTIONS */
+.stats-section {
+  padding: 60px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.stats-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 32px;
+}
+
+/* TOP CITIES TABLE */
+.stats-table {
+  width: 100%;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+}
+.stats-table th {
+  background: var(--gray-100);
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 14px;
+}
+.stats-table td {
+  padding: 16px;
+  border-top: 1px solid var(--gray-200);
+}
+.stats-table tr:hover {
+  background: var(--gray-50);
+}
+.city-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.city-link:hover {
+  text-decoration: underline;
+}
+
+/* TRADE BREAKDOWN */
+.trade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.trade-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  border: 1px solid var(--gray-200);
+}
+.trade-card-name {
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.trade-card-count {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.trade-card-pct {
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+/* CTA */
+.cta-section {
+  background: var(--primary);
+  padding: 60px 32px;
+  text-align: center;
+  color: white;
+}
+.cta-section h2 {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.cta-section p {
+  font-size: 18px;
+  opacity: .9;
+  margin-bottom: 24px;
+}
+.cta-btn {
+  display: inline-block;
+  background: white;
+  color: var(--primary);
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all .2s;
+}
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+
+@media (max-width: 768px) {
+  .stats-hero h1 { font-size: 32px; }
+  .big-stats { flex-direction: column; gap: 32px; }
+  .big-stat-value { font-size: 42px; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<section class="stats-hero">
+  <h1>Building Permit Statistics</h1>
+  <p>Real-time construction permit data across the United States. Updated daily from official municipal sources.</p>
+  <div class="trust-badge">
+    <svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+    Data updated daily from official sources
+  </div>
+</section>
+
+<section class="big-stats">
+  <div class="big-stat">
+    <div class="big-stat-value">{{ "{:,}".format(total_permits) }}</div>
+    <div class="big-stat-label">Active Permits</div>
+  </div>
+  <div class="big-stat">
+    <div class="big-stat-value">{{ city_count }}+</div>
+    <div class="big-stat-label">Cities Tracked</div>
+  </div>
+  <div class="big-stat">
+    <div class="big-stat-value">${{ "%.1f" | format(total_value / 1000000000) }}B</div>
+    <div class="big-stat-label">Total Project Value</div>
+  </div>
+  <div class="big-stat">
+    <div class="big-stat-value">{{ high_value_count | default(0) }}</div>
+    <div class="big-stat-label">High-Value Projects ($100K+)</div>
+  </div>
+</section>
+
+<section class="stats-section">
+  <h2>Top 10 Cities by Permit Volume</h2>
+  <table class="stats-table">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>City</th>
+        <th>Active Permits</th>
+        <th>Total Value</th>
+        <th>Avg. Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for city in top_cities %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><a href="/permits/{{ city.slug }}" class="city-link">{{ city.name }}, {{ city.state }}</a></td>
+        <td>{{ "{:,}".format(city.permit_count) }}</td>
+        <td>{% if city.total_value >= 1000000 %}${{ "%.1f" | format(city.total_value / 1000000) }}M{% else %}${{ "{:,}".format(city.total_value | int) }}{% endif %}</td>
+        <td>{% if city.avg_value %}${{ "{:,}".format(city.avg_value | int) }}{% else %}-{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="stats-section" style="background: var(--gray-100); max-width: 100%; padding-left: calc((100% - 1200px) / 2 + 32px); padding-right: calc((100% - 1200px) / 2 + 32px);">
+  <h2>Permits by Trade Category</h2>
+  <div class="trade-grid">
+    {% for trade in trade_breakdown %}
+    <div class="trade-card">
+      <div class="trade-card-name">{{ trade.name }}</div>
+      <div class="trade-card-count">{{ "{:,}".format(trade.count) }}</div>
+      <div class="trade-card-pct">{{ "%.1f" | format(trade.percentage) }}% of permits</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="cta-section">
+  <h2>Access Full Permit Data</h2>
+  <p>Get daily alerts, contractor contacts, and detailed permit analytics.</p>
+  <a href="/pricing" class="cta-btn">View Plans</a>
+</section>
+
+{% include 'partials/footer.html' %}
+
+</body>
+</html>

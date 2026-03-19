@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ state_name }} Building Permits & Contractor Leads | PermitGrab</title>
+<meta name="description" content="Track building permits across {{ cities | length }} {{ state_name }} cities. Real-time construction permit data for contractors.">
+<link rel="canonical" href="https://permitgrab.com/permits/{{ state_slug }}">
+<meta property="og:title" content="{{ state_name }} Building Permits | PermitGrab">
+<meta property="og:description" content="Browse {{ total_permits | default(0) | int }} active building permits across {{ cities | length }} {{ state_name }} cities.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://permitgrab.com/permits/{{ state_slug }}">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+<!-- V12.23 SEO: State page structured data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "{{ state_name }} Building Permits",
+  "description": "Track building permits across {{ cities | length }} {{ state_name }} cities",
+  "url": "https://permitgrab.com/permits/{{ state_slug }}",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
+  }
+}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --green: #16a34a;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+
+/* HERO */
+.state-hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #374151 100%);
+  color: white;
+  padding: 60px 32px;
+}
+.state-hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.breadcrumb {
+  font-size: 14px;
+  color: rgba(255,255,255,.6);
+  margin-bottom: 16px;
+}
+.breadcrumb a {
+  color: rgba(255,255,255,.6);
+  text-decoration: none;
+}
+.breadcrumb a:hover {
+  color: white;
+}
+.state-hero h1 {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.state-hero p {
+  font-size: 18px;
+  color: rgba(255,255,255,.8);
+  max-width: 600px;
+}
+.hero-stats {
+  display: flex;
+  gap: 48px;
+  margin-top: 32px;
+}
+.hero-stat {
+  text-align: center;
+}
+.hero-stat-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.hero-stat-label {
+  font-size: 14px;
+  color: rgba(255,255,255,.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* CITIES GRID */
+.cities-section {
+  padding: 60px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.cities-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 32px;
+}
+.cities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+.city-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--gray-200);
+  text-decoration: none;
+  color: inherit;
+  transition: all .2s;
+}
+.city-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0,0,0,.1);
+  border-color: var(--primary);
+}
+.city-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.city-card-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: var(--gray-500);
+}
+.city-card-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.city-card-stat strong {
+  color: var(--gray-700);
+}
+
+/* MARKET OVERVIEW */
+.overview-section {
+  background: white;
+  padding: 60px 32px;
+  border-top: 1px solid var(--gray-200);
+}
+.overview-inner {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.overview-inner h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 24px;
+}
+.overview-inner p {
+  font-size: 16px;
+  color: var(--gray-600);
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+/* CTA */
+.cta-section {
+  background: var(--primary);
+  padding: 60px 32px;
+  text-align: center;
+  color: white;
+}
+.cta-section h2 {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.cta-section p {
+  font-size: 18px;
+  opacity: .9;
+  margin-bottom: 24px;
+}
+.cta-btn {
+  display: inline-block;
+  background: white;
+  color: var(--primary);
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all .2s;
+}
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+
+@media (max-width: 768px) {
+  .state-hero h1 { font-size: 32px; }
+  .hero-stats { flex-wrap: wrap; gap: 24px; }
+  .cities-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<section class="state-hero">
+  <div class="state-hero-inner">
+    <div class="breadcrumb">
+      <a href="/">Home</a> &rarr; <span>{{ state_name }}</span>
+    </div>
+    <h1>Building Permits in {{ state_name }}</h1>
+    <p>Track construction activity across {{ cities | length }} {{ state_name }} cities. Get real-time permit data and contractor leads.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-value">{{ cities | length }}</div>
+        <div class="hero-stat-label">Cities Covered</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">{{ "{:,}".format(total_permits | default(0) | int) }}</div>
+        <div class="hero-stat-label">Active Permits</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">${{ "%.1f" | format((total_value | default(0)) / 1000000000) }}B</div>
+        <div class="hero-stat-label">Total Value</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cities-section">
+  <h2>{{ state_name }} Cities</h2>
+  <div class="cities-grid">
+    {% for city in cities %}
+    <a href="/permits/{{ city.slug }}" class="city-card">
+      <h3>{{ city.name }}</h3>
+      <div class="city-card-stats">
+        <div class="city-card-stat"><strong>{{ city.permit_count | default(0) }}</strong> permits</div>
+        {% if city.total_value and city.total_value > 0 %}
+        <div class="city-card-stat"><strong>${{ "%.1f" | format(city.total_value / 1000000) }}M</strong> value</div>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="overview-section">
+  <div class="overview-inner">
+    <h2>{{ state_name }} Construction Market</h2>
+    <p>{{ state_name }} has one of the most active construction markets in the United States. With {{ cities | length }} cities actively issuing building permits, contractors have abundant opportunities to connect with new projects.</p>
+    <p>PermitGrab tracks permits daily from official municipal sources across {{ state_name }}, giving you early visibility into new construction activity. Whether you're looking for residential renovations, commercial buildouts, or major developments, our platform helps you find leads before your competition.</p>
+    <p>Browse the cities above to explore specific markets, or <a href="/signup" style="color: var(--primary);">sign up for Pro</a> to get daily email alerts and full contact information for permit holders.</p>
+  </div>
+</section>
+
+<section class="cta-section">
+  <h2>Get {{ state_name }} Permit Alerts</h2>
+  <p>Be the first to know about new construction projects in {{ state_name }}.</p>
+  <a href="/get-alerts" class="cta-btn">Set Up Free Alerts</a>
+</section>
+
+{% include 'partials/footer.html' %}
+
+</body>
+</html>

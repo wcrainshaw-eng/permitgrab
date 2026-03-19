@@ -17,6 +17,71 @@
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 {% include 'partials/analytics.html' %}
+<!-- V12.23 SEO: FAQ structured data for rich snippets -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's included in the free plan?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The free plan lets you browse all building permits, filter by city, trade, and value, and see permit details and project values. Contact information is available with the Professional plan."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I cancel anytime?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, you can cancel your subscription anytime from your account settings. No contracts, no hidden fees. Your access continues until the end of your billing period."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How fresh is the permit data?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Our permit data is updated daily from official municipal sources. We pull directly from city and county building department APIs to ensure you're seeing the latest permits."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What cities do you cover?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We currently cover 140+ metro areas including New York City, Los Angeles, Chicago, Austin, Seattle, and more. We add new cities regularly based on customer demand."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do you offer team pricing?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes! Contact us at support@permitgrab.com for team and enterprise pricing options."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a free trial?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes! Start with a 14-day free trial of Professional. No credit card required to get started. Cancel anytime if it's not the right fit."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I export leads?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, CSV export is included with the Professional plan. Download all matching permits as a spreadsheet with full contact details, perfect for importing into your CRM or sharing with your team."
+      }
+    }
+  ]
+}
+</script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {

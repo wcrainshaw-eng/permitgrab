@@ -2277,6 +2277,61 @@ def about_page():
     return render_template('about.html', footer_cities=footer_cities)
 
 
+@app.route('/stats')
+def stats_page():
+    """V12.23 SEO: Render building permit statistics page."""
+    permits = load_permits()
+    footer_cities = get_cities_with_data()
+
+    # Calculate totals
+    total_permits = len(permits)
+    total_value = sum(p.get('estimated_cost', 0) or 0 for p in permits)
+    high_value_count = sum(1 for p in permits if (p.get('estimated_cost', 0) or 0) >= 100000)
+
+    # Top cities by permit count
+    city_stats = {}
+    for p in permits:
+        city_name = p.get('city', '')
+        if city_name:
+            if city_name not in city_stats:
+                city_stats[city_name] = {
+                    'name': city_name,
+                    'state': p.get('state', ''),
+                    'slug': p.get('city', '').lower().replace(' ', '-'),
+                    'permit_count': 0,
+                    'total_value': 0,
+                }
+            city_stats[city_name]['permit_count'] += 1
+            city_stats[city_name]['total_value'] += p.get('estimated_cost', 0) or 0
+
+    # Calculate averages and sort
+    for city in city_stats.values():
+        city['avg_value'] = city['total_value'] / city['permit_count'] if city['permit_count'] > 0 else 0
+
+    top_cities = sorted(city_stats.values(), key=lambda x: x['permit_count'], reverse=True)[:10]
+
+    # Trade breakdown
+    trade_counts = {}
+    for p in permits:
+        trade = p.get('trade_category', 'Other')
+        trade_counts[trade] = trade_counts.get(trade, 0) + 1
+
+    trade_breakdown = [
+        {'name': trade, 'count': count, 'percentage': (count / total_permits * 100) if total_permits > 0 else 0}
+        for trade, count in sorted(trade_counts.items(), key=lambda x: -x[1])
+    ]
+
+    return render_template('stats.html',
+                           total_permits=total_permits,
+                           total_value=total_value,
+                           high_value_count=high_value_count,
+                           city_count=len(footer_cities),
+                           top_cities=top_cities,
+                           trade_breakdown=trade_breakdown,
+                           last_updated=datetime.now().strftime('%Y-%m-%d'),
+                           footer_cities=footer_cities)
+
+
 @app.route('/contact')
 def contact_page():
     """Render the Contact page."""
@@ -4169,9 +4224,85 @@ def get_all_cities_list():
 
 ALL_CITIES = get_all_cities_list()
 
+# V12.23 SEO: State hub pages
+STATE_CONFIG = {
+    'texas': {'name': 'Texas', 'abbrev': 'TX'},
+    'california': {'name': 'California', 'abbrev': 'CA'},
+    'maryland': {'name': 'Maryland', 'abbrev': 'MD'},
+    'colorado': {'name': 'Colorado', 'abbrev': 'CO'},
+    'florida': {'name': 'Florida', 'abbrev': 'FL'},
+    'louisiana': {'name': 'Louisiana', 'abbrev': 'LA'},
+    'new-york': {'name': 'New York', 'abbrev': 'NY'},
+    'illinois': {'name': 'Illinois', 'abbrev': 'IL'},
+    'ohio': {'name': 'Ohio', 'abbrev': 'OH'},
+    'washington': {'name': 'Washington', 'abbrev': 'WA'},
+}
 
-@app.route('/permits/<city_slug>')
-def city_landing(city_slug):
+
+def get_state_data(state_slug):
+    """Get aggregated data for a state hub page."""
+    if state_slug not in STATE_CONFIG:
+        return None
+
+    state_info = STATE_CONFIG[state_slug]
+    state_abbrev = state_info['abbrev']
+    permits = load_permits()
+
+    # Get all cities in this state
+    all_cities_info = get_all_cities_info()
+    state_cities = [c for c in all_cities_info if c.get('state') == state_abbrev]
+
+    # Count permits per city
+    city_permit_counts = {}
+    city_values = {}
+    for p in permits:
+        city_name = p.get('city', '')
+        if p.get('state') == state_abbrev and city_name:
+            city_permit_counts[city_name] = city_permit_counts.get(city_name, 0) + 1
+            city_values[city_name] = city_values.get(city_name, 0) + (p.get('estimated_cost', 0) or 0)
+
+    # Add counts to city info
+    cities_with_data = []
+    for c in state_cities:
+        city_data = c.copy()
+        city_data['permit_count'] = city_permit_counts.get(c['name'], 0)
+        city_data['total_value'] = city_values.get(c['name'], 0)
+        if city_data['permit_count'] > 0:
+            cities_with_data.append(city_data)
+
+    # Sort by permit count
+    cities_with_data.sort(key=lambda x: x['permit_count'], reverse=True)
+
+    # Calculate totals
+    total_permits = sum(city_permit_counts.values())
+    total_value = sum(city_values.values())
+
+    return {
+        'state_name': state_info['name'],
+        'state_slug': state_slug,
+        'cities': cities_with_data,
+        'total_permits': total_permits,
+        'total_value': total_value,
+    }
+
+
+@app.route('/permits/<state_slug>')
+def state_or_city_landing(state_slug):
+    """Route that handles both state hub pages and city landing pages."""
+    # Check if it's a state slug first
+    if state_slug in STATE_CONFIG:
+        state_data = get_state_data(state_slug)
+        if state_data and state_data['cities']:
+            footer_cities = get_cities_with_data()
+            return render_template('state_landing.html',
+                                   footer_cities=footer_cities,
+                                   **state_data)
+
+    # Otherwise, fall through to city landing page logic
+    return city_landing_inner(state_slug)
+
+
+def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
     # Check for SEO config, or create fallback from city_configs
     if city_slug in CITY_SEO_CONFIG:
@@ -4399,13 +4530,21 @@ def sitemap():
         {'loc': f"{SITE_URL}/contractors", 'changefreq': 'daily', 'priority': '0.8'},
         {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7'},
         {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
+        {'loc': f"{SITE_URL}/stats", 'changefreq': 'daily', 'priority': '0.7'},  # V12.23 SEO
         {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6'},
         {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5'},
-        {'loc': f"{SITE_URL}/login", 'changefreq': 'monthly', 'priority': '0.4'},
-        {'loc': f"{SITE_URL}/signup", 'changefreq': 'monthly', 'priority': '0.4'},
+        # V12.23 SEO: Removed /login, /signup from sitemap - auth pages shouldn't be indexed
         {'loc': f"{SITE_URL}/privacy", 'changefreq': 'monthly', 'priority': '0.3'},
         {'loc': f"{SITE_URL}/terms", 'changefreq': 'monthly', 'priority': '0.3'},
     ]
+
+    # V12.23 SEO: Add state hub pages to sitemap
+    for state_slug in STATE_CONFIG.keys():
+        urls.append({
+            'loc': f"{SITE_URL}/permits/{state_slug}",
+            'changefreq': 'daily',
+            'priority': '0.85',  # Between homepage and city pages
+        })
 
     # V12.11: Only include cities with permits in sitemap (exclude empty/coming soon cities)
     cities_with_data = get_cities_with_data()
@@ -4553,6 +4692,8 @@ Disallow: /billing
 Disallow: /onboarding
 Disallow: /logout
 Disallow: /reset-password
+Disallow: /login
+Disallow: /signup
 
 # Crawl-delay for polite crawling
 Crawl-delay: 1
