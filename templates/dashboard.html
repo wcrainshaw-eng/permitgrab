@@ -1361,7 +1361,7 @@ footer a:hover { color: white; }
     <div class="trusted-badge">Official Data Sources</div>
     <div class="testimonial-item">
       <span class="testimonial-stars" style="color: var(--primary);">&#9679;</span>
-      <span class="testimonial-text">120+ cities covered</span>
+      <span class="testimonial-text">{{ ((city_count // 10) * 10) if city_count else 140 }}+ cities covered</span>
     </div>
     <div class="testimonial-item">
       <span class="testimonial-stars" style="color: var(--primary);">&#9679;</span>

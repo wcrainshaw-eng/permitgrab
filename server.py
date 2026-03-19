@@ -338,6 +338,14 @@ def add_lead_scores(permits):
 
     for i, p in enumerate(permits):
         score = scores[i] if i < len(scores) else 70
+
+        # V12.15: Hard cap for permits without addresses
+        # These are low-quality leads that shouldn't appear at top of "Best Leads"
+        address = p.get('address', '') or ''
+        address_clean = address.strip().lower()
+        if not address_clean or address_clean in ['not provided', 'address not provided', 'n/a', 'none', '', 'location']:
+            score = min(score, 65)  # Cap at 65 regardless of linear spread
+
         p['lead_score'] = score
 
         # Determine quality tier
@@ -989,8 +997,11 @@ def index():
             default_city = user.city or ''
             default_trade = user.trade or ''
 
+    # V12.15: Pass city_count for dynamic "X+ cities covered" display
+    city_count = get_city_count()
     return render_template('dashboard.html', footer_cities=footer_cities,
-                          default_city=default_city, default_trade=default_trade)
+                          default_city=default_city, default_trade=default_trade,
+                          city_count=city_count)
 
 
 # V9 Fix 9: /dashboard redirects to homepage

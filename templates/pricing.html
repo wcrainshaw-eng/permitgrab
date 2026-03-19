@@ -404,7 +404,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </div>
       </div>
       <div class="testimonial-card">
-        <div class="testimonial-stars" style="font-size: 32px; color: var(--primary);">120+</div>
+        <div class="testimonial-stars" style="font-size: 32px; color: var(--primary);">{{ ((city_count // 10) * 10) if city_count else 140 }}+</div>
         <p class="testimonial-quote">Cities and counties covered nationwide, with new markets added every week.</p>
         <div class="testimonial-author">
           <div class="testimonial-name">Cities Covered</div>
