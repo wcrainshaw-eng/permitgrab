@@ -602,7 +602,7 @@ function renderTable(data) {
     <tr>
       <td><span class="contractor-name" onclick="showContractor('${escapeHtml(c.name)}')">${escapeHtml(c.name)}</span></td>
       <td>${c.total_permits.toLocaleString()}</td>
-      <td class="value-cell">${c.total_value ? '$' + c.total_value.toLocaleString() : '—'}</td>
+      <td class="value-cell">${formatValue(c.total_value)}</td>
       <td class="cities-cell">${c.cities.slice(0, 3).join(', ')}${c.cities.length > 3 ? ` +${c.cities.length - 3}` : ''}</td>
       <td><span class="trade-badge">${escapeHtml(c.primary_trade)}</span></td>
       <td>${c.most_recent_date || '—'}</td>
@@ -644,8 +644,8 @@ async function showContractor(name) {
     const data = await resp.json();
 
     document.getElementById('modal-permits').textContent = data.total_permits.toLocaleString();
-    // V12.17: Show dash instead of $0 for contractors without value data
-    document.getElementById('modal-value').textContent = data.total_value ? '$' + data.total_value.toLocaleString() : '—';
+    // V12.19: Format large values as $X.XM or $X.XB
+    document.getElementById('modal-value').textContent = formatValue(data.total_value);
     document.getElementById('modal-cities').textContent = data.cities.length;
 
     // V8: Trade breakdown
@@ -722,6 +722,19 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// V12.19: Format large values as $X.XM or $X.XB
+function formatValue(value) {
+  if (!value) return '—';
+  if (value >= 1000000000) {
+    return '$' + (value / 1000000000).toFixed(1) + 'B';
+  } else if (value >= 1000000) {
+    return '$' + (value / 1000000).toFixed(1) + 'M';
+  } else if (value >= 1000) {
+    return '$' + (value / 1000).toFixed(0) + 'K';
+  }
+  return '$' + value.toLocaleString();
 }
 
 // Load cities for filter

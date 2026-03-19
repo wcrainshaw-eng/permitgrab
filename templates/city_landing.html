@@ -759,7 +759,7 @@ body {
     </div>
     {% if total_value > 0 %}
     <div class="hero-stat">
-      <div class="hero-stat-value">${{ "{:,.0f}".format(total_value) }}</div>
+      <div class="hero-stat-value">{% if total_value >= 1000000000 %}${{ "%.1f" | format(total_value / 1000000000) }}B{% elif total_value >= 1000000 %}${{ "%.0f" | format(total_value / 1000000) }}M{% else %}${{ "{:,.0f}".format(total_value) }}{% endif %}</div>
       <div class="hero-stat-label">Total Project Value</div>
     </div>
     <div class="hero-stat">
