@@ -663,7 +663,7 @@ async function showContractor(name) {
     document.getElementById('modal-permits-list').innerHTML = data.permits.slice(0, 20).map(p => `
       <div class="permit-item">
         <div class="address">${escapeHtml(p.address)}</div>
-        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost ? (p.estimated_cost >= 1000000 ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M' : '$' + p.estimated_cost.toLocaleString()) : '<span style="color: #9ca3af; font-style: italic;">Not listed on permit</span>'}</div>
+        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost && p.estimated_cost !== 50000000 ? (p.estimated_cost >= 1000000 ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M' : '$' + p.estimated_cost.toLocaleString()) : '<span style="color: #9ca3af; font-style: italic;">Not listed on permit</span>'}</div>
       </div>
     `).join('') || '<div style="color: var(--gray-400);">No permits found</div>';
 

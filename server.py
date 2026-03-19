@@ -425,8 +425,8 @@ def add_lead_scores(permits):
         address = p.get('address', '') or ''
         address_clean = address.strip().lower()
         if not address_clean or address_clean in ['not provided', 'address not provided', 'n/a', 'none', '', 'location']:
-            # Reduce score by 25% for missing address (maintains relative ordering)
-            score = max(40, round(score * 0.75))
+            # V12.23: Reduce score by 50% for missing address (stronger penalty to push addressless permits down)
+            score = max(40, round(score * 0.50))
 
         p['lead_score'] = score
 
@@ -766,7 +766,9 @@ def get_popular_cities(limit=12):
     for name, count in sorted(city_counts.items(), key=lambda x: -x[1]):
         if name in city_lookup:
             city_info = city_lookup[name].copy()
-            city_info['permit_count'] = count
+            # V12.23: Don't show permit count on 404 page - it shows the collector limit (2000)
+            # which looks suspiciously capped. Better to show no count than a misleading one.
+            # city_info['permit_count'] = count  # Removed - shows API limit, not real total
             popular.append(city_info)
             if len(popular) >= limit:
                 break
@@ -2395,8 +2397,7 @@ def api_analytics_volume():
     if city:
         permits = [p for p in permits if p.get('city') == city]
 
-    # Group by week
-    from datetime import timedelta
+    # Group by week (use module-level timedelta import)
     now = datetime.now()
     weekly_counts = {}
 
@@ -2490,8 +2491,7 @@ def api_analytics_values():
     if city:
         permits = [p for p in permits if p.get('city') == city]
 
-    # Group by week
-    from datetime import timedelta
+    # Group by week (use module-level timedelta import)
     now = datetime.now()
     weekly_values = {}
     weekly_counts = {}
@@ -4240,7 +4240,7 @@ def city_landing(city_slug):
     unique_contractors = 0
     if total_value == 0:
         # Count permits from last 30 days
-        from datetime import timedelta
+        # V12.23: Removed redundant local import that was shadowing module-level timedelta
         thirty_days_ago = datetime.now() - timedelta(days=30)
         recent_permits = []
         contractors_set = set()
@@ -4339,7 +4339,7 @@ def city_trade_landing(city_slug, trade_slug):
     matching_permits.sort(key=lambda x: x.get('filing_date', ''), reverse=True)
 
     # Calculate stats
-    from datetime import datetime, timedelta
+    # V12.23: Use module-level datetime/timedelta imports
     now = datetime.now()
     month_ago = (now - timedelta(days=30)).isoformat()
     week_ago = (now - timedelta(days=7)).isoformat()

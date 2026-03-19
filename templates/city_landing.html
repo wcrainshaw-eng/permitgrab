@@ -834,7 +834,7 @@ body {
         <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; {{ permit.date_label | default('Filed') }}: {{ permit.filing_date }}</p>
       </div>
       <div class="permit-value {{ permit.value_tier }}">
-        {% if permit.estimated_cost %}{% if permit.estimated_cost >= 1000000 %}${{ "%.1f" | format(permit.estimated_cost / 1000000) }}M{% else %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 13px;">Not listed on permit</span>{% endif %}
+        {% if permit.estimated_cost and permit.estimated_cost != 50000000 %}{% if permit.estimated_cost >= 1000000 %}${{ "%.1f" | format(permit.estimated_cost / 1000000) }}M{% else %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 13px;">Not listed on permit</span>{% endif %}
       </div>
     </div>
     {% endfor %}
