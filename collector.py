@@ -9,6 +9,7 @@ import json
 import os
 import re
 import time
+import tempfile
 from datetime import datetime, timedelta
 from city_configs import (
     CITY_REGISTRY, TRADE_CATEGORIES, PERMIT_VALUE_TIERS,
@@ -68,6 +69,34 @@ def _release_lock():
         os.remove(COLLECTION_LOCK_FILE)
     except FileNotFoundError:
         pass
+
+
+def atomic_write_json(filepath, data, indent=2):
+    """
+    V12.16: Atomic JSON write to prevent corruption.
+    Writes to a temp file first, then renames to final path.
+    os.rename() is atomic on POSIX systems, so the file is either
+    fully written or not changed at all.
+    """
+    dir_path = os.path.dirname(filepath)
+    try:
+        # Write to temp file in same directory (required for atomic rename)
+        fd, temp_path = tempfile.mkstemp(suffix='.tmp', dir=dir_path)
+        try:
+            with os.fdopen(fd, 'w') as f:
+                json.dump(data, f, indent=indent, default=str)
+            # Atomic rename
+            os.rename(temp_path, filepath)
+        except Exception:
+            # Clean up temp file on error
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise
+    except Exception as e:
+        print(f"  [ERROR] Atomic write failed for {filepath}: {e}")
+        raise
 
 
 # ============================================================================
@@ -747,10 +776,9 @@ def collect_permit_history(years_back=3):
         )
         history_index[addr_key]["permit_count"] = len(history_index[addr_key]["permits"])
 
-    # Save to JSON
+    # Save to JSON (atomic write)
     output_file = os.path.join(DATA_DIR, "permit_history.json")
-    with open(output_file, "w") as f:
-        json.dump(history_index, f, indent=2, default=str)
+    atomic_write_json(output_file, history_index)
 
     total_addresses = len(history_index)
     total_permits = sum(len(h["permits"]) for h in history_index.values())
@@ -872,8 +900,7 @@ def _collect_all_inner(days_back=30):
         # Save intermediate results every 50 cities so data appears gradually
         if (i + 1) % 50 == 0 and all_permits:
             output_file = os.path.join(DATA_DIR, "permits.json")
-            with open(output_file, "w") as f:
-                json.dump(all_permits, f, indent=2, default=str)
+            atomic_write_json(output_file, all_permits)
             print(f"  [Intermediate save: {len(all_permits)} permits after {i+1} cities]")
 
     # Trade category breakdown
@@ -887,12 +914,11 @@ def _collect_all_inner(days_back=30):
     for p in all_permits:
         value_counts[p["value_tier"]] = value_counts.get(p["value_tier"], 0) + 1
 
-    # Save to JSON
+    # Save to JSON (atomic write to prevent corruption)
     output_file = os.path.join(DATA_DIR, "permits.json")
-    with open(output_file, "w") as f:
-        json.dump(all_permits, f, indent=2, default=str)
+    atomic_write_json(output_file, all_permits)
 
-    # Save stats
+    # Save stats (atomic write)
     stats_file = os.path.join(DATA_DIR, "collection_stats.json")
     collection_stats = {
         "collected_at": datetime.now().isoformat(),
@@ -902,8 +928,7 @@ def _collect_all_inner(days_back=30):
         "trade_breakdown": dict(sorted(trade_counts.items(), key=lambda x: -x[1])),
         "value_breakdown": value_counts,
     }
-    with open(stats_file, "w") as f:
-        json.dump(collection_stats, f, indent=2)
+    atomic_write_json(stats_file, collection_stats)
 
     # V12 Fix 4.1: Save diagnostic report
     diagnostic = {
@@ -929,8 +954,7 @@ def _collect_all_inner(days_back=30):
             })
 
     diag_file = os.path.join(DATA_DIR, "collection_diagnostic.json")
-    with open(diag_file, "w") as f:
-        json.dump(diagnostic, f, indent=2)
+    atomic_write_json(diag_file, diagnostic)
 
     # V12 Fix 4.2: Track consecutive failures
     failure_tracker_path = os.path.join(DATA_DIR, "city_failures.json")
@@ -955,8 +979,7 @@ def _collect_all_inner(days_back=30):
         else:
             failure_tracker[key] = failure_tracker.get(key, 0) + 1
 
-    with open(failure_tracker_path, "w") as f:
-        json.dump(failure_tracker, f, indent=2)
+    atomic_write_json(failure_tracker_path, failure_tracker)
 
     # Log cities with 5+ consecutive failures
     chronic_failures = {k: v for k, v in failure_tracker.items() if v >= 5}
