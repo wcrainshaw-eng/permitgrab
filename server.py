@@ -76,6 +76,10 @@ def admin_force_collection():
             print("[Admin] Starting forced collection...")
             collect_all(days_back=60)
             print("[Admin] Forced collection complete.")
+            # V12.19: Explicitly reload data after collection completes
+            # (collector.py also calls this but belt-and-suspenders approach)
+            preload_data_from_disk()
+            print("[Admin] Data reloaded into server memory.")
         except Exception as e:
             print(f"[Admin] Force collection error: {e}")
 
