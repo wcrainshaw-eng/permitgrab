@@ -309,7 +309,11 @@ def calculate_lead_scores(permits):
                     if isinstance(d, str):
                         d = datetime.strptime(d[:10], '%Y-%m-%d')
                     days_old = (datetime.now() - d).days
-                    recency = max(0.0, 25.0 - (days_old * 0.8))
+                    # V12.27: Penalize future-dated permits (bad source data)
+                    if days_old < 0:
+                        recency = 0.0  # Future dates get zero recency points
+                    else:
+                        recency = max(0.0, 25.0 - (days_old * 0.8))
                     break
                 except (ValueError, TypeError):
                     pass
@@ -537,9 +541,10 @@ def generate_permit_description(permit):
     if address:
         parts.append(f"at {address}")
 
-    # Value
+    # Value - V12.27: Skip if at $50M cap (unreliable data)
     cost = permit.get('estimated_cost', 0) or 0
-    if cost > 0:
+    MAX_REASONABLE_COST = 50_000_000
+    if cost > 0 and cost != MAX_REASONABLE_COST:
         if cost >= 1000000:
             parts.append(f"— ${cost/1000000:.1f}M project")
         elif cost >= 1000:
@@ -1233,6 +1238,11 @@ def api_permits():
     stats = load_stats()
     last_updated = stats.get('collected_at', '')
 
+    # V12.27: Calculate total stats from ALL permits (not just page) for consistency
+    all_permits = load_permits()
+    total_value = sum(p.get('estimated_cost', 0) or 0 for p in all_permits)
+    high_value_count = sum(1 for p in all_permits if (p.get('estimated_cost', 0) or 0) >= 100000)
+
     return jsonify({
         'permits': page_permits,
         'total': total,
@@ -1241,6 +1251,10 @@ def api_permits():
         'total_pages': (total + per_page - 1) // per_page,
         'user_is_pro': user_is_pro,
         'last_updated': last_updated,
+        # V12.27: Include aggregate stats for hero section consistency
+        'total_value': total_value,
+        'high_value_count': high_value_count,
+        'total_permits': len(all_permits),
     })
 
 @app.route('/api/stats')

@@ -248,7 +248,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <h3>{{ city.name }}</h3>
       <div class="city-card-stats">
         <div class="city-card-stat"><strong>{{ city.permit_count | default(0) }}</strong> {{ "permit" if city.permit_count == 1 else "permits" }}</div>
-        {% if city.total_value and city.total_value > 0 %}
+        {% if city.total_value and city.total_value >= 50000 %}
+        {# V12.27: Only show value if >= $50K to avoid "$0.0M" display #}
         <div class="city-card-stat"><strong>{% if city.total_value >= 1000000000 %}${{ "%.1f" | format(city.total_value / 1000000000) }}B{% else %}${{ "%.1f" | format(city.total_value / 1000000) }}M{% endif %}</strong> value</div>
         {% else %}
         <div class="city-card-stat" style="color: #6b7280; font-style: italic;">Value not reported</div>

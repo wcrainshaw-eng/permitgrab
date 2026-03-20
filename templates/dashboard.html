@@ -1776,6 +1776,9 @@ async function loadSavedLeads() {
 
 // V12.17: Store true total from API for accurate stats
 let totalPermitCount = 0;
+// V12.27: Store aggregate stats from API for consistency with stats page
+let totalValueFromAPI = 0;
+let highValueCountFromAPI = 0;
 
 async function loadData() {
   try {
@@ -1784,6 +1787,9 @@ async function loadData() {
     const data = await resp.json();
     allPermits = data.permits;
     totalPermitCount = data.total; // True total from API
+    // V12.27: Store aggregate stats calculated from ALL permits (not just page)
+    totalValueFromAPI = data.total_value || 0;
+    highValueCountFromAPI = data.high_value_count || 0;
 
     // V8: Display data freshness
     if (data.last_updated) {
@@ -1882,9 +1888,15 @@ function updateStats(useFiltered = false) {
   const filtersActive = city || trade || value || status || quality || search;
   // V12.21: Use true total from API unless filters are actually applied
   const total = (useFiltered && filtersActive) ? permits.length : (totalPermitCount || permits.length);
-  const totalValue = permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
+  // V12.27: Use API totals when unfiltered for consistency with stats page
+  const totalValue = (useFiltered && filtersActive)
+    ? permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0)
+    : (totalValueFromAPI || permits.reduce((sum, p) => sum + (p.estimated_cost || 0), 0));
   // V12.18: High-value = $100K+ projects (more meaningful to contractors than lead score)
-  const highValue = permits.filter(p => (p.estimated_cost || 0) >= 100000).length;
+  // V12.27: Use API count when unfiltered for consistency
+  const highValue = (useFiltered && filtersActive)
+    ? permits.filter(p => (p.estimated_cost || 0) >= 100000).length
+    : (highValueCountFromAPI || permits.filter(p => (p.estimated_cost || 0) >= 100000).length);
   // V9 Fix 11: Show trade categories instead of metro areas to avoid marketing contradiction
   const uniqueTrades = new Set(permits.map(p => p.trade_category)).size;
 

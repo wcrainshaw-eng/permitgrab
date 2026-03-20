@@ -204,7 +204,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <h1>Permit Map</h1>
     <div class="map-controls">
       <select id="filter-city" onchange="filterMap()">
-        <option value="">All Cities</option>
+        <option value="">Select a city...</option>
         {% for city in cities %}
         <option value="{{ city.name }}">{{ city.name }}, {{ city.state }}</option>
         {% endfor %}
@@ -228,8 +228,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
   <div id="map" style="position: relative;">
     <div class="map-loading" id="map-loading">
-      <div class="spinner"></div>
-      <div>Loading permits...</div>
+      <div id="loading-icon" style="font-size: 32px; margin-bottom: 12px;">📍</div>
+      <div id="loading-text">Select a city to view permits</div>
     </div>
   </div>
 
@@ -319,8 +319,8 @@ function initMap() {
 
   map.addLayer(markers);
 
-  // Load permits
-  loadPermits();
+  // V12.27: Don't load permits on init - wait for city selection for fast initial load
+  // loadPermits();
 }
 
 async function loadPermits() {
@@ -412,29 +412,50 @@ function addMarkersToMap(permits) {
   });
 }
 
-function filterMap() {
+async function filterMap() {
   const city = document.getElementById('filter-city').value;
   const trade = document.getElementById('filter-trade').value;
 
-  let filtered = allPermits;
-
-  if (city) {
-    filtered = filtered.filter(p => p.city === city);
+  // V12.27: If no city selected, show prompt and clear map
+  if (!city) {
+    markers.clearLayers();
+    document.getElementById('map-loading').style.display = 'block';
+    document.getElementById('loading-icon').textContent = '📍';
+    document.getElementById('loading-text').textContent = 'Select a city to view permits';
+    return;
   }
 
-  if (trade) {
-    filtered = filtered.filter(p => {
-      const cat = (p.trade_category || '').toLowerCase();
-      const desc = (p.description || '').toLowerCase();
-      return cat.includes(trade.toLowerCase()) || desc.includes(trade.toLowerCase());
-    });
-  }
+  // V12.27: Load permits for selected city (fast, city-specific API call)
+  document.getElementById('map-loading').style.display = 'block';
+  document.getElementById('loading-icon').innerHTML = '<div class="spinner" style="width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;"></div>';
+  document.getElementById('loading-text').textContent = 'Loading ' + city + ' permits...';
 
-  addMarkersToMap(filtered);
+  try {
+    const response = await fetch('/api/permits?city=' + encodeURIComponent(city) + '&per_page=2000');
+    const data = await response.json();
+    allPermits = data.permits || [];
 
-  // Zoom to filtered area if specific city selected
-  if (city && cityCoords[city]) {
-    map.setView(cityCoords[city], 10);
+    let filtered = allPermits;
+
+    if (trade) {
+      filtered = filtered.filter(p => {
+        const cat = (p.trade_category || '').toLowerCase();
+        const desc = (p.description || '').toLowerCase();
+        return cat.includes(trade.toLowerCase()) || desc.includes(trade.toLowerCase());
+      });
+    }
+
+    addMarkersToMap(filtered);
+    document.getElementById('map-loading').style.display = 'none';
+
+    // Zoom to city
+    if (cityCoords[city]) {
+      map.setView(cityCoords[city], 10);
+    }
+  } catch (error) {
+    console.error('Error loading permits:', error);
+    document.getElementById('loading-icon').textContent = '⚠️';
+    document.getElementById('loading-text').textContent = 'Error loading permits. Please try again.';
   }
 }
 
