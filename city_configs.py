@@ -4097,8 +4097,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "jersey_city": {
@@ -4122,8 +4122,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "paterson": {
@@ -4147,8 +4147,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "buffalo": {
@@ -7264,7 +7264,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "camden": {
@@ -7288,7 +7289,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "elizabeth": {
@@ -7312,7 +7314,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "clifton": {
@@ -7336,7 +7339,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "new_brunswick": {
@@ -7360,7 +7364,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.32: Covered by nj_statewide bulk source
+        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
     "cambridge_ma": {

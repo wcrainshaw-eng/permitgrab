@@ -291,6 +291,146 @@ if os.path.isdir(DATA_DIR):
 # V12.1: Removed _sanitize_permits_file() - raw byte stripping corrupted JSON structure
 # The correct approach is parse-then-rewrite in load_permits() using strict=False
 
+# ============================================================================
+# V12.32: AUTO-DISCOVER CITIES FROM PERMIT DATA
+# ============================================================================
+# Bulk sources create permits for cities not in CITY_REGISTRY. This module
+# scans permit data to discover all cities and enables routing for them.
+
+import re
+_discovered_cities_cache = {}
+_discovered_cities_timestamp = 0
+
+def slugify_for_lookup(city_name, state):
+    """Generate a URL slug from city name and state."""
+    if not city_name:
+        return None
+    name = city_name.strip()
+    # Remove common suffixes
+    for suffix in [" City", " Township", " Borough", " Town", " Village"]:
+        if name.endswith(suffix):
+            name = name[:-len(suffix)]
+    slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    return f"{slug}-{state.lower()}" if slug else None
+
+
+def discover_cities_from_permits():
+    """
+    V12.32: Scan permit data to discover all cities including bulk-sourced ones.
+    Returns dict of {slug: city_config} for all discovered cities.
+    Caches results for 5 minutes to avoid repeated scans.
+    """
+    global _discovered_cities_cache, _discovered_cities_timestamp
+
+    # Check cache validity (5 minute TTL)
+    cache_age = time.time() - _discovered_cities_timestamp
+    if _discovered_cities_cache and cache_age < 300:
+        return _discovered_cities_cache
+
+    print("[V12.32] Discovering cities from permit data...")
+
+    # Start with explicit configs from CITY_REGISTRY
+    all_cities = {}
+    for key, config in CITY_REGISTRY.items():
+        if config.get('active', False):
+            slug = config.get('slug', key)
+            all_cities[slug] = {
+                'key': key,
+                'name': config.get('name', key),
+                'state': config.get('state', ''),
+                'slug': slug,
+                'configured': True,
+                'active': True,
+            }
+
+    # Scan permits for additional cities
+    permits_path = os.path.join(DATA_DIR, 'permits.json')
+    if os.path.exists(permits_path):
+        try:
+            with open(permits_path) as f:
+                permits = json.load(f, strict=False)
+
+            # Find unique (city, state) pairs
+            seen_cities = set()
+            for permit in permits:
+                city_name = permit.get('city', '').strip()
+                state = permit.get('state', '').strip()
+                if city_name and state:
+                    seen_cities.add((city_name, state))
+
+            # Add any cities not already in all_cities
+            for city_name, state in seen_cities:
+                slug = slugify_for_lookup(city_name, state)
+                if slug and slug not in all_cities:
+                    all_cities[slug] = {
+                        'key': slug,
+                        'name': city_name,
+                        'state': state,
+                        'slug': slug,
+                        'configured': False,  # Auto-discovered
+                        'active': True,
+                        'source_bulk': True,
+                    }
+
+            print(f"[V12.32] Found {len(all_cities)} total cities ({len(seen_cities)} unique from permits)")
+
+        except Exception as e:
+            print(f"[V12.32] Error scanning permits: {e}")
+
+    _discovered_cities_cache = all_cities
+    _discovered_cities_timestamp = time.time()
+    return all_cities
+
+
+def get_city_by_slug_auto(slug):
+    """
+    V12.32: Look up city config by slug, checking both CITY_REGISTRY
+    and auto-discovered cities from bulk source data.
+    Returns (city_key, city_config) or (None, None) if not found.
+    """
+    # First try explicit registry (faster, has full config)
+    city_key, city_config = get_city_by_slug(slug)
+    if city_config:
+        return city_key, city_config
+
+    # Try auto-discovered cities
+    discovered = discover_cities_from_permits()
+    if slug in discovered:
+        city_info = discovered[slug]
+        # Build a minimal config compatible with existing code
+        return city_info['key'], {
+            'name': city_info['name'],
+            'state': city_info['state'],
+            'slug': slug,
+            'active': True,
+            'auto_discovered': True,
+        }
+
+    return None, None
+
+
+def get_cities_by_state_auto(state_abbrev):
+    """
+    V12.32: Get all cities for a state, including auto-discovered ones.
+    Returns list of city info dicts.
+    """
+    state_abbrev = state_abbrev.upper()
+    discovered = discover_cities_from_permits()
+
+    cities = []
+    for slug, info in discovered.items():
+        if info.get('state', '').upper() == state_abbrev:
+            cities.append(info)
+
+    return sorted(cities, key=lambda x: x.get('name', ''))
+
+
+def get_total_city_count_auto():
+    """V12.32: Get total count of all cities with permit data."""
+    discovered = discover_cities_from_permits()
+    return len(discovered)
+
+
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
 USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 
@@ -1191,8 +1331,8 @@ def index():
             default_city = user.city or ''
             default_trade = user.trade or ''
 
-    # V12.15: Pass city_count for dynamic "X+ cities covered" display
-    city_count = get_city_count()
+    # V12.32: Pass city_count including auto-discovered bulk source cities
+    city_count = get_total_city_count_auto()
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
                           city_count=city_count)
@@ -2146,7 +2286,7 @@ def pricing_page():
     """Render the Pricing page."""
     user = get_current_user()
     cities = get_all_cities_info()
-    city_count = get_city_count()
+    city_count = get_total_city_count_auto()  # V12.32: Include bulk source cities
     footer_cities = get_cities_with_data()
     # V12.25: Pass permit count for dynamic "By the Numbers" section
     permits = load_permits()
@@ -2438,12 +2578,12 @@ def stats_page():
         for trade, count in sorted(trade_counts.items(), key=lambda x: -x[1])
     ]
 
-    # V12.25: Use get_city_count() for consistency with homepage
+    # V12.32: Use get_total_city_count_auto() to include bulk source cities
     return render_template('stats.html',
                            total_permits=total_permits,
                            total_value=total_value,
                            high_value_count=high_value_count,
-                           city_count=get_city_count(),
+                           city_count=get_total_city_count_auto(),
                            top_cities=top_cities,
                            trade_breakdown=trade_breakdown,
                            last_updated=datetime.now().strftime('%Y-%m-%d'),
@@ -4409,9 +4549,8 @@ def get_state_data(state_slug):
     state_abbrev = state_info['abbrev']
     permits = load_permits()
 
-    # Get all cities in this state
-    all_cities_info = get_all_cities_info()
-    state_cities = [c for c in all_cities_info if c.get('state') == state_abbrev]
+    # V12.32: Get all cities in this state, including auto-discovered bulk source cities
+    state_cities = get_cities_by_state_auto(state_abbrev)
 
     # Count permits per city
     city_permit_counts = {}
@@ -4469,8 +4608,8 @@ def city_landing_inner(city_slug):
     if city_slug in CITY_SEO_CONFIG:
         config = CITY_SEO_CONFIG[city_slug]
     else:
-        # Try to get city from city_configs for dynamic fallback
-        city_key, city_config = get_city_by_slug(city_slug)
+        # V12.32: Try both explicit configs AND auto-discovered bulk source cities
+        city_key, city_config = get_city_by_slug_auto(city_slug)
         if not city_config:
             return render_city_not_found(city_slug)
         # Generate basic SEO config with properly formatted city name
@@ -4708,17 +4847,21 @@ def sitemap():
             'priority': '0.85',  # Between homepage and city pages
         })
 
-    # V12.11: Only include cities with permits in sitemap (exclude empty/coming soon cities)
+    # V12.32: Include auto-discovered cities from bulk sources in sitemap
+    # Use dynamic discovery instead of static ALL_CITIES
+    all_discovered_cities = discover_cities_from_permits()
+
+    # Get cities with permits for filtering
     cities_with_data = get_cities_with_data()
     cities_with_permits = {c['name'] for c in cities_with_data}
 
-    for city in ALL_CITIES:
+    for slug, city_info in all_discovered_cities.items():
         # Skip cities with no permits (these have noindex anyway)
-        if city['name'] not in cities_with_permits:
+        if city_info['name'] not in cities_with_permits:
             continue
 
         urls.append({
-            'loc': f"{SITE_URL}/permits/{city['slug']}",
+            'loc': f"{SITE_URL}/permits/{slug}",
             'changefreq': 'daily',
             'priority': '0.8',
         })
@@ -4726,7 +4869,7 @@ def sitemap():
         # Add city × trade pages for each trade
         for trade_slug in get_trade_slugs():
             urls.append({
-                'loc': f"{SITE_URL}/permits/{city['slug']}/{trade_slug}",
+                'loc': f"{SITE_URL}/permits/{slug}/{trade_slug}",
                 'changefreq': 'daily',
                 'priority': '0.8',
             })
