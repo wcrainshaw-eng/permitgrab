@@ -1,11 +1,12 @@
 <!-- Google Analytics GA4 -->
-<!-- REPLACE G-XXXXXXXXXX WITH REAL GA4 MEASUREMENT ID -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<!-- V12.24: Reads GA4 ID from GOOGLE_ANALYTICS_ID env var -->
+{% if config.GOOGLE_ANALYTICS_ID %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GOOGLE_ANALYTICS_ID }}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-XXXXXXXXXX');
+  gtag('config', '{{ config.GOOGLE_ANALYTICS_ID }}');
 
   // Custom event tracking for key conversions
   function trackEvent(eventName, eventParams) {
@@ -25,7 +26,11 @@
     trackEvent('view_login');
   }
 </script>
+{% else %}
+<!-- GA4 not configured - set GOOGLE_ANALYTICS_ID env var to enable -->
+{% endif %}
 
 <!-- Google Search Console Verification -->
-<!-- REPLACE WITH REAL SEARCH CONSOLE VERIFICATION CODE -->
-<meta name="google-site-verification" content="XXXXX">
+{% if config.GOOGLE_SITE_VERIFICATION %}
+<meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
+{% endif %}

@@ -268,8 +268,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <td>{{ loop.index }}</td>
         <td><a href="/permits/{{ city.slug }}" class="city-link">{{ city.name }}, {{ city.state }}</a></td>
         <td>{{ "{:,}".format(city.permit_count) }}</td>
-        <td>{% if city.total_value >= 1000000 %}${{ "%.1f" | format(city.total_value / 1000000) }}M{% else %}${{ "{:,}".format(city.total_value | int) }}{% endif %}</td>
-        <td>{% if city.avg_value %}${{ "{:,}".format(city.avg_value | int) }}{% else %}-{% endif %}</td>
+        <td>{% if city.total_value and city.total_value > 0 %}{% if city.total_value >= 1000000000 %}${{ "%.1f" | format(city.total_value / 1000000000) }}B{% elif city.total_value >= 1000000 %}${{ "%.1f" | format(city.total_value / 1000000) }}M{% else %}${{ "{:,}".format(city.total_value | int) }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic;">Not listed on permit</span>{% endif %}</td>
+        <td>{% if city.avg_value and city.avg_value > 0 %}${{ "{:,}".format(city.avg_value | int) }}{% else %}<span style="color: #9ca3af; font-style: italic;">—</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
