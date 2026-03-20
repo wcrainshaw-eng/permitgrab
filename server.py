@@ -2039,7 +2039,10 @@ def pricing_page():
     cities = get_all_cities_info()
     city_count = get_city_count()
     footer_cities = get_cities_with_data()
-    return render_template('pricing.html', user=user, cities=cities, city_count=city_count, footer_cities=footer_cities)
+    # V12.25: Pass permit count for dynamic "By the Numbers" section
+    permits = load_permits()
+    permit_count = len(permits)
+    return render_template('pricing.html', user=user, cities=cities, city_count=city_count, footer_cities=footer_cities, permit_count=permit_count)
 
 
 @app.route('/signup')
@@ -2326,11 +2329,12 @@ def stats_page():
         for trade, count in sorted(trade_counts.items(), key=lambda x: -x[1])
     ]
 
+    # V12.25: Use get_city_count() for consistency with homepage
     return render_template('stats.html',
                            total_permits=total_permits,
                            total_value=total_value,
                            high_value_count=high_value_count,
-                           city_count=len(footer_cities),
+                           city_count=get_city_count(),
                            top_cities=top_cities,
                            trade_breakdown=trade_breakdown,
                            last_updated=datetime.now().strftime('%Y-%m-%d'),

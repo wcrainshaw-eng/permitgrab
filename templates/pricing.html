@@ -462,7 +462,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <h2 class="testimonials-title">Real Data, Real Leads</h2>
     <div class="testimonials-grid">
       <div class="testimonial-card">
-        <div class="testimonial-stars" style="font-size: 32px; color: var(--primary);">2,000+</div>
+        <div class="testimonial-stars" style="font-size: 32px; color: var(--primary);">{{ "{:,}".format(((permit_count | default(80000)) // 1000) * 1000) }}+</div>
         <p class="testimonial-quote">Active building permits tracked across all cities. Updated daily from official municipal sources.</p>
         <div class="testimonial-author">
           <div class="testimonial-name">Permits Tracked</div>

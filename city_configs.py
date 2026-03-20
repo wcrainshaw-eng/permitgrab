@@ -1449,7 +1449,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
     "gainesville": {
@@ -1547,7 +1547,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
     "williamson_county_tx": {
@@ -1570,7 +1570,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
     "dallas": {
@@ -1742,7 +1742,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
     "sonoma_county": {
@@ -1789,7 +1789,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
     "summit_county_ut": {

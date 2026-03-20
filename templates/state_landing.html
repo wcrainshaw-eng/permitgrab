@@ -233,7 +233,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <div class="hero-stat-label">Active Permits</div>
       </div>
       <div class="hero-stat">
-        <div class="hero-stat-value">${{ "%.1f" | format((total_value | default(0)) / 1000000000) }}B</div>
+        <div class="hero-stat-value">{% if total_value | default(0) >= 1000000000 %}${{ "%.1f" | format((total_value | default(0)) / 1000000000) }}B{% else %}${{ "%.0f" | format((total_value | default(0)) / 1000000) }}M{% endif %}</div>
         <div class="hero-stat-label">Total Value</div>
       </div>
     </div>
@@ -247,9 +247,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <a href="/permits/{{ city.slug }}" class="city-card">
       <h3>{{ city.name }}</h3>
       <div class="city-card-stats">
-        <div class="city-card-stat"><strong>{{ city.permit_count | default(0) }}</strong> permits</div>
+        <div class="city-card-stat"><strong>{{ city.permit_count | default(0) }}</strong> {{ "permit" if city.permit_count == 1 else "permits" }}</div>
         {% if city.total_value and city.total_value > 0 %}
         <div class="city-card-stat"><strong>{% if city.total_value >= 1000000000 %}${{ "%.1f" | format(city.total_value / 1000000000) }}B{% else %}${{ "%.1f" | format(city.total_value / 1000000) }}M{% endif %}</strong> value</div>
+        {% else %}
+        <div class="city-card-stat" style="color: #6b7280; font-style: italic;">Value not reported</div>
         {% endif %}
       </div>
     </a>
