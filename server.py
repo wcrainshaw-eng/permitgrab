@@ -92,6 +92,54 @@ def admin_force_collection():
     })
 
 
+@app.route('/api/admin/collection-status')
+def admin_collection_status():
+    """V12.29: Get last collection run status for debugging."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    stats_file = os.path.join(DATA_DIR, "collection_stats.json")
+    if not os.path.exists(stats_file):
+        return jsonify({'error': 'No collection stats found', 'path': stats_file}), 404
+
+    try:
+        with open(stats_file) as f:
+            stats = json.load(f)
+
+        # Calculate summary
+        city_stats = stats.get('city_stats', {})
+        total_cities = len(city_stats)
+        cities_with_permits = sum(1 for s in city_stats.values() if s.get('normalized', 0) > 0)
+        cities_empty = sum(1 for s in city_stats.values() if s.get('status') == 'success_empty')
+        cities_errored = sum(1 for s in city_stats.values() if 'error' in str(s.get('status', '')))
+        cities_timeout = sum(1 for s in city_stats.values() if 'timeout' in str(s.get('status', '').lower()))
+
+        # Get list of failed cities
+        failed_cities = [
+            {'city': k, 'name': v.get('city_name', k), 'status': v.get('status', 'unknown')}
+            for k, v in city_stats.items()
+            if 'error' in str(v.get('status', '')) or 'timeout' in str(v.get('status', '').lower())
+        ]
+
+        return jsonify({
+            'collected_at': stats.get('collected_at'),
+            'total_permits': stats.get('total_permits', 0),
+            'summary': {
+                'total_cities_attempted': total_cities,
+                'cities_with_permits': cities_with_permits,
+                'cities_empty': cities_empty,
+                'cities_errored': cities_errored,
+                'cities_timeout': cities_timeout,
+            },
+            'failed_cities': failed_cities[:50],  # Limit to 50 to avoid huge response
+            'trade_breakdown': stats.get('trade_breakdown', {}),
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to read stats: {str(e)}'}), 500
+
+
 # ===========================
 # DATABASE SETUP (V7)
 # ===========================

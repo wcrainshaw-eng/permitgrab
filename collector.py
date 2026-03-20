@@ -26,6 +26,13 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Rate limiting: 1 second between city pulls
 RATE_LIMIT_DELAY = 1.0
 
+# V12.29: Batch processing to prevent server overload
+BATCH_SIZE = 50
+BATCH_PAUSE_SECONDS = 5  # Pause between batches
+
+# V12.29: Shorter timeout to fail fast on dead endpoints
+API_TIMEOUT_SECONDS = 15
+
 # V12.2: Shared session with proper headers — required for Socrata to not block us
 SESSION = requests.Session()
 SESSION.headers.update({
@@ -127,7 +134,7 @@ def fetch_socrata(config, days_back):
         "$where": where_clause,
     }
 
-    resp = SESSION.get(endpoint, params=params, timeout=60)
+    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     return resp.json()
 
@@ -166,7 +173,7 @@ def fetch_arcgis(config, days_back):
         "f": "json",
     }
 
-    resp = SESSION.get(endpoint, params=params, timeout=60)
+    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -205,7 +212,7 @@ def fetch_ckan(config, days_back):
     if date_field:
         params["sort"] = f"{date_field} desc"
 
-    resp = SESSION.get(endpoint, params=params, timeout=60)
+    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -250,7 +257,7 @@ def fetch_carto(config, days_back):
 
     params = {"q": sql, "format": "json"}
 
-    resp = SESSION.get(endpoint, params=params, timeout=60)
+    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -654,7 +661,7 @@ def fetch_history_socrata(config, years_back=3):
         "$where": f"{date_field} > '{since_date}T00:00:00'",
     }
 
-    resp = requests.get(endpoint, params=params, timeout=60)
+    resp = requests.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     return resp.json()
 
@@ -684,7 +691,7 @@ def fetch_history_arcgis(config, years_back=3):
         "f": "json",
     }
 
-    resp = requests.get(endpoint, params=params, timeout=60)
+    resp = requests.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -712,7 +719,7 @@ def fetch_history_ckan(config, years_back=3):
     if date_field:
         params["sort"] = f"{date_field} desc"
 
-    resp = requests.get(endpoint, params=params, timeout=60)
+    resp = requests.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -744,7 +751,7 @@ def fetch_history_carto(config, years_back=3):
 
     params = {"q": sql, "format": "json"}
 
-    resp = requests.get(endpoint, params=params, timeout=60)
+    resp = requests.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -983,11 +990,14 @@ def _collect_all_inner(days_back=30):
         # Rate limiting
         time.sleep(RATE_LIMIT_DELAY)
 
-        # Save intermediate results every 50 cities so data appears gradually
-        if (i + 1) % 50 == 0 and all_permits:
+        # V12.29: Batch processing - save and pause every BATCH_SIZE cities
+        if (i + 1) % BATCH_SIZE == 0 and all_permits:
             output_file = os.path.join(DATA_DIR, "permits.json")
             atomic_write_json(output_file, all_permits)
-            print(f"  [Intermediate save: {len(all_permits)} permits after {i+1} cities]")
+            print(f"  [Batch {(i+1)//BATCH_SIZE}: {len(all_permits)} permits after {i+1} cities]")
+            # V12.29: Pause between batches to let server breathe
+            print(f"  [Pausing {BATCH_PAUSE_SECONDS}s before next batch...]")
+            time.sleep(BATCH_PAUSE_SECONDS)
 
     # V12.22: Deduplicate permits by permit_number
     # County datasets split by city_filter can cause the same permit to appear
