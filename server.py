@@ -4855,6 +4855,14 @@ def parse_blog_post(filename):
     text_only = re.sub(r'<[^>]+>', '', html)
     excerpt = text_only[:160].strip() + '...' if len(text_only) > 160 else text_only
 
+    # V12.26: Parse FAQs if present in frontmatter (JSON array format)
+    faqs = []
+    if 'faqs' in meta:
+        try:
+            faqs = json.loads(meta['faqs'])
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         'slug': filename.replace('.md', ''),
         'title': meta.get('title', 'Untitled'),
@@ -4863,6 +4871,7 @@ def parse_blog_post(filename):
         'excerpt': excerpt,
         'content': html,
         'keywords': meta.get('keywords', ''),
+        'faqs': faqs,
     }
 
 

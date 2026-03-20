@@ -3,6 +3,7 @@ title: "Do I Need a Building Permit for a Kitchen Remodel? (2026 Guide)"
 date: "2026-03-19"
 author: "PermitGrab Team"
 keywords: "kitchen remodel permit, do i need permit kitchen, kitchen renovation permit, building permit kitchen remodel"
+faqs: [{"q": "Do I need a building permit for a kitchen remodel?", "a": "It depends on what you're changing. You need a permit if you're moving walls, relocating plumbing, adding electrical circuits, moving gas lines, or changing the footprint. Cosmetic updates like new cabinets, countertops, flooring, and paint typically don't require permits."}, {"q": "What happens if I skip the kitchen remodel permit?", "a": "Skipping a required permit can result in fines (2x to 10x the permit fee), stop-work orders, insurance claim denials, problems when selling your home, and in worst cases, being required to tear out the unpermitted work."}, {"q": "How much does a kitchen remodel permit cost?", "a": "Costs vary by city: Austin TX $500-$2,000, Chicago IL $1,800-$4,200, New York City $1,000-$5,000+, Los Angeles $500-$3,000, San Francisco $1,500-$4,500. This includes building, electrical, and plumbing permits."}]
 ---
 
 One of the most common questions homeowners and contractors ask: does a kitchen remodel actually require a building permit? The short answer is **it depends on what you're changing** — and getting it wrong can cost you thousands in fines and rework.

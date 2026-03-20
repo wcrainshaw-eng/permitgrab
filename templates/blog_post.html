@@ -29,6 +29,27 @@
   }
 }
 </script>
+{% if post.faqs %}
+<!-- V12.26 SEO: FAQ schema for rich snippets -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for faq in post.faqs %}
+    {
+      "@type": "Question",
+      "name": "{{ faq.q }}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{ faq.a }}"
+      }
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endif %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root { --primary: #2563eb; --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827; }
