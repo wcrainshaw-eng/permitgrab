@@ -63,7 +63,7 @@ def admin_reset_permits():
 
 @app.route('/api/admin/force-collection', methods=['POST'])
 def admin_force_collection():
-    """Trigger data collection immediately instead of waiting for scheduler."""
+    """V12.33: Trigger REFRESH collection (additive mode - merges with existing)."""
     secret = request.headers.get('X-Admin-Key')
     expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
     if secret != expected:
@@ -72,12 +72,10 @@ def admin_force_collection():
     import threading
     def run_collection():
         try:
-            from collector import collect_all
-            print("[Admin] Starting forced collection...")
-            collect_all(days_back=60)
-            print("[Admin] Forced collection complete.")
-            # V12.19: Explicitly reload data after collection completes
-            # (collector.py also calls this but belt-and-suspenders approach)
+            from collector import collect_refresh
+            print("[Admin] Starting REFRESH collection (additive mode)...")
+            collect_refresh(days_back=7)
+            print("[Admin] Refresh collection complete.")
             preload_data_from_disk()
             print("[Admin] Data reloaded into server memory.")
         except Exception as e:
@@ -87,8 +85,72 @@ def admin_force_collection():
     thread.start()
 
     return jsonify({
-        'message': 'Collection started in background',
-        'note': 'Data will appear on homepage within 15-20 minutes'
+        'message': 'REFRESH collection started (additive mode)',
+        'note': 'Only fetches recent permits, merges with existing data'
+    })
+
+
+@app.route('/api/admin/full-collection', methods=['POST'])
+def admin_full_collection():
+    """V12.33: Trigger FULL collection (rebuild entire dataset)."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    import threading
+    def run_collection():
+        try:
+            from collector import collect_full
+            print("[Admin] Starting FULL collection (rebuild mode)...")
+            collect_full(days_back=60)
+            print("[Admin] Full collection complete.")
+            preload_data_from_disk()
+            print("[Admin] Data reloaded into server memory.")
+        except Exception as e:
+            print(f"[Admin] Full collection error: {e}")
+
+    thread = threading.Thread(target=run_collection, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'message': 'FULL collection started (rebuild mode)',
+        'note': 'Rebuilds entire dataset from scratch. Takes 30-60 minutes.'
+    })
+
+
+@app.route('/api/admin/add-source', methods=['POST'])
+def admin_add_source():
+    """V12.33: Add a single source and merge with existing data."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    source_key = request.args.get('source')
+    source_type = request.args.get('type', 'bulk')  # 'bulk' or 'city'
+
+    if not source_key:
+        return jsonify({'error': 'Missing source parameter. Usage: ?source=nj_statewide&type=bulk'}), 400
+
+    import threading
+    def run_collection():
+        try:
+            from collector import collect_single_source
+            print(f"[Admin] Adding single source: {source_key} ({source_type})...")
+            collect_single_source(source_key, source_type)
+            print(f"[Admin] Source {source_key} added successfully.")
+            preload_data_from_disk()
+            print("[Admin] Data reloaded into server memory.")
+        except Exception as e:
+            print(f"[Admin] Add source error: {e}")
+
+    thread = threading.Thread(target=run_collection, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'message': f'Adding source: {source_key} ({source_type})',
+        'note': 'Data will be merged with existing permits'
     })
 
 
@@ -178,6 +240,68 @@ def admin_suggested_fixes():
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': f'Failed to read suggested fixes: {str(e)}'}), 500
+
+
+@app.route('/api/admin/coverage')
+def admin_coverage():
+    """V12.33: Get coverage statistics - which cities/states have data."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # Load permits to analyze coverage
+    permits_path = os.path.join(DATA_DIR, 'permits.json')
+    if not os.path.exists(permits_path):
+        return jsonify({'error': 'No permit data found'}), 404
+
+    try:
+        with open(permits_path) as f:
+            permits = json.load(f)
+
+        # Analyze by city and state
+        city_counts = {}
+        state_counts = {}
+        bulk_source_counts = {}
+
+        for p in permits:
+            city = p.get('city', 'Unknown')
+            state = p.get('state', 'Unknown')
+            source = p.get('source_bulk', 'individual')
+
+            city_key = f"{city}, {state}"
+            city_counts[city_key] = city_counts.get(city_key, 0) + 1
+            state_counts[state] = state_counts.get(state, 0) + 1
+
+            if source != 'individual':
+                bulk_source_counts[source] = bulk_source_counts.get(source, 0) + 1
+
+        # Sort by permit count
+        top_cities = sorted(city_counts.items(), key=lambda x: -x[1])[:50]
+        states_covered = sorted(state_counts.items(), key=lambda x: -x[1])
+
+        # All US states for comparison
+        all_states = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+                      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+                      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+                      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY']
+        states_missing = [s for s in all_states if s not in state_counts]
+
+        return jsonify({
+            'total_permits': len(permits),
+            'total_cities_with_data': len(city_counts),
+            'total_states_with_data': len(state_counts),
+            'states_covered': states_covered,
+            'states_missing': states_missing,
+            'top_50_cities': top_cities,
+            'bulk_source_breakdown': bulk_source_counts,
+            'permits_from_bulk': sum(bulk_source_counts.values()),
+            'permits_from_individual': len(permits) - sum(bulk_source_counts.values()),
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to analyze coverage: {str(e)}'}), 500
 
 
 # ===========================

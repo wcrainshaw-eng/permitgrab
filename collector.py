@@ -1165,20 +1165,175 @@ def collect_permit_history(years_back=3):
     return history_index, stats
 
 
-def collect_all(days_back=30):
-    """Collect permits from all active cities."""
-    # V12.2: Prevent concurrent collection runs
+def load_existing_permits():
+    """V12.33: Load existing permits from disk for additive collection."""
+    permits_file = os.path.join(DATA_DIR, "permits.json")
+    if os.path.exists(permits_file):
+        try:
+            with open(permits_file, 'r') as f:
+                permits = json.load(f)
+            print(f"[V12.33] Loaded {len(permits)} existing permits from disk")
+            return permits
+        except Exception as e:
+            print(f"[V12.33] Could not load existing permits: {e}")
+    return []
+
+
+def merge_permits(existing, new_permits):
+    """
+    V12.33: Merge new permits into existing data, deduplicating by permit_number.
+    New permits with the same permit_number overwrite old ones (fresher data).
+    """
+    # Build index of existing permits
+    by_permit_num = {}
+    for p in existing:
+        pn = p.get('permit_number', '')
+        if pn:
+            by_permit_num[pn] = p
+
+    # Add/update with new permits
+    new_count = 0
+    updated_count = 0
+    for p in new_permits:
+        pn = p.get('permit_number', '')
+        if pn:
+            if pn in by_permit_num:
+                updated_count += 1
+            else:
+                new_count += 1
+            by_permit_num[pn] = p
+
+    merged = list(by_permit_num.values())
+    print(f"[V12.33] Merged: {new_count} new, {updated_count} updated, {len(merged)} total")
+    return merged
+
+
+def collect_refresh(days_back=7):
+    """
+    V12.33: Refresh collection - only fetch recent permits and merge with existing.
+    This is the default mode for scheduled collection (every 6-12 hours).
+    Failed sources don't wipe existing data.
+    """
     if not _acquire_lock():
         return [], {}
 
     try:
-        return _collect_all_inner(days_back)
+        print("=" * 60)
+        print("PermitGrab - REFRESH Collection (Additive Mode)")
+        print(f"Fetching permits from last {days_back} days only")
+        print("=" * 60)
+
+        # Load existing permits first
+        existing_permits = load_existing_permits()
+
+        # Collect new permits
+        new_permits, stats = _collect_all_inner(days_back, additive_mode=True)
+
+        # Merge with existing
+        merged = merge_permits(existing_permits, new_permits)
+
+        # Save merged result
+        output_file = os.path.join(DATA_DIR, "permits.json")
+        atomic_write_json(output_file, merged)
+        print(f"[V12.33] Saved {len(merged)} total permits")
+
+        return merged, stats
     finally:
         _release_lock()
 
 
-def _collect_all_inner(days_back=30):
-    """Inner implementation of collect_all (called with lock held)."""
+def collect_full(days_back=60):
+    """
+    V12.33: Full collection - rebuild the entire dataset from scratch.
+    Use for initial data load and periodic cleanup (once per day at 2 AM).
+    """
+    if not _acquire_lock():
+        return [], {}
+
+    try:
+        print("=" * 60)
+        print("PermitGrab - FULL Collection (Rebuild Mode)")
+        print(f"Fetching all permits from last {days_back} days")
+        print("=" * 60)
+        return _collect_all_inner(days_back, additive_mode=False)
+    finally:
+        _release_lock()
+
+
+def collect_single_source(source_key, source_type='bulk'):
+    """
+    V12.33: Collect from a single source and merge with existing data.
+    Use when adding a new bulk source mid-day.
+
+    source_type: 'bulk' for BULK_SOURCES, 'city' for CITY_REGISTRY
+    """
+    if not _acquire_lock():
+        return [], {}
+
+    try:
+        print("=" * 60)
+        print(f"PermitGrab - SINGLE SOURCE Collection: {source_key}")
+        print("=" * 60)
+
+        existing_permits = load_existing_permits()
+        new_permits = []
+        stats = {}
+
+        if source_type == 'bulk':
+            config = get_bulk_source_config(source_key)
+            if not config:
+                print(f"[ERROR] Bulk source not found: {source_key}")
+                return existing_permits, {"error": "source_not_found"}
+
+            city_permits, source_stats = collect_bulk_source(source_key, config, days_back=90)
+            for city_slug, permits in city_permits.items():
+                new_permits.extend(permits)
+            stats[source_key] = source_stats
+            print(f"  ✓ {config['name']}: {len(new_permits)} permits")
+
+        else:  # city
+            config = get_city_config(source_key)
+            if not config:
+                print(f"[ERROR] City not found: {source_key}")
+                return existing_permits, {"error": "source_not_found"}
+
+            raw, fetch_status = fetch_permits(source_key, days_back=60)
+            for record in raw:
+                try:
+                    normalized = normalize_permit(record, source_key)
+                    if normalized and normalized.get("permit_number"):
+                        new_permits.append(normalized)
+                except Exception:
+                    continue
+            stats[source_key] = {"raw": len(raw), "normalized": len(new_permits), "status": fetch_status}
+            print(f"  ✓ {config['name']}: {len(new_permits)} permits")
+
+        # Merge with existing
+        merged = merge_permits(existing_permits, new_permits)
+
+        # Save merged result
+        output_file = os.path.join(DATA_DIR, "permits.json")
+        atomic_write_json(output_file, merged)
+        print(f"[V12.33] Saved {len(merged)} total permits")
+
+        return merged, stats
+    finally:
+        _release_lock()
+
+
+def collect_all(days_back=30):
+    """Collect permits from all active cities (legacy - calls refresh mode)."""
+    # V12.33: Default to refresh mode for backwards compatibility
+    return collect_refresh(days_back)
+
+
+def _collect_all_inner(days_back=30, additive_mode=True):
+    """Inner implementation of collect_all (called with lock held).
+
+    V12.33: additive_mode controls whether we save incrementally:
+      - True (default): Returns permits without saving (caller handles merge)
+      - False: Saves directly (full rebuild mode)
+    """
     all_permits = []
     stats = {}
     bulk_stats = {}
@@ -1342,11 +1497,15 @@ def _collect_all_inner(days_back=30):
     for p in all_permits:
         value_counts[p["value_tier"]] = value_counts.get(p["value_tier"], 0) + 1
 
-    # Save to JSON (atomic write to prevent corruption)
-    output_file = os.path.join(DATA_DIR, "permits.json")
-    print(f"[V12.30] Writing {len(all_permits)} permits to {output_file}...")
-    atomic_write_json(output_file, all_permits)
-    print(f"[V12.30] Permits written successfully.")
+    # V12.33: In additive mode, caller handles saving after merge
+    # In full mode, save directly here
+    if not additive_mode:
+        output_file = os.path.join(DATA_DIR, "permits.json")
+        print(f"[V12.33] FULL MODE: Writing {len(all_permits)} permits to {output_file}...")
+        atomic_write_json(output_file, all_permits)
+        print(f"[V12.33] Permits written successfully.")
+    else:
+        print(f"[V12.33] ADDITIVE MODE: Returning {len(all_permits)} permits for merge")
 
     # V12.30: Save stats FIRST with explicit error handling
     # This ensures timestamp updates even if hot-reload fails
