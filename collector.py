@@ -994,6 +994,18 @@ def _collect_all_inner(days_back=30):
         if (i + 1) % BATCH_SIZE == 0 and all_permits:
             output_file = os.path.join(DATA_DIR, "permits.json")
             atomic_write_json(output_file, all_permits)
+            # V12.30: Update timestamp on every batch so homepage shows recent activity
+            stats_file = os.path.join(DATA_DIR, "collection_stats.json")
+            batch_stats = {
+                "collected_at": datetime.now().isoformat(),
+                "total_permits": len(all_permits),
+                "cities_processed": i + 1,
+                "in_progress": True,
+            }
+            try:
+                atomic_write_json(stats_file, batch_stats)
+            except Exception as e:
+                print(f"  [WARNING] Failed to update batch stats: {e}")
             print(f"  [Batch {(i+1)//BATCH_SIZE}: {len(all_permits)} permits after {i+1} cities]")
             # V12.29: Pause between batches to let server breathe
             print(f"  [Pausing {BATCH_PAUSE_SECONDS}s before next batch...]")
@@ -1020,9 +1032,12 @@ def _collect_all_inner(days_back=30):
 
     # Save to JSON (atomic write to prevent corruption)
     output_file = os.path.join(DATA_DIR, "permits.json")
+    print(f"[V12.30] Writing {len(all_permits)} permits to {output_file}...")
     atomic_write_json(output_file, all_permits)
+    print(f"[V12.30] Permits written successfully.")
 
-    # Save stats (atomic write)
+    # V12.30: Save stats FIRST with explicit error handling
+    # This ensures timestamp updates even if hot-reload fails
     stats_file = os.path.join(DATA_DIR, "collection_stats.json")
     collection_stats = {
         "collected_at": datetime.now().isoformat(),
@@ -1031,8 +1046,14 @@ def _collect_all_inner(days_back=30):
         "city_stats": stats,
         "trade_breakdown": dict(sorted(trade_counts.items(), key=lambda x: -x[1])),
         "value_breakdown": value_counts,
+        "in_progress": False,  # Mark as complete
     }
-    atomic_write_json(stats_file, collection_stats)
+    print(f"[V12.30] Writing collection stats to {stats_file}...")
+    try:
+        atomic_write_json(stats_file, collection_stats)
+        print(f"[V12.30] Collection stats written successfully.")
+    except Exception as e:
+        print(f"[V12.30] ERROR writing collection stats: {e}")
 
     # V12 Fix 4.1: Save diagnostic report
     diagnostic = {
