@@ -140,6 +140,46 @@ def admin_collection_status():
         return jsonify({'error': f'Failed to read stats: {str(e)}'}), 500
 
 
+@app.route('/api/admin/validation-results')
+def admin_validation_results():
+    """V12.31: Get endpoint validation results for applying fixes."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    validation_file = os.path.join(DATA_DIR, "endpoint_validation.json")
+    if not os.path.exists(validation_file):
+        return jsonify({'error': 'No validation results found. Run validate_endpoints.py first.'}), 404
+
+    try:
+        with open(validation_file) as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': f'Failed to read validation results: {str(e)}'}), 500
+
+
+@app.route('/api/admin/suggested-fixes')
+def admin_suggested_fixes():
+    """V12.31: Get suggested fixes for broken endpoints."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    fixes_file = os.path.join(DATA_DIR, "suggested_fixes.json")
+    if not os.path.exists(fixes_file):
+        return jsonify({'error': 'No suggested fixes found. Run validate_endpoints.py --fix first.'}), 404
+
+    try:
+        with open(fixes_file) as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': f'Failed to read suggested fixes: {str(e)}'}), 500
+
+
 # ===========================
 # DATABASE SETUP (V7)
 # ===========================
