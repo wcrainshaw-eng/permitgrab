@@ -305,7 +305,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "Dataset ID needs verification",
     },
 
@@ -330,7 +330,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "404 - Dataset ID needs verification",
     },
 
@@ -355,7 +355,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "V12.3: Reactivated — verified working with V12.2 User-Agent headers",
     },
@@ -383,7 +383,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "Dataset ID needs verification",
     },
 
@@ -410,7 +410,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "404 - Dataset ID needs verification",
     },
 
@@ -435,7 +435,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - data.denvergov.org domain not responding",
     },
 
@@ -461,7 +461,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - ArcGIS endpoint returning Invalid URL error",
     },
 
@@ -543,7 +543,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUED_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Service returns 404 — MD_OpenData/MapServer not found",
     },
 
@@ -571,7 +571,7 @@ CITY_REGISTRY = {
         "date_field": "issueddate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - ArcGIS query returning invalid query parameters error",
     },
 
@@ -599,7 +599,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -649,7 +649,7 @@ CITY_REGISTRY = {
         },
         "date_field": "approval_issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - dataset not found on data.sandiego.gov",
     },
 
@@ -677,7 +677,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -768,7 +768,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -794,7 +794,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -821,7 +821,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -848,7 +848,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -874,7 +874,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -901,7 +901,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -928,7 +928,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -955,7 +955,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -982,7 +982,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - data.mesaaz.gov returns 404, use mesa_new instead",
     },
 
@@ -1009,7 +1009,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1036,7 +1036,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1063,7 +1063,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1090,7 +1090,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1117,7 +1117,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1144,7 +1144,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1171,7 +1171,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1198,7 +1198,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1230,7 +1230,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -1282,7 +1282,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.5: No public API — uses Accela web portal only (HillsGovHub)",
     },
 
@@ -1310,7 +1310,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.5: No public API — uses JaxEPICS proprietary system",
     },
 
@@ -1338,7 +1338,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Service timeout — endpoint may be down or restricted",
     },
 
@@ -1366,7 +1366,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -1394,7 +1394,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -1423,7 +1423,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "No address data in dataset - not useful for leads",
     },
 
@@ -1692,7 +1692,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1765,7 +1765,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1859,7 +1859,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "Calgary, Alberta, Canada",
     },
@@ -1886,7 +1886,7 @@ CITY_REGISTRY = {
         },
         "date_field": "application_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1909,7 +1909,7 @@ CITY_REGISTRY = {
         },
         "date_field": "inspection_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1981,7 +1981,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date_issued",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2005,7 +2005,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2031,7 +2031,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2056,7 +2056,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Fixed date_field typo but dataset ends June 2025 - no longer updated",
     },
 
@@ -2080,7 +2080,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - duplicate of new_orleans using same endpoint",
     },
 
@@ -2104,7 +2104,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "Edmonton, Alberta, Canada",
     },
@@ -2129,7 +2129,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
         "notes": "Winnipeg, Manitoba, Canada",
     },
@@ -2204,7 +2204,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2278,7 +2278,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2349,7 +2349,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - duplicate slug with new_orleans",
     },
 
@@ -2375,7 +2375,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applydate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2404,7 +2404,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2429,7 +2429,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2454,7 +2454,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2479,7 +2479,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2504,7 +2504,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2529,7 +2529,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2554,7 +2554,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2579,7 +2579,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2604,7 +2604,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2629,7 +2629,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2654,7 +2654,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2679,7 +2679,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2704,7 +2704,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2735,7 +2735,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2762,7 +2762,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },    "plano": {
         "name": "Plano",
@@ -2801,7 +2801,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2826,7 +2826,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2851,7 +2851,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2876,7 +2876,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2901,7 +2901,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2926,7 +2926,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2983,7 +2983,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3008,7 +3008,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3033,7 +3033,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3058,7 +3058,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3083,7 +3083,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3108,7 +3108,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3133,7 +3133,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3158,7 +3158,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3183,7 +3183,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3208,7 +3208,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3233,7 +3233,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3262,7 +3262,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3287,7 +3287,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3312,7 +3312,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3337,7 +3337,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3362,7 +3362,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3387,7 +3387,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3412,7 +3412,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3437,7 +3437,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3462,7 +3462,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3487,7 +3487,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3512,7 +3512,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3537,7 +3537,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3562,7 +3562,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3587,7 +3587,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3612,7 +3612,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3637,7 +3637,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3662,7 +3662,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3687,7 +3687,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3712,7 +3712,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3737,7 +3737,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3762,7 +3762,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3791,7 +3791,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3816,7 +3816,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3841,7 +3841,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3866,7 +3866,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3891,7 +3891,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3916,7 +3916,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3941,7 +3941,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3966,7 +3966,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3991,7 +3991,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4016,7 +4016,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4041,7 +4041,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4066,7 +4066,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4097,7 +4097,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4122,7 +4122,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4147,7 +4147,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4174,7 +4174,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - dataset sq5r-f8zb not found on data.buffalony.gov",
     },
 
@@ -4199,7 +4199,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4224,7 +4224,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4249,7 +4249,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4275,7 +4275,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4300,7 +4300,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4325,7 +4325,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4350,7 +4350,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4376,7 +4376,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4401,7 +4401,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4426,7 +4426,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4451,7 +4451,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4476,7 +4476,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4501,7 +4501,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4526,7 +4526,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4557,7 +4557,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4582,7 +4582,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4607,7 +4607,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4632,7 +4632,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4657,7 +4657,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4682,7 +4682,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4709,7 +4709,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4734,7 +4734,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4759,7 +4759,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "anchorage": {
@@ -4784,7 +4784,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -4809,7 +4809,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "missoula": {
@@ -4833,7 +4833,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -4858,7 +4858,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4883,7 +4883,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4908,7 +4908,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -4936,7 +4936,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "cary": {
@@ -4960,7 +4960,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "wilmington_nc": {
@@ -4984,7 +4984,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -5014,7 +5014,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "greenville_sc": {
@@ -5038,7 +5038,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "myrtle_beach": {
@@ -5062,7 +5062,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "richmond": {
@@ -5088,7 +5088,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "norfolk": {
@@ -5112,7 +5112,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "chesapeake": {
@@ -5136,7 +5136,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "arlington_va": {
@@ -5160,7 +5160,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "alexandria_va": {
@@ -5184,7 +5184,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "annapolis": {
@@ -5208,7 +5208,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "rockville": {
@@ -5252,7 +5252,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "erie": {
@@ -5276,7 +5276,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "scranton": {
@@ -5300,7 +5300,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "wilmington_de": {
@@ -5324,7 +5324,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "dover": {
@@ -5348,7 +5348,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "charleston_wv": {
@@ -5372,7 +5372,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -5400,7 +5400,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "evansville": {
@@ -5424,7 +5424,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "south_bend": {
@@ -5448,7 +5448,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "lexington": {
@@ -5472,7 +5472,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "bowling_green_ky": {
@@ -5496,7 +5496,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "knoxville": {
@@ -5520,7 +5520,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "chattanooga": {
@@ -5544,7 +5544,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "huntsville": {
@@ -5568,7 +5568,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "jackson_ms": {
@@ -5592,7 +5592,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "gulfport": {
@@ -5616,7 +5616,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -5644,7 +5644,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "lafayette_la": {
@@ -5668,7 +5668,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "fayetteville_ar": {
@@ -5692,7 +5692,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "tulsa": {
@@ -5718,7 +5718,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "norman": {
@@ -5742,7 +5742,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "kansas_city_mo": {
@@ -5768,7 +5768,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "kansas_city_ks": {
@@ -5792,7 +5792,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "overland_park": {
@@ -5816,7 +5816,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "topeka": {
@@ -5840,7 +5840,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "minneapolis": {
@@ -5866,7 +5866,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "st_paul": {
@@ -5892,7 +5892,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "rochester_mn": {
@@ -5916,7 +5916,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "duluth": {
@@ -5940,7 +5940,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -5968,7 +5968,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "athens_ga": {
@@ -5992,7 +5992,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -6020,7 +6020,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "hayward": {
@@ -6044,7 +6044,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "sunnyvale": {
@@ -6068,7 +6068,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pasadena": {
@@ -6092,7 +6092,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "torrance": {
@@ -6116,7 +6116,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pomona": {
@@ -6140,7 +6140,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "escondido": {
@@ -6164,7 +6164,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "salinas": {
@@ -6188,7 +6188,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "lancaster_ca": {
@@ -6212,7 +6212,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "palmdale": {
@@ -6236,7 +6236,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "elk_grove": {
@@ -6260,7 +6260,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "victorville": {
@@ -6284,7 +6284,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "concord": {
@@ -6308,7 +6308,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "vallejo": {
@@ -6332,7 +6332,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "berkeley": {
@@ -6356,7 +6356,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "daly_city": {
@@ -6380,7 +6380,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "el_monte": {
@@ -6404,7 +6404,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "downey": {
@@ -6428,7 +6428,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -6456,7 +6456,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "midland": {
@@ -6480,7 +6480,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "odessa": {
@@ -6504,7 +6504,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "beaumont": {
@@ -6528,7 +6528,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "abilene": {
@@ -6552,7 +6552,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "waco": {
@@ -6576,7 +6576,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "tyler": {
@@ -6600,7 +6600,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "round_rock": {
@@ -6624,7 +6624,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pearland": {
@@ -6648,7 +6648,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -6676,7 +6676,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "gainesville_fl": {
@@ -6700,7 +6700,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "lehigh_acres": {
@@ -6724,7 +6724,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "palm_bay": {
@@ -6748,7 +6748,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "lakeland": {
@@ -6772,7 +6772,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -6800,7 +6800,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "avondale": {
@@ -6824,7 +6824,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "goodyear": {
@@ -6848,7 +6848,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "buckeye": {
@@ -6872,7 +6872,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "casa_grande": {
@@ -6896,7 +6896,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "sparks": {
@@ -6920,7 +6920,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "rio_rancho": {
@@ -6944,7 +6944,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "las_cruces": {
@@ -6968,7 +6968,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "santa_fe": {
@@ -6992,7 +6992,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -7020,7 +7020,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "kenosha": {
@@ -7044,7 +7044,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "racine": {
@@ -7068,7 +7068,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "appleton": {
@@ -7092,7 +7092,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "davenport": {
@@ -7116,7 +7116,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "sioux_city": {
@@ -7140,7 +7140,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "iowa_city": {
@@ -7164,7 +7164,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "council_bluffs": {
@@ -7188,7 +7188,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "grand_island": {
@@ -7212,7 +7212,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "kearney": {
@@ -7236,7 +7236,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -7264,7 +7264,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "camden": {
@@ -7288,7 +7288,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "elizabeth": {
@@ -7312,7 +7312,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "clifton": {
@@ -7336,7 +7336,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "new_brunswick": {
@@ -7360,7 +7360,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "cambridge_ma": {
@@ -7384,7 +7384,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "quincy_ma": {
@@ -7408,7 +7408,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "newton_ma": {
@@ -7432,7 +7432,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "waterbury": {
@@ -7456,7 +7456,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "danbury": {
@@ -7480,7 +7480,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "norwalk": {
@@ -7504,7 +7504,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "meriden": {
@@ -7528,7 +7528,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -7556,7 +7556,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "utica": {
@@ -7580,7 +7580,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "binghamton": {
@@ -7604,7 +7604,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "troy": {
@@ -7628,7 +7628,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "new_rochelle": {
@@ -7652,7 +7652,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "mount_vernon": {
@@ -7676,7 +7676,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "white_plains": {
@@ -7700,7 +7700,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "cranston": {
@@ -7724,7 +7724,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "warwick_ri": {
@@ -7748,7 +7748,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pawtucket": {
@@ -7772,7 +7772,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -7821,7 +7821,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "thornton": {
@@ -7845,7 +7845,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "westminster_co": {
@@ -7869,7 +7869,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "arvada": {
@@ -7893,7 +7893,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pueblo": {
@@ -7917,7 +7917,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "boulder": {
@@ -7941,7 +7941,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "ogden": {
@@ -7965,7 +7965,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "layton": {
@@ -7989,7 +7989,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "st_george": {
@@ -8013,7 +8013,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "meridian": {
@@ -8037,7 +8037,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "nampa": {
@@ -8061,7 +8061,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "idaho_falls": {
@@ -8085,7 +8085,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pocatello": {
@@ -8109,7 +8109,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -8130,7 +8130,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": False,  # No individual permit data available
         "notes": "Houston provides aggregated monthly data, not individual permits",
     },
 
@@ -8173,7 +8173,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUED",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - ArcGIS endpoint error",
     },
 
@@ -8195,7 +8195,7 @@ CITY_REGISTRY = {
         "date_field": "COIssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - MapServer service not found",
     },
 

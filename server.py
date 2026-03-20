@@ -4268,6 +4268,7 @@ def get_all_cities_list():
 ALL_CITIES = get_all_cities_list()
 
 # V12.23 SEO: State hub pages
+# V12.28 MEGA EXPANSION: Added 28 new states (38 total with 3+ cities)
 STATE_CONFIG = {
     'texas': {'name': 'Texas', 'abbrev': 'TX'},
     'california': {'name': 'California', 'abbrev': 'CA'},
@@ -4279,6 +4280,35 @@ STATE_CONFIG = {
     'illinois': {'name': 'Illinois', 'abbrev': 'IL'},
     'ohio': {'name': 'Ohio', 'abbrev': 'OH'},
     'washington': {'name': 'Washington', 'abbrev': 'WA'},
+    # V12.28 New state hubs
+    'arizona': {'name': 'Arizona', 'abbrev': 'AZ'},
+    'massachusetts': {'name': 'Massachusetts', 'abbrev': 'MA'},
+    'new-jersey': {'name': 'New Jersey', 'abbrev': 'NJ'},
+    'north-carolina': {'name': 'North Carolina', 'abbrev': 'NC'},
+    'virginia': {'name': 'Virginia', 'abbrev': 'VA'},
+    'connecticut': {'name': 'Connecticut', 'abbrev': 'CT'},
+    'utah': {'name': 'Utah', 'abbrev': 'UT'},
+    'wisconsin': {'name': 'Wisconsin', 'abbrev': 'WI'},
+    'nevada': {'name': 'Nevada', 'abbrev': 'NV'},
+    'iowa': {'name': 'Iowa', 'abbrev': 'IA'},
+    'missouri': {'name': 'Missouri', 'abbrev': 'MO'},
+    'pennsylvania': {'name': 'Pennsylvania', 'abbrev': 'PA'},
+    'georgia': {'name': 'Georgia', 'abbrev': 'GA'},
+    'indiana': {'name': 'Indiana', 'abbrev': 'IN'},
+    'south-carolina': {'name': 'South Carolina', 'abbrev': 'SC'},
+    'idaho': {'name': 'Idaho', 'abbrev': 'ID'},
+    'michigan': {'name': 'Michigan', 'abbrev': 'MI'},
+    'tennessee': {'name': 'Tennessee', 'abbrev': 'TN'},
+    'nebraska': {'name': 'Nebraska', 'abbrev': 'NE'},
+    'new-mexico': {'name': 'New Mexico', 'abbrev': 'NM'},
+    'alabama': {'name': 'Alabama', 'abbrev': 'AL'},
+    'kansas': {'name': 'Kansas', 'abbrev': 'KS'},
+    'rhode-island': {'name': 'Rhode Island', 'abbrev': 'RI'},
+    'minnesota': {'name': 'Minnesota', 'abbrev': 'MN'},
+    'oregon': {'name': 'Oregon', 'abbrev': 'OR'},
+    'kentucky': {'name': 'Kentucky', 'abbrev': 'KY'},
+    'oklahoma': {'name': 'Oklahoma', 'abbrev': 'OK'},
+    'mississippi': {'name': 'Mississippi', 'abbrev': 'MS'},
 }
 
 
