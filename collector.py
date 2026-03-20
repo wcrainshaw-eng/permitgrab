@@ -12,8 +12,9 @@ import time
 import tempfile
 from datetime import datetime, timedelta
 from city_configs import (
-    CITY_REGISTRY, TRADE_CATEGORIES, PERMIT_VALUE_TIERS,
-    get_active_cities, get_city_config
+    CITY_REGISTRY, TRADE_CATEGORIES, PERMIT_VALUE_TIERS, BULK_SOURCES,
+    get_active_cities, get_city_config,
+    get_active_bulk_sources, get_bulk_source_config
 )
 
 # Use Render persistent disk if available, otherwise local
@@ -32,6 +33,10 @@ BATCH_PAUSE_SECONDS = 5  # Pause between batches
 
 # V12.29: Shorter timeout to fail fast on dead endpoints
 API_TIMEOUT_SECONDS = 15
+
+# V12.31: Bulk source settings
+BULK_PAGE_SIZE = 50000  # Records per API call for bulk sources
+BULK_MAX_PAGES = 20     # Max pages to fetch (1M records total)
 
 # V12.2: Shared session with proper headers — required for Socrata to not block us
 SESSION = requests.Session()
@@ -269,6 +274,275 @@ def fetch_carto(config, days_back):
     if "rows" in data:
         return data["rows"]
     return []
+
+
+# ============================================================================
+# BULK SOURCE FETCHERS (V12.31)
+# ============================================================================
+
+def fetch_socrata_bulk(config, days_back=90):
+    """
+    V12.31: Fetch ALL permits from a bulk Socrata source with pagination.
+    Returns all records without city filtering - caller handles grouping.
+    """
+    endpoint = config["endpoint"]
+    date_field = config.get("date_field", "")
+
+    # Calculate date filter
+    since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
+
+    all_records = []
+    offset = 0
+
+    for page in range(BULK_MAX_PAGES):
+        params = {
+            "$limit": BULK_PAGE_SIZE,
+            "$offset": offset,
+            "$order": f"{date_field} DESC" if date_field else ":id",
+        }
+
+        if date_field:
+            params["$where"] = f"{date_field} > '{since_date}'"
+
+        print(f"    Fetching page {page + 1} (offset {offset})...")
+
+        try:
+            resp = SESSION.get(endpoint, params=params, timeout=60)  # Longer timeout for bulk
+            resp.raise_for_status()
+            records = resp.json()
+
+            if not records:
+                print(f"    No more records at page {page + 1}")
+                break
+
+            all_records.extend(records)
+            print(f"    Got {len(records)} records (total: {len(all_records)})")
+
+            if len(records) < BULK_PAGE_SIZE:
+                # Last page
+                break
+
+            offset += BULK_PAGE_SIZE
+            time.sleep(1)  # Rate limit between pages
+
+        except Exception as e:
+            print(f"    [ERROR] Page {page + 1} failed: {e}")
+            break
+
+    return all_records
+
+
+def slugify_city_name(city_name, state):
+    """
+    V12.31: Convert a city name to a URL-safe slug.
+    e.g., "Newark City" -> "newark", "East Orange" -> "east-orange"
+    """
+    if not city_name:
+        return None
+
+    # Clean up common suffixes
+    name = city_name.strip()
+    for suffix in [" City", " Township", " Borough", " Town", " Village"]:
+        if name.endswith(suffix):
+            name = name[:-len(suffix)]
+
+    # Convert to lowercase and replace spaces/special chars with hyphens
+    slug = re.sub(r'[^a-z0-9]+', '-', name.lower())
+    slug = slug.strip('-')
+
+    # Add state suffix for disambiguation
+    return f"{slug}-{state.lower()}" if slug else None
+
+
+def collect_bulk_source(source_key, config, days_back=90):
+    """
+    V12.31: Collect permits from a bulk source and split by city.
+    Returns dict of {city_slug: [permits]} and stats.
+    """
+    print(f"\n  === BULK SOURCE: {config['name']} ===")
+
+    platform = config.get("platform", "socrata")
+    city_field = config.get("city_field")
+    state = config.get("state", "")
+
+    if not city_field:
+        print(f"    [ERROR] No city_field defined for bulk source {source_key}")
+        return {}, {"status": "error_no_city_field"}
+
+    # Fetch all records
+    if platform == "socrata":
+        raw_records = fetch_socrata_bulk(config, days_back)
+    else:
+        print(f"    [ERROR] Bulk mode not yet supported for platform: {platform}")
+        return {}, {"status": f"error_unsupported_platform_{platform}"}
+
+    if not raw_records:
+        return {}, {"status": "empty", "raw": 0}
+
+    print(f"    Total records fetched: {len(raw_records)}")
+
+    # Group records by city
+    city_groups = {}
+    unknown_city_count = 0
+
+    for record in raw_records:
+        city_name = record.get(city_field, "").strip()
+        if not city_name:
+            unknown_city_count += 1
+            continue
+
+        # Normalize city name for grouping
+        city_name_normalized = city_name.title()
+
+        if city_name_normalized not in city_groups:
+            city_groups[city_name_normalized] = []
+        city_groups[city_name_normalized].append(record)
+
+    print(f"    Found {len(city_groups)} unique cities")
+    if unknown_city_count > 0:
+        print(f"    ({unknown_city_count} records with no city value)")
+
+    # Process each city group
+    city_permits = {}  # city_slug -> [normalized permits]
+    city_stats = {}
+
+    for city_name, records in city_groups.items():
+        # Create a virtual city config for normalization
+        city_slug = slugify_city_name(city_name, state)
+        if not city_slug:
+            continue
+
+        # Create virtual config for this city
+        virtual_config = {
+            "name": city_name,
+            "state": state,
+            "slug": city_slug,
+            "platform": platform,
+            "field_map": config.get("field_map", {}),
+        }
+
+        # Normalize each permit
+        normalized = []
+        for record in records:
+            try:
+                permit = normalize_permit_bulk(record, virtual_config, source_key)
+                if permit and permit.get("permit_number"):
+                    normalized.append(permit)
+            except Exception:
+                continue
+
+        if normalized:
+            city_permits[city_slug] = normalized
+            city_stats[city_slug] = {
+                "city_name": city_name,
+                "raw": len(records),
+                "normalized": len(normalized),
+            }
+
+    stats = {
+        "status": "success",
+        "source": source_key,
+        "raw_total": len(raw_records),
+        "cities_found": len(city_groups),
+        "cities_with_permits": len(city_permits),
+        "total_normalized": sum(len(p) for p in city_permits.values()),
+        "city_breakdown": city_stats,
+    }
+
+    print(f"    Normalized {stats['total_normalized']} permits across {stats['cities_with_permits']} cities")
+
+    return city_permits, stats
+
+
+def normalize_permit_bulk(raw_record, virtual_config, source_key):
+    """
+    V12.31: Normalize a permit from a bulk source.
+    Similar to normalize_permit but uses a virtual config.
+    """
+    fmap = virtual_config.get("field_map", {})
+
+    def get_field(field_name):
+        raw_key = fmap.get(field_name, "")
+        if not raw_key:
+            return ""
+        return str(raw_record.get(raw_key, "")).strip()
+
+    # Build address
+    address = get_field("address")
+    if not address:
+        # Try common address field patterns
+        for fallback in ["location", "property_address", "site_address", "street_address"]:
+            val = str(raw_record.get(fallback, "")).strip()
+            if val and val.lower() not in ["none", "n/a", ""]:
+                address = val
+                break
+
+    if not address:
+        address = "Address not provided"
+
+    # Parse cost
+    cost_str = get_field("estimated_cost")
+    try:
+        cost = float(re.sub(r'[^\d.]', '', cost_str)) if cost_str else 0
+    except (ValueError, TypeError):
+        cost = 0
+
+    # Cap outlier values
+    if cost > 50_000_000:
+        cost = 50_000_000
+
+    # Parse date
+    date_str = get_field("filing_date")
+    parsed_date = ""
+    if date_str:
+        for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+            try:
+                parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
+                break
+            except ValueError:
+                continue
+        if not parsed_date:
+            parsed_date = str(date_str)[:10]
+
+    # Build description
+    desc = get_field("description") or get_field("work_type") or get_field("permit_type")
+
+    # Classify trade
+    trade = classify_trade(desc + " " + get_field("work_type") + " " + get_field("permit_type"))
+
+    # Score value
+    value_tier = score_value(cost)
+
+    # Generate permit number if missing
+    permit_num = get_field("permit_number")
+    if not permit_num:
+        import hashlib
+        raw_str = f"{source_key}_{address}_{parsed_date}"
+        permit_num = f"PG-{source_key[:3].upper()}-{hashlib.md5(raw_str.encode()).hexdigest()[:8]}"
+
+    city_slug = virtual_config.get("slug", source_key)
+
+    return {
+        "id": f"{city_slug}_{permit_num}",
+        "city": virtual_config.get("name", ""),
+        "state": virtual_config.get("state", ""),
+        "permit_number": sanitize_string(permit_num),
+        "permit_type": sanitize_string(get_field("permit_type")),
+        "work_type": sanitize_string(get_field("work_type")),
+        "trade_category": trade,
+        "address": sanitize_string(address),
+        "zip": sanitize_string(get_field("zip")),
+        "filing_date": parsed_date,
+        "status": sanitize_string(get_field("status")),
+        "estimated_cost": cost,
+        "value_tier": value_tier,
+        "description": sanitize_string(desc[:500]) if desc else "",
+        "contact_name": sanitize_string(get_field("contractor_name")),
+        "contact_phone": "",
+        "borough": "",
+        "source_city": city_slug,
+        "source_bulk": source_key,  # Track which bulk source this came from
+    }
 
 
 def fetch_permits(city_key, days_back=30):
@@ -907,6 +1181,44 @@ def _collect_all_inner(days_back=30):
     """Inner implementation of collect_all (called with lock held)."""
     all_permits = []
     stats = {}
+    bulk_stats = {}
+    cities_from_bulk = set()  # Track cities covered by bulk sources
+
+    # V12.31: First, process bulk sources (county/state-level datasets)
+    active_bulk_sources = get_active_bulk_sources()
+    if active_bulk_sources:
+        print("=" * 60)
+        print("PermitGrab - BULK SOURCE Collection")
+        print(f"Processing {len(active_bulk_sources)} bulk sources (counties/states)")
+        print("=" * 60)
+
+        for source_key in active_bulk_sources:
+            config = get_bulk_source_config(source_key)
+            if not config:
+                continue
+
+            try:
+                city_permits, source_stats = collect_bulk_source(source_key, config, days_back=90)
+
+                # Add all permits from bulk source
+                for city_slug, permits in city_permits.items():
+                    all_permits.extend(permits)
+                    cities_from_bulk.add(city_slug)
+
+                bulk_stats[source_key] = source_stats
+                print(f"  ✓ {config['name']}: {source_stats.get('total_normalized', 0)} permits from {source_stats.get('cities_with_permits', 0)} cities")
+
+            except Exception as e:
+                print(f"  ✗ {config['name']}: ERROR - {str(e)[:100]}")
+                bulk_stats[source_key] = {"status": f"error: {str(e)[:100]}"}
+
+            # Pause between bulk sources
+            time.sleep(5)
+
+        print(f"\n  Bulk sources complete: {len(cities_from_bulk)} cities from bulk data")
+        print(f"  Total permits from bulk: {len(all_permits)}")
+
+    # V12.31: Now process individual city APIs
     active_cities = get_active_cities()
 
     # V12 Fix 4.2: Skip cities with 10+ consecutive failures to save time
@@ -931,9 +1243,9 @@ def _collect_all_inner(days_back=30):
 
     active_cities = filtered_cities
 
-    print("=" * 60)
-    print("PermitGrab - Data Collection")
-    print(f"Pulling permits from {len(active_cities)} cities (last {days_back} days)")
+    print("\n" + "=" * 60)
+    print("PermitGrab - INDIVIDUAL CITY Collection")
+    print(f"Pulling permits from {len(active_cities)} direct city APIs (last {days_back} days)")
     print("=" * 60)
 
     for i, city_key in enumerate(active_cities):
@@ -1044,6 +1356,8 @@ def _collect_all_inner(days_back=30):
         "days_back": days_back,
         "total_permits": len(all_permits),
         "city_stats": stats,
+        "bulk_stats": bulk_stats,  # V12.31: Include bulk source stats
+        "cities_from_bulk": len(cities_from_bulk),  # V12.31
         "trade_breakdown": dict(sorted(trade_counts.items(), key=lambda x: -x[1])),
         "value_breakdown": value_counts,
         "in_progress": False,  # Mark as complete

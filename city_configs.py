@@ -9830,6 +9830,120 @@ CITY_REGISTRY = {
 
 
 # ============================================================================
+# BULK SOURCES (V12.31) - County/State-level datasets covering multiple cities
+# ============================================================================
+# Each bulk source pulls from a single API and splits by city_field.
+# This is more efficient than individual city configs for datasets
+# that cover entire counties or states.
+
+BULK_SOURCES = {
+    # =========================================================================
+    # STATE-LEVEL SOURCES
+    # =========================================================================
+
+    "nj_statewide": {
+        "name": "New Jersey Statewide",
+        "state": "NJ",
+        "platform": "socrata",
+        "mode": "bulk",
+        "endpoint": "https://data.nj.gov/resource/w9se-dmra.json",
+        "dataset_id": "w9se-dmra",
+        "description": "NJ Uniform Construction Code Building Permits - all 550 municipalities",
+        "city_field": "muniname",  # Field containing city/municipality name
+        "county_field": "county",
+        "field_map": {
+            "permit_number": "permitno",
+            "filing_date": "permitdate",
+            "permit_type": "permittypedesc",
+            "description": "permittypedesc",
+            "estimated_cost": "constcost",
+            "status": "permitstatusdesc",
+            "square_feet": "squarefeet",
+        },
+        "date_field": "permitdate",
+        "limit": 50000,  # Per-page limit for bulk fetch
+        "active": True,
+        "notes": "V12.31: Statewide dataset covering all 550 NJ municipalities",
+    },
+
+    # =========================================================================
+    # COUNTY-LEVEL SOURCES
+    # =========================================================================
+
+    "san_diego_county": {
+        "name": "San Diego County",
+        "state": "CA",
+        "platform": "socrata",
+        "mode": "bulk",
+        "endpoint": "https://internal-sandiegocounty.data.socrata.com/resource/im3c-szc4.json",
+        "dataset_id": "im3c-szc4",
+        "description": "San Diego County Building Permits - 18 cities",
+        "city_field": "city",
+        "field_map": {
+            "permit_number": "permit_number",
+            "filing_date": "issue_date",
+            "permit_type": "permit_type",
+            "description": "description",
+            "estimated_cost": "valuation",
+            "address": "site_address",
+            "status": "status",
+        },
+        "date_field": "issue_date",
+        "limit": 50000,
+        "active": True,
+        "notes": "V12.31: County dataset covering San Diego, Carlsbad, Oceanside, etc.",
+    },
+
+    "sonoma_county": {
+        "name": "Sonoma County",
+        "state": "CA",
+        "platform": "socrata",
+        "mode": "bulk",
+        "endpoint": "https://data.sonomacounty.ca.gov/resource/88ms-k5e7.json",
+        "dataset_id": "88ms-k5e7",
+        "description": "Sonoma County Building Permits - 9 cities",
+        "city_field": "jurisdiction",
+        "field_map": {
+            "permit_number": "file_number",
+            "filing_date": "issued",
+            "permit_type": "application_type",
+            "description": "description",
+            "estimated_cost": "value",
+            "status": "status",
+        },
+        "date_field": "issued",
+        "limit": 50000,
+        "active": True,
+        "notes": "V12.31: County dataset covering Santa Rosa, Petaluma, etc.",
+    },
+
+    "miami_dade_county": {
+        "name": "Miami-Dade County",
+        "state": "FL",
+        "platform": "socrata",
+        "mode": "bulk",
+        "endpoint": "https://datahub-miamidade.opendata.arcgis.com/resource/building_permits.json",
+        "dataset_id": "building_permits",
+        "description": "Miami-Dade County Building Permits - 34 cities",
+        "city_field": "municipality",
+        "field_map": {
+            "permit_number": "permit_number",
+            "filing_date": "issue_date",
+            "permit_type": "permit_type",
+            "description": "work_description",
+            "estimated_cost": "job_value",
+            "address": "address",
+            "status": "status",
+        },
+        "date_field": "issue_date",
+        "limit": 50000,
+        "active": False,  # Need to verify endpoint
+        "notes": "V12.31: Needs endpoint verification",
+    },
+}
+
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -10069,3 +10183,31 @@ PERMIT_VALUE_TIERS = {
     },
 }
 
+
+# ============================================================================
+# BULK SOURCE HELPER FUNCTIONS (V12.31)
+# ============================================================================
+
+def get_active_bulk_sources():
+    """Return list of active bulk source keys."""
+    return [k for k, v in BULK_SOURCES.items() if v.get("active", False)]
+
+
+def get_bulk_source_config(source_key):
+    """Get configuration for a specific bulk source."""
+    return BULK_SOURCES.get(source_key)
+
+
+def get_all_bulk_sources_info():
+    """Get basic info for all bulk sources (for display purposes)."""
+    sources = []
+    for key, config in BULK_SOURCES.items():
+        sources.append({
+            "key": key,
+            "name": config["name"],
+            "state": config["state"],
+            "platform": config["platform"],
+            "city_field": config.get("city_field", ""),
+            "active": config.get("active", False),
+        })
+    return sorted(sources, key=lambda x: x["name"])
