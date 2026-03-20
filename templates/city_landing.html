@@ -22,6 +22,7 @@
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 
 <!-- V12.10: Structured Data - Dataset schema for permit data -->
+<!-- V12.26: Added creator + license fields per GSC recommendations -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -44,7 +45,13 @@
     "@type": "Organization",
     "name": "PermitGrab",
     "url": "https://permitgrab.com"
-  }
+  },
+  "creator": {
+    "@type": "Organization",
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
+  },
+  "license": "https://permitgrab.com/terms"
 }
 </script>
 <!-- V12.12: Breadcrumb structured data -->

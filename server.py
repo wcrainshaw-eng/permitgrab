@@ -143,6 +143,10 @@ class User(db.Model):
     stripe_customer_id = db.Column(db.String(255))
     stripe_subscription_id = db.Column(db.String(255))
     stripe_subscription_status = db.Column(db.String(50))
+    # V12.26: Competitor Watch - JSON list of competitor names to track
+    watched_competitors = db.Column(db.Text, default='[]')
+    # V12.26: Weekly digest city subscriptions - JSON list of city names
+    digest_cities = db.Column(db.Text, default='[]')
 
     def to_dict(self):
         """Convert to dictionary for JSON responses."""
@@ -159,6 +163,9 @@ class User(db.Model):
             'stripe_customer_id': self.stripe_customer_id,
             'stripe_subscription_id': self.stripe_subscription_id,
             'stripe_subscription_status': self.stripe_subscription_status,
+            # V12.26: Competitor Watch and Digest Cities
+            'watched_competitors': json.loads(self.watched_competitors or '[]'),
+            'digest_cities': json.loads(self.digest_cities or '[]'),
         }
 
 
@@ -2338,6 +2345,19 @@ def stats_page():
                            top_cities=top_cities,
                            trade_breakdown=trade_breakdown,
                            last_updated=datetime.now().strftime('%Y-%m-%d'),
+                           footer_cities=footer_cities)
+
+
+@app.route('/map')
+def map_page():
+    """V12.26: Interactive permit heat map with Leaflet.js."""
+    user = get_current_user()
+    is_pro = user and user.plan == 'pro'
+    cities = get_all_cities_info()
+    footer_cities = get_cities_with_data()
+    return render_template('map.html',
+                           is_pro=is_pro,
+                           cities=cities,
                            footer_cities=footer_cities)
 
 
@@ -4537,6 +4557,7 @@ def sitemap():
         {'loc': SITE_URL, 'changefreq': 'daily', 'priority': '1.0'},
         {'loc': f"{SITE_URL}/pricing", 'changefreq': 'weekly', 'priority': '0.9'},
         {'loc': f"{SITE_URL}/contractors", 'changefreq': 'daily', 'priority': '0.8'},
+        {'loc': f"{SITE_URL}/map", 'changefreq': 'daily', 'priority': '0.8'},  # V12.26: Permit heat map
         {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7'},
         {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
         {'loc': f"{SITE_URL}/stats", 'changefreq': 'daily', 'priority': '0.7'},  # V12.23 SEO
@@ -4651,9 +4672,94 @@ def api_update_account():
         user.trade = data['trade']
     if 'daily_alerts' in data:
         user.daily_alerts = bool(data['daily_alerts'])
+    # V12.26: Competitor Watch and Digest Cities
+    if 'watched_competitors' in data:
+        competitors = data['watched_competitors']
+        if isinstance(competitors, list):
+            # Limit to 5 competitors, Pro only
+            if user.plan == 'pro':
+                user.watched_competitors = json.dumps(competitors[:5])
+    if 'digest_cities' in data:
+        cities = data['digest_cities']
+        if isinstance(cities, list):
+            user.digest_cities = json.dumps(cities)
 
     db.session.commit()
     return jsonify({'success': True, 'user': user.to_dict()})
+
+
+# V12.26: Competitor Watch API
+@app.route('/api/competitors/watch', methods=['GET', 'POST', 'DELETE'])
+def api_competitor_watch():
+    """Manage watched competitors for Competitor Watch alerts."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if user.plan != 'pro':
+        return jsonify({'error': 'Competitor Watch is a Pro feature', 'upgrade_url': '/pricing'}), 403
+
+    competitors = json.loads(user.watched_competitors or '[]')
+
+    if request.method == 'GET':
+        return jsonify({'competitors': competitors})
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        name = (data.get('name', '') if data else '').strip()
+        if not name:
+            return jsonify({'error': 'Competitor name required'}), 400
+        if len(competitors) >= 5:
+            return jsonify({'error': 'Maximum 5 competitors allowed'}), 400
+        if name.lower() not in [c.lower() for c in competitors]:
+            competitors.append(name)
+            user.watched_competitors = json.dumps(competitors)
+            db.session.commit()
+        return jsonify({'competitors': competitors})
+
+    elif request.method == 'DELETE':
+        data = request.get_json()
+        name = (data.get('name', '') if data else '').strip()
+        competitors = [c for c in competitors if c.lower() != name.lower()]
+        user.watched_competitors = json.dumps(competitors)
+        db.session.commit()
+        return jsonify({'competitors': competitors})
+
+
+# V12.26: Check for competitor matches in recent permits
+@app.route('/api/competitors/matches')
+def api_competitor_matches():
+    """Get permits matching watched competitors."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if user.plan != 'pro':
+        return jsonify({'error': 'Competitor Watch is a Pro feature'}), 403
+
+    competitors = json.loads(user.watched_competitors or '[]')
+    if not competitors:
+        return jsonify({'matches': [], 'message': 'No competitors being watched'})
+
+    permits = load_permits()
+    matches = []
+
+    for permit in permits:
+        contractor = (permit.get('contact_name', '') or '').lower()
+        for comp in competitors:
+            if comp.lower() in contractor:
+                matches.append({
+                    'permit': permit,
+                    'matched_competitor': comp
+                })
+                break
+
+    # Sort by filing date, most recent first
+    matches.sort(key=lambda x: x['permit'].get('filing_date', ''), reverse=True)
+
+    return jsonify({'matches': matches[:50]})  # Limit to 50 most recent
 
 
 @app.route('/api/change-password', methods=['POST'])

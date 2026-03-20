@@ -14,6 +14,7 @@
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 {% include 'partials/analytics.html' %}
 <!-- V12.23 SEO: Statistics page structured data -->
+<!-- V12.26: Added creator url + license field per GSC recommendations -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -23,10 +24,12 @@
   "url": "https://permitgrab.com/stats",
   "creator": {
     "@type": "Organization",
-    "name": "PermitGrab"
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
   },
   "dateModified": "{{ last_updated }}",
-  "temporalCoverage": "2024/2026"
+  "temporalCoverage": "2024/2026",
+  "license": "https://permitgrab.com/terms"
 }
 </script>
 <style>

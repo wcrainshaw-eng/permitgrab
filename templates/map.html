@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building Permit Map | PermitGrab</title>
+<meta name="description" content="Interactive map of building permits across 140+ US cities. Find construction activity near you.">
+<link rel="canonical" href="https://permitgrab.com/map">
+<meta property="og:title" content="Building Permit Map | PermitGrab">
+<meta property="og:description" content="Interactive map of building permits across 140+ US cities.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://permitgrab.com/map">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<!-- Leaflet MarkerCluster CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --green: #16a34a;
+  --blue: #2563eb;
+  --orange: #f97316;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); }
+
+/* MAP CONTAINER */
+.map-page { display: flex; flex-direction: column; height: calc(100vh - 64px); }
+.map-header {
+  background: white;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.map-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+.map-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.map-controls select, .map-controls input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+.map-controls select:focus, .map-controls input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.locate-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .2s;
+}
+.locate-btn:hover { background: var(--primary-dark); }
+.locate-btn svg { width: 16px; height: 16px; }
+
+#map { flex: 1; width: 100%; min-height: 400px; }
+
+/* LEGEND */
+.map-legend {
+  position: absolute;
+  bottom: 30px;
+  right: 10px;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  z-index: 1000;
+  font-size: 13px;
+}
+.legend-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--gray-900);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.legend-dot.residential { background: var(--green); }
+.legend-dot.commercial { background: var(--blue); }
+.legend-dot.high-value { background: var(--orange); }
+
+/* LOADING STATE */
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 24px 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  z-index: 1000;
+  text-align: center;
+}
+.map-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* POPUP STYLES */
+.permit-popup { min-width: 200px; }
+.permit-popup h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--gray-900); }
+.permit-popup p { font-size: 13px; color: var(--gray-600); margin-bottom: 4px; }
+.permit-popup .value { font-weight: 600; color: var(--primary); }
+.permit-popup .trade-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--gray-100);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.permit-popup .view-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.permit-popup .view-link:hover { text-decoration: underline; }
+
+/* PRO BLUR */
+.blurred-popup {
+  filter: blur(4px);
+  pointer-events: none;
+}
+.upgrade-notice {
+  text-align: center;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+.upgrade-notice a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  .map-header { flex-direction: column; align-items: stretch; }
+  .map-controls { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<div class="map-page">
+  <div class="map-header">
+    <h1>Permit Map</h1>
+    <div class="map-controls">
+      <select id="filter-city" onchange="filterMap()">
+        <option value="">All Cities</option>
+        {% for city in cities %}
+        <option value="{{ city.name }}">{{ city.name }}, {{ city.state }}</option>
+        {% endfor %}
+      </select>
+      <select id="filter-trade" onchange="filterMap()">
+        <option value="">All Trades</option>
+        <option value="Residential">Residential</option>
+        <option value="Commercial">Commercial</option>
+        <option value="HVAC">HVAC</option>
+        <option value="Electrical">Electrical</option>
+        <option value="Plumbing">Plumbing</option>
+        <option value="Roofing">Roofing</option>
+        <option value="Solar">Solar</option>
+      </select>
+      <button class="locate-btn" onclick="locateUser()">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        My Location
+      </button>
+    </div>
+  </div>
+
+  <div id="map" style="position: relative;">
+    <div class="map-loading" id="map-loading">
+      <div class="spinner"></div>
+      <div>Loading permits...</div>
+    </div>
+  </div>
+
+  <div class="map-legend">
+    <div class="legend-title">Permit Types</div>
+    <div class="legend-item"><span class="legend-dot residential"></span> Residential</div>
+    <div class="legend-item"><span class="legend-dot commercial"></span> Commercial</div>
+    <div class="legend-item"><span class="legend-dot high-value"></span> High Value ($100K+)</div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Leaflet MarkerCluster JS -->
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+<script>
+const isPro = {{ 'true' if is_pro else 'false' }};
+let map;
+let markers;
+let allPermits = [];
+
+// City coordinates for clustering (pre-geocoded city centers)
+const cityCoords = {
+  'Austin': [30.2672, -97.7431],
+  'Chicago': [41.8781, -87.6298],
+  'Houston': [29.7604, -95.3698],
+  'Dallas': [32.7767, -96.7970],
+  'San Antonio': [29.4241, -98.4936],
+  'Phoenix': [33.4484, -112.0740],
+  'Los Angeles': [34.0522, -118.2437],
+  'San Diego': [32.7157, -117.1611],
+  'San Francisco': [37.7749, -122.4194],
+  'San Jose': [37.3382, -121.8863],
+  'Denver': [39.7392, -104.9903],
+  'Seattle': [47.6062, -122.3321],
+  'Portland': [45.5152, -122.6784],
+  'Miami': [25.7617, -80.1918],
+  'Orlando': [28.5383, -81.3792],
+  'Tampa': [27.9506, -82.4572],
+  'Atlanta': [33.7490, -84.3880],
+  'Nashville': [36.1627, -86.7816],
+  'Charlotte': [35.2271, -80.8431],
+  'Raleigh': [35.7796, -78.6382],
+  'Boston': [42.3601, -71.0589],
+  'New York': [40.7128, -74.0060],
+  'Philadelphia': [39.9526, -75.1652],
+  'Pittsburgh': [40.4406, -79.9959],
+  'Detroit': [42.3314, -83.0458],
+  'Minneapolis': [44.9778, -93.2650],
+  'St. Louis': [38.6270, -90.1994],
+  'Kansas City': [39.0997, -94.5786],
+  'Las Vegas': [36.1699, -115.1398],
+  'Salt Lake City': [40.7608, -111.8910],
+  // Default for unknown cities - will be scattered slightly
+};
+
+function initMap() {
+  // Center on US
+  map = L.map('map').setView([39.8283, -98.5795], 4);
+
+  // Add tile layer (OpenStreetMap)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  // Initialize marker cluster group
+  markers = L.markerClusterGroup({
+    chunkedLoading: true,
+    maxClusterRadius: 50,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    iconCreateFunction: function(cluster) {
+      const count = cluster.getChildCount();
+      let size = 'small';
+      if (count > 100) size = 'large';
+      else if (count > 10) size = 'medium';
+
+      return L.divIcon({
+        html: '<div><span>' + count + '</span></div>',
+        className: 'marker-cluster marker-cluster-' + size,
+        iconSize: L.point(40, 40)
+      });
+    }
+  });
+
+  map.addLayer(markers);
+
+  // Load permits
+  loadPermits();
+}
+
+async function loadPermits() {
+  try {
+    const response = await fetch('/api/permits?per_page=2000');
+    const data = await response.json();
+    allPermits = data.permits || [];
+
+    addMarkersToMap(allPermits);
+    document.getElementById('map-loading').style.display = 'none';
+  } catch (error) {
+    console.error('Error loading permits:', error);
+    document.getElementById('map-loading').innerHTML = '<div>Error loading map data</div>';
+  }
+}
+
+function getMarkerColor(permit) {
+  // High value = orange
+  if ((permit.estimated_cost || 0) >= 100000) return '#f97316';
+  // Commercial keywords = blue
+  const desc = (permit.description || '').toLowerCase() + (permit.permit_type || '').toLowerCase();
+  if (desc.includes('commercial') || desc.includes('office') || desc.includes('retail') || desc.includes('restaurant')) {
+    return '#2563eb';
+  }
+  // Default residential = green
+  return '#16a34a';
+}
+
+function getCoordinates(permit) {
+  const city = permit.city || '';
+  const baseCoords = cityCoords[city];
+
+  if (baseCoords) {
+    // Add small random offset to prevent stacking
+    const lat = baseCoords[0] + (Math.random() - 0.5) * 0.05;
+    const lng = baseCoords[1] + (Math.random() - 0.5) * 0.05;
+    return [lat, lng];
+  }
+
+  // Fallback: random US location (not ideal, but prevents errors)
+  return [39.8 + (Math.random() - 0.5) * 10, -98.5 + (Math.random() - 0.5) * 20];
+}
+
+function addMarkersToMap(permits) {
+  markers.clearLayers();
+
+  permits.forEach(permit => {
+    const coords = getCoordinates(permit);
+    const color = getMarkerColor(permit);
+
+    const marker = L.circleMarker(coords, {
+      radius: 8,
+      fillColor: color,
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8
+    });
+
+    // Create popup content
+    const value = permit.estimated_cost
+      ? (permit.estimated_cost >= 1000000
+          ? '$' + (permit.estimated_cost / 1000000).toFixed(1) + 'M'
+          : '$' + permit.estimated_cost.toLocaleString())
+      : 'Not listed';
+
+    let popupContent = `
+      <div class="permit-popup">
+        <h4>${permit.address || 'Address not available'}</h4>
+        <p><strong>${permit.city || 'Unknown'}, ${permit.state || ''}</strong></p>
+        <p>Value: <span class="value">${value}</span></p>
+        <span class="trade-badge">${permit.trade_category || 'General'}</span>
+    `;
+
+    if (isPro) {
+      popupContent += `
+        <br><a href="/?search=${encodeURIComponent(permit.address || '')}" class="view-link">View Details &rarr;</a>
+      </div>`;
+    } else {
+      popupContent += `
+        <div class="upgrade-notice">
+          <a href="/pricing">Upgrade to Pro</a> to see full details
+        </div>
+      </div>`;
+    }
+
+    marker.bindPopup(popupContent);
+    markers.addLayer(marker);
+  });
+}
+
+function filterMap() {
+  const city = document.getElementById('filter-city').value;
+  const trade = document.getElementById('filter-trade').value;
+
+  let filtered = allPermits;
+
+  if (city) {
+    filtered = filtered.filter(p => p.city === city);
+  }
+
+  if (trade) {
+    filtered = filtered.filter(p => {
+      const cat = (p.trade_category || '').toLowerCase();
+      const desc = (p.description || '').toLowerCase();
+      return cat.includes(trade.toLowerCase()) || desc.includes(trade.toLowerCase());
+    });
+  }
+
+  addMarkersToMap(filtered);
+
+  // Zoom to filtered area if specific city selected
+  if (city && cityCoords[city]) {
+    map.setView(cityCoords[city], 10);
+  }
+}
+
+function locateUser() {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
+        map.setView([latitude, longitude], 12);
+
+        // Add user location marker
+        L.marker([latitude, longitude], {
+          icon: L.divIcon({
+            className: 'user-location',
+            html: '<div style="width:20px;height:20px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 5px rgba(0,0,0,.3);"></div>',
+            iconSize: [20, 20]
+          })
+        }).addTo(map).bindPopup('You are here');
+      },
+      error => {
+        alert('Unable to get your location. Please enable location services.');
+      }
+    );
+  } else {
+    alert('Geolocation is not supported by your browser.');
+  }
+}
+
+// Initialize map when page loads
+document.addEventListener('DOMContentLoaded', initMap);
+</script>
+
+{% include 'partials/footer.html' %}
+
+</body>
+</html>
