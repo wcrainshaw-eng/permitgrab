@@ -438,11 +438,21 @@ def slugify_for_lookup(city_name, state):
     return f"{slug}-{state.lower()}" if slug else None
 
 
+def normalize_city_key(city_name, state):
+    """V12.36: Create normalized key for deduplication (case-insensitive, trimmed)."""
+    if not city_name or not state:
+        return None
+    # Normalize: lowercase, strip whitespace, collapse multiple spaces
+    name = ' '.join(city_name.lower().split())
+    return (name, state.upper())
+
+
 def discover_cities_from_permits():
     """
     V12.32: Scan permit data to discover all cities including bulk-sourced ones.
     Returns dict of {slug: city_config} for all discovered cities.
     Caches results for 5 minutes to avoid repeated scans.
+    V12.36: Fixed deduplication - merges cities by normalized (name, state).
     """
     global _discovered_cities_cache, _discovered_cities_timestamp
 
@@ -451,21 +461,31 @@ def discover_cities_from_permits():
     if _discovered_cities_cache and cache_age < 300:
         return _discovered_cities_cache
 
-    print("[V12.32] Discovering cities from permit data...")
+    print("[V12.36] Discovering cities from permit data (with dedup)...")
+
+    # V12.36: Track by normalized (name, state) key to prevent duplicates
+    all_cities = {}
+    seen_normalized = {}  # Maps normalized_key -> slug for dedup
 
     # Start with explicit configs from CITY_REGISTRY
-    all_cities = {}
     for key, config in CITY_REGISTRY.items():
         if config.get('active', False):
             slug = config.get('slug', key)
-            all_cities[slug] = {
-                'key': key,
-                'name': config.get('name', key),
-                'state': config.get('state', ''),
-                'slug': slug,
-                'configured': True,
-                'active': True,
-            }
+            name = config.get('name', key)
+            state = config.get('state', '')
+
+            # Track by normalized key for dedup
+            norm_key = normalize_city_key(name, state)
+            if norm_key and norm_key not in seen_normalized:
+                seen_normalized[norm_key] = slug
+                all_cities[slug] = {
+                    'key': key,
+                    'name': name,
+                    'state': state,
+                    'slug': slug,
+                    'configured': True,
+                    'active': True,
+                }
 
     # Scan permits for additional cities
     permits_path = os.path.join(DATA_DIR, 'permits.json')
@@ -474,32 +494,38 @@ def discover_cities_from_permits():
             with open(permits_path) as f:
                 permits = json.load(f, strict=False)
 
-            # Find unique (city, state) pairs
-            seen_cities = set()
+            # Find unique (city, state) pairs from permits
+            permit_cities = set()
             for permit in permits:
                 city_name = permit.get('city', '').strip()
                 state = permit.get('state', '').strip()
                 if city_name and state:
-                    seen_cities.add((city_name, state))
+                    permit_cities.add((city_name, state))
 
-            # Add any cities not already in all_cities
-            for city_name, state in seen_cities:
-                slug = slugify_for_lookup(city_name, state)
-                if slug and slug not in all_cities:
-                    all_cities[slug] = {
-                        'key': slug,
-                        'name': city_name,
-                        'state': state,
-                        'slug': slug,
-                        'configured': False,  # Auto-discovered
-                        'active': True,
-                        'source_bulk': True,
-                    }
+            # Add cities not already tracked (by normalized key)
+            added_count = 0
+            for city_name, state in permit_cities:
+                norm_key = normalize_city_key(city_name, state)
+                if norm_key and norm_key not in seen_normalized:
+                    slug = slugify_for_lookup(city_name, state)
+                    if slug:
+                        seen_normalized[norm_key] = slug
+                        all_cities[slug] = {
+                            'key': slug,
+                            'name': city_name,
+                            'state': state,
+                            'slug': slug,
+                            'configured': False,  # Auto-discovered
+                            'active': True,
+                            'source_bulk': True,
+                        }
+                        added_count += 1
 
-            print(f"[V12.32] Found {len(all_cities)} total cities ({len(seen_cities)} unique from permits)")
+            print(f"[V12.36] Found {len(all_cities)} unique cities "
+                  f"({len(permit_cities)} in permits, {added_count} new)")
 
         except Exception as e:
-            print(f"[V12.32] Error scanning permits: {e}")
+            print(f"[V12.36] Error scanning permits: {e}")
 
     _discovered_cities_cache = all_cities
     _discovered_cities_timestamp = time.time()
@@ -4665,7 +4691,9 @@ STATE_CONFIG = {
 
 
 def get_state_data(state_slug):
-    """Get aggregated data for a state hub page."""
+    """Get aggregated data for a state hub page.
+    V12.36: Fixed to use normalized city names for accurate counting.
+    """
     if state_slug not in STATE_CONFIG:
         return None
 
@@ -4676,23 +4704,46 @@ def get_state_data(state_slug):
     # V12.32: Get all cities in this state, including auto-discovered bulk source cities
     state_cities = get_cities_by_state_auto(state_abbrev)
 
-    # Count permits per city
-    city_permit_counts = {}
-    city_values = {}
-    for p in permits:
-        city_name = p.get('city', '')
-        if p.get('state') == state_abbrev and city_name:
-            city_permit_counts[city_name] = city_permit_counts.get(city_name, 0) + 1
-            city_values[city_name] = city_values.get(city_name, 0) + (p.get('estimated_cost', 0) or 0)
+    # V12.36: Count permits per city using normalized names for matching
+    # This handles case differences like "SILVER SPRING" vs "Silver Spring"
+    city_permit_counts = {}  # normalized_name -> count
+    city_values = {}  # normalized_name -> total value
+    city_display_names = {}  # normalized_name -> best display name
 
-    # Add counts to city info
+    for p in permits:
+        city_name = p.get('city', '').strip()
+        if p.get('state') == state_abbrev and city_name:
+            # Normalize for counting
+            norm_name = ' '.join(city_name.lower().split())
+            city_permit_counts[norm_name] = city_permit_counts.get(norm_name, 0) + 1
+            city_values[norm_name] = city_values.get(norm_name, 0) + (p.get('estimated_cost', 0) or 0)
+            # Keep track of display name (prefer title case)
+            if norm_name not in city_display_names or city_name.istitle():
+                city_display_names[norm_name] = city_name
+
+    # Add counts to city info, matching by normalized name
     cities_with_data = []
+    seen_norm_names = set()  # Prevent duplicates in output
+
     for c in state_cities:
+        norm_name = ' '.join(c['name'].lower().split())
+        if norm_name in seen_norm_names:
+            continue  # Skip duplicate
+
         city_data = c.copy()
-        city_data['permit_count'] = city_permit_counts.get(c['name'], 0)
-        city_data['total_value'] = city_values.get(c['name'], 0)
+        city_data['permit_count'] = city_permit_counts.get(norm_name, 0)
+        city_data['total_value'] = city_values.get(norm_name, 0)
+
+        # Use best display name if available
+        if norm_name in city_display_names:
+            display_name = city_display_names[norm_name]
+            # Prefer title case version
+            if display_name.istitle():
+                city_data['name'] = display_name
+
         if city_data['permit_count'] > 0:
             cities_with_data.append(city_data)
+            seen_norm_names.add(norm_name)
 
     # Sort by permit count
     cities_with_data.sort(key=lambda x: x['permit_count'], reverse=True)
