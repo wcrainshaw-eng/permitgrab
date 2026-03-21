@@ -361,7 +361,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "Dataset ID needs verification",
     },
 
@@ -388,7 +388,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "404 - Dataset ID needs verification",
     },
 
@@ -413,7 +413,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.8: Deactivated - data.denvergov.org domain not responding",
     },
 
@@ -439,7 +439,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.8: Deactivated - ArcGIS endpoint returning Invalid URL error",
     },
 
@@ -577,7 +577,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -627,7 +627,7 @@ CITY_REGISTRY = {
         },
         "date_field": "approval_issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.8: Deactivated - dataset not found on data.sandiego.gov",
     },
 
@@ -655,7 +655,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -686,7 +686,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUED_DATE",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     # =========================================================================
@@ -717,7 +717,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     # =========================================================================
@@ -746,7 +746,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -772,7 +772,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -799,7 +799,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -879,7 +879,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -906,7 +906,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -933,7 +933,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -960,7 +960,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.8: Deactivated - data.mesaaz.gov returns 404, use mesa_new instead",
     },
 
@@ -987,7 +987,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1014,7 +1014,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1041,7 +1041,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1068,7 +1068,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1095,7 +1095,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1122,7 +1122,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1149,7 +1149,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1176,7 +1176,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -1208,7 +1208,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -1260,7 +1260,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.5: No public API — uses Accela web portal only (HillsGovHub)",
     },
 
@@ -1288,7 +1288,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.5: No public API — uses JaxEPICS proprietary system",
     },
 
@@ -1316,7 +1316,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.4: Service timeout — endpoint may be down or restricted",
     },
 
@@ -1344,7 +1344,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -1372,7 +1372,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.4: Fabricated ArcGIS org ID — returns Invalid URL",
     },
 
@@ -2299,7 +2299,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2324,7 +2324,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2349,7 +2349,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2374,7 +2374,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2399,7 +2399,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2424,7 +2424,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2449,7 +2449,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2474,7 +2474,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2499,7 +2499,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2524,7 +2524,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2549,7 +2549,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2574,7 +2574,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2599,7 +2599,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2630,7 +2630,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2657,7 +2657,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },    "plano": {
         "name": "Plano",
@@ -2703,7 +2703,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2728,7 +2728,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2753,7 +2753,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2778,7 +2778,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2803,7 +2803,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2828,7 +2828,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2899,7 +2899,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2924,7 +2924,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2949,7 +2949,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2974,7 +2974,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -2999,7 +2999,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3024,7 +3024,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3049,7 +3049,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3074,7 +3074,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3099,7 +3099,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3124,7 +3124,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3149,7 +3149,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3178,7 +3178,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3203,7 +3203,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3228,7 +3228,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3253,7 +3253,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3278,7 +3278,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3303,7 +3303,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3328,7 +3328,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3353,7 +3353,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3378,7 +3378,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3403,7 +3403,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3428,7 +3428,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3453,7 +3453,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3478,7 +3478,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3503,7 +3503,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3528,7 +3528,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3553,7 +3553,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3578,7 +3578,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3603,7 +3603,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3628,7 +3628,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3653,7 +3653,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3678,7 +3678,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3707,7 +3707,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3732,7 +3732,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3757,7 +3757,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3782,7 +3782,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3807,7 +3807,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3832,7 +3832,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3857,7 +3857,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3882,7 +3882,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3907,7 +3907,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3932,7 +3932,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3957,7 +3957,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -3982,7 +3982,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4090,7 +4090,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.8: Deactivated - dataset sq5r-f8zb not found on data.buffalony.gov",
     },
 
@@ -4115,7 +4115,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4140,7 +4140,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4165,7 +4165,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4191,7 +4191,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4216,7 +4216,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4241,7 +4241,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4266,7 +4266,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4292,7 +4292,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4317,7 +4317,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4342,7 +4342,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4367,7 +4367,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4392,7 +4392,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4417,7 +4417,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4442,7 +4442,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4473,7 +4473,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4498,7 +4498,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4523,7 +4523,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4548,7 +4548,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4573,7 +4573,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4598,7 +4598,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4625,7 +4625,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4650,7 +4650,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4675,7 +4675,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "anchorage": {
@@ -4700,7 +4700,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -4725,7 +4725,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "missoula": {
@@ -4749,7 +4749,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -4774,7 +4774,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4799,7 +4799,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4824,7 +4824,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     # =========================================================================
@@ -4852,7 +4852,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "cary": {
@@ -4876,7 +4876,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "wilmington_nc": {
@@ -4900,7 +4900,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -4930,7 +4930,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "greenville_sc": {
@@ -4954,7 +4954,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "myrtle_beach": {
@@ -4978,7 +4978,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "richmond": {
@@ -5004,7 +5004,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "norfolk": {
@@ -5028,7 +5028,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "chesapeake": {
@@ -5052,7 +5052,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "arlington_va": {
@@ -5076,7 +5076,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "alexandria_va": {
@@ -5100,7 +5100,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "annapolis": {
@@ -5124,7 +5124,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "rockville": {
@@ -5174,7 +5174,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "erie": {
@@ -5198,7 +5198,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "scranton": {
@@ -5222,7 +5222,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "wilmington_de": {
@@ -5246,7 +5246,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "dover": {
@@ -5270,7 +5270,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "charleston_wv": {
@@ -5294,7 +5294,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -5322,7 +5322,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "evansville": {
@@ -5346,7 +5346,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "south_bend": {
@@ -5370,7 +5370,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "lexington": {
@@ -5394,7 +5394,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "bowling_green_ky": {
@@ -5418,7 +5418,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "knoxville": {
@@ -5442,7 +5442,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "chattanooga": {
@@ -5466,7 +5466,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "huntsville": {
@@ -5490,7 +5490,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "jackson_ms": {
@@ -5514,7 +5514,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "gulfport": {
@@ -5538,7 +5538,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -5566,7 +5566,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
     },
 
     "lafayette_la": {
@@ -5590,7 +5590,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "fayetteville_ar": {
@@ -5614,7 +5614,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "tulsa": {
@@ -5640,7 +5640,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "norman": {
@@ -5664,7 +5664,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "kansas_city_mo": {
@@ -5690,7 +5690,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "kansas_city_ks": {
@@ -5714,7 +5714,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "overland_park": {
@@ -5738,7 +5738,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "topeka": {
@@ -5762,7 +5762,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "minneapolis": {
@@ -5788,7 +5788,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "st_paul": {
@@ -5814,7 +5814,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "rochester_mn": {
@@ -5838,7 +5838,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "duluth": {
@@ -5862,7 +5862,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -5890,7 +5890,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "athens_ga": {
@@ -5914,7 +5914,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -5942,7 +5942,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "hayward": {
@@ -5966,7 +5966,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "sunnyvale": {
@@ -5990,7 +5990,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
     },
 
     "pasadena": {
@@ -6014,7 +6014,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "torrance": {
@@ -6038,7 +6038,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pomona": {
@@ -6062,7 +6062,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "escondido": {
@@ -6086,7 +6086,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "salinas": {
@@ -6110,7 +6110,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "lancaster_ca": {
@@ -6134,7 +6134,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "palmdale": {
@@ -6158,7 +6158,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "elk_grove": {
@@ -6182,7 +6182,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "victorville": {
@@ -6206,7 +6206,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "concord": {
@@ -6230,7 +6230,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "vallejo": {
@@ -6254,7 +6254,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "berkeley": {
@@ -6278,7 +6278,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "daly_city": {
@@ -6302,7 +6302,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "el_monte": {
@@ -6326,7 +6326,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "downey": {
@@ -6350,7 +6350,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -6378,7 +6378,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "midland": {
@@ -6402,7 +6402,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "odessa": {
@@ -6426,7 +6426,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "beaumont": {
@@ -6450,7 +6450,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "abilene": {
@@ -6474,7 +6474,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "waco": {
@@ -6498,7 +6498,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "tyler": {
@@ -6522,7 +6522,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "round_rock": {
@@ -6567,7 +6567,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -6595,7 +6595,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "gainesville_fl": {
@@ -6619,7 +6619,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "lehigh_acres": {
@@ -6643,7 +6643,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "palm_bay": {
@@ -6667,7 +6667,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "lakeland": {
@@ -6691,7 +6691,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -6719,7 +6719,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "avondale": {
@@ -6743,7 +6743,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "goodyear": {
@@ -6767,7 +6767,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "buckeye": {
@@ -6791,7 +6791,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "casa_grande": {
@@ -6815,7 +6815,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "sparks": {
@@ -6839,7 +6839,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "rio_rancho": {
@@ -6863,7 +6863,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "las_cruces": {
@@ -6887,7 +6887,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "santa_fe": {
@@ -6911,7 +6911,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -6939,7 +6939,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "kenosha": {
@@ -6963,7 +6963,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "racine": {
@@ -6987,7 +6987,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
     },
 
     "appleton": {
@@ -7011,7 +7011,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "davenport": {
@@ -7035,7 +7035,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "sioux_city": {
@@ -7059,7 +7059,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "iowa_city": {
@@ -7083,7 +7083,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "council_bluffs": {
@@ -7107,7 +7107,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "grand_island": {
@@ -7131,7 +7131,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "kearney": {
@@ -7155,7 +7155,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -7308,7 +7308,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "quincy_ma": {
@@ -7332,7 +7332,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "newton_ma": {
@@ -7356,7 +7356,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "waterbury": {
@@ -7380,7 +7380,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "danbury": {
@@ -7404,7 +7404,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "norwalk": {
@@ -7428,7 +7428,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "meriden": {
@@ -7452,7 +7452,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -7480,7 +7480,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "utica": {
@@ -7504,7 +7504,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "binghamton": {
@@ -7528,7 +7528,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "troy": {
@@ -7552,7 +7552,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "new_rochelle": {
@@ -7576,7 +7576,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "mount_vernon": {
@@ -7600,7 +7600,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "white_plains": {
@@ -7624,7 +7624,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "cranston": {
@@ -7648,7 +7648,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "warwick_ri": {
@@ -7672,7 +7672,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pawtucket": {
@@ -7696,7 +7696,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -7745,7 +7745,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "thornton": {
@@ -7769,7 +7769,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "westminster_co": {
@@ -7793,7 +7793,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "arvada": {
@@ -7817,7 +7817,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pueblo": {
@@ -7841,7 +7841,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "boulder": {
@@ -7865,7 +7865,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "ogden": {
@@ -7889,7 +7889,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "layton": {
@@ -7913,7 +7913,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "st_george": {
@@ -7937,7 +7937,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "meridian": {
@@ -7961,7 +7961,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "nampa": {
@@ -7985,7 +7985,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "idaho_falls": {
@@ -8009,7 +8009,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pocatello": {
@@ -8033,7 +8033,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -8120,7 +8120,7 @@ CITY_REGISTRY = {
         "date_field": "COIssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.8: Deactivated - MapServer service not found",
     },
 
