@@ -10564,6 +10564,29 @@ BULK_SOURCES = {
         "active": True,
         "notes": "V12.35: Discovery - Baton Rouge parish permits",
     },
+
+    "contra_costa_county_ca": {
+        "name": "Contra Costa County CA",
+        "state": "CA",
+        "platform": "socrata",
+        "mode": "bulk",
+        "endpoint": "https://www.transparentrichmond.org/resource/tkbh-qmdj.json",
+        "dataset_id": "tkbh-qmdj",
+        "description": "Contra Costa County Building Permits (Richmond area)",
+        "city_field": "site_city",
+        "field_map": {
+            "permit_number": "permit_no",
+            "description": "description",
+            "address": "site_address",
+            "filing_date": "applied",
+            "status": "status",
+            "permit_type": "type",
+        },
+        "date_field": "applied",
+        "limit": 50000,
+        "active": True,
+        "notes": "V12.38: Richmond, El Sobrante, San Pablo, El Cerrito, Hercules, etc.",
+    },
 }
 
 
