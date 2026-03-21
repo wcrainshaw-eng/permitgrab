@@ -1660,19 +1660,22 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     print(f"  High ($50K+): {value_counts['high']}")
     print(f"  Medium ($10K-$50K): {value_counts['medium']}")
     print(f"  Standard (<$10K): {value_counts['low']}")
-    print(f"\nData saved to: {output_file}")
 
-    # V12.18: Hot-reload data in the running server without restart
-    # Since collector runs in the same process via APScheduler, we can
-    # directly call the server's reload function to refresh in-memory data
-    try:
-        from server import preload_data_from_disk
-        preload_data_from_disk()
-        print(f"[V12.18] Hot-reloaded {len(all_permits)} permits into server memory")
-    except ImportError as e:
-        print(f"[V12.18] Could not hot-reload server data: {e}")
-    except Exception as e:
-        print(f"[V12.18] Hot-reload error: {e}")
+    # V12.42: Only hot-reload in full mode (when data was actually saved)
+    # In additive mode, collect_refresh handles save + hot-reload AFTER merging
+    if not additive_mode:
+        print(f"\nData saved to: {output_file}")
+        # V12.18: Hot-reload data in the running server without restart
+        try:
+            from server import preload_data_from_disk
+            preload_data_from_disk()
+            print(f"[V12.42] Hot-reloaded {len(all_permits)} permits into server memory")
+        except ImportError as e:
+            print(f"[V12.42] Running standalone - hot-reload skipped")
+        except Exception as e:
+            print(f"[V12.42] Hot-reload error: {e}")
+    else:
+        print(f"\n[V12.42] Additive mode - caller will handle save + hot-reload")
 
     return all_permits, collection_stats
 
