@@ -1241,6 +1241,7 @@ def collect_refresh(days_back=7):
     V12.33: Refresh collection - only fetch recent permits and merge with existing.
     This is the default mode for scheduled collection (every 6-12 hours).
     Failed sources don't wipe existing data.
+    V12.41: Fixed hot-reload timing - now happens AFTER save, not before.
     """
     if not _acquire_lock():
         return [], {}
@@ -1263,7 +1264,18 @@ def collect_refresh(days_back=7):
         # Save merged result
         output_file = os.path.join(DATA_DIR, "permits.json")
         atomic_write_json(output_file, merged)
-        print(f"[V12.33] Saved {len(merged)} total permits")
+        print(f"[V12.41] Saved {len(merged)} total permits to {output_file}")
+
+        # V12.41: Hot-reload AFTER saving to disk
+        # Previous bug: hot-reload in _collect_all_inner happened BEFORE save
+        try:
+            from server import preload_data_from_disk
+            preload_data_from_disk()
+            print(f"[V12.41] Hot-reloaded {len(merged)} permits into server memory")
+        except ImportError:
+            print("[V12.41] Running standalone - hot-reload skipped")
+        except Exception as e:
+            print(f"[V12.41] Hot-reload error: {e}")
 
         return merged, stats
     finally:
