@@ -1247,6 +1247,8 @@ def collect_full(days_back=180):
     V12.33: Full collection - rebuild the entire dataset from scratch.
     Use for initial data load and periodic cleanup (once per day at 2 AM).
     V12.38: Increased default from 60 to 180 days to catch more permits.
+    V12.40: Added safety checks - won't overwrite if <1000 permits collected.
+            Uses temp file + atomic swap to prevent data loss on crash.
     """
     if not _acquire_lock():
         return [], {}
@@ -1500,11 +1502,28 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
     # V12.33: In additive mode, caller handles saving after merge
     # In full mode, save directly here
+    # V12.40: Added safety checks to prevent data wipe
     if not additive_mode:
         output_file = os.path.join(DATA_DIR, "permits.json")
-        print(f"[V12.33] FULL MODE: Writing {len(all_permits)} permits to {output_file}...")
-        atomic_write_json(output_file, all_permits)
-        print(f"[V12.33] Permits written successfully.")
+        temp_file = os.path.join(DATA_DIR, "permits_rebuild_temp.json")
+
+        # Safety check: Don't overwrite with empty or very small dataset
+        MIN_PERMITS_THRESHOLD = 1000  # Expect at least 1K permits from bulk sources
+        if len(all_permits) < MIN_PERMITS_THRESHOLD:
+            print(f"[V12.40] WARNING: Only collected {len(all_permits)} permits (threshold: {MIN_PERMITS_THRESHOLD})")
+            print(f"[V12.40] ABORTING full rebuild to prevent data wipe!")
+            print(f"[V12.40] Existing permits.json preserved. Check bulk source connectivity.")
+            # Still return the permits for debugging, but don't save
+            return all_permits, {"city_stats": stats, "bulk_stats": bulk_stats, "aborted": True}
+
+        # Write to temp file first
+        print(f"[V12.40] FULL MODE: Writing {len(all_permits)} permits to temp file...")
+        atomic_write_json(temp_file, all_permits)
+
+        # Atomic swap: rename temp to final
+        print(f"[V12.40] Swapping temp file to {output_file}...")
+        os.rename(temp_file, output_file)
+        print(f"[V12.40] Permits written successfully ({len(all_permits)} total).")
     else:
         print(f"[V12.33] ADDITIVE MODE: Returning {len(all_permits)} permits for merge")
 
