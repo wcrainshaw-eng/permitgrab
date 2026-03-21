@@ -19,3 +19,4 @@ node_modules/
 # macOS
 .DS_Store
 RENDER_ENV_VARS.txt
+city_configs.py.backup.*
