@@ -35,8 +35,9 @@ BATCH_PAUSE_SECONDS = 5  # Pause between batches
 API_TIMEOUT_SECONDS = 15
 
 # V12.31: Bulk source settings
-BULK_PAGE_SIZE = 50000  # Records per API call for bulk sources
-BULK_MAX_PAGES = 20     # Max pages to fetch (1M records total)
+# V12.40: Reduced from 50K to 10K to prevent memory issues on Render (512MB)
+BULK_PAGE_SIZE = 10000  # Records per API call for bulk sources
+BULK_MAX_PAGES = 50     # Max pages to fetch (500K records total)
 
 # V12.2: Shared session with proper headers — required for Socrata to not block us
 SESSION = requests.Session()
@@ -283,13 +284,19 @@ def fetch_carto(config, days_back):
 def fetch_socrata_bulk(config, days_back=90):
     """
     V12.31: Fetch ALL permits from a bulk Socrata source with pagination.
+    V12.40: Added verbose logging for production debugging.
     Returns all records without city filtering - caller handles grouping.
     """
     endpoint = config["endpoint"]
     date_field = config.get("date_field", "")
+    source_name = config.get("name", "Unknown")
 
     # Calculate date filter
     since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
+
+    print(f"    [V12.40] Starting bulk fetch: {source_name}", flush=True)
+    print(f"    [V12.40] Endpoint: {endpoint}", flush=True)
+    print(f"    [V12.40] Date field: {date_field}, since: {since_date}", flush=True)
 
     all_records = []
     offset = 0
@@ -304,19 +311,31 @@ def fetch_socrata_bulk(config, days_back=90):
         if date_field:
             params["$where"] = f"{date_field} > '{since_date}'"
 
-        print(f"    Fetching page {page + 1} (offset {offset})...")
+        print(f"    Fetching page {page + 1} (offset {offset})...", flush=True)
 
         try:
-            resp = SESSION.get(endpoint, params=params, timeout=60)  # Longer timeout for bulk
+            resp = SESSION.get(endpoint, params=params, timeout=90)  # V12.40: Increased timeout
+            print(f"    [V12.40] Response status: {resp.status_code}", flush=True)
             resp.raise_for_status()
-            records = resp.json()
+
+            # V12.40: Check for error responses from Socrata
+            try:
+                records = resp.json()
+            except Exception as json_err:
+                print(f"    [V12.40] JSON parse error: {json_err}", flush=True)
+                print(f"    [V12.40] Response text: {resp.text[:500]}", flush=True)
+                break
+
+            if isinstance(records, dict) and records.get("error"):
+                print(f"    [V12.40] Socrata error: {records}", flush=True)
+                break
 
             if not records:
-                print(f"    No more records at page {page + 1}")
+                print(f"    No more records at page {page + 1}", flush=True)
                 break
 
             all_records.extend(records)
-            print(f"    Got {len(records)} records (total: {len(all_records)})")
+            print(f"    Got {len(records)} records (total: {len(all_records)})", flush=True)
 
             if len(records) < BULK_PAGE_SIZE:
                 # Last page
@@ -325,10 +344,19 @@ def fetch_socrata_bulk(config, days_back=90):
             offset += BULK_PAGE_SIZE
             time.sleep(1)  # Rate limit between pages
 
+        except requests.exceptions.Timeout as e:
+            print(f"    [V12.40] TIMEOUT on page {page + 1}: {e}", flush=True)
+            break
+        except requests.exceptions.RequestException as e:
+            print(f"    [V12.40] REQUEST ERROR on page {page + 1}: {type(e).__name__}: {e}", flush=True)
+            break
         except Exception as e:
-            print(f"    [ERROR] Page {page + 1} failed: {e}")
+            print(f"    [V12.40] UNEXPECTED ERROR on page {page + 1}: {type(e).__name__}: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             break
 
+    print(f"    [V12.40] Bulk fetch complete: {len(all_records)} total records", flush=True)
     return all_records
 
 
