@@ -103,7 +103,7 @@ def admin_full_collection():
         try:
             from collector import collect_full
             print("[Admin] Starting FULL collection (rebuild mode)...")
-            collect_full(days_back=60)
+            collect_full(days_back=180)  # V12.38: Expanded from 60 to 180 days
             print("[Admin] Full collection complete.")
             preload_data_from_disk()
             print("[Admin] Data reloaded into server memory.")
@@ -3945,7 +3945,8 @@ def admin_trigger_collection():
     from collector import collect_all
 
     # Run in background thread so it doesn't block
-    thread = threading.Thread(target=collect_all, kwargs={"days_back": 60}, daemon=True)
+    # V12.38: Expanded from 60 to 180 days
+    thread = threading.Thread(target=collect_all, kwargs={"days_back": 180}, daemon=True)
     thread.start()
 
     return jsonify({
@@ -5375,8 +5376,9 @@ def scheduled_collection():
             print(f"[{datetime.now()}] Running scheduled data collection...")
 
             # Regular permit collection (daily)
+            # V12.38: Expanded from 60 to 180 days to catch more permits
             from collector import collect_all, collect_permit_history
-            collect_all(days_back=60)
+            collect_all(days_back=180)
             print(f"[{datetime.now()}] Permit collection complete.")
 
             # Violation collection (daily)

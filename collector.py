@@ -1242,10 +1242,11 @@ def collect_refresh(days_back=7):
         _release_lock()
 
 
-def collect_full(days_back=60):
+def collect_full(days_back=180):
     """
     V12.33: Full collection - rebuild the entire dataset from scratch.
     Use for initial data load and periodic cleanup (once per day at 2 AM).
+    V12.38: Increased default from 60 to 180 days to catch more permits.
     """
     if not _acquire_lock():
         return [], {}
@@ -1297,7 +1298,7 @@ def collect_single_source(source_key, source_type='bulk'):
                 print(f"[ERROR] City not found: {source_key}")
                 return existing_permits, {"error": "source_not_found"}
 
-            raw, fetch_status = fetch_permits(source_key, days_back=60)
+            raw, fetch_status = fetch_permits(source_key, days_back=180)
             for record in raw:
                 try:
                     normalized = normalize_permit(record, source_key)
@@ -1618,4 +1619,4 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
 
 if __name__ == "__main__":
-    permits, stats = collect_all(days_back=60)
+    permits, stats = collect_all(days_back=180)
