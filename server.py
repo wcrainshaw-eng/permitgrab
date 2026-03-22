@@ -589,6 +589,13 @@ USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 _initial_data_loaded = False
 _collection_in_progress = False
 
+# V12.49: In-memory permits cache to prevent re-reading from disk on every request
+# This fixes the OOM crash (2GB memory limit exceeded) caused by concurrent requests
+# each parsing the full permits.json independently.
+_permits_cache = []
+_permits_cache_mtime = 0  # File modification time when cache was last populated
+_permits_cache_lock = threading.Lock()
+
 def preload_data_from_disk():
     """V12.12: Load existing data from disk on startup BEFORE serving any requests.
 
@@ -596,17 +603,20 @@ def preload_data_from_disk():
     rather than showing 0 permits while waiting for collection to complete.
 
     V12.19: Auto-deletes corrupted files so next collection writes clean data.
+    V12.49: Forces cache invalidation so fresh data is loaded after collection.
     """
-    global _initial_data_loaded
+    global _initial_data_loaded, _permits_cache_mtime
+    # V12.49: Invalidate cache so load_permits() re-reads from disk
+    _permits_cache_mtime = 0
     permits_file = os.path.join(DATA_DIR, 'permits.json')
     if os.path.exists(permits_file):
         try:
             file_size = os.path.getsize(permits_file)
             print(f"[Server] V12.12: Found permits.json on disk ({file_size} bytes)")
-            # Trigger a load to validate and process the data
+            # Trigger a load to validate, process, and cache the data
             permits = load_permits()
             if permits:
-                print(f"[Server] V12.12: Preloaded {len(permits)} permits from disk")
+                print(f"[Server] V12.49: Preloaded and cached {len(permits)} permits from disk")
                 _initial_data_loaded = True
             else:
                 # load_permits returned empty - file may be corrupted
@@ -1037,23 +1047,19 @@ def validate_permit_dates(permit):
         permit['date_label'] = 'Filed'  # Default label
 
 
-def load_permits():
-    """Load permits from JSON file, re-classify trades, and generate unique descriptions."""
+def _load_permits_from_disk():
+    """V12.49: Internal - read and process permits from disk. Called only when cache is stale."""
     path = os.path.join(DATA_DIR, 'permits.json')
     if os.path.exists(path):
         try:
             with open(path) as f:
                 permits = json.load(f, strict=False)
-            # V12.19: REMOVED re-write on load - this caused race conditions with collector
-            # The collector already writes clean JSON via atomic_write_json()
-            # Re-classify trades and generate descriptions on load
             for permit in permits:
                 try:
                     reclassify_permit(permit)
-                    validate_permit_dates(permit)  # V12.9: Fix future-dated permits
-                    format_permit_address(permit)  # V12.11: Fix county address display
+                    validate_permit_dates(permit)
+                    format_permit_address(permit)
                     permit['display_description'] = generate_permit_description(permit)
-                    # V12.21: Sanity check - cap outlier values at $50M (likely data entry errors)
                     if permit.get('estimated_cost', 0) > 50_000_000:
                         permit['estimated_cost'] = 50_000_000
                 except Exception as e:
@@ -1062,7 +1068,6 @@ def load_permits():
             return permits
         except json.JSONDecodeError as e:
             print(f"[Server] ERROR: Failed to parse permits.json: {e}")
-            # V12.19: Auto-delete corrupted file so next collection writes clean data
             print(f"[Server] V12.19: AUTO-DELETING corrupted permits.json")
             try:
                 os.remove(path)
@@ -1074,6 +1079,39 @@ def load_permits():
             print(f"[Server] ERROR: Unexpected error loading permits: {e}")
             return []
     return []
+
+
+def load_permits():
+    """V12.49: Load permits using in-memory cache. Only re-reads from disk when file changes.
+
+    This fixes the OOM crash where every concurrent API request independently parsed
+    the full permits.json (23MB+), blowing through the 2GB Render memory limit.
+    Now the file is parsed once and served from memory until the file changes on disk.
+    """
+    global _permits_cache, _permits_cache_mtime
+
+    path = os.path.join(DATA_DIR, 'permits.json')
+    try:
+        current_mtime = os.path.getmtime(path) if os.path.exists(path) else 0
+    except OSError:
+        current_mtime = 0
+
+    # Return cached data if file hasn't changed
+    if _permits_cache and current_mtime == _permits_cache_mtime:
+        return _permits_cache
+
+    # File changed or no cache - reload from disk (with lock to prevent stampede)
+    with _permits_cache_lock:
+        # Double-check after acquiring lock (another thread may have refreshed)
+        if _permits_cache and current_mtime == _permits_cache_mtime:
+            return _permits_cache
+
+        print(f"[Server] V12.49: Cache miss - reloading permits from disk (mtime: {current_mtime})")
+        permits = _load_permits_from_disk()
+        _permits_cache = permits
+        _permits_cache_mtime = current_mtime
+        print(f"[Server] V12.49: Cached {len(permits)} permits in memory")
+        return permits
 
 def load_stats():
     """Load collection stats."""

@@ -1283,10 +1283,19 @@ def collect_refresh(days_back=7):
         # Merge with existing
         merged = merge_permits(existing_permits, new_permits)
 
+        # V12.49: Safety check - don't save if merged result is drastically smaller
+        # than what we had. This prevents data loss if collection mostly fails.
+        existing_count = len(existing_permits)
+        merged_count = len(merged)
+        if existing_count > 1000 and merged_count < existing_count * 0.5:
+            print(f"[V12.49] WARNING: Merged ({merged_count}) is <50% of existing ({existing_count})")
+            print(f"[V12.49] ABORTING refresh save to prevent data loss!")
+            return existing_permits, stats
+
         # Save merged result
         output_file = os.path.join(DATA_DIR, "permits.json")
         atomic_write_json(output_file, merged)
-        print(f"[V12.41] Saved {len(merged)} total permits to {output_file}")
+        print(f"[V12.49] Saved {len(merged)} total permits to {output_file}")
 
         # V12.41: Hot-reload AFTER saving to disk
         # Previous bug: hot-reload in _collect_all_inner happened BEFORE save
@@ -1524,9 +1533,14 @@ def _collect_all_inner(days_back=30, additive_mode=True):
         time.sleep(RATE_LIMIT_DELAY)
 
         # V12.29: Batch processing - save and pause every BATCH_SIZE cities
+        # V12.49: CRITICAL FIX - Only do batch saves in FULL mode (additive_mode=False).
+        # In additive/refresh mode, batch saves overwrite permits.json with ONLY the
+        # newly collected permits (a handful), wiping the existing 50K+ permits.
+        # The caller (collect_refresh) handles the merge+save AFTER collection completes.
         if (i + 1) % BATCH_SIZE == 0 and all_permits:
-            output_file = os.path.join(DATA_DIR, "permits.json")
-            atomic_write_json(output_file, all_permits)
+            if not additive_mode:
+                output_file = os.path.join(DATA_DIR, "permits.json")
+                atomic_write_json(output_file, all_permits)
             # V12.30: Update timestamp on every batch so homepage shows recent activity
             stats_file = os.path.join(DATA_DIR, "collection_stats.json")
             batch_stats = {
