@@ -32,12 +32,21 @@ BATCH_SIZE = 50
 BATCH_PAUSE_SECONDS = 5  # Pause between batches
 
 # V12.29: Shorter timeout to fail fast on dead endpoints
-API_TIMEOUT_SECONDS = 15
+API_TIMEOUT_SECONDS = 30  # V12.48: Increased from 15 to 30 per spec
 
 # V12.31: Bulk source settings
 # V12.40: Reduced from 50K to 10K to prevent memory issues on Render (512MB)
 BULK_PAGE_SIZE = 10000  # Records per API call for bulk sources
 BULK_MAX_PAGES = 50     # Max pages to fetch (500K records total)
+
+# V12.48: Track failures to skip broken endpoints after 3 failures
+ENDPOINT_FAILURES = {}  # {city_key: failure_count}
+MAX_FAILURES_BEFORE_SKIP = 3
+
+def reset_failure_tracking():
+    """V12.48: Reset failure tracking at start of new collection run."""
+    global ENDPOINT_FAILURES
+    ENDPOINT_FAILURES = {}
 
 # V12.2: Shared session with proper headers — required for Socrata to not block us
 SESSION = requests.Session()
@@ -577,7 +586,13 @@ def fetch_permits(city_key, days_back=30):
     """Fetch recent permits from a city's API using the appropriate platform fetcher.
 
     V12.2: Returns (data, status_string) tuple for proper failure tracking.
+    V12.48: Skip endpoints that have failed 3+ times in this session.
     """
+    # V12.48: Skip if this endpoint has failed too many times
+    if ENDPOINT_FAILURES.get(city_key, 0) >= MAX_FAILURES_BEFORE_SKIP:
+        print(f"  [SKIP] {city_key} - disabled after {MAX_FAILURES_BEFORE_SKIP} failures")
+        return [], "skip_failed"
+
     config = get_city_config(city_key)
     if not config:
         print(f"  [SKIP] Unknown city: {city_key}")
@@ -635,6 +650,12 @@ def fetch_permits(city_key, days_back=30):
             print(f"  Retrying in {wait_time}s...")
             time.sleep(wait_time)
 
+    # V12.48: Track failure and log warning
+    ENDPOINT_FAILURES[city_key] = ENDPOINT_FAILURES.get(city_key, 0) + 1
+    fail_count = ENDPOINT_FAILURES[city_key]
+    print(f"  [WARNING] {city_key} returned 0 results (failure #{fail_count})")
+    if fail_count >= MAX_FAILURES_BEFORE_SKIP:
+        print(f"  [WARNING] {city_key} will be skipped for remainder of this session")
     return [], last_error
 
 
@@ -950,7 +971,7 @@ def normalize_address(address):
 # HISTORY FETCHERS
 # ============================================================================
 
-def fetch_history_socrata(config, years_back=3):
+def fetch_history_socrata(config, years_back=1):
     """Fetch historical permits from a Socrata SODA API."""
     endpoint = config["endpoint"]
     date_field = config["date_field"]
@@ -968,7 +989,7 @@ def fetch_history_socrata(config, years_back=3):
     return resp.json()
 
 
-def fetch_history_arcgis(config, years_back=3):
+def fetch_history_arcgis(config, years_back=1):
     """Fetch historical permits from an ArcGIS REST API FeatureServer."""
     endpoint = config["endpoint"]
     date_field = config["date_field"]
@@ -1006,7 +1027,7 @@ def fetch_history_arcgis(config, years_back=3):
     return []
 
 
-def fetch_history_ckan(config, years_back=3):
+def fetch_history_ckan(config, years_back=1):
     """Fetch historical permits from a CKAN API."""
     endpoint = config["endpoint"]
     dataset_id = config["dataset_id"]
@@ -1038,7 +1059,7 @@ def fetch_history_ckan(config, years_back=3):
     return []
 
 
-def fetch_history_carto(config, years_back=3):
+def fetch_history_carto(config, years_back=1):
     """Fetch historical permits from a CARTO SQL API."""
     endpoint = config["endpoint"]
     table_name = config.get("table_name", config["dataset_id"])
@@ -1062,8 +1083,8 @@ def fetch_history_carto(config, years_back=3):
     return []
 
 
-def fetch_permit_history(city_key, years_back=3):
-    """Fetch historical permits for a city (last 3 years)."""
+def fetch_permit_history(city_key, years_back=1):
+    """Fetch historical permits for a city (last 1 year)."""
     config = get_city_config(city_key)
     if not config:
         print(f"  [SKIP] Unknown city: {city_key}")
@@ -1105,7 +1126,7 @@ def fetch_permit_history(city_key, years_back=3):
 # COLLECTION FUNCTIONS
 # ============================================================================
 
-def collect_permit_history(years_back=3):
+def collect_permit_history(years_back=1):
     """Collect permit history from all active cities, indexed by normalized address."""
     history_index = {}
     stats = {}
@@ -1247,6 +1268,7 @@ def collect_refresh(days_back=7):
         return [], {}
 
     try:
+        reset_failure_tracking()  # V12.48: Clear failures at start of new run
         print("=" * 60)
         print("PermitGrab - REFRESH Collection (Additive Mode)")
         print(f"Fetching permits from last {days_back} days only")
@@ -1282,11 +1304,11 @@ def collect_refresh(days_back=7):
         _release_lock()
 
 
-def collect_full(days_back=180):
+def collect_full(days_back=365):
     """
     V12.33: Full collection - rebuild the entire dataset from scratch.
     Use for initial data load and periodic cleanup (once per day at 2 AM).
-    V12.38: Increased default from 60 to 180 days to catch more permits.
+    V12.48: Increased default to 365 days (1 year) to match history window.
     V12.40: Added safety checks - won't overwrite if <1000 permits collected.
             Uses temp file + atomic swap to prevent data loss on crash.
     """
@@ -1294,6 +1316,7 @@ def collect_full(days_back=180):
         return [], {}
 
     try:
+        reset_failure_tracking()  # V12.48: Clear failures at start of new run
         print("=" * 60)
         print("PermitGrab - FULL Collection (Rebuild Mode)")
         print(f"Fetching all permits from last {days_back} days")
@@ -1340,7 +1363,7 @@ def collect_single_source(source_key, source_type='bulk'):
                 print(f"[ERROR] City not found: {source_key}")
                 return existing_permits, {"error": "source_not_found"}
 
-            raw, fetch_status = fetch_permits(source_key, days_back=180)
+            raw, fetch_status = fetch_permits(source_key, days_back=365)
             for record in raw:
                 try:
                     normalized = normalize_permit(record, source_key)
@@ -1681,4 +1704,4 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
 
 if __name__ == "__main__":
-    permits, stats = collect_all(days_back=180)
+    permits, stats = collect_all(days_back=365)
