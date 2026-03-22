@@ -826,40 +826,136 @@ def check_onboarding_nudges():
 
 
 # =============================================================================
-# TEST FUNCTIONS
+# BILLING EMAILS (triggered by Stripe webhooks)
 # =============================================================================
 
-def send_test_digest(to_email, cities=None):
-    """Send a test digest email."""
-    if cities is None:
-        cities = ['Atlanta']
+def send_payment_success(user, plan='Professional'):
+    """Send payment confirmation email after successful subscription."""
+    name = user.name or 'there'
 
-    # Get recent permits
-    since = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-    permits = get_permits_for_digest(cities, since, 25)
+    content = f'''
+    <div style="padding:32px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="display:inline-block;width:64px;height:64px;background:#10b981;border-radius:50%;line-height:64px;font-size:32px;">
+          &#10003;
+        </div>
+      </div>
 
-    # Create mock user
-    class MockUser:
-        email = to_email
-        name = 'Test User'
-        digest_cities = json.dumps(cities)
-        plan = 'professional'
-        unsubscribe_token = 'test-token'
+      <h1 style="margin:0 0 16px 0;font-size:24px;color:#111827;text-align:center;">Payment Confirmed</h1>
 
-    html = build_digest_html(MockUser(), permits, is_pro=True)
+      <p style="font-size:16px;color:#4b5563;line-height:1.6;margin:0 0 24px 0;text-align:center;">
+        Hey {name}, thanks for upgrading to PermitGrab Professional! Your subscription is now active.
+      </p>
 
-    subject = f"[TEST] PermitGrab Daily Digest — {cities[0]} — {datetime.now().strftime('%b %d')}"
+      <div style="background:#f0fdf4;border-radius:8px;padding:20px;margin-bottom:24px;border:1px solid #86efac;">
+        <h3 style="margin:0 0 12px 0;font-size:16px;color:#166534;">Your Professional benefits:</h3>
+        <ul style="margin:0;padding-left:20px;color:#15803d;line-height:1.8;">
+          <li>Full contractor contact info on every permit</li>
+          <li>Unlimited daily digest permits</li>
+          <li>CSV export for all searches</li>
+          <li>Save unlimited leads</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
 
-    # Save preview
-    preview_path = '/tmp/test_digest_preview.html'
-    try:
-        with open(preview_path, 'w') as f:
-            f.write(html)
-        print(f"Preview saved to: {preview_path}")
-    except Exception:
-        pass
+      <div style="text-align:center;">
+        <a href="{SITE_URL}/dashboard" style="display:inline-block;padding:14px 32px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">Go to Dashboard</a>
+      </div>
+    </div>'''
 
-    return send_email(to_email, subject, html)
+    html = base_template(content, preheader="Your Professional subscription is active")
+    return send_email(user.email, "Payment confirmed - Welcome to PermitGrab Professional", html)
+
+
+def send_payment_failed(user):
+    """Send payment failed notification."""
+    name = user.name or 'there'
+
+    content = f'''
+    <div style="padding:32px;">
+      <h1 style="margin:0 0 16px 0;font-size:24px;color:#111827;">Payment Issue</h1>
+
+      <p style="font-size:16px;color:#4b5563;line-height:1.6;margin:0 0 24px 0;">
+        Hey {name}, we weren't able to process your latest payment. Don't worry - your account is still active for now.
+      </p>
+
+      <div style="background:#fef2f2;border-radius:8px;padding:20px;margin-bottom:24px;border:1px solid #fecaca;">
+        <p style="margin:0;color:#991b1b;">
+          Please update your payment method to avoid any interruption to your Professional access.
+        </p>
+      </div>
+
+      <div style="text-align:center;">
+        <a href="{SITE_URL}/account/billing" style="display:inline-block;padding:14px 32px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">Update Payment Method</a>
+      </div>
+
+      <p style="font-size:14px;color:#9ca3af;margin-top:24px;">
+        If you have any questions, reply to this email and we'll help you out.
+      </p>
+    </div>'''
+
+    html = base_template(content, preheader="Please update your payment method")
+    return send_email(user.email, "Action needed: Payment issue with your PermitGrab subscription", html)
+
+
+def send_subscription_renewed(user):
+    """Send subscription renewal confirmation."""
+    name = user.name or 'there'
+
+    content = f'''
+    <div style="padding:32px;">
+      <h1 style="margin:0 0 16px 0;font-size:24px;color:#111827;">Subscription Renewed</h1>
+
+      <p style="font-size:16px;color:#4b5563;line-height:1.6;margin:0 0 24px 0;">
+        Hey {name}, your PermitGrab Professional subscription has been renewed. Thanks for being a customer!
+      </p>
+
+      <p style="font-size:16px;color:#4b5563;line-height:1.6;margin:0 0 24px 0;">
+        Your receipt has been sent to this email address.
+      </p>
+
+      <div style="text-align:center;">
+        <a href="{SITE_URL}/dashboard" style="display:inline-block;padding:14px 32px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">View Dashboard</a>
+      </div>
+    </div>'''
+
+    html = base_template(content, preheader="Your subscription has been renewed")
+    return send_email(user.email, "Subscription renewed - PermitGrab Professional", html)
+
+
+def send_subscription_cancelled(user):
+    """Send subscription cancellation confirmation."""
+    name = user.name or 'there'
+
+    content = f'''
+    <div style="padding:32px;">
+      <h1 style="margin:0 0 16px 0;font-size:24px;color:#111827;">Subscription Cancelled</h1>
+
+      <p style="font-size:16px;color:#4b5563;line-height:1.6;margin:0 0 24px 0;">
+        Hey {name}, your PermitGrab Professional subscription has been cancelled. We're sorry to see you go.
+      </p>
+
+      <div style="background:#f3f4f6;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <p style="margin:0;color:#4b5563;">
+          Your account has been moved to the Free plan. You can still browse permits, but contractor contact info and advanced features are no longer available.
+        </p>
+      </div>
+
+      <p style="font-size:16px;color:#4b5563;line-height:1.6;margin:0 0 24px 0;">
+        Changed your mind? You can re-subscribe anytime:
+      </p>
+
+      <div style="text-align:center;">
+        <a href="{SITE_URL}/pricing" style="display:inline-block;padding:14px 32px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">Reactivate Professional</a>
+      </div>
+
+      <p style="font-size:14px;color:#9ca3af;margin-top:24px;">
+        If you have any feedback on why you cancelled, we'd love to hear it. Just reply to this email.
+      </p>
+    </div>'''
+
+    html = base_template(content, preheader="Your subscription has been cancelled")
+    return send_email(user.email, "Subscription cancelled - PermitGrab", html)
 
 
 # =============================================================================

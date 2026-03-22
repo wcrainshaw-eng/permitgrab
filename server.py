@@ -728,8 +728,10 @@ def get_total_city_count_auto():
     return len(discovered)
 
 
-SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')
-USERS_FILE = os.path.join(DATA_DIR, 'users.json')
+# V12.53: DEPRECATED - subscribers now stored in User model with digest_cities field
+# These constants and functions are kept for backward compatibility but not used
+SUBSCRIBERS_FILE = os.path.join(DATA_DIR, 'subscribers.json')  # DEPRECATED
+USERS_FILE = os.path.join(DATA_DIR, 'users.json')  # DEPRECATED - use PostgreSQL User model
 
 # V12.12: Startup data loading state
 # Track whether initial data has been loaded from disk
@@ -1281,15 +1283,21 @@ def render_city_not_found(searched_slug):
     ), 404
 
 
+# V12.53: DEPRECATED - Use User model with digest_cities and digest_active fields
 def load_subscribers():
-    """Load subscriber list."""
+    """DEPRECATED: Load subscriber list from JSON file.
+    V12.53: Use User.query.filter(User.digest_active == True) instead.
+    """
     if os.path.exists(SUBSCRIBERS_FILE):
         with open(SUBSCRIBERS_FILE) as f:
             return json.load(f)
     return []
 
+
 def save_subscribers(subs):
-    """Save subscriber list."""
+    """DEPRECATED: Save subscriber list to JSON file.
+    V12.53: Use User model with db.session.commit() instead.
+    """
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(SUBSCRIBERS_FILE, 'w') as f:
         json.dump(subs, f, indent=2)
@@ -1780,52 +1788,91 @@ def api_city_health():
 @app.route('/api/subscribe', methods=['POST'])
 @limiter.limit("5 per minute")
 def api_subscribe():
-    """POST /api/subscribe - Add email alert subscriber."""
+    """POST /api/subscribe - Add email alert subscriber.
+
+    V12.53: Now uses User model instead of subscribers.json.
+    Creates a lightweight User record for digest subscriptions.
+    """
     data = request.get_json()
     if not data or not data.get('email'):
         return jsonify({'error': 'Email required'}), 400
 
-    subs = load_subscribers()
+    email = data['email'].strip().lower()
+    city = data.get('city', '')
+    trade = data.get('trade', '')
 
-    # Check for duplicate
-    existing_emails = [s['email'] for s in subs]
-    if data['email'] in existing_emails:
-        return jsonify({'error': 'Email already subscribed'}), 409
+    # Check if user already exists
+    existing = find_user_by_email(email)
+    if existing:
+        # Update their digest settings
+        cities = json.loads(existing.digest_cities or '[]')
+        if city and city not in cities:
+            cities.append(city)
+            existing.digest_cities = json.dumps(cities)
+        existing.digest_active = True
+        if trade:
+            existing.trade = trade
+        db.session.commit()
 
-    sub = {
-        'email': data['email'],
-        'name': data.get('name', ''),
-        'company': data.get('company', ''),
-        'city': data.get('city', ''),
-        'trade': data.get('trade', ''),
-        'plan': data.get('plan', 'free'),
-        'subscribed_at': datetime.now().isoformat(),
-        'active': True,
-        'unsubscribe_token': generate_unsubscribe_token(),
-    }
+        return jsonify({
+            'message': f'Updated digest settings for {email}',
+            'subscriber': {'email': email, 'city': city, 'trade': trade},
+        }), 200
 
-    subs.append(sub)
-    save_subscribers(subs)
+    # Create new lightweight user for digest subscription
+    import secrets
+    try:
+        new_user = User(
+            email=email,
+            name=data.get('name', ''),
+            password_hash='',  # No password - digest-only user
+            plan='free',
+            digest_active=True,
+            digest_cities=json.dumps([city]) if city else '[]',
+            trade=trade,
+            unsubscribe_token=secrets.token_urlsafe(32),
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        print(f"[Subscribe] Created digest user: {email}")
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Email already exists'}), 409
 
     # Track alert signup event
     analytics.track_event('alert_signup', event_data={
-        'city': sub.get('city', ''),
-        'trade': sub.get('trade', '')
-    }, city_filter=sub.get('city'))
+        'city': city,
+        'trade': trade
+    }, city_filter=city)
 
     return jsonify({
-        'message': f'Successfully subscribed {sub["email"]}',
-        'subscriber': sub,
+        'message': f'Successfully subscribed {email}',
+        'subscriber': {'email': email, 'city': city, 'trade': trade},
     }), 201
+
 
 @app.route('/api/subscribers')
 def api_subscribers():
-    """GET /api/subscribers - List all subscribers (admin endpoint)."""
+    """GET /api/subscribers - List all digest subscribers (admin endpoint).
+
+    V12.53: Now queries User model instead of subscribers.json.
+    """
     # Check admin authentication
     if not session.get('admin_authenticated'):
         return jsonify({'error': 'Admin authentication required'}), 401
 
-    subs = load_subscribers()
+    users = User.query.filter(User.digest_active == True).all()
+    subs = []
+    for u in users:
+        subs.append({
+            'email': u.email,
+            'name': u.name,
+            'city': json.loads(u.digest_cities or '[]'),
+            'trade': u.trade,
+            'plan': u.plan,
+            'subscribed_at': u.created_at.isoformat() if u.created_at else None,
+        })
+
     return jsonify({
         'total': len(subs),
         'subscribers': subs,
@@ -2910,20 +2957,15 @@ def api_onboarding():
         user_obj.trade = trade
         user_obj.daily_alerts = daily_alerts
         user_obj.onboarding_completed = True
-        db.session.commit()
 
-    # If they opted into alerts, add them to subscribers
-    if daily_alerts:
-        subs = load_subscribers()
-        if not any(s.get('email') == user['email'] for s in subs):
-            subs.append({
-                'email': user['email'],
-                'name': user.get('name', ''),
-                'city': city,
-                'trade': trade,
-                'subscribed_at': datetime.now().isoformat()
-            })
-            save_subscribers(subs)
+        # V12.53: Update digest settings in User model instead of subscribers.json
+        if daily_alerts and city:
+            cities = json.loads(user_obj.digest_cities or '[]')
+            if city not in cities:
+                cities.append(city)
+            user_obj.digest_cities = json.dumps(cities)
+            user_obj.digest_active = True
+        db.session.commit()
 
     # Track onboarding complete event
     analytics.track_event('onboarding_complete', event_data={
@@ -3500,44 +3542,89 @@ def stripe_webhook():
     except stripe.error.SignatureVerificationError:
         return jsonify({'error': 'Invalid signature'}), 400
 
-    # Handle checkout.session.completed event
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        customer_email = session.get('customer_email') or session.get('customer_details', {}).get('email')
-        plan = session.get('metadata', {}).get('plan', 'professional')
+    event_type = event['type']
+    print(f"[Stripe] Received event: {event_type}")
+
+    # V12.53: Handle all subscription lifecycle events
+    if event_type == 'checkout.session.completed':
+        # New subscription or upgrade
+        session_obj = event['data']['object']
+        customer_email = session_obj.get('customer_email') or session_obj.get('customer_details', {}).get('email')
+        plan = session_obj.get('metadata', {}).get('plan', 'professional')
 
         if customer_email:
-            # Create or update subscriber with professional plan
-            subs = load_subscribers()
-            existing = next((s for s in subs if s['email'] == customer_email), None)
+            user = find_user_by_email(customer_email)
+            if user:
+                user.plan = 'pro'
+                user.stripe_customer_id = session_obj.get('customer')
+                user.subscription_id = session_obj.get('subscription')
+                # Clear trial fields since they're now a paying customer
+                user.trial_end_date = None
+                user.trial_started_at = None
+                db.session.commit()
+                print(f"[Stripe] User {customer_email} upgraded to {plan}")
 
-            if existing:
-                existing['plan'] = plan
-                existing['stripe_customer_id'] = session.get('customer')
-                existing['subscription_id'] = session.get('subscription')
-                existing['upgraded_at'] = datetime.now().isoformat()
-            else:
-                subs.append({
-                    'email': customer_email,
-                    'name': session.get('customer_details', {}).get('name', ''),
-                    'company': '',
-                    'city': '',
-                    'trade': '',
-                    'plan': plan,
-                    'subscribed_at': datetime.now().isoformat(),
-                    'active': True,
-                    'stripe_customer_id': session.get('customer'),
-                    'subscription_id': session.get('subscription'),
-                })
-
-            save_subscribers(subs)
-            print(f"[Stripe] Subscriber {customer_email} upgraded to {plan}")
+                # V12.53: Send payment success email
+                try:
+                    from email_alerts import send_payment_success
+                    send_payment_success(user, plan)
+                except Exception as e:
+                    print(f"[Stripe] Payment success email failed: {e}")
 
             # Track payment success event
             analytics.track_event('payment_success', event_data={
                 'plan': plan,
-                'stripe_customer_id': session.get('customer')
+                'stripe_customer_id': session_obj.get('customer')
             }, user_id_override=customer_email)
+
+    elif event_type == 'invoice.payment_failed':
+        # Payment failed
+        invoice = event['data']['object']
+        customer_email = invoice.get('customer_email')
+
+        if customer_email:
+            user = find_user_by_email(customer_email)
+            if user:
+                print(f"[Stripe] Payment failed for {customer_email}")
+                try:
+                    from email_alerts import send_payment_failed
+                    send_payment_failed(user)
+                except Exception as e:
+                    print(f"[Stripe] Payment failed email failed: {e}")
+
+    elif event_type == 'invoice.payment_succeeded':
+        # Renewal payment succeeded
+        invoice = event['data']['object']
+        customer_email = invoice.get('customer_email')
+        # Only send renewal email if this is not the first payment
+        billing_reason = invoice.get('billing_reason')
+
+        if customer_email and billing_reason == 'subscription_cycle':
+            user = find_user_by_email(customer_email)
+            if user:
+                print(f"[Stripe] Subscription renewed for {customer_email}")
+                try:
+                    from email_alerts import send_subscription_renewed
+                    send_subscription_renewed(user)
+                except Exception as e:
+                    print(f"[Stripe] Renewal email failed: {e}")
+
+    elif event_type == 'customer.subscription.deleted':
+        # Subscription cancelled
+        subscription = event['data']['object']
+        customer_id = subscription.get('customer')
+
+        # Find user by stripe_customer_id
+        user = User.query.filter_by(stripe_customer_id=customer_id).first()
+        if user:
+            user.plan = 'free'
+            db.session.commit()
+            print(f"[Stripe] Subscription cancelled for {user.email}")
+            try:
+                from email_alerts import send_subscription_cancelled
+                send_subscription_cancelled(user)
+            except Exception as e:
+                print(f"[Stripe] Cancellation email failed: {e}")
 
     return jsonify({'status': 'success'})
 
@@ -3714,6 +3801,10 @@ def api_login():
     # Log in the user
     session['user_email'] = email
 
+    # V12.53: Update last_login_at timestamp
+    user.last_login_at = datetime.utcnow()
+    db.session.commit()
+
     # Track login event
     analytics.track_event('login')
 
@@ -3773,10 +3864,10 @@ def api_unsubscribe():
             </body></html>
         '''), 400
 
-    subs = load_subscribers()
-    subscriber = next((s for s in subs if s.get('unsubscribe_token') == token), None)
+    # V12.53: Use User model instead of subscribers.json
+    user = User.query.filter_by(unsubscribe_token=token).first()
 
-    if not subscriber:
+    if not user:
         return render_template_string('''
             <!DOCTYPE html>
             <html><head><title>Error</title></head>
@@ -3786,10 +3877,9 @@ def api_unsubscribe():
             </body></html>
         '''), 404
 
-    # Mark as inactive
-    subscriber['active'] = False
-    subscriber['unsubscribed_at'] = datetime.now().isoformat()
-    save_subscribers(subs)
+    # Mark digest as inactive
+    user.digest_active = False
+    db.session.commit()
 
     return render_template_string('''
         <!DOCTYPE html>
@@ -3801,7 +3891,7 @@ def api_unsubscribe():
                 Changed your mind? <a href="/">Re-subscribe anytime</a>
             </p>
         </body></html>
-    ''', email=subscriber['email'])
+    ''', email=user.email)
 
 
 # ===========================
@@ -3845,7 +3935,8 @@ def admin_page():
 
     # V12.51: Load data from SQLite for admin dashboard
     permit_stats = permitdb.get_permit_stats()
-    subscribers = load_subscribers()
+    # V12.53: Count digest subscribers from User model instead of subscribers.json
+    digest_subscribers = User.query.filter(User.digest_active == True).all()
     stats = load_stats()
 
     # V11 Fix 2.1: Get real user stats from database
@@ -4043,7 +4134,7 @@ def admin_page():
         pro_users=len(pro_users),
         last_updated=stats.get('collected_at', ''),
         subscribers=subscribers,
-        total_subscribers=len(subscribers),
+        total_subscribers=len(digest_subscribers),
         diagnostic=diagnostic,
         success_msg=request.args.get('success', ''),
         error_msg=request.args.get('error', ''),
@@ -4136,28 +4227,11 @@ def admin_upgrade_user():
     if plan not in ('free', 'pro', 'enterprise'):
         return redirect('/admin?error=Invalid+plan')
 
-    # Update user (V7: direct database update)
+    # V12.53: Direct User model update (removed subscribers.json dependency)
     user_obj = find_user_by_email(email)
-    user_found = user_obj is not None
     if user_obj:
         user_obj.plan = plan
         db.session.commit()
-
-    # Also update subscriber if exists
-    subs = load_subscribers()
-    sub_found = False
-    for sub in subs:
-        if sub.get('email', '').lower() == email:
-            sub['plan'] = plan
-            sub['upgraded_at'] = datetime.now().isoformat()
-            sub['upgraded_by'] = 'admin'
-            sub_found = True
-            break
-
-    if sub_found:
-        save_subscribers(subs)
-
-    if user_found or sub_found:
         return redirect(f'/admin?success=Upgraded+{email}+to+{plan}')
     else:
         return redirect(f'/admin?error=User+{email}+not+found')
