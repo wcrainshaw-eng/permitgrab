@@ -21,6 +21,7 @@ from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, 
 from lifecycle import get_lifecycle_label
 from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_slugs
 import analytics
+import db  # V12.50: SQLite database layer
 
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
@@ -63,50 +64,44 @@ def admin_reset_permits():
 
 @app.route('/api/admin/force-collection', methods=['POST'])
 def admin_force_collection():
-    """V12.33: Trigger REFRESH collection (additive mode - merges with existing)."""
+    """V12.50: Trigger REFRESH collection (upserts to SQLite)."""
     secret = request.headers.get('X-Admin-Key')
     expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
     if secret != expected:
         return jsonify({'error': 'Unauthorized'}), 401
 
-    import threading
     def run_collection():
         try:
             from collector import collect_refresh
-            print("[Admin] Starting REFRESH collection (additive mode)...")
+            print("[Admin] Starting REFRESH collection...")
             collect_refresh(days_back=7)
             print("[Admin] Refresh collection complete.")
-            preload_data_from_disk()
-            print("[Admin] Data reloaded into server memory.")
         except Exception as e:
-            print(f"[Admin] Force collection error: {e}")
+            print(f"[Admin] Collection error: {e}")
 
     thread = threading.Thread(target=run_collection, daemon=True)
     thread.start()
 
     return jsonify({
-        'message': 'REFRESH collection started (additive mode)',
-        'note': 'Only fetches recent permits, merges with existing data'
+        'message': 'REFRESH collection started',
+        'note': 'V12.50: Data written directly to SQLite'
     })
 
 
 @app.route('/api/admin/full-collection', methods=['POST'])
 def admin_full_collection():
-    """V12.33: Trigger FULL collection (rebuild entire dataset)."""
+    """V12.50: Trigger FULL collection (rebuild SQLite)."""
     secret = request.headers.get('X-Admin-Key')
     expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
     if secret != expected:
         return jsonify({'error': 'Unauthorized'}), 401
 
-    import threading
     def run_collection():
         try:
             from collector import collect_full
             print("[Admin] Starting FULL collection (rebuild mode)...")
-            collect_full(days_back=180)  # V12.38: Expanded from 60 to 180 days
+            collect_full(days_back=365)
             print("[Admin] Full collection complete.")
-            preload_data_from_disk()
-            print("[Admin] Data reloaded into server memory.")
         except Exception as e:
             print(f"[Admin] Full collection error: {e}")
 
@@ -115,13 +110,13 @@ def admin_full_collection():
 
     return jsonify({
         'message': 'FULL collection started (rebuild mode)',
-        'note': 'Rebuilds entire dataset from scratch. Takes 30-60 minutes.'
+        'note': 'V12.50: Rebuilds SQLite database. Takes 30-60 minutes.'
     })
 
 
 @app.route('/api/admin/add-source', methods=['POST'])
 def admin_add_source():
-    """V12.33: Add a single source and merge with existing data."""
+    """V12.50: Add a single source and upsert to SQLite."""
     secret = request.headers.get('X-Admin-Key')
     expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
     if secret != expected:
@@ -133,15 +128,12 @@ def admin_add_source():
     if not source_key:
         return jsonify({'error': 'Missing source parameter. Usage: ?source=nj_statewide&type=bulk'}), 400
 
-    import threading
     def run_collection():
         try:
             from collector import collect_single_source
             print(f"[Admin] Adding single source: {source_key} ({source_type})...")
             collect_single_source(source_key, source_type)
             print(f"[Admin] Source {source_key} added successfully.")
-            preload_data_from_disk()
-            print("[Admin] Data reloaded into server memory.")
         except Exception as e:
             print(f"[Admin] Add source error: {e}")
 
@@ -150,7 +142,7 @@ def admin_add_source():
 
     return jsonify({
         'message': f'Adding source: {source_key} ({source_type})',
-        'note': 'Data will be merged with existing permits'
+        'note': 'V12.50: Data written directly to SQLite'
     })
 
 
@@ -604,8 +596,21 @@ def preload_data_from_disk():
 
     V12.19: Auto-deletes corrupted files so next collection writes clean data.
     V12.49: Forces cache invalidation so fresh data is loaded after collection.
+    V12.50: Initialize SQLite database on startup.
     """
     global _initial_data_loaded, _permits_cache_mtime
+
+    # V12.50: Initialize SQLite database (creates tables if needed)
+    try:
+        db.init_db()
+        stats = db.get_permit_stats()
+        if stats['total_permits'] > 0:
+            print(f"[Server] V12.50: SQLite ready with {stats['total_permits']} permits")
+            _initial_data_loaded = True
+            return  # SQLite has data, no need to check JSON
+    except Exception as e:
+        print(f"[Server] V12.50: SQLite init error: {e}, falling back to JSON")
+
     # V12.49: Invalidate cache so load_permits() re-reads from disk
     _permits_cache_mtime = 0
     permits_file = os.path.join(DATA_DIR, 'permits.json')
@@ -1571,123 +1576,111 @@ def health_check():
 @limiter.limit("60 per minute")
 def api_permits():
     """
-    GET /api/permits
+    GET /api/permits — V12.50: SQL-backed queries.
     Query params: city, trade, value, status, search, quality, page, per_page
     Returns paginated, filtered permit data with lead scores.
 
     FREEMIUM GATING: Non-Pro users see masked contact info on ALL permits.
     """
-    permits = load_permits()
-
-    # Add lead scores to all permits
-    permits = add_lead_scores(permits)
-
-    # Apply filters
+    # Parse filters
     city = request.args.get('city', '')
     trade = request.args.get('trade', '')
     value = request.args.get('value', '')
-    status = request.args.get('status', '')
+    status_filter = request.args.get('status', '')
     quality = request.args.get('quality', '')
-    search = request.args.get('search', '').lower()
+    search = request.args.get('search', '')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
 
-    # City filter - handle both slug (from onboarding) and city name (from dashboard)
+    # Resolve city slug to name if needed
+    city_name = None
     if city:
-        # Try to resolve city slug to city name
         city_key, city_config = get_city_by_slug(city)
         if city_config:
             city_name = city_config.get('name', city)
         else:
             city_name = city  # Use as-is if not a valid slug
-        permits = [p for p in permits if p.get('city') == city_name]
 
-    # Trade filter - handle both slug (from onboarding) and trade category name (from dashboard)
+    # Resolve trade slug to name if needed
+    trade_name = None
     if trade and trade != 'all-trades':
-        # Try to resolve trade slug to trade name
         trade_config = get_trade(trade)
         if trade_config:
             trade_name = trade_config.get('name', trade)
         else:
             trade_name = trade  # Use as-is if not a valid slug
-        # Case-insensitive match for trade_category
-        permits = [p for p in permits if p.get('trade_category', '').lower() == trade_name.lower()]
-    if value:
-        permits = [p for p in permits if p.get('value_tier') == value]
-    if status:
-        permits = [p for p in permits if p.get('status') == status]
+
+    # V12.50: Query SQLite database (replaces loading 100K permits into memory)
+    permits, total = db.query_permits(
+        city=city_name,
+        trade=trade_name,
+        value=value or None,
+        status=status_filter or None,
+        search=search or None,
+        page=page,
+        per_page=per_page,
+        order_by='filing_date DESC'
+    )
+
+    # Add lead scores to page results
+    permits = add_lead_scores(permits)
+
+    # Sort by lead score (hot leads first) within page
+    permits.sort(key=lambda x: x.get('lead_score', 0), reverse=True)
+
+    # Quality filter (post-query since lead_score is computed)
     if quality:
         if quality == 'hot':
             permits = [p for p in permits if p.get('lead_quality') == 'hot']
         elif quality == 'warm':
             permits = [p for p in permits if p.get('lead_quality') in ('hot', 'warm')]
-    if search:
-        permits = [p for p in permits if search in
-                   f"{p.get('address','')} {p.get('description','')} {p.get('contact_name','')} {p.get('permit_number','')} {p.get('zip','')}".lower()]
-
-    # Sort by lead score (hot leads first)
-    permits.sort(key=lambda x: x.get('lead_score', 0), reverse=True)
-
-    # Pagination
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 50))
-    total = len(permits)
-    start = (page - 1) * per_page
-    page_permits = permits[start:start + per_page]
 
     # FREEMIUM GATING: Strip contact info for ALL permits for non-Pro users
     user = get_current_user()
     user_is_pro = is_pro(user)
 
     if not user_is_pro:
-        # Strip contact info from ALL permits for non-Pro users
-        for permit in page_permits:
+        for permit in permits:
             permit['contact_phone'] = None
             permit['contact_name'] = None
             permit['contact_email'] = None
             permit['owner_name'] = None
             permit['is_gated'] = True
     else:
-        # Pro users get all contact info
-        for permit in page_permits:
+        for permit in permits:
             permit['is_gated'] = False
 
-    # V8: Add last_updated timestamp
-    stats = load_stats()
-    last_updated = stats.get('collected_at', '')
-
-    # V12.27: Calculate total stats from ALL permits (not just page) for consistency
-    all_permits = load_permits()
-    total_value = sum(p.get('estimated_cost', 0) or 0 for p in all_permits)
-    high_value_count = sum(1 for p in all_permits if (p.get('estimated_cost', 0) or 0) >= 100000)
+    # V12.50: Aggregate stats from SQL (not from loading all permits!)
+    stats_data = db.get_permit_stats()
+    collection_stats = load_stats()  # Keep this for collected_at timestamp
 
     return jsonify({
-        'permits': page_permits,
+        'permits': permits,
         'total': total,
         'page': page,
         'per_page': per_page,
         'total_pages': (total + per_page - 1) // per_page,
         'user_is_pro': user_is_pro,
-        'last_updated': last_updated,
-        # V12.27: Include aggregate stats for hero section consistency
-        'total_value': total_value,
-        'high_value_count': high_value_count,
-        'total_permits': len(all_permits),
+        'last_updated': collection_stats.get('collected_at', ''),
+        'total_value': stats_data['total_value'],
+        'high_value_count': stats_data['high_value_count'],
+        'total_permits': stats_data['total_permits'],
     })
 
 @app.route('/api/stats')
 def api_stats():
-    """GET /api/stats - Dashboard statistics."""
-    permits = load_permits()
-    stats = load_stats()
+    """GET /api/stats — V12.50: SQL-backed stats."""
+    stats_data = db.get_permit_stats()
+    collection_stats = load_stats()
 
     return jsonify({
-        'total_permits': len(permits),
-        'total_value': sum(p.get('estimated_cost', 0) for p in permits),
-        # V12.18: High-value = $100K+ projects (more meaningful to contractors than lead score)
-        'high_value_count': len([p for p in permits if p.get('estimated_cost', 0) >= 100000]),
-        'cities': len(set(p.get('city') for p in permits)),
-        'trade_breakdown': stats.get('trade_breakdown', {}),
-        'value_breakdown': stats.get('value_breakdown', {}),
-        'last_updated': stats.get('collected_at', ''),
+        'total_permits': stats_data['total_permits'],
+        'total_value': stats_data['total_value'],
+        'high_value_count': stats_data['high_value_count'],
+        'cities': stats_data['city_count'],
+        'trade_breakdown': collection_stats.get('trade_breakdown', {}),
+        'value_breakdown': collection_stats.get('value_breakdown', {}),
+        'last_updated': collection_stats.get('collected_at', ''),
     })
 
 @app.route('/api/filters')
@@ -5401,23 +5394,30 @@ def blog_post(slug):
 # SCHEDULED DATA COLLECTION
 # ===========================
 def scheduled_collection():
-    """Run data collection every 24 hours. Waits for initial collection first."""
-    # V12.2: Wait for initial collection to finish (sleep 30 minutes on first boot)
-    print(f"[{datetime.now()}] Scheduled collector waiting 30 minutes for initial collection...")
-    time.sleep(1800)  # 30 minutes
+    """V12.50: Run delta collection every 6 hours."""
+    # Wait for initial data to be ready (reduced from 30 — SQLite startup is instant)
+    print(f"[{datetime.now()}] V12.50: Scheduled collector waiting 5 minutes for startup...")
+    time.sleep(300)  # 5 minutes
 
     # Track when we last ran permit history (run weekly)
     last_history_run = None
 
     while True:
         try:
-            print(f"[{datetime.now()}] Running scheduled data collection...")
+            print(f"[{datetime.now()}] V12.50: Running scheduled REFRESH collection...")
 
-            # Regular permit collection (daily)
-            # V12.38: Expanded from 60 to 180 days to catch more permits
-            from collector import collect_all, collect_permit_history
-            collect_all(days_back=180)
-            print(f"[{datetime.now()}] Permit collection complete.")
+            # V12.50: Use collect_refresh for delta collection
+            from collector import collect_refresh, collect_permit_history
+            collect_refresh(days_back=7)
+            print(f"[{datetime.now()}] Refresh collection complete.")
+
+            # V12.50: Prune old permits (keep last 90 days)
+            try:
+                deleted = db.delete_old_permits(days=90)
+                if deleted > 0:
+                    print(f"[{datetime.now()}] Pruned {deleted} old permits.")
+            except Exception as e:
+                print(f"[{datetime.now()}] Prune error: {e}")
 
             # Violation collection (daily)
             try:
@@ -5439,7 +5439,7 @@ def scheduled_collection():
             now = datetime.now()
             if last_history_run is None or (now - last_history_run).days >= 7:
                 try:
-                    collect_permit_history(years_back=3)
+                    collect_permit_history(years_back=1)
                     last_history_run = now
                     print(f"[{datetime.now()}] Permit history collection complete.")
                 except Exception as e:
@@ -5457,8 +5457,8 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Collection error: {e}")
 
-        # Sleep 24 hours
-        time.sleep(86400)
+        # V12.50: Sleep 6 hours (reduced from 24 — deltas are lightweight)
+        time.sleep(21600)
 
 
 def run_initial_collection():

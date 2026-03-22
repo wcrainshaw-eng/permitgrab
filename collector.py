@@ -16,6 +16,7 @@ from city_configs import (
     get_active_cities, get_city_config,
     get_active_bulk_sources, get_bulk_source_config
 )
+import db  # V12.50: SQLite database layer
 
 # Use Render persistent disk if available, otherwise local
 if os.path.isdir('/var/data'):
@@ -1127,13 +1128,13 @@ def fetch_permit_history(city_key, years_back=1):
 # ============================================================================
 
 def collect_permit_history(years_back=1):
-    """Collect permit history from all active cities, indexed by normalized address."""
-    history_index = {}
-    stats = {}
+    """V12.50: Collect permit history into SQLite."""
+    db.init_db()
     active_cities = get_active_cities()
+    stats = {}
 
     print("=" * 60)
-    print("PermitGrab - Permit History Collection")
+    print("PermitGrab V12.50 - Permit History Collection")
     print(f"Pulling {years_back} years of history from {len(active_cities)} cities")
     print("=" * 60)
 
@@ -1142,76 +1143,74 @@ def collect_permit_history(years_back=1):
         raw = fetch_permit_history(city_key, years_back)
         city_count = 0
 
+        # Process in batches of 500 to limit memory
+        batch = []
         for record in raw:
             try:
                 normalized = normalize_permit(record, city_key)
                 if not normalized or not normalized["permit_number"]:
                     continue
-
                 addr_key = normalize_address(normalized["address"])
                 if not addr_key or addr_key == "address not provided":
                     continue
 
-                if addr_key not in history_index:
-                    history_index[addr_key] = {
-                        "address": normalized["address"],
-                        "city": normalized["city"],
-                        "state": normalized["state"],
-                        "permits": []
-                    }
-
-                history_index[addr_key]["permits"].append({
-                    "permit_number": normalized["permit_number"],
-                    "permit_type": normalized["permit_type"],
-                    "work_type": normalized["work_type"],
-                    "trade_category": normalized["trade_category"],
-                    "filing_date": normalized["filing_date"],
-                    "estimated_cost": normalized["estimated_cost"],
-                    "description": normalized["description"][:200],
-                    "contractor": normalized["contact_name"],
-                })
+                batch.append((addr_key, normalized))
                 city_count += 1
+
+                if len(batch) >= 500:
+                    _flush_history_batch(batch)
+                    batch = []
 
             except Exception:
                 continue
 
-        stats[city_key] = {
-            "raw": len(raw),
-            "indexed": city_count,
-            "city_name": config["name"],
-        }
+        # Flush remaining
+        if batch:
+            _flush_history_batch(batch)
 
-        # Rate limiting
+        stats[city_key] = {"raw": len(raw), "indexed": city_count, "city_name": config["name"]}
         time.sleep(RATE_LIMIT_DELAY)
 
-    # Sort permits by date for each address
-    for addr_key in history_index:
-        history_index[addr_key]["permits"].sort(
-            key=lambda x: x["filing_date"] or "0000-00-00",
-            reverse=True
+    # Print summary
+    conn = db.get_connection()
+    total = conn.execute("SELECT COUNT(*) FROM permit_history").fetchone()[0]
+    addresses = conn.execute("SELECT COUNT(DISTINCT address_key) FROM permit_history").fetchone()[0]
+    repeats = conn.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT address_key FROM permit_history GROUP BY address_key HAVING COUNT(*) >= 3
         )
-        history_index[addr_key]["permit_count"] = len(history_index[addr_key]["permits"])
-
-    # Save to JSON (atomic write)
-    output_file = os.path.join(DATA_DIR, "permit_history.json")
-    atomic_write_json(output_file, history_index)
-
-    total_addresses = len(history_index)
-    total_permits = sum(len(h["permits"]) for h in history_index.values())
-    repeat_renovators = sum(1 for h in history_index.values() if len(h["permits"]) >= 3)
+    """).fetchone()[0]
 
     print("\n" + "=" * 60)
     print("PERMIT HISTORY COLLECTION COMPLETE")
     print("=" * 60)
-    print(f"Total unique addresses: {total_addresses}")
-    print(f"Total historical permits: {total_permits}")
-    print(f"Repeat Renovators (3+ permits): {repeat_renovators}")
+    print(f"Total addresses: {addresses}")
+    print(f"Total historical permits: {total}")
+    print(f"Repeat Renovators (3+): {repeats}")
     print(f"\nBy City:")
     for key, s in sorted(stats.items(), key=lambda x: -x[1]["indexed"]):
         print(f"  {s['city_name']}: {s['indexed']} permits indexed ({s['raw']} raw)")
-    print(f"\nData saved to: {output_file}")
 
-    return history_index, stats
+    return stats
+
+
+def _flush_history_batch(batch):
+    """V12.50: Write a batch of history records to SQLite."""
+    conn = db.get_connection()
+    for addr_key, n in batch:
+        conn.execute("""
+            INSERT OR IGNORE INTO permit_history (
+                address_key, address, city, state,
+                permit_number, permit_type, work_type, trade_category,
+                filing_date, estimated_cost, description, contractor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            addr_key, n["address"], n["city"], n["state"],
+            n["permit_number"], n["permit_type"], n["work_type"], n["trade_category"],
+            n["filing_date"], n["estimated_cost"], n.get("description", "")[:200],
+            n.get("contact_name")
+        ))
+    conn.commit()
 
 
 def load_existing_permits():
@@ -1259,85 +1258,106 @@ def merge_permits(existing, new_permits):
 
 def collect_refresh(days_back=7):
     """
-    V12.33: Refresh collection - only fetch recent permits and merge with existing.
-    This is the default mode for scheduled collection (every 6-12 hours).
-    Failed sources don't wipe existing data.
-    V12.41: Fixed hot-reload timing - now happens AFTER save, not before.
+    V12.50: Delta collection. Fetch recent permits and upsert into SQLite.
+    No risk of data loss — INSERT OR REPLACE only touches rows we're updating.
     """
     if not _acquire_lock():
         return [], {}
 
     try:
-        reset_failure_tracking()  # V12.48: Clear failures at start of new run
+        db.init_db()
+        reset_failure_tracking()
+
         print("=" * 60)
-        print("PermitGrab - REFRESH Collection (Additive Mode)")
-        print(f"Fetching permits from last {days_back} days only")
+        print("PermitGrab V12.50 - REFRESH Collection (Delta Mode)")
+        print(f"Fetching permits from last {days_back} days")
         print("=" * 60)
 
-        # Load existing permits first
-        existing_permits = load_existing_permits()
-
-        # Collect new permits
+        # Collect new permits from all active sources
         new_permits, stats = _collect_all_inner(days_back, additive_mode=True)
 
-        # Merge with existing
-        merged = merge_permits(existing_permits, new_permits)
+        # Process each permit (reclassify, validate, etc.) before saving
+        for permit in new_permits:
+            try:
+                from server import reclassify_permit, validate_permit_dates, format_permit_address, generate_permit_description
+                reclassify_permit(permit)
+                validate_permit_dates(permit)
+                format_permit_address(permit)
+                permit['display_description'] = generate_permit_description(permit)
+                if permit.get('estimated_cost', 0) > 50_000_000:
+                    permit['estimated_cost'] = 50_000_000
+            except ImportError:
+                pass  # Running standalone
+            except Exception as e:
+                print(f"  [WARN] Failed to process permit: {e}")
 
-        # V12.49: Safety check - don't save if merged result is drastically smaller
-        # than what we had. This prevents data loss if collection mostly fails.
-        existing_count = len(existing_permits)
-        merged_count = len(merged)
-        if existing_count > 1000 and merged_count < existing_count * 0.5:
-            print(f"[V12.49] WARNING: Merged ({merged_count}) is <50% of existing ({existing_count})")
-            print(f"[V12.49] ABORTING refresh save to prevent data loss!")
-            return existing_permits, stats
+        # V12.50: Upsert into SQLite (replaces load→merge→save cycle)
+        if new_permits:
+            new_count, updated_count = db.upsert_permits(new_permits)
+            print(f"[V12.50] Upserted: {new_count} new, {updated_count} updated")
+        else:
+            print("[V12.50] No new permits collected")
 
-        # Save merged result
-        output_file = os.path.join(DATA_DIR, "permits.json")
-        atomic_write_json(output_file, merged)
-        print(f"[V12.49] Saved {len(merged)} total permits to {output_file}")
-
-        # V12.41: Hot-reload AFTER saving to disk
-        # Previous bug: hot-reload in _collect_all_inner happened BEFORE save
-        try:
-            from server import preload_data_from_disk
-            preload_data_from_disk()
-            print(f"[V12.41] Hot-reloaded {len(merged)} permits into server memory")
-        except ImportError:
-            print("[V12.41] Running standalone - hot-reload skipped")
-        except Exception as e:
-            print(f"[V12.41] Hot-reload error: {e}")
-
-        return merged, stats
+        return new_permits, stats
     finally:
         _release_lock()
 
 
 def collect_full(days_back=365):
     """
-    V12.33: Full collection - rebuild the entire dataset from scratch.
-    Use for initial data load and periodic cleanup (once per day at 2 AM).
-    V12.48: Increased default to 365 days (1 year) to match history window.
-    V12.40: Added safety checks - won't overwrite if <1000 permits collected.
-            Uses temp file + atomic swap to prevent data loss on crash.
+    V12.50: Full collection. Rebuilds permits table from scratch.
+    Uses a transaction so the old data stays visible until the new data is ready.
     """
     if not _acquire_lock():
         return [], {}
 
     try:
-        reset_failure_tracking()  # V12.48: Clear failures at start of new run
+        db.init_db()
+        reset_failure_tracking()
+
         print("=" * 60)
-        print("PermitGrab - FULL Collection (Rebuild Mode)")
+        print("PermitGrab V12.50 - FULL Collection (Rebuild Mode)")
         print(f"Fetching all permits from last {days_back} days")
         print("=" * 60)
-        return _collect_all_inner(days_back, additive_mode=False)
+
+        new_permits, stats = _collect_all_inner(days_back, additive_mode=False)
+
+        # Process permits
+        for permit in new_permits:
+            try:
+                from server import reclassify_permit, validate_permit_dates, format_permit_address, generate_permit_description
+                reclassify_permit(permit)
+                validate_permit_dates(permit)
+                format_permit_address(permit)
+                permit['display_description'] = generate_permit_description(permit)
+                if permit.get('estimated_cost', 0) > 50_000_000:
+                    permit['estimated_cost'] = 50_000_000
+            except ImportError:
+                pass
+            except Exception:
+                continue
+
+        # Safety check: don't wipe DB if collection returned almost nothing
+        if len(new_permits) < 1000:
+            print(f"[V12.50] WARNING: Only {len(new_permits)} permits collected, skipping full rebuild")
+            # Fall back to upsert instead of replace
+            db.upsert_permits(new_permits)
+            return new_permits, stats
+
+        # Full rebuild: clear and re-insert in a transaction
+        conn = db.get_connection()
+        conn.execute("DELETE FROM permits")
+        db.upsert_permits(new_permits)
+        print(f"[V12.50] Full rebuild complete: {len(new_permits)} permits")
+
+        return new_permits, stats
     finally:
         _release_lock()
 
 
 def collect_single_source(source_key, source_type='bulk'):
     """
-    V12.33: Collect from a single source and merge with existing data.
+    V12.50: Collect from a single source and upsert to SQLite.
     Use when adding a new bulk source mid-day.
 
     source_type: 'bulk' for BULK_SOURCES, 'city' for CITY_REGISTRY
@@ -1346,11 +1366,11 @@ def collect_single_source(source_key, source_type='bulk'):
         return [], {}
 
     try:
+        db.init_db()
         print("=" * 60)
-        print(f"PermitGrab - SINGLE SOURCE Collection: {source_key}")
+        print(f"PermitGrab V12.50 - SINGLE SOURCE Collection: {source_key}")
         print("=" * 60)
 
-        existing_permits = load_existing_permits()
         new_permits = []
         stats = {}
 
@@ -1358,7 +1378,7 @@ def collect_single_source(source_key, source_type='bulk'):
             config = get_bulk_source_config(source_key)
             if not config:
                 print(f"[ERROR] Bulk source not found: {source_key}")
-                return existing_permits, {"error": "source_not_found"}
+                return [], {"error": "source_not_found"}
 
             city_permits, source_stats = collect_bulk_source(source_key, config, days_back=90)
             for city_slug, permits in city_permits.items():
@@ -1370,7 +1390,7 @@ def collect_single_source(source_key, source_type='bulk'):
             config = get_city_config(source_key)
             if not config:
                 print(f"[ERROR] City not found: {source_key}")
-                return existing_permits, {"error": "source_not_found"}
+                return [], {"error": "source_not_found"}
 
             raw, fetch_status = fetch_permits(source_key, days_back=365)
             for record in raw:
@@ -1383,15 +1403,12 @@ def collect_single_source(source_key, source_type='bulk'):
             stats[source_key] = {"raw": len(raw), "normalized": len(new_permits), "status": fetch_status}
             print(f"  ✓ {config['name']}: {len(new_permits)} permits")
 
-        # Merge with existing
-        merged = merge_permits(existing_permits, new_permits)
+        # V12.50: Upsert to SQLite
+        if new_permits:
+            new_count, updated_count = db.upsert_permits(new_permits, source_city_key=source_key)
+            print(f"[V12.50] Upserted: {new_count} new, {updated_count} updated")
 
-        # Save merged result
-        output_file = os.path.join(DATA_DIR, "permits.json")
-        atomic_write_json(output_file, merged)
-        print(f"[V12.33] Saved {len(merged)} total permits")
-
-        return merged, stats
+        return new_permits, stats
     finally:
         _release_lock()
 
@@ -1532,15 +1549,9 @@ def _collect_all_inner(days_back=30, additive_mode=True):
         # Rate limiting
         time.sleep(RATE_LIMIT_DELAY)
 
-        # V12.29: Batch processing - save and pause every BATCH_SIZE cities
-        # V12.49: CRITICAL FIX - Only do batch saves in FULL mode (additive_mode=False).
-        # In additive/refresh mode, batch saves overwrite permits.json with ONLY the
-        # newly collected permits (a handful), wiping the existing 50K+ permits.
-        # The caller (collect_refresh) handles the merge+save AFTER collection completes.
+        # V12.50: Removed batch JSON writes — SQLite handles persistence
+        # V12.29: Still pause between batches to let server breathe
         if (i + 1) % BATCH_SIZE == 0 and all_permits:
-            if not additive_mode:
-                output_file = os.path.join(DATA_DIR, "permits.json")
-                atomic_write_json(output_file, all_permits)
             # V12.30: Update timestamp on every batch so homepage shows recent activity
             stats_file = os.path.join(DATA_DIR, "collection_stats.json")
             batch_stats = {
@@ -1554,7 +1565,6 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             except Exception as e:
                 print(f"  [WARNING] Failed to update batch stats: {e}")
             print(f"  [Batch {(i+1)//BATCH_SIZE}: {len(all_permits)} permits after {i+1} cities]")
-            # V12.29: Pause between batches to let server breathe
             print(f"  [Pausing {BATCH_PAUSE_SECONDS}s before next batch...]")
             time.sleep(BATCH_PAUSE_SECONDS)
 
@@ -1577,32 +1587,9 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     for p in all_permits:
         value_counts[p["value_tier"]] = value_counts.get(p["value_tier"], 0) + 1
 
-    # V12.33: In additive mode, caller handles saving after merge
-    # In full mode, save directly here
-    # V12.40: Added safety checks to prevent data wipe
-    if not additive_mode:
-        output_file = os.path.join(DATA_DIR, "permits.json")
-        temp_file = os.path.join(DATA_DIR, "permits_rebuild_temp.json")
-
-        # Safety check: Don't overwrite with empty or very small dataset
-        MIN_PERMITS_THRESHOLD = 1000  # Expect at least 1K permits from bulk sources
-        if len(all_permits) < MIN_PERMITS_THRESHOLD:
-            print(f"[V12.40] WARNING: Only collected {len(all_permits)} permits (threshold: {MIN_PERMITS_THRESHOLD})")
-            print(f"[V12.40] ABORTING full rebuild to prevent data wipe!")
-            print(f"[V12.40] Existing permits.json preserved. Check bulk source connectivity.")
-            # Still return the permits for debugging, but don't save
-            return all_permits, {"city_stats": stats, "bulk_stats": bulk_stats, "aborted": True}
-
-        # Write to temp file first
-        print(f"[V12.40] FULL MODE: Writing {len(all_permits)} permits to temp file...")
-        atomic_write_json(temp_file, all_permits)
-
-        # Atomic swap: rename temp to final
-        print(f"[V12.40] Swapping temp file to {output_file}...")
-        os.rename(temp_file, output_file)
-        print(f"[V12.40] Permits written successfully ({len(all_permits)} total).")
-    else:
-        print(f"[V12.33] ADDITIVE MODE: Returning {len(all_permits)} permits for merge")
+    # V12.50: Caller (collect_refresh/collect_full) handles SQLite writes
+    # This function now purely returns collected permits without file I/O
+    print(f"[V12.50] Returning {len(all_permits)} permits for SQLite upsert")
 
     # V12.30: Save stats FIRST with explicit error handling
     # This ensures timestamp updates even if hot-reload fails
