@@ -297,6 +297,123 @@ def admin_coverage():
 
 
 # ===========================
+# V12.53: ADMIN EMAIL ENDPOINTS
+# ===========================
+
+@app.route('/api/admin/send-digest', methods=['POST'])
+def admin_send_digest():
+    """V12.53: Manually trigger daily digest for testing."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    email = request.args.get('email', '')
+
+    try:
+        from email_alerts import send_daily_digest, send_test_digest
+        if email:
+            # Send to specific email for testing
+            result = send_test_digest(email)
+            return jsonify({'status': 'sent', 'to': email, 'result': result})
+        else:
+            # Send to all subscribers
+            sent, failed = send_daily_digest()
+            return jsonify({'status': 'done', 'sent': sent, 'failed': failed})
+    except Exception as e:
+        return jsonify({'error': f'Digest failed: {str(e)}'}), 500
+
+
+@app.route('/api/admin/send-welcome', methods=['POST'])
+def admin_send_welcome():
+    """V12.53: Send welcome email to a specific user."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    email = request.args.get('email', '')
+    email_type = request.args.get('type', 'free')  # 'free' or 'pro'
+
+    if not email:
+        return jsonify({'error': 'Email parameter required'}), 400
+
+    user = find_user_by_email(email)
+    if not user:
+        return jsonify({'error': f'User {email} not found'}), 404
+
+    try:
+        from email_alerts import send_welcome_free, send_welcome_pro_trial
+        if email_type == 'pro':
+            send_welcome_pro_trial(user)
+        else:
+            send_welcome_free(user)
+        return jsonify({'status': 'sent', 'to': email, 'type': email_type})
+    except Exception as e:
+        return jsonify({'error': f'Welcome email failed: {str(e)}'}), 500
+
+
+@app.route('/api/admin/run-trial-check', methods=['POST'])
+def admin_run_trial_check():
+    """V12.53: Manually run trial lifecycle check."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        from email_alerts import check_trial_lifecycle
+        results = check_trial_lifecycle()
+        return jsonify({'status': 'done', 'results': results})
+    except Exception as e:
+        return jsonify({'error': f'Trial check failed: {str(e)}'}), 500
+
+
+@app.route('/api/admin/run-onboarding-check', methods=['POST'])
+def admin_run_onboarding_check():
+    """V12.53: Manually run onboarding nudge check."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        from email_alerts import check_onboarding_nudges
+        sent = check_onboarding_nudges()
+        return jsonify({'status': 'done', 'sent': sent})
+    except Exception as e:
+        return jsonify({'error': f'Onboarding check failed: {str(e)}'}), 500
+
+
+@app.route('/api/admin/email-stats')
+def admin_email_stats():
+    """V12.53: Get email system statistics."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        users = User.query.all()
+
+        stats = {
+            'total_users': len(users),
+            'digest_active': sum(1 for u in users if u.digest_active),
+            'email_verified': sum(1 for u in users if u.email_verified),
+            'welcome_sent': sum(1 for u in users if u.welcome_email_sent),
+            'pro_trial_users': sum(1 for u in users if u.plan == 'pro_trial'),
+            'pro_users': sum(1 for u in users if u.plan == 'pro'),
+            'free_users': sum(1 for u in users if u.plan == 'free'),
+            'trial_midpoint_sent': sum(1 for u in users if u.trial_midpoint_sent),
+            'trial_ending_sent': sum(1 for u in users if u.trial_ending_sent),
+            'trial_expired_sent': sum(1 for u in users if u.trial_expired_sent),
+        }
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': f'Stats failed: {str(e)}'}), 500
+
+
+# ===========================
 # DATABASE SETUP (V7)
 # ===========================
 from flask_sqlalchemy import SQLAlchemy
@@ -352,6 +469,24 @@ class User(db.Model):
     # V12.26: Weekly digest city subscriptions - JSON list of city names
     digest_cities = db.Column(db.Text, default='[]')
 
+    # V12.53: Email system fields
+    email_verified = db.Column(db.Boolean, default=False)
+    email_verified_at = db.Column(db.DateTime)
+    email_verification_token = db.Column(db.String(64))
+    unsubscribe_token = db.Column(db.String(64))
+    digest_active = db.Column(db.Boolean, default=True)  # Can receive digest emails
+    last_login_at = db.Column(db.DateTime)
+    last_digest_sent_at = db.Column(db.DateTime)
+    last_reengagement_sent_at = db.Column(db.DateTime)
+    # Trial tracking
+    trial_started_at = db.Column(db.DateTime)
+    trial_end_date = db.Column(db.DateTime)
+    trial_midpoint_sent = db.Column(db.Boolean, default=False)
+    trial_ending_sent = db.Column(db.Boolean, default=False)
+    trial_expired_sent = db.Column(db.Boolean, default=False)
+    # Welcome email tracking
+    welcome_email_sent = db.Column(db.Boolean, default=False)
+
     def to_dict(self):
         """Convert to dictionary for JSON responses."""
         return {
@@ -370,7 +505,27 @@ class User(db.Model):
             # V12.26: Competitor Watch and Digest Cities
             'watched_competitors': json.loads(self.watched_competitors or '[]'),
             'digest_cities': json.loads(self.digest_cities or '[]'),
+            # V12.53: Email system fields
+            'email_verified': self.email_verified,
+            'digest_active': self.digest_active,
+            'trial_end_date': self.trial_end_date.isoformat() if self.trial_end_date else None,
         }
+
+    def is_pro(self):
+        """Check if user has Pro access (paid or trial)."""
+        if self.plan in ('professional', 'pro', 'enterprise'):
+            # Check if trial has expired
+            if self.trial_end_date and datetime.utcnow() > self.trial_end_date:
+                return False
+            return True
+        return False
+
+    def days_until_trial_ends(self):
+        """Get days remaining in trial, or None if not on trial."""
+        if not self.trial_end_date:
+            return None
+        delta = self.trial_end_date - datetime.utcnow()
+        return max(0, delta.days)
 
 
 # Create tables on startup
@@ -3474,15 +3629,24 @@ def api_register():
 
     # Create new user in database
     try:
+        import secrets
+        plan = data.get('plan', 'free')
+        is_trial = plan == 'pro_trial'
+
         new_user = User(
             email=email,
             name=name,
             password_hash=generate_password_hash(password),
-            plan='free'
+            plan='pro_trial' if is_trial else 'free',
+            # V12.53: Email system fields
+            unsubscribe_token=secrets.token_urlsafe(32),
+            digest_active=True,
+            trial_started_at=datetime.utcnow() if is_trial else None,
+            trial_end_date=(datetime.utcnow() + timedelta(days=14)) if is_trial else None,
         )
         db.session.add(new_user)
         db.session.commit()
-        print(f"[Register] User created in database: {email}")
+        print(f"[Register] User created in database: {email} (plan: {new_user.plan})")
     except IntegrityError:
         # Database UNIQUE constraint caught a race condition
         db.session.rollback()
@@ -3493,7 +3657,23 @@ def api_register():
     session['user_email'] = email
 
     # Track signup event
-    analytics.track_event('signup', event_data={'method': 'email'})
+    analytics.track_event('signup', event_data={'method': 'email', 'plan': new_user.plan})
+
+    # V12.53: Send welcome email (async to not block registration)
+    try:
+        from email_alerts import send_welcome_free, send_welcome_pro_trial
+        if new_user.plan == 'pro_trial':
+            send_welcome_pro_trial(new_user)
+            new_user.welcome_email_sent = True
+            db.session.commit()
+            print(f"[Register] Welcome Pro Trial email sent to {email}")
+        else:
+            send_welcome_free(new_user)
+            new_user.welcome_email_sent = True
+            db.session.commit()
+            print(f"[Register] Welcome Free email sent to {email}")
+    except Exception as e:
+        print(f"[Register] Welcome email failed for {email}: {e}")
 
     # Return user without password hash
     return jsonify({
@@ -5435,6 +5615,67 @@ def scheduled_collection():
         time.sleep(21600)
 
 
+# ===========================
+# V12.53: EMAIL SCHEDULER
+# ===========================
+
+def schedule_email_tasks():
+    """V12.53: Schedule all email tasks to run at specific times daily.
+
+    - Daily digest: 7 AM ET (12:00 UTC)
+    - Trial lifecycle check: 8 AM ET (13:00 UTC)
+    - Onboarding nudges: 9 AM ET (14:00 UTC)
+    """
+    import pytz
+    from email_alerts import send_daily_digest, check_trial_lifecycle, check_onboarding_nudges
+
+    # Wait for initial startup
+    print(f"[{datetime.now()}] V12.53: Email scheduler waiting 2 minutes for startup...")
+    time.sleep(120)
+
+    et = pytz.timezone('America/New_York')
+
+    while True:
+        try:
+            now_utc = datetime.utcnow()
+            now_et = datetime.now(et)
+
+            # Check if it's time for daily tasks (7-9 AM ET window)
+            if 7 <= now_et.hour <= 9:
+                # Daily digest at 7 AM ET
+                if now_et.hour == 7 and now_et.minute < 30:
+                    print(f"[{datetime.now()}] V12.53: Running daily digest...")
+                    try:
+                        sent, failed = send_daily_digest()
+                        print(f"[{datetime.now()}] V12.53: Daily digest complete - {sent} sent, {failed} failed")
+                    except Exception as e:
+                        print(f"[{datetime.now()}] V12.53: Daily digest error: {e}")
+
+                # Trial lifecycle at 8 AM ET
+                if now_et.hour == 8 and now_et.minute < 30:
+                    print(f"[{datetime.now()}] V12.53: Checking trial lifecycle...")
+                    try:
+                        results = check_trial_lifecycle()
+                        print(f"[{datetime.now()}] V12.53: Trial lifecycle complete - {results}")
+                    except Exception as e:
+                        print(f"[{datetime.now()}] V12.53: Trial lifecycle error: {e}")
+
+                # Onboarding nudges at 9 AM ET
+                if now_et.hour == 9 and now_et.minute < 30:
+                    print(f"[{datetime.now()}] V12.53: Checking onboarding nudges...")
+                    try:
+                        sent = check_onboarding_nudges()
+                        print(f"[{datetime.now()}] V12.53: Onboarding nudges complete - {sent} sent")
+                    except Exception as e:
+                        print(f"[{datetime.now()}] V12.53: Onboarding nudges error: {e}")
+
+        except Exception as e:
+            print(f"[{datetime.now()}] V12.53: Email scheduler error: {e}")
+
+        # Check every 30 minutes
+        time.sleep(1800)
+
+
 def run_initial_collection():
     """Run initial data collection on startup."""
     try:
@@ -5533,7 +5774,11 @@ def start_collectors():
     collector_thread = threading.Thread(target=scheduled_collection, daemon=True)
     collector_thread.start()
 
-    print(f"[{datetime.now()}] Collector threads started.")
+    # V12.53: Email scheduler thread
+    email_thread = threading.Thread(target=schedule_email_tasks, daemon=True)
+    email_thread.start()
+
+    print(f"[{datetime.now()}] Collector and email threads started.")
 
 # V12.12: Preload existing data from disk BEFORE starting collectors
 # This ensures stale data is served immediately rather than showing 0 permits
