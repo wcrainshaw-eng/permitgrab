@@ -21,7 +21,7 @@ from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, 
 from lifecycle import get_lifecycle_label
 from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_slugs
 import analytics
-import db  # V12.50: SQLite database layer
+import db as permitdb  # V12.50: SQLite database layer (renamed to avoid Flask-SQLAlchemy collision)
 
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
@@ -589,62 +589,28 @@ _permits_cache_mtime = 0  # File modification time when cache was last populated
 _permits_cache_lock = threading.Lock()
 
 def preload_data_from_disk():
-    """V12.12: Load existing data from disk on startup BEFORE serving any requests.
+    """V12.51: Initialize SQLite database on startup.
 
-    This ensures that even after a deploy, stale data is served immediately
-    rather than showing 0 permits while waiting for collection to complete.
-
-    V12.19: Auto-deletes corrupted files so next collection writes clean data.
-    V12.49: Forces cache invalidation so fresh data is loaded after collection.
-    V12.50: Initialize SQLite database on startup.
+    V12.50 migrated from JSON files to SQLite. This function now just
+    initializes the database and reports the current permit count.
     """
-    global _initial_data_loaded, _permits_cache_mtime
+    global _initial_data_loaded
 
-    # V12.50: Initialize SQLite database (creates tables if needed)
-    try:
-        db.init_db()
-        stats = db.get_permit_stats()
-        if stats['total_permits'] > 0:
-            print(f"[Server] V12.50: SQLite ready with {stats['total_permits']} permits")
-            _initial_data_loaded = True
-            return  # SQLite has data, no need to check JSON
-    except Exception as e:
-        print(f"[Server] V12.50: SQLite init error: {e}, falling back to JSON")
-
-    # V12.49: Invalidate cache so load_permits() re-reads from disk
-    _permits_cache_mtime = 0
-    permits_file = os.path.join(DATA_DIR, 'permits.json')
-    if os.path.exists(permits_file):
-        try:
-            file_size = os.path.getsize(permits_file)
-            print(f"[Server] V12.12: Found permits.json on disk ({file_size} bytes)")
-            # Trigger a load to validate, process, and cache the data
-            permits = load_permits()
-            if permits:
-                print(f"[Server] V12.49: Preloaded and cached {len(permits)} permits from disk")
-                _initial_data_loaded = True
-            else:
-                # load_permits returned empty - file may be corrupted
-                print(f"[Server] V12.19: load_permits returned empty, checking file...")
-        except json.JSONDecodeError as e:
-            print(f"[Server] V12.19: CORRUPTED permits.json detected: {e}")
-            print(f"[Server] V12.19: AUTO-DELETING corrupted file at {permits_file}")
-            try:
-                os.remove(permits_file)
-                print(f"[Server] V12.19: Deleted corrupted file. Next collection will write clean data.")
-            except OSError as del_err:
-                print(f"[Server] V12.19: Failed to delete corrupted file: {del_err}")
-        except Exception as e:
-            print(f"[Server] V12.12: Failed to preload permits: {e}")
-    else:
-        print(f"[Server] V12.12: No permits.json found on disk - fresh deploy or disk wiped")
+    permitdb.init_db()
+    stats = permitdb.get_permit_stats()
+    print(f"[Server] V12.51: SQLite ready - {stats['total_permits']} permits, {stats['city_count']} cities")
+    _initial_data_loaded = True
 
 def is_data_loading():
-    """V12.12: Check if we're in a loading state (no data available)."""
+    """V12.51: Check if we're in a loading state (no data available)."""
     if _initial_data_loaded:
         return False
-    permits_file = os.path.join(DATA_DIR, 'permits.json')
-    return not os.path.exists(permits_file) or os.path.getsize(permits_file) < 100
+    # Check SQLite for data
+    try:
+        stats = permitdb.get_permit_stats()
+        return stats['total_permits'] == 0
+    except Exception:
+        return True
 
 # Admin password from environment
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
@@ -1131,25 +1097,20 @@ def load_stats():
     return {}
 
 def get_cities_with_data():
-    """V12.10: Get cities sorted by permit volume (top cities first for footer)."""
-    permits = load_permits()
+    """V12.51: Get cities sorted by permit volume (SQL-backed)."""
+    # Get city counts from SQLite
+    city_rows = permitdb.get_cities_with_permits()
 
-    # Count permits per city
-    city_counts = {}
-    for p in permits:
-        city = p.get('city', '')
-        if city:
-            city_counts[city] = city_counts.get(city, 0) + 1
-
-    # Convert to city info format with slug, sorted by permit count
+    # Convert to city info format with slug
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
 
     cities_with_counts = []
-    for name, count in city_counts.items():
+    for row in city_rows:
+        name = row['city']
         if name in city_lookup:
             city_info = city_lookup[name].copy()
-            city_info['permit_count'] = count
+            city_info['permit_count'] = row['permit_count']
             cities_with_counts.append(city_info)
 
     # Sort by permit count descending (top cities first)
@@ -1187,26 +1148,22 @@ def get_suggested_cities(searched_slug, limit=6):
 
 
 def get_popular_cities(limit=12):
-    """V12.9: Get popular cities for 404 page based on permit count."""
-    permits = load_permits()
-    # Count permits per city
-    city_counts = {}
-    for p in permits:
-        city = p.get('city', '')
-        if city:
-            city_counts[city] = city_counts.get(city, 0) + 1
+    """V12.51: Get popular cities for 404 page (SQL-backed)."""
+    conn = permitdb.get_connection()
+    rows = conn.execute("""
+        SELECT city, COUNT(*) as cnt FROM permits
+        WHERE city IS NOT NULL AND city != ''
+        GROUP BY city ORDER BY cnt DESC LIMIT ?
+    """, (limit * 2,)).fetchall()  # Fetch extra in case some aren't in city_lookup
 
-    # Get city info and sort by count
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
 
     popular = []
-    for name, count in sorted(city_counts.items(), key=lambda x: -x[1]):
+    for row in rows:
+        name = row['city']
         if name in city_lookup:
             city_info = city_lookup[name].copy()
-            # V12.23: Don't show permit count on 404 page - it shows the collector limit (2000)
-            # which looks suspiciously capped. Better to show no count than a misleading one.
-            # city_info['permit_count'] = count  # Removed - shows API limit, not real total
             popular.append(city_info)
             if len(popular) >= limit:
                 break
@@ -1548,12 +1505,12 @@ def alerts_redirect():
 @app.route('/health')
 def health_check():
     """
-    V12.12: Health check endpoint with data availability check.
+    V12.51: Health check endpoint with SQLite data availability check.
     Returns 503 if no permit data is available (fresh deploy/empty disk).
     This prevents Render from routing traffic to an empty instance.
     """
-    permits = load_permits()
-    permit_count = len(permits)
+    stats = permitdb.get_permit_stats()
+    permit_count = stats['total_permits']
 
     if permit_count == 0 and is_data_loading():
         # No data and we're in a loading state - return unhealthy
@@ -1611,7 +1568,7 @@ def api_permits():
             trade_name = trade  # Use as-is if not a valid slug
 
     # V12.50: Query SQLite database (replaces loading 100K permits into memory)
-    permits, total = db.query_permits(
+    permits, total = permitdb.query_permits(
         city=city_name,
         trade=trade_name,
         value=value or None,
@@ -1651,7 +1608,7 @@ def api_permits():
             permit['is_gated'] = False
 
     # V12.50: Aggregate stats from SQL (not from loading all permits!)
-    stats_data = db.get_permit_stats()
+    stats_data = permitdb.get_permit_stats()
     collection_stats = load_stats()  # Keep this for collected_at timestamp
 
     return jsonify({
@@ -1670,7 +1627,7 @@ def api_permits():
 @app.route('/api/stats')
 def api_stats():
     """GET /api/stats — V12.50: SQL-backed stats."""
-    stats_data = db.get_permit_stats()
+    stats_data = permitdb.get_permit_stats()
     collection_stats = load_stats()
 
     return jsonify({
@@ -1685,12 +1642,20 @@ def api_stats():
 
 @app.route('/api/filters')
 def api_filters():
-    """GET /api/filters - Available filter options."""
-    permits = load_permits()
+    """GET /api/filters - Available filter options (V12.51: SQL-backed)."""
+    conn = permitdb.get_connection()
 
-    cities = sorted(set(p.get('city', '') for p in permits if p.get('city')))
-    trades = sorted(set(p.get('trade_category', '') for p in permits if p.get('trade_category')))
-    statuses = sorted(set(p.get('status', '') for p in permits if p.get('status')))
+    cities = [r[0] for r in conn.execute(
+        "SELECT DISTINCT city FROM permits WHERE city IS NOT NULL AND city != '' ORDER BY city"
+    ).fetchall()]
+
+    trades = [r[0] for r in conn.execute(
+        "SELECT DISTINCT trade_category FROM permits WHERE trade_category IS NOT NULL AND trade_category != '' ORDER BY trade_category"
+    ).fetchall()]
+
+    statuses = [r[0] for r in conn.execute(
+        "SELECT DISTINCT status FROM permits WHERE status IS NOT NULL AND status != '' ORDER BY status"
+    ).fetchall()]
 
     return jsonify({
         'cities': cities,
@@ -5413,7 +5378,7 @@ def scheduled_collection():
 
             # V12.50: Prune old permits (keep last 90 days)
             try:
-                deleted = db.delete_old_permits(days=90)
+                deleted = permitdb.delete_old_permits(days=90)
                 if deleted > 0:
                     print(f"[{datetime.now()}] Pruned {deleted} old permits.")
             except Exception as e:

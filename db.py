@@ -16,12 +16,24 @@ else:
     DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'permitgrab.db')
 
 # Thread-local connections (SQLite connections can't be shared across threads)
+# V12.51: Also track PID to handle Gunicorn --preload fork correctly
 _local = threading.local()
 
 
 def get_connection():
-    """Get a thread-local SQLite connection with WAL mode enabled."""
-    if not hasattr(_local, 'conn') or _local.conn is None:
+    """Get a thread-local SQLite connection with WAL mode enabled.
+
+    V12.51: Process-aware — resets connection after Gunicorn fork to avoid
+    sharing connections across worker processes.
+    """
+    pid = os.getpid()
+
+    # If we forked (Gunicorn worker), reset thread-local
+    if not hasattr(_local, 'pid') or _local.pid != pid:
+        _local.pid = pid
+        _local.conn = None
+
+    if _local.conn is None:
         # Ensure data directory exists
         db_dir = os.path.dirname(DB_PATH)
         if db_dir and not os.path.exists(db_dir):

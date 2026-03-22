@@ -16,7 +16,7 @@ from city_configs import (
     get_active_cities, get_city_config,
     get_active_bulk_sources, get_bulk_source_config
 )
-import db  # V12.50: SQLite database layer
+import db as permitdb  # V12.50: SQLite database layer
 
 # Use Render persistent disk if available, otherwise local
 if os.path.isdir('/var/data'):
@@ -1129,7 +1129,7 @@ def fetch_permit_history(city_key, years_back=1):
 
 def collect_permit_history(years_back=1):
     """V12.50: Collect permit history into SQLite."""
-    db.init_db()
+    permitdb.init_db()
     active_cities = get_active_cities()
     stats = {}
 
@@ -1172,7 +1172,7 @@ def collect_permit_history(years_back=1):
         time.sleep(RATE_LIMIT_DELAY)
 
     # Print summary
-    conn = db.get_connection()
+    conn = permitdb.get_connection()
     total = conn.execute("SELECT COUNT(*) FROM permit_history").fetchone()[0]
     addresses = conn.execute("SELECT COUNT(DISTINCT address_key) FROM permit_history").fetchone()[0]
     repeats = conn.execute("""
@@ -1196,7 +1196,7 @@ def collect_permit_history(years_back=1):
 
 def _flush_history_batch(batch):
     """V12.50: Write a batch of history records to SQLite."""
-    conn = db.get_connection()
+    conn = permitdb.get_connection()
     for addr_key, n in batch:
         conn.execute("""
             INSERT OR IGNORE INTO permit_history (
@@ -1265,7 +1265,7 @@ def collect_refresh(days_back=7):
         return [], {}
 
     try:
-        db.init_db()
+        permitdb.init_db()
         reset_failure_tracking()
 
         print("=" * 60)
@@ -1293,7 +1293,7 @@ def collect_refresh(days_back=7):
 
         # V12.50: Upsert into SQLite (replaces load→merge→save cycle)
         if new_permits:
-            new_count, updated_count = db.upsert_permits(new_permits)
+            new_count, updated_count = permitdb.upsert_permits(new_permits)
             print(f"[V12.50] Upserted: {new_count} new, {updated_count} updated")
         else:
             print("[V12.50] No new permits collected")
@@ -1312,7 +1312,7 @@ def collect_full(days_back=365):
         return [], {}
 
     try:
-        db.init_db()
+        permitdb.init_db()
         reset_failure_tracking()
 
         print("=" * 60)
@@ -1341,13 +1341,13 @@ def collect_full(days_back=365):
         if len(new_permits) < 1000:
             print(f"[V12.50] WARNING: Only {len(new_permits)} permits collected, skipping full rebuild")
             # Fall back to upsert instead of replace
-            db.upsert_permits(new_permits)
+            permitdb.upsert_permits(new_permits)
             return new_permits, stats
 
         # Full rebuild: clear and re-insert in a transaction
-        conn = db.get_connection()
+        conn = permitdb.get_connection()
         conn.execute("DELETE FROM permits")
-        db.upsert_permits(new_permits)
+        permitdb.upsert_permits(new_permits)
         print(f"[V12.50] Full rebuild complete: {len(new_permits)} permits")
 
         return new_permits, stats
@@ -1366,7 +1366,7 @@ def collect_single_source(source_key, source_type='bulk'):
         return [], {}
 
     try:
-        db.init_db()
+        permitdb.init_db()
         print("=" * 60)
         print(f"PermitGrab V12.50 - SINGLE SOURCE Collection: {source_key}")
         print("=" * 60)
@@ -1405,7 +1405,7 @@ def collect_single_source(source_key, source_type='bulk'):
 
         # V12.50: Upsert to SQLite
         if new_permits:
-            new_count, updated_count = db.upsert_permits(new_permits, source_city_key=source_key)
+            new_count, updated_count = permitdb.upsert_permits(new_permits, source_city_key=source_key)
             print(f"[V12.50] Upserted: {new_count} new, {updated_count} updated")
 
         return new_permits, stats
@@ -1685,21 +1685,9 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     print(f"  Medium ($10K-$50K): {value_counts['medium']}")
     print(f"  Standard (<$10K): {value_counts['low']}")
 
-    # V12.42: Only hot-reload in full mode (when data was actually saved)
-    # In additive mode, collect_refresh handles save + hot-reload AFTER merging
-    if not additive_mode:
-        print(f"\nData saved to: {output_file}")
-        # V12.18: Hot-reload data in the running server without restart
-        try:
-            from server import preload_data_from_disk
-            preload_data_from_disk()
-            print(f"[V12.42] Hot-reloaded {len(all_permits)} permits into server memory")
-        except ImportError as e:
-            print(f"[V12.42] Running standalone - hot-reload skipped")
-        except Exception as e:
-            print(f"[V12.42] Hot-reload error: {e}")
-    else:
-        print(f"\n[V12.42] Additive mode - caller will handle save + hot-reload")
+    # V12.51: SQLite handles persistence - no hot-reload needed here
+    # The caller (collect_refresh/collect_full) handles SQLite upsert
+    print(f"\n[V12.50] Returning {len(all_permits)} permits for SQLite persistence")
 
     return all_permits, collection_stats
 

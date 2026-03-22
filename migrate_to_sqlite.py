@@ -11,11 +11,11 @@ import sys
 # Add app directory to path
 sys.path.insert(0, '/app')
 try:
-    import db
+    import db as permitdb
 except ImportError:
     # Running locally
     sys.path.insert(0, os.path.dirname(__file__))
-    import db
+    import db as permitdb
 
 DATA_DIR = '/var/data' if os.path.isdir('/var/data') else os.path.join(os.path.dirname(__file__), 'data')
 
@@ -39,7 +39,7 @@ def migrate_permits():
     BATCH = 1000
     for i in range(0, len(permits), BATCH):
         batch = permits[i:i+BATCH]
-        db.upsert_permits(batch)
+        permitdb.upsert_permits(batch)
         if (i + BATCH) % 10000 == 0:
             print(f"  Inserted {min(i+BATCH, len(permits))}/{len(permits)}...")
 
@@ -64,12 +64,12 @@ def migrate_history():
 
     print(f"Loaded {len(history)} addresses")
 
-    conn = db.get_connection()
+    conn = permitdb.get_connection()
     total = 0
     count = 0
     addresses_to_delete = []
 
-    for addr_key, data in history.items():
+    for addr_key, data in list(history.items()):
         for p in data.get('permits', []):
             conn.execute("""
                 INSERT OR IGNORE INTO permit_history (
@@ -117,22 +117,22 @@ if __name__ == '__main__':
     print("PermitGrab V12.50 - JSON -> SQLite Migration")
     print("=" * 60)
 
-    db.init_db()
+    permitdb.init_db()
     migrate_permits()
     migrate_history()
 
     # Verify
-    conn = db.get_connection()
+    conn = permitdb.get_connection()
     p_count = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
     h_count = conn.execute("SELECT COUNT(*) FROM permit_history").fetchone()[0]
-    db_size = os.path.getsize(db.DB_PATH) / 1024 / 1024
+    db_size = os.path.getsize(permitdb.DB_PATH) / 1024 / 1024
 
     print(f"\n{'=' * 60}")
     print(f"Migration complete!")
     print(f"  Permits table: {p_count} rows")
     print(f"  History table: {h_count} rows")
     print(f"  Database size: {db_size:.1f}MB")
-    print(f"  Location: {db.DB_PATH}")
+    print(f"  Location: {permitdb.DB_PATH}")
     print(f"{'=' * 60}")
     print(f"\nYou can now safely delete the JSON files:")
     print(f"  rm {os.path.join(DATA_DIR, 'permits.json')}")
