@@ -45,7 +45,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .dropdown { position: relative; }
 .dropdown-toggle { background: none; border: none; color: rgba(255,255,255,.7); font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 .dropdown-toggle:hover { color: white; }
-.dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: white; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,.1); min-width: 200px; z-index: 1000; margin-top: 8px; padding: 8px 0; }
+.dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: white; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,.1); min-width: 200px; z-index: 1000; padding: 16px 0 8px 0; }
+.dropdown-menu::before { content: ''; position: absolute; top: -10px; left: 0; right: 0; height: 10px; }
 .dropdown:hover .dropdown-menu { display: block; }
 .dropdown-menu a { display: block; padding: 10px 16px; color: var(--gray-700) !important; }
 .dropdown-menu a:hover { background: var(--gray-50); color: var(--primary) !important; }

@@ -137,8 +137,16 @@ body {
   box-shadow: 0 10px 25px rgba(0,0,0,.15);
   min-width: 180px;
   z-index: 1000;
-  margin-top: 12px;
-  padding: 8px 0;
+  padding: 16px 0 8px 0;
+}
+
+.nav-dropdown .dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
 }
 
 .nav-dropdown:hover .dropdown-menu {
