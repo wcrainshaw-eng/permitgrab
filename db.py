@@ -356,3 +356,56 @@ def get_repeat_renovators(min_permits=3):
         ORDER BY permit_count DESC
     """, (min_permits,))
     return [dict(row) for row in cursor]
+
+
+# ---------------------------------------------------------------------------
+# Collection Stats — V12.51: Replaces collection_stats.json
+# ---------------------------------------------------------------------------
+
+def get_collection_stats():
+    """
+    V12.51: Get the latest collection run stats.
+    Returns a dict compatible with the old collection_stats.json format.
+    """
+    conn = get_connection()
+
+    # Get latest completed collection run
+    row = conn.execute("""
+        SELECT * FROM collection_runs
+        WHERE status = 'completed'
+        ORDER BY completed_at DESC
+        LIMIT 1
+    """).fetchone()
+
+    if row:
+        return {
+            'collected_at': row['completed_at'],
+            'run_type': row['run_type'],
+            'cities_processed': row['cities_processed'],
+            'permits_collected': row['permits_collected'],
+            'permits_new': row['permits_new'],
+            'permits_updated': row['permits_updated'],
+            'details': json.loads(row['details']) if row['details'] else {},
+        }
+
+    return {}
+
+
+def record_collection_run(run_type, cities_processed, permits_collected,
+                          permits_new, permits_updated, details=None, error=None):
+    """
+    V12.51: Record a collection run in the database.
+    """
+    conn = get_connection()
+    status = 'completed' if not error else 'failed'
+    conn.execute("""
+        INSERT INTO collection_runs (
+            run_type, completed_at, cities_processed, permits_collected,
+            permits_new, permits_updated, status, error_message, details
+        ) VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        run_type, cities_processed, permits_collected,
+        permits_new, permits_updated, status, error,
+        json.dumps(details) if details else None
+    ))
+    conn.commit()

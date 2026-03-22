@@ -1213,47 +1213,8 @@ def _flush_history_batch(batch):
     conn.commit()
 
 
-def load_existing_permits():
-    """V12.33: Load existing permits from disk for additive collection."""
-    permits_file = os.path.join(DATA_DIR, "permits.json")
-    if os.path.exists(permits_file):
-        try:
-            with open(permits_file, 'r') as f:
-                permits = json.load(f)
-            print(f"[V12.33] Loaded {len(permits)} existing permits from disk")
-            return permits
-        except Exception as e:
-            print(f"[V12.33] Could not load existing permits: {e}")
-    return []
-
-
-def merge_permits(existing, new_permits):
-    """
-    V12.33: Merge new permits into existing data, deduplicating by permit_number.
-    New permits with the same permit_number overwrite old ones (fresher data).
-    """
-    # Build index of existing permits
-    by_permit_num = {}
-    for p in existing:
-        pn = p.get('permit_number', '')
-        if pn:
-            by_permit_num[pn] = p
-
-    # Add/update with new permits
-    new_count = 0
-    updated_count = 0
-    for p in new_permits:
-        pn = p.get('permit_number', '')
-        if pn:
-            if pn in by_permit_num:
-                updated_count += 1
-            else:
-                new_count += 1
-            by_permit_num[pn] = p
-
-    merged = list(by_permit_num.values())
-    print(f"[V12.33] Merged: {new_count} new, {updated_count} updated, {len(merged)} total")
-    return merged
+# V12.51: Removed load_existing_permits() and merge_permits()
+# These JSON-based functions are no longer needed - SQLite handles deduplication via upsert
 
 
 def collect_refresh(days_back=7):
@@ -1344,11 +1305,53 @@ def collect_full(days_back=365):
             permitdb.upsert_permits(new_permits)
             return new_permits, stats
 
-        # Full rebuild: clear and re-insert in a transaction
+        # V12.51: Full rebuild in a single atomic transaction
+        # This ensures old data remains visible until new data is fully inserted
         conn = permitdb.get_connection()
-        conn.execute("DELETE FROM permits")
-        permitdb.upsert_permits(new_permits)
-        print(f"[V12.50] Full rebuild complete: {len(new_permits)} permits")
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("DELETE FROM permits")
+
+            # Inline insert (don't use upsert_permits which has its own commit)
+            now = datetime.now().isoformat()
+            for p in new_permits:
+                pn = p.get('permit_number')
+                if not pn:
+                    continue
+                conn.execute("""
+                    INSERT OR REPLACE INTO permits (
+                        permit_number, city, state, address, zip,
+                        permit_type, permit_sub_type, work_type, trade_category,
+                        description, display_description, estimated_cost, value_tier,
+                        status, filing_date, issued_date, date,
+                        contact_name, contact_phone, contact_email, owner_name,
+                        contractor_name, square_feet, lifecycle_label,
+                        source_city_key, collected_at, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?
+                    )
+                """, (
+                    pn, p.get('city'), p.get('state'), p.get('address'), p.get('zip'),
+                    p.get('permit_type'), p.get('permit_sub_type'), p.get('work_type'), p.get('trade_category'),
+                    p.get('description'), p.get('display_description'), p.get('estimated_cost', 0), p.get('value_tier'),
+                    p.get('status'), p.get('filing_date'), p.get('issued_date'), p.get('date'),
+                    p.get('contact_name'), p.get('contact_phone'), p.get('contact_email'), p.get('owner_name'),
+                    p.get('contractor_name'), p.get('square_feet'), p.get('lifecycle_label'),
+                    None, now, now
+                ))
+
+            conn.commit()
+            print(f"[V12.51] Full rebuild complete: {len(new_permits)} permits (atomic transaction)")
+        except Exception as e:
+            conn.rollback()
+            print(f"[V12.51] Full rebuild FAILED, rolled back: {e}")
+            raise
 
         return new_permits, stats
     finally:

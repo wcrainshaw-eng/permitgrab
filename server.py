@@ -581,12 +581,8 @@ USERS_FILE = os.path.join(DATA_DIR, 'users.json')
 _initial_data_loaded = False
 _collection_in_progress = False
 
-# V12.49: In-memory permits cache to prevent re-reading from disk on every request
-# This fixes the OOM crash (2GB memory limit exceeded) caused by concurrent requests
-# each parsing the full permits.json independently.
-_permits_cache = []
-_permits_cache_mtime = 0  # File modification time when cache was last populated
-_permits_cache_lock = threading.Lock()
+# V12.51: Removed V12.49 cache code (_permits_cache, _permits_cache_mtime, _permits_cache_lock)
+# SQLite handles all permit storage now - no JSON file caching needed
 
 def preload_data_from_disk():
     """V12.51: Initialize SQLite database on startup.
@@ -1018,74 +1014,12 @@ def validate_permit_dates(permit):
         permit['date_label'] = 'Filed'  # Default label
 
 
-def _load_permits_from_disk():
-    """V12.49: Internal - read and process permits from disk. Called only when cache is stale."""
-    path = os.path.join(DATA_DIR, 'permits.json')
-    if os.path.exists(path):
-        try:
-            with open(path) as f:
-                permits = json.load(f, strict=False)
-            for permit in permits:
-                try:
-                    reclassify_permit(permit)
-                    validate_permit_dates(permit)
-                    format_permit_address(permit)
-                    permit['display_description'] = generate_permit_description(permit)
-                    if permit.get('estimated_cost', 0) > 50_000_000:
-                        permit['estimated_cost'] = 50_000_000
-                except Exception as e:
-                    print(f"[Server] Warning: Failed to process permit: {e}")
-                    continue
-            return permits
-        except json.JSONDecodeError as e:
-            print(f"[Server] ERROR: Failed to parse permits.json: {e}")
-            print(f"[Server] V12.19: AUTO-DELETING corrupted permits.json")
-            try:
-                os.remove(path)
-                print(f"[Server] V12.19: Deleted corrupted file at {path}")
-            except OSError as del_err:
-                print(f"[Server] V12.19: Failed to delete: {del_err}")
-            return []
-        except Exception as e:
-            print(f"[Server] ERROR: Unexpected error loading permits: {e}")
-            return []
-    return []
-
-
-def load_permits():
-    """V12.49: Load permits using in-memory cache. Only re-reads from disk when file changes.
-
-    This fixes the OOM crash where every concurrent API request independently parsed
-    the full permits.json (23MB+), blowing through the 2GB Render memory limit.
-    Now the file is parsed once and served from memory until the file changes on disk.
-    """
-    global _permits_cache, _permits_cache_mtime
-
-    path = os.path.join(DATA_DIR, 'permits.json')
-    try:
-        current_mtime = os.path.getmtime(path) if os.path.exists(path) else 0
-    except OSError:
-        current_mtime = 0
-
-    # Return cached data if file hasn't changed
-    if _permits_cache and current_mtime == _permits_cache_mtime:
-        return _permits_cache
-
-    # File changed or no cache - reload from disk (with lock to prevent stampede)
-    with _permits_cache_lock:
-        # Double-check after acquiring lock (another thread may have refreshed)
-        if _permits_cache and current_mtime == _permits_cache_mtime:
-            return _permits_cache
-
-        print(f"[Server] V12.49: Cache miss - reloading permits from disk (mtime: {current_mtime})")
-        permits = _load_permits_from_disk()
-        _permits_cache = permits
-        _permits_cache_mtime = current_mtime
-        print(f"[Server] V12.49: Cached {len(permits)} permits in memory")
-        return permits
+# V12.51: Removed _load_permits_from_disk() and load_permits()
+# All permit data now comes from SQLite via permitdb.query_permits()
+# This eliminates the JSON file parsing that caused OOM crashes
 
 def load_stats():
-    """Load collection stats."""
+    """Load collection stats. V12.51: Falls back to SQLite if JSON not found."""
     path = os.path.join(DATA_DIR, 'collection_stats.json')
     if os.path.exists(path):
         try:
@@ -1093,8 +1027,13 @@ def load_stats():
                 return json.load(f, strict=False)
         except Exception as e:
             print(f"[Server] ERROR: Failed to parse collection_stats.json: {e}")
-            return {}
-    return {}
+            # Fall through to SQLite fallback
+
+    # V12.51: SQLite fallback
+    try:
+        return permitdb.get_collection_stats()
+    except Exception:
+        return {}
 
 def get_cities_with_data():
     """V12.51: Get cities sorted by permit volume (SQL-backed)."""
@@ -1751,18 +1690,21 @@ def api_export():
             'upgrade_url': '/pricing'
         }), 403
 
-    permits = load_permits()
-    permits = add_lead_scores(permits)
-
-    # Apply same filters as /api/permits
+    # V12.51: SQL-backed export
     city = request.args.get('city', '')
     trade = request.args.get('trade', '')
     quality = request.args.get('quality', '')
 
-    if city:
-        permits = [p for p in permits if p.get('city') == city]
-    if trade:
-        permits = [p for p in permits if p.get('trade_category') == trade]
+    permits, _ = permitdb.query_permits(
+        city=city or None,
+        trade=trade or None,
+        page=1,
+        per_page=50000,  # Export limit
+        order_by='filing_date DESC'
+    )
+    permits = add_lead_scores(permits)
+
+    # Quality filter (post-query since lead_score is computed)
     if quality:
         if quality == 'hot':
             permits = [p for p in permits if p.get('lead_quality') == 'hot']
@@ -1819,8 +1761,8 @@ def get_saved_leads():
 
     user_leads = get_user_saved_leads(user['email'])
 
-    # Enrich with permit data
-    all_permits = load_permits()
+    # V12.51: Enrich with permit data from SQLite
+    all_permits, _ = permitdb.query_permits(page=1, per_page=100000)
     permits = add_lead_scores(all_permits)
     permit_map = {p.get('permit_number'): p for p in permits}
 
@@ -1960,7 +1902,8 @@ def export_saved_leads():
         }), 403
 
     user_leads = get_user_saved_leads(user['email'])
-    all_permits = load_permits()
+    # V12.51: SQL-backed
+    all_permits, _ = permitdb.query_permits(page=1, per_page=100000)
     permits = add_lead_scores(all_permits)
     permit_map = {p.get('permit_number'): p for p in permits}
 
@@ -2190,7 +2133,8 @@ def api_violations():
     Returns recent code violations, flagged as pre-leads if no matching permit.
     """
     violations = load_violations()
-    permits = load_permits()
+    # V12.51: SQL-backed permits
+    permits, _ = permitdb.query_permits(page=1, per_page=100000)
 
     city = request.args.get('city', '')
 
@@ -2261,13 +2205,10 @@ def api_contractors():
     GET /api/contractors
     Query params: city, search, sort_by, sort_order, page, per_page
     Returns aggregated contractor data from permits.
+    V12.51: SQL-backed
     """
-    permits = load_permits()
-
-    # Filter by city if specified
     city = request.args.get('city', '')
-    if city:
-        permits = [p for p in permits if p.get('city') == city]
+    permits, _ = permitdb.query_permits(city=city or None, page=1, per_page=100000)
 
     # Aggregate by contractor name
     contractors = {}
@@ -2355,8 +2296,9 @@ def api_contractor_detail(name):
     """
     GET /api/contractors/<name>
     Returns all permits for a specific contractor.
+    V12.51: SQL-backed
     """
-    permits = load_permits()
+    permits, _ = permitdb.query_permits(page=1, per_page=100000)
     permits = add_lead_scores(permits)
 
     # Find permits by contractor name (case-insensitive)
@@ -2389,12 +2331,10 @@ def api_top_contractors():
     GET /api/contractors/top
     Query params: city, limit
     Returns top contractors by permit volume.
+    V12.51: SQL-backed
     """
-    permits = load_permits()
-
     city = request.args.get('city', '')
-    if city:
-        permits = [p for p in permits if p.get('city') == city]
+    permits, _ = permitdb.query_permits(city=city or None, page=1, per_page=100000)
 
     limit = int(request.args.get('limit', 5))
 
@@ -2429,14 +2369,14 @@ def contractors_page():
 
 @app.route('/pricing')
 def pricing_page():
-    """Render the Pricing page."""
+    """Render the Pricing page. V12.51: SQL-backed"""
     user = get_current_user()
     cities = get_all_cities_info()
     city_count = get_total_city_count_auto()  # V12.32: Include bulk source cities
     footer_cities = get_cities_with_data()
-    # V12.25: Pass permit count for dynamic "By the Numbers" section
-    permits = load_permits()
-    permit_count = len(permits)
+    # V12.51: Get permit count from SQLite
+    stats = permitdb.get_permit_stats()
+    permit_count = stats['total_permits']
     return render_template('pricing.html', user=user, cities=cities, city_count=city_count, footer_cities=footer_cities, permit_count=permit_count)
 
 
@@ -2682,49 +2622,45 @@ def about_page():
 
 @app.route('/stats')
 def stats_page():
-    """V12.23 SEO: Render building permit statistics page."""
-    permits = load_permits()
+    """V12.51: Render building permit statistics page (SQL-backed)."""
+    conn = permitdb.get_connection()
     footer_cities = get_cities_with_data()
 
-    # Calculate totals
-    total_permits = len(permits)
-    total_value = sum(p.get('estimated_cost', 0) or 0 for p in permits)
-    high_value_count = sum(1 for p in permits if (p.get('estimated_cost', 0) or 0) >= 100000)
+    # Get totals from SQLite
+    stats = permitdb.get_permit_stats()
+    total_permits = stats['total_permits']
+    total_value = stats['total_value']
+    high_value_count = stats['high_value_count']
 
     # Top cities by permit count
-    city_stats = {}
-    for p in permits:
-        city_name = p.get('city', '')
-        if city_name:
-            if city_name not in city_stats:
-                city_stats[city_name] = {
-                    'name': city_name,
-                    'state': p.get('state', ''),
-                    'slug': p.get('city', '').lower().replace(' ', '-'),
-                    'permit_count': 0,
-                    'total_value': 0,
-                }
-            city_stats[city_name]['permit_count'] += 1
-            city_stats[city_name]['total_value'] += p.get('estimated_cost', 0) or 0
-
-    # Calculate averages and sort
-    for city in city_stats.values():
-        city['avg_value'] = city['total_value'] / city['permit_count'] if city['permit_count'] > 0 else 0
-
-    top_cities = sorted(city_stats.values(), key=lambda x: x['permit_count'], reverse=True)[:10]
+    top_cities_rows = conn.execute("""
+        SELECT city, state, COUNT(*) as permit_count, SUM(COALESCE(estimated_cost, 0)) as total_value
+        FROM permits WHERE city IS NOT NULL AND city != ''
+        GROUP BY city, state ORDER BY permit_count DESC LIMIT 10
+    """).fetchall()
+    top_cities = []
+    for row in top_cities_rows:
+        top_cities.append({
+            'name': row['city'],
+            'state': row['state'] or '',
+            'slug': row['city'].lower().replace(' ', '-'),
+            'permit_count': row['permit_count'],
+            'total_value': row['total_value'] or 0,
+            'avg_value': (row['total_value'] or 0) / row['permit_count'] if row['permit_count'] > 0 else 0
+        })
 
     # Trade breakdown
-    trade_counts = {}
-    for p in permits:
-        trade = p.get('trade_category', 'Other')
-        trade_counts[trade] = trade_counts.get(trade, 0) + 1
-
+    trade_rows = conn.execute("""
+        SELECT trade_category, COUNT(*) as cnt FROM permits
+        WHERE trade_category IS NOT NULL AND trade_category != ''
+        GROUP BY trade_category ORDER BY cnt DESC
+    """).fetchall()
     trade_breakdown = [
-        {'name': trade, 'count': count, 'percentage': (count / total_permits * 100) if total_permits > 0 else 0}
-        for trade, count in sorted(trade_counts.items(), key=lambda x: -x[1])
+        {'name': row['trade_category'], 'count': row['cnt'],
+         'percentage': (row['cnt'] / total_permits * 100) if total_permits > 0 else 0}
+        for row in trade_rows
     ]
 
-    # V12.32: Use get_total_city_count_auto() to include bulk source cities
     return render_template('stats.html',
                            total_permits=total_permits,
                            total_value=total_value,
@@ -2860,27 +2796,40 @@ def api_analytics_volume():
     GET /api/analytics/volume
     Query params: city, weeks (default 12)
     Returns weekly permit counts for trend analysis.
+    V12.51: Uses SQLite for efficient aggregation.
     """
-    permits = load_permits()
-
     city = request.args.get('city', '')
     weeks = int(request.args.get('weeks', 12))
 
-    if city:
-        permits = [p for p in permits if p.get('city') == city]
-
-    # Group by week (use module-level timedelta import)
+    conn = permitdb.get_connection()
     now = datetime.now()
-    weekly_counts = {}
+    cutoff = (now - timedelta(weeks=weeks)).strftime('%Y-%m-%d')
 
+    # Build query with optional city filter
+    if city:
+        cursor = conn.execute("""
+            SELECT filing_date, COUNT(*) as cnt
+            FROM permits
+            WHERE city = ? AND filing_date >= ? AND filing_date IS NOT NULL
+            GROUP BY filing_date
+        """, (city, cutoff))
+    else:
+        cursor = conn.execute("""
+            SELECT filing_date, COUNT(*) as cnt
+            FROM permits
+            WHERE filing_date >= ? AND filing_date IS NOT NULL
+            GROUP BY filing_date
+        """, (cutoff,))
+
+    # Aggregate by week
+    weekly_counts = {}
     for i in range(weeks):
         week_start = now - timedelta(weeks=i+1)
-        week_end = now - timedelta(weeks=i)
         week_key = week_start.strftime('%Y-%m-%d')
         weekly_counts[week_key] = 0
 
-    for p in permits:
-        filing_date = p.get('filing_date', '')
+    for row in cursor:
+        filing_date = row['filing_date']
         if not filing_date:
             continue
         try:
@@ -2890,7 +2839,7 @@ def api_analytics_volume():
                 week_start = now - timedelta(weeks=weeks_ago+1)
                 week_key = week_start.strftime('%Y-%m-%d')
                 if week_key in weekly_counts:
-                    weekly_counts[week_key] += 1
+                    weekly_counts[week_key] += row['cnt']
         except (ValueError, TypeError):
             continue
 
@@ -2925,25 +2874,35 @@ def api_analytics_trades():
     GET /api/analytics/trades
     Query params: city
     Returns trade breakdown for the selected city.
+    V12.51: Uses SQLite for efficient aggregation.
     """
-    permits = load_permits()
-
     city = request.args.get('city', '')
+    conn = permitdb.get_connection()
+
     if city:
-        permits = [p for p in permits if p.get('city') == city]
+        cursor = conn.execute("""
+            SELECT COALESCE(trade_category, 'Other') as trade, COUNT(*) as cnt
+            FROM permits
+            WHERE city = ?
+            GROUP BY trade_category
+            ORDER BY cnt DESC
+        """, (city,))
+        total_row = conn.execute("SELECT COUNT(*) FROM permits WHERE city = ?", (city,)).fetchone()
+    else:
+        cursor = conn.execute("""
+            SELECT COALESCE(trade_category, 'Other') as trade, COUNT(*) as cnt
+            FROM permits
+            GROUP BY trade_category
+            ORDER BY cnt DESC
+        """)
+        total_row = conn.execute("SELECT COUNT(*) FROM permits").fetchone()
 
-    # Count by trade
-    trade_counts = {}
-    for p in permits:
-        trade = p.get('trade_category', 'Other')
-        trade_counts[trade] = trade_counts.get(trade, 0) + 1
-
-    # Sort by count
-    trades = sorted(trade_counts.items(), key=lambda x: -x[1])
+    trades = [{'trade': row['trade'] or 'Other', 'count': row['cnt']} for row in cursor]
+    total = total_row[0] if total_row else 0
 
     return jsonify({
-        'trades': [{'trade': t, 'count': c} for t, c in trades],
-        'total': len(permits),
+        'trades': trades,
+        'total': total,
         'city': city or 'All Cities',
     })
 
@@ -2954,30 +2913,46 @@ def api_analytics_values():
     GET /api/analytics/values
     Query params: city, weeks (default 12)
     Returns weekly average project values.
+    V12.51: Uses SQLite for efficient aggregation.
     """
-    permits = load_permits()
-
     city = request.args.get('city', '')
     weeks = int(request.args.get('weeks', 12))
 
-    if city:
-        permits = [p for p in permits if p.get('city') == city]
-
-    # Group by week (use module-level timedelta import)
+    conn = permitdb.get_connection()
     now = datetime.now()
+    cutoff = (now - timedelta(weeks=weeks)).strftime('%Y-%m-%d')
+
+    # Build query with optional city filter
+    if city:
+        cursor = conn.execute("""
+            SELECT filing_date, SUM(estimated_cost) as total_value, COUNT(*) as cnt
+            FROM permits
+            WHERE city = ? AND filing_date >= ? AND filing_date IS NOT NULL
+                  AND estimated_cost > 0
+            GROUP BY filing_date
+        """, (city, cutoff))
+    else:
+        cursor = conn.execute("""
+            SELECT filing_date, SUM(estimated_cost) as total_value, COUNT(*) as cnt
+            FROM permits
+            WHERE filing_date >= ? AND filing_date IS NOT NULL
+                  AND estimated_cost > 0
+            GROUP BY filing_date
+        """, (cutoff,))
+
+    # Initialize week buckets
     weekly_values = {}
     weekly_counts = {}
-
     for i in range(weeks):
         week_start = now - timedelta(weeks=i+1)
         week_key = week_start.strftime('%Y-%m-%d')
         weekly_values[week_key] = 0
         weekly_counts[week_key] = 0
 
-    for p in permits:
-        filing_date = p.get('filing_date', '')
-        value = p.get('estimated_cost', 0) or 0
-        if not filing_date or value <= 0:
+    # Aggregate by week
+    for row in cursor:
+        filing_date = row['filing_date']
+        if not filing_date:
             continue
         try:
             filed = datetime.strptime(filing_date[:10], '%Y-%m-%d')
@@ -2986,8 +2961,8 @@ def api_analytics_values():
                 week_start = now - timedelta(weeks=weeks_ago+1)
                 week_key = week_start.strftime('%Y-%m-%d')
                 if week_key in weekly_values:
-                    weekly_values[week_key] += value
-                    weekly_counts[week_key] += 1
+                    weekly_values[week_key] += row['total_value'] or 0
+                    weekly_counts[week_key] += row['cnt']
         except (ValueError, TypeError):
             continue
 
@@ -3125,6 +3100,7 @@ def api_signal_detail(signal_id):
     """
     GET /api/signals/<signal_id>
     Returns a single signal with linked permits.
+    V12.51: Uses SQLite for permit lookups.
     """
     signals = load_signals()
     signal = next((s for s in signals if s.get('signal_id') == signal_id), None)
@@ -3135,15 +3111,18 @@ def api_signal_detail(signal_id):
     # Add lead potential
     signal['lead_potential'] = calculate_lead_potential(signal)
 
-    # Load linked permits
+    # Load linked permits from SQLite
     linked_permits = []
     if signal.get('linked_permits'):
-        all_permits = load_permits()
-        all_permits = add_lead_scores(all_permits)
-        permit_map = {p.get('permit_number'): p for p in all_permits}
-        for permit_id in signal['linked_permits']:
-            if permit_id in permit_map:
-                linked_permits.append(permit_map[permit_id])
+        conn = permitdb.get_connection()
+        permit_numbers = signal['linked_permits']
+        placeholders = ','.join('?' * len(permit_numbers))
+        cursor = conn.execute(
+            f"SELECT * FROM permits WHERE permit_number IN ({placeholders})",
+            permit_numbers
+        )
+        linked_permits = [dict(row) for row in cursor]
+        linked_permits = add_lead_scores(linked_permits)
 
     return jsonify({
         'signal': signal,
@@ -3199,25 +3178,26 @@ def api_address_intel(address):
     """
     GET /api/address-intel/<address>
     Returns ALL intelligence for an address: permits, signals, violations, history.
+    V12.51: Uses SQLite for permits and history lookups.
     """
     normalized = normalize_address_for_lookup(address)
 
     if not normalized:
         return jsonify({'error': 'Address required'}), 400
 
-    # Load all data
-    permits = load_permits()
-    permits = add_lead_scores(permits)
+    conn = permitdb.get_connection()
+
+    # Find matching permits from SQLite (LIKE search on address)
+    cursor = conn.execute(
+        "SELECT * FROM permits WHERE LOWER(address) LIKE ?",
+        (f"%{normalized}%",)
+    )
+    matching_permits = [dict(row) for row in cursor]
+    matching_permits = add_lead_scores(matching_permits)
+
+    # Signals and violations still use JSON (not in SQLite)
     signals = load_signals()
     violations = load_violations()
-    history = load_permit_history()
-
-    # Find matching permits
-    matching_permits = []
-    for p in permits:
-        p_addr = normalize_address_for_lookup(p.get('address', ''))
-        if normalized in p_addr or p_addr in normalized:
-            matching_permits.append(p)
 
     # Find matching signals
     matching_signals = []
@@ -3234,14 +3214,17 @@ def api_address_intel(address):
         if normalized in v_addr or v_addr in normalized:
             matching_violations.append(v)
 
-    # Find permit history
-    history_entry = history.get(normalized, {})
-    if not history_entry:
-        # Try partial match
-        for key, value in history.items():
-            if normalized in key or key in normalized:
-                history_entry = value
-                break
+    # Find permit history from SQLite
+    history_permits = permitdb.get_address_history(normalized)
+    history_entry = {}
+    if history_permits:
+        history_entry = {
+            'address': history_permits[0].get('address'),
+            'city': history_permits[0].get('city'),
+            'state': history_permits[0].get('state'),
+            'permits': history_permits,
+            'permit_count': len(history_permits),
+        }
 
     return jsonify({
         'address': address,
@@ -3680,8 +3663,8 @@ def admin_page():
             </body></html>
         ''')
 
-    # Load data for admin dashboard
-    permits = load_permits()
+    # V12.51: Load data from SQLite for admin dashboard
+    permit_stats = permitdb.get_permit_stats()
     subscribers = load_subscribers()
     stats = load_stats()
 
@@ -3690,8 +3673,8 @@ def admin_page():
     pro_users = User.query.filter(User.plan.in_(['pro', 'professional', 'enterprise'])).all()
     alert_users = User.query.filter_by(daily_alerts=True).all()
 
-    # Count unique cities in permits
-    city_count = len(set(p.get('city', '') for p in permits if p.get('city')))
+    # Stats from SQLite
+    city_count = permit_stats['city_count']
 
     # V12: Load collection diagnostic
     diag_path = os.path.join(DATA_DIR, 'collection_diagnostic.json')
@@ -3874,7 +3857,7 @@ def admin_page():
         </body>
         </html>
     ''',
-        total_permits=len(permits),
+        total_permits=permit_stats['total_permits'],
         city_count=city_count,
         total_users=len(all_users),
         pro_users=len(pro_users),
@@ -3896,17 +3879,18 @@ def check_admin_logout():
 
 @app.route('/api/collection-status')
 def api_collection_status():
-    """GET /api/collection-status - Check data collection status (admin only)."""
+    """GET /api/collection-status - Check data collection status (admin only).
+    V12.51: Uses SQLite for permit stats.
+    """
     if not session.get('admin_authenticated'):
         return jsonify({'error': 'Admin authentication required'}), 401
 
     stats = load_stats()
-    permits = load_permits()
+    permit_stats = permitdb.get_permit_stats()
 
-    # Check data directory
+    # Check data directory (some JSON files still exist for signals/violations)
     data_files = {}
-    for filename in ['permits.json', 'collection_stats.json', 'violations.json',
-                      'signals.json', 'permit_history.json', 'city_health.json']:
+    for filename in ['violations.json', 'signals.json', 'city_health.json']:
         filepath = os.path.join(DATA_DIR, filename)
         if os.path.exists(filepath):
             data_files[filename] = {
@@ -3917,13 +3901,18 @@ def api_collection_status():
         else:
             data_files[filename] = {'exists': False}
 
-    # Count unique cities
-    city_count = len(set(p.get('city', '') for p in permits if p.get('city')))
+    # Add SQLite database info
+    if os.path.exists(permitdb.DB_PATH):
+        data_files['permitgrab.db'] = {
+            'exists': True,
+            'size_kb': round(os.path.getsize(permitdb.DB_PATH) / 1024, 1),
+            'modified': datetime.fromtimestamp(os.path.getmtime(permitdb.DB_PATH)).isoformat(),
+        }
 
     return jsonify({
         'data_dir': DATA_DIR,
-        'total_permits': len(permits),
-        'unique_cities': city_count,
+        'total_permits': permit_stats['total_permits'],
+        'unique_cities': permit_stats['city_count'],
         'last_collection': stats.get('collected_at', 'Never'),
         'city_stats': stats.get('city_stats', {}),
         'data_files': data_files,
@@ -4690,30 +4679,37 @@ STATE_CONFIG = {
 def get_state_data(state_slug):
     """Get aggregated data for a state hub page.
     V12.36: Fixed to use normalized city names for accurate counting.
+    V12.51: Uses SQLite aggregation for efficiency.
     """
     if state_slug not in STATE_CONFIG:
         return None
 
     state_info = STATE_CONFIG[state_slug]
     state_abbrev = state_info['abbrev']
-    permits = load_permits()
 
     # V12.32: Get all cities in this state, including auto-discovered bulk source cities
     state_cities = get_cities_by_state_auto(state_abbrev)
 
-    # V12.36: Count permits per city using normalized names for matching
-    # This handles case differences like "SILVER SPRING" vs "Silver Spring"
-    city_permit_counts = {}  # normalized_name -> count
-    city_values = {}  # normalized_name -> total value
-    city_display_names = {}  # normalized_name -> best display name
+    # V12.51: Use SQL aggregation for city stats
+    conn = permitdb.get_connection()
+    cursor = conn.execute("""
+        SELECT city, COUNT(*) as permit_count, COALESCE(SUM(estimated_cost), 0) as total_value
+        FROM permits
+        WHERE state = ?
+        GROUP BY city
+    """, (state_abbrev,))
 
-    for p in permits:
-        city_name = p.get('city', '').strip()
-        if p.get('state') == state_abbrev and city_name:
-            # Normalize for counting
+    # Build city stats from SQL
+    city_permit_counts = {}
+    city_values = {}
+    city_display_names = {}
+
+    for row in cursor:
+        city_name = row['city'] or ''
+        if city_name:
             norm_name = ' '.join(city_name.lower().split())
-            city_permit_counts[norm_name] = city_permit_counts.get(norm_name, 0) + 1
-            city_values[norm_name] = city_values.get(norm_name, 0) + (p.get('estimated_cost', 0) or 0)
+            city_permit_counts[norm_name] = row['permit_count']
+            city_values[norm_name] = row['total_value']
             # Keep track of display name (prefer title case)
             if norm_name not in city_display_names or city_name.istitle():
                 city_display_names[norm_name] = city_name
@@ -4798,17 +4794,28 @@ def city_landing_inner(city_slug):
             """
         }
 
-    permits = load_permits()
-
-    # Filter permits for this city (use raw_name if available for matching)
+    # V12.51: Use SQLite for city permits
     filter_name = config.get('raw_name', config['name'])
-    city_permits = [p for p in permits if p.get('city') == filter_name]
+    conn = permitdb.get_connection()
 
-    # Calculate stats
-    permit_count = len(city_permits)
-    total_value = sum(p.get('estimated_cost', 0) for p in city_permits)
+    # Get stats via SQL aggregation
+    stats_row = conn.execute("""
+        SELECT COUNT(*) as permit_count,
+               COALESCE(SUM(estimated_cost), 0) as total_value,
+               COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
+        FROM permits WHERE city = ?
+    """, (filter_name,)).fetchone()
+
+    permit_count = stats_row['permit_count']
+    total_value = stats_row['total_value']
     # V12.18: High-value = $100K+ projects (more meaningful to contractors)
-    high_value_count = len([p for p in city_permits if p.get('estimated_cost', 0) >= 100000])
+    high_value_count = stats_row['high_value_count']
+
+    # Get permits for display (limited set, sorted by value)
+    cursor = conn.execute("""
+        SELECT * FROM permits WHERE city = ? ORDER BY estimated_cost DESC LIMIT 100
+    """, (filter_name,))
+    city_permits = [dict(row) for row in cursor]
 
     # V12.5: noindex for empty city pages to avoid thin content in Google
     robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
@@ -4816,14 +4823,15 @@ def city_landing_inner(city_slug):
     # V12.11: Coming Soon flag for empty cities
     is_coming_soon = permit_count == 0
 
-    # Trade breakdown
-    trade_breakdown = {}
-    for p in city_permits:
-        trade = p.get('trade_category', 'Other')
-        trade_breakdown[trade] = trade_breakdown.get(trade, 0) + 1
+    # V12.51: Trade breakdown via SQL for full accuracy
+    trade_cursor = conn.execute("""
+        SELECT COALESCE(trade_category, 'Other') as trade, COUNT(*) as cnt
+        FROM permits WHERE city = ? GROUP BY trade_category
+    """, (filter_name,))
+    trade_breakdown = {row['trade'] or 'Other': row['cnt'] for row in trade_cursor}
 
-    # Sort permits by value for preview
-    sorted_permits = sorted(city_permits, key=lambda x: x.get('estimated_cost', 0), reverse=True)
+    # Permits already sorted by value from SQL
+    sorted_permits = city_permits
 
     # V12.17: Add "is_new" flag for permits filed in last 7 days
     seven_days_ago = datetime.now() - timedelta(days=7)
@@ -4839,30 +4847,22 @@ def city_landing_inner(city_slug):
             p['is_new'] = False
 
     # V12.9: Calculate alternative stats for cities without value data
+    # V12.51: Use SQL for accurate counts
     new_this_month = permit_count  # Fallback to total count
     unique_contractors = 0
     if total_value == 0:
-        # Count permits from last 30 days
-        # V12.23: Removed redundant local import that was shadowing module-level timedelta
-        thirty_days_ago = datetime.now() - timedelta(days=30)
-        recent_permits = []
-        contractors_set = set()
-        for p in city_permits:
-            # Check filing date
-            filing_date_str = p.get('filing_date', '')
-            if filing_date_str:
-                try:
-                    filing_date = datetime.strptime(filing_date_str, '%Y-%m-%d')
-                    if filing_date >= thirty_days_ago:
-                        recent_permits.append(p)
-                except:
-                    pass
-            # Count unique contractors
-            contractor = p.get('contractor_name') or p.get('applicant_name')
-            if contractor and contractor.strip():
-                contractors_set.add(contractor.strip().lower())
-        new_this_month = len(recent_permits) if recent_permits else permit_count
-        unique_contractors = len(contractors_set) if contractors_set else '50+'
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        recent_row = conn.execute("""
+            SELECT COUNT(*) as cnt FROM permits
+            WHERE city = ? AND filing_date >= ?
+        """, (filter_name, thirty_days_ago)).fetchone()
+        new_this_month = recent_row['cnt'] if recent_row else permit_count
+
+        contractor_row = conn.execute("""
+            SELECT COUNT(DISTINCT LOWER(COALESCE(contractor_name, ''))) as cnt
+            FROM permits WHERE city = ? AND contractor_name IS NOT NULL AND contractor_name != ''
+        """, (filter_name,)).fetchone()
+        unique_contractors = contractor_row['cnt'] if contractor_row and contractor_row['cnt'] > 0 else '50+'
 
     # V12.17: Other cities for footer links - sorted by permit volume
     cities_by_volume = get_cities_with_data()  # Pre-sorted by permit count descending
@@ -4913,15 +4913,20 @@ def city_trade_landing(city_slug, trade_slug):
     if not trade:
         return "Trade not found", 404
 
-    permits = load_permits()
+    # V12.51: Use SQLite for city permits
+    conn = permitdb.get_connection()
 
     # V12.9: Format city name for display
     display_name = format_city_name(city_config['name'])
 
-    # Filter permits for this city and trade (use raw name for matching)
-    city_permits = [p for p in permits if p.get('city') == city_config['name']]
+    # Filter permits for this city from SQLite
+    cursor = conn.execute(
+        "SELECT * FROM permits WHERE city = ? ORDER BY filing_date DESC",
+        (city_config['name'],)
+    )
+    city_permits = [dict(row) for row in cursor]
 
-    # Match permits to this trade based on keywords
+    # Match permits to this trade based on keywords (Python-based for flexibility)
     trade_keywords = [kw.lower() for kw in trade['keywords']]
     matching_permits = []
     for p in city_permits:
@@ -4938,8 +4943,7 @@ def city_trade_landing(city_slug, trade_slug):
         if any(kw in text for kw in trade_keywords):
             matching_permits.append(p)
 
-    # Sort by date
-    matching_permits.sort(key=lambda x: x.get('filing_date', ''), reverse=True)
+    # Already sorted by date from SQL
 
     # Calculate stats
     # V12.23: Use module-level datetime/timedelta imports
@@ -5190,18 +5194,23 @@ def api_competitor_matches():
     if not competitors:
         return jsonify({'matches': [], 'message': 'No competitors being watched'})
 
-    permits = load_permits()
+    # V12.51: Use SQLite with LIKE queries for competitor matching
+    conn = permitdb.get_connection()
     matches = []
 
-    for permit in permits:
-        contractor = (permit.get('contact_name', '') or '').lower()
-        for comp in competitors:
-            if comp.lower() in contractor:
-                matches.append({
-                    'permit': permit,
-                    'matched_competitor': comp
-                })
-                break
+    for comp in competitors:
+        cursor = conn.execute("""
+            SELECT * FROM permits
+            WHERE LOWER(contact_name) LIKE ?
+            ORDER BY filing_date DESC
+            LIMIT 50
+        """, (f"%{comp.lower()}%",))
+
+        for row in cursor:
+            matches.append({
+                'permit': dict(row),
+                'matched_competitor': comp
+            })
 
     # Sort by filing date, most recent first
     matches.sort(key=lambda x: x['permit'].get('filing_date', ''), reverse=True)
