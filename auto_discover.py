@@ -1,7 +1,9 @@
 """
-PermitGrab V12.54 — Auto Discover
+PermitGrab V12.54b — Auto Discover
 Search Socrata catalog, ArcGIS hubs, and CKAN for permit datasets.
 Score datasets. Generate field maps. Pure search + scoring functions.
+
+V12.54b: Added per-domain rate limiting and exponential backoff on 429.
 """
 
 import requests
@@ -9,7 +11,9 @@ import json
 import time
 import os
 import re
+import threading
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 SESSION = requests.Session()
 SESSION.headers.update({
@@ -19,6 +23,48 @@ SESSION.headers.update({
 SOCRATA_APP_TOKEN = os.environ.get("SOCRATA_APP_TOKEN", "")
 if SOCRATA_APP_TOKEN:
     SESSION.headers["X-App-Token"] = SOCRATA_APP_TOKEN
+
+# V12.54b: Per-domain rate limiting
+_domain_last_request = {}
+_global_lock = threading.Lock()
+MIN_DOMAIN_INTERVAL = 1.0  # seconds between requests to same domain
+
+
+def rate_limit_domain(url):
+    """Ensure at least MIN_DOMAIN_INTERVAL seconds between requests
+    to the same domain. Thread-safe."""
+    domain = urlparse(url).netloc
+    with _global_lock:
+        last = _domain_last_request.get(domain, 0)
+        now = time.time()
+        wait = MIN_DOMAIN_INTERVAL - (now - last)
+        if wait > 0:
+            time.sleep(wait)
+        _domain_last_request[domain] = time.time()
+
+
+def request_with_backoff(url, params=None, timeout=15, max_retries=3):
+    """GET with per-domain rate limiting and exponential backoff on 429/5xx."""
+    rate_limit_domain(url)
+    for attempt in range(max_retries):
+        try:
+            resp = SESSION.get(url, params=params, timeout=timeout)
+            if resp.status_code == 429:
+                wait = min(60, (2 ** attempt) * 5)
+                print(f"[Discovery] 429 from {urlparse(url).netloc}, waiting {wait}s")
+                time.sleep(wait)
+                continue
+            if resp.status_code >= 500:
+                time.sleep(2 ** attempt)
+                continue
+            return resp
+        except Exception:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            raise
+    return resp  # Return last response even if it was an error
+
 
 # Keywords to search for (use ALL of them)
 SEARCH_KEYWORDS = [
@@ -59,7 +105,7 @@ def search_socrata_catalog(query, limit=100, offset=0):
     url = "https://api.us.socrata.com/api/catalog/v1"
     params = {'q': query, 'limit': limit, 'offset': offset, 'only': 'datasets'}
     try:
-        resp = SESSION.get(url, params=params, timeout=30)
+        resp = request_with_backoff(url, params=params, timeout=30)
         if resp.status_code != 200:
             return [], 0
         data = resp.json()
@@ -75,7 +121,7 @@ def search_socrata_domain(domain, query):
     url = f"https://{domain}/api/catalog/v1"
     params = {'q': query, 'limit': 50}
     try:
-        resp = SESSION.get(url, params=params, timeout=15)
+        resp = request_with_backoff(url, params=params, timeout=15)
         if resp.status_code != 200:
             return []
         return resp.json().get('results', [])
@@ -93,7 +139,7 @@ def search_arcgis(name, state):
         'num': 20,
     }
     try:
-        resp = SESSION.get(url, params=params, timeout=15)
+        resp = request_with_backoff(url, params=params, timeout=15)
         if resp.status_code != 200:
             return []
         results = resp.json().get('results', [])
@@ -120,7 +166,7 @@ def search_arcgis_hub(hub_domain, query='building permits'):
     url = f"https://{hub_domain}/api/v3/search"
     params = {'q': query, 'per_page': 20}
     try:
-        resp = SESSION.get(url, params=params, timeout=15)
+        resp = request_with_backoff(url, params=params, timeout=15)
         if resp.status_code != 200:
             return []
         items = resp.json().get('data', [])
@@ -167,14 +213,15 @@ def try_common_domains(city_name, state):
                     'dataset_id': resource.get('id', ''),
                     'columns': resource.get('columns_field_name', []),
                 })
-        time.sleep(0.5)  # Rate limit
+        time.sleep(0.5)  # Rate limit between domain attempts
     return candidates
 
 
 def get_socrata_columns(endpoint):
     """Fetch column names from a Socrata endpoint by requesting 1 record."""
     try:
-        resp = SESSION.get(f"{endpoint}?$limit=1", timeout=15)
+        url = f"{endpoint}?$limit=1"
+        resp = request_with_backoff(url, timeout=15)
         if resp.status_code == 200:
             data = resp.json()
             if data and isinstance(data, list) and len(data) > 0:
@@ -188,7 +235,7 @@ def get_arcgis_columns(endpoint):
     """Fetch column names from an ArcGIS query endpoint."""
     try:
         params = {'where': '1=1', 'outFields': '*', 'resultRecordCount': 1, 'f': 'json'}
-        resp = SESSION.get(endpoint, params=params, timeout=15)
+        resp = request_with_backoff(endpoint, params=params, timeout=15)
         if resp.status_code == 200:
             data = resp.json()
             features = data.get('features', [])
@@ -284,7 +331,8 @@ def fetch_sample(endpoint, platform, limit=10):
     Returns list of dicts (raw records) or empty list on failure."""
     try:
         if platform == 'socrata':
-            resp = SESSION.get(f"{endpoint}?$limit={limit}&$order=:id DESC", timeout=15)
+            url = f"{endpoint}?$limit={limit}&$order=:id DESC"
+            resp = request_with_backoff(url, timeout=15)
             if resp.status_code == 200:
                 return resp.json()
         elif platform == 'arcgis':
@@ -293,7 +341,7 @@ def fetch_sample(endpoint, platform, limit=10):
                 'resultRecordCount': limit, 'f': 'json',
                 'orderByFields': 'OBJECTID DESC'
             }
-            resp = SESSION.get(endpoint, params=params, timeout=15)
+            resp = request_with_backoff(endpoint, params=params, timeout=15)
             if resp.status_code == 200:
                 features = resp.json().get('features', [])
                 return [f.get('attributes', {}) for f in features]

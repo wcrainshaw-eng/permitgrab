@@ -1,10 +1,15 @@
 """
-PermitGrab V12.54 — Autonomy Engine
+PermitGrab V12.54b — Autonomy Engine
 The daemon thread. Processes counties first, then cities.
 Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
 
 CRITICAL: Each city/county is fully processed in ONE function call.
           No "pending" state. No separate validation cron. No onboarding queue.
+
+V12.54b FIXES:
+  - Added 50/day onboard cap to prevent server overload
+  - Added trade_category + value_tier classification
+  - Reuses collector.py fetch functions instead of duplicates
 """
 
 import time
@@ -27,6 +32,8 @@ from auto_discover import (
     check_data_recency, auto_fix_field_map, get_socrata_columns,
     get_arcgis_columns, SEARCH_KEYWORDS,
 )
+# V12.54b: Import from collector for trade classification and fetch functions
+from collector import classify_trade, score_value, fetch_socrata, fetch_arcgis
 
 
 def slugify(text):
@@ -70,40 +77,6 @@ def _parse_cost(value):
         except (ValueError, TypeError):
             return 0.0
     return 0.0
-
-
-def fetch_permits_socrata(endpoint, date_field, days_back=180, limit=50000):
-    """Fetch permits from a Socrata endpoint."""
-    from auto_discover import SESSION
-    try:
-        cutoff = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
-        url = f"{endpoint}?$where={date_field} >= '{cutoff}'&$limit={limit}"
-        resp = SESSION.get(url, timeout=60)
-        if resp.status_code == 200:
-            return resp.json()
-    except Exception as e:
-        print(f"[Autonomy] Socrata fetch error: {e}")
-    return []
-
-
-def fetch_permits_arcgis(endpoint, date_field, days_back=180, limit=2000):
-    """Fetch permits from an ArcGIS endpoint."""
-    from auto_discover import SESSION
-    try:
-        cutoff_ms = int((datetime.now() - timedelta(days=days_back)).timestamp() * 1000)
-        params = {
-            'where': f"{date_field} >= {cutoff_ms}",
-            'outFields': '*',
-            'resultRecordCount': limit,
-            'f': 'json',
-        }
-        resp = SESSION.get(endpoint, params=params, timeout=60)
-        if resp.status_code == 200:
-            features = resp.json().get('features', [])
-            return [f.get('attributes', {}) for f in features]
-    except Exception as e:
-        print(f"[Autonomy] ArcGIS fetch error: {e}")
-    return []
 
 
 def process_county(county):
@@ -233,13 +206,19 @@ def process_county(county):
         'discovery_score': best['score'],
     })
 
-    # 5. PULL 6 MONTHS RIGHT NOW
+    # 5. PULL 6 MONTHS RIGHT NOW (V12.54b: use collector.py fetch functions)
     permits_raw = []
     try:
+        config = {
+            'endpoint': best['endpoint'],
+            'date_field': date_field,
+            'limit': 50000 if best['platform'] == 'socrata' else 2000,
+            'field_map': field_map,
+        }
         if best['platform'] == 'socrata':
-            permits_raw = fetch_permits_socrata(best['endpoint'], date_field, days_back=180)
+            permits_raw = fetch_socrata(config, days_back=180)
         elif best['platform'] == 'arcgis':
-            permits_raw = fetch_permits_arcgis(best['endpoint'], date_field, days_back=180)
+            permits_raw = fetch_arcgis(config, days_back=180)
     except Exception as e:
         print(f"[Autonomy] Fetch error for {name}: {e}")
 
@@ -262,6 +241,10 @@ def process_county(county):
                 'contractor_name': raw.get(field_map.get('contractor_name', ''), ''),
                 'owner_name': raw.get(field_map.get('owner_name', ''), ''),
             }
+            # V12.54b: Classify trade and value tier (same as collector.py)
+            permit['trade_category'] = classify_trade(
+                permit.get('description', ''), permit.get('permit_type', ''))
+            permit['value_tier'] = score_value(permit.get('estimated_cost', 0))
             # Must have permit_number or address to be useful
             if permit.get('permit_number') or permit.get('address'):
                 # Generate permit_number if missing
@@ -381,7 +364,7 @@ def process_city(city):
 
     date_field = field_map.get('date') or field_map.get('filing_date')
 
-    # 4. Create source + PULL 6 MONTHS
+    # 4. Create source + PULL 6 MONTHS (V12.54b: use collector.py fetch functions)
     source_key = slug
     upsert_city_source({
         'source_key': source_key,
@@ -399,10 +382,16 @@ def process_city(city):
 
     permits_raw = []
     try:
+        config = {
+            'endpoint': best['endpoint'],
+            'date_field': date_field,
+            'limit': 50000 if best['platform'] == 'socrata' else 2000,
+            'field_map': field_map,
+        }
         if best['platform'] == 'socrata':
-            permits_raw = fetch_permits_socrata(best['endpoint'], date_field, days_back=180)
+            permits_raw = fetch_socrata(config, days_back=180)
         elif best['platform'] == 'arcgis':
-            permits_raw = fetch_permits_arcgis(best['endpoint'], date_field, days_back=180)
+            permits_raw = fetch_arcgis(config, days_back=180)
     except Exception as e:
         print(f"[Autonomy] Fetch error for {name}: {e}")
 
@@ -425,6 +414,10 @@ def process_city(city):
                 'contractor_name': raw.get(field_map.get('contractor_name', ''), ''),
                 'owner_name': raw.get(field_map.get('owner_name', ''), ''),
             }
+            # V12.54b: Classify trade and value tier (same as collector.py)
+            permit['trade_category'] = classify_trade(
+                permit.get('description', ''), permit.get('permit_type', ''))
+            permit['value_tier'] = score_value(permit.get('estimated_cost', 0))
             if permit.get('permit_number') or permit.get('address'):
                 if not permit['permit_number']:
                     permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
@@ -469,7 +462,11 @@ def run_autonomy_engine():
 
 
 def run_search_cycle():
-    """Process counties first, then cities. Single-pass each."""
+    """Process counties first, then cities. Single-pass each.
+    V12.54b: Caps at 50 successful onboards per cycle to protect server resources."""
+    MAX_ONBOARDS_PER_CYCLE = 50
+    onboard_count = 0
+
     stats = {
         'targets_searched': 0, 'sources_found': 0,
         'permits_loaded': 0, 'cities_activated': 0, 'errors': []
@@ -477,7 +474,7 @@ def run_search_cycle():
 
     # Phase A: Counties
     county = get_next_unsearched_county()
-    while county:
+    while county and onboard_count < MAX_ONBOARDS_PER_CYCLE:
         try:
             result = process_county(county)
             stats['targets_searched'] += 1
@@ -485,6 +482,8 @@ def run_search_cycle():
                 stats['sources_found'] += 1
                 stats['permits_loaded'] += result.get('permits', 0)
                 stats['cities_activated'] += result.get('cities_covered', 0)
+                if result.get('permits', 0) > 0:
+                    onboard_count += 1
         except Exception as e:
             stats['errors'].append(f"county:{county.get('county_name','?')}: {str(e)[:100]}")
             print(f"[Autonomy] Error processing {county.get('county_name')}: {e}")
@@ -492,26 +491,39 @@ def run_search_cycle():
         throttle()
         county = get_next_unsearched_county()
 
-    # Phase B: Individual cities
-    city = get_next_unsearched_city()
-    while city:
-        try:
-            result = process_city(city)
-            stats['targets_searched'] += 1
-            if result.get('found') and result.get('valid') and not result.get('rejected'):
-                stats['sources_found'] += 1
-                stats['permits_loaded'] += result.get('permits', 0)
-                stats['cities_activated'] += 1
-        except Exception as e:
-            stats['errors'].append(f"city:{city.get('city_name','?')}: {str(e)[:100]}")
-            print(f"[Autonomy] Error processing {city.get('city_name')}: {e}")
-
-        throttle()
+    # Phase B: Individual cities (only if county phase didn't exhaust the cap)
+    if onboard_count < MAX_ONBOARDS_PER_CYCLE:
         city = get_next_unsearched_city()
+        while city and onboard_count < MAX_ONBOARDS_PER_CYCLE:
+            try:
+                result = process_city(city)
+                stats['targets_searched'] += 1
+                if result.get('found') and result.get('valid') and not result.get('rejected'):
+                    stats['sources_found'] += 1
+                    stats['permits_loaded'] += result.get('permits', 0)
+                    stats['cities_activated'] += 1
+                    if result.get('permits', 0) > 0:
+                        onboard_count += 1
+            except Exception as e:
+                stats['errors'].append(f"city:{city.get('city_name','?')}: {str(e)[:100]}")
+                print(f"[Autonomy] Error processing {city.get('city_name')}: {e}")
+
+            throttle()
+            city = get_next_unsearched_city()
 
     log_discovery_run('search', stats)
     print(f"[Autonomy] Search cycle complete: {stats['sources_found']} sources, "
-          f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities")
+          f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities, "
+          f"{onboard_count} onboards (cap: {MAX_ONBOARDS_PER_CYCLE})")
+
+    # Sleep until next cycle. If we hit the cap, come back in 6 hours.
+    # If we didn't hit the cap (running low on targets), come back in 12 hours.
+    if onboard_count >= MAX_ONBOARDS_PER_CYCLE:
+        print(f"[Autonomy] Hit daily cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 6 hours.")
+        time.sleep(21600)  # 6 hours
+    else:
+        print(f"[Autonomy] Targets exhausted for now. Sleeping 12 hours.")
+        time.sleep(43200)  # 12 hours
 
 
 def run_maintenance_cycle():
