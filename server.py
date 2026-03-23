@@ -489,8 +489,9 @@ def admin_send_welcome():
     if not valid:
         return error
 
-    email = request.args.get('email', '')
-    email_type = request.args.get('type', 'free')  # 'free' or 'pro'
+    # V12.59: Read from both query string and JSON body
+    email = request.args.get('email') or (request.json or {}).get('email', '')
+    email_type = request.args.get('type') or (request.json or {}).get('type', 'free')
 
     if not email:
         return jsonify({'error': 'Email parameter required'}), 400

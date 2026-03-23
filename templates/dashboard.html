@@ -1497,7 +1497,10 @@ footer a:hover { color: white; }
         </select>
       </div>
       <div class="results-count">
-        <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
+        <span id="loading-indicator" style="color:#6b7280;">Loading permits...</span>
+        <span id="results-text" style="display:none;">
+          <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> permits
+        </span>
         <span id="data-freshness" style="margin-left: 8px; font-size: 12px; color: var(--gray-400);"></span>
         <!-- V12.13: Grey out Save/Export for logged-out users -->
         {% if user %}
@@ -1787,6 +1790,7 @@ let totalPermitCount = 0;
 // V12.27: Store aggregate stats from API for consistency with stats page
 let totalValueFromAPI = 0;
 let highValueCountFromAPI = 0;
+let dataReady = false;  // V12.59: Guard against premature filter execution
 
 async function loadData() {
   try {
@@ -1812,12 +1816,19 @@ async function loadData() {
     return;
   }
 
+  // V12.59: Mark data as ready before populating filters
+  dataReady = true;
+
   // Populate filters
   populateFilters();
   // Update stats
   updateStats();
   // Initial render
   applyFilters();
+
+  // V12.59: Show results, hide loading indicator
+  document.getElementById('loading-indicator').style.display = 'none';
+  document.getElementById('results-text').style.display = '';
 }
 
 function formatTimeAgo(dateStr) {
@@ -1937,6 +1948,9 @@ function updateStats(useFiltered = false) {
 // FILTERS
 // ===========================
 function applyFilters() {
+  // V12.59: Don't run until data is loaded
+  if (!dataReady) return;
+
   const city = document.getElementById('filter-city').value;
   const trade = document.getElementById('filter-trade').value;
   const value = document.getElementById('filter-value').value;

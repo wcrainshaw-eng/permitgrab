@@ -295,11 +295,12 @@ def get_permits_for_digest(cities, since_date, limit=25):
     return [dict(row) for row in cursor]
 
 
-def build_digest_html(user, permits, is_pro=False):
+def build_digest_html(user, permits, is_pro=False, active_cities=None):
     """Build the daily digest email HTML."""
     name = user.name or 'there'
-    cities = json.loads(user.digest_cities or '[]')
-    city_display = ', '.join(cities[:3]) + ('...' if len(cities) > 3 else '') if cities else 'your cities'
+    # V12.59: Use active_cities (cities with actual permits) if provided
+    display_cities = active_cities or json.loads(user.digest_cities or '[]')
+    city_display = ', '.join(display_cities[:3]) + ('...' if len(display_cities) > 3 else '') if display_cities else 'your cities'
 
     # Calculate stats
     total_value = sum(p.get('estimated_cost', 0) or 0 for p in permits)
@@ -405,14 +406,20 @@ def send_daily_digest_to_user(user):
 
     permits = get_permits_for_digest(cities, since, limit)
 
-    # Build and send
-    html = build_digest_html(user, permits, is_pro)
+    # V12.59: Only reference cities that actually have permits
+    cities_with_permits = list(dict.fromkeys(
+        p.get('city', '') for p in permits if p.get('city')
+    ))
+    active_cities = cities_with_permits if cities_with_permits else cities
 
-    # Build subject
-    if len(cities) == 1:
-        subject = f"PermitGrab Daily Digest — {cities[0]} — {datetime.now().strftime('%b %d')}"
+    # Build and send
+    html = build_digest_html(user, permits, is_pro, active_cities)
+
+    # Build subject — V12.59: Use only cities with actual permits
+    if len(active_cities) == 1:
+        subject = f"PermitGrab Daily Digest — {active_cities[0]} — {datetime.now().strftime('%b %d')}"
     else:
-        subject = f"PermitGrab Daily Digest — {len(cities)} Cities — {datetime.now().strftime('%b %d')}"
+        subject = f"PermitGrab Daily Digest — {len(active_cities)} Cities — {datetime.now().strftime('%b %d')}"
 
     success = send_email(user.email, subject, html)
 
