@@ -414,6 +414,135 @@ def admin_email_stats():
 
 
 # ===========================
+# V12.54: AUTONOMY ENGINE ADMIN ROUTES
+# ===========================
+
+@app.route('/api/admin/autonomy-status')
+def admin_autonomy_status():
+    """V12.54: Get autonomy engine status."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from city_source_db import get_autonomy_status
+        return jsonify(get_autonomy_status())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/us-cities')
+def admin_us_cities():
+    """V12.54: List cities with filters."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    status = request.args.get('status')
+    state = request.args.get('state')
+    limit = int(request.args.get('limit', 50))
+    offset = int(request.args.get('offset', 0))
+    try:
+        import db as permitdb
+        conn = permitdb.get_connection()
+        query = "SELECT * FROM us_cities WHERE 1=1"
+        params = []
+        if status:
+            query += " AND status=?"
+            params.append(status)
+        if state:
+            query += " AND state=?"
+            params.append(state)
+        query += " ORDER BY priority ASC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/us-counties')
+def admin_us_counties():
+    """V12.54: List counties with filters."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    status = request.args.get('status')
+    limit = int(request.args.get('limit', 50))
+    try:
+        import db as permitdb
+        conn = permitdb.get_connection()
+        query = "SELECT * FROM us_counties WHERE 1=1"
+        params = []
+        if status:
+            query += " AND status=?"
+            params.append(status)
+        query += " ORDER BY priority ASC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/city-sources')
+def admin_city_sources():
+    """V12.54: List all data sources."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import db as permitdb
+        conn = permitdb.get_connection()
+        rows = conn.execute("SELECT * FROM city_sources ORDER BY last_collected_at DESC LIMIT 200").fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/discovery-log')
+def admin_discovery_log():
+    """V12.54: Recent discovery runs."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import db as permitdb
+        conn = permitdb.get_connection()
+        rows = conn.execute("SELECT * FROM discovery_runs ORDER BY id DESC LIMIT 20").fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/trigger-search', methods=['POST'])
+def admin_trigger_search():
+    """V12.54: Manually trigger search for a city or county."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json() or {}
+    slug = data.get('slug')
+    fips = data.get('fips')
+    try:
+        if fips:
+            from city_source_db import update_county_status
+            update_county_status(fips, 'not_started')
+            return jsonify({"status": "ok", "message": f"County {fips} reset to not_started"})
+        elif slug:
+            from city_source_db import update_city_status
+            update_city_status(slug, 'not_started')
+            return jsonify({"status": "ok", "message": f"City {slug} reset to not_started"})
+        return jsonify({"error": "provide slug or fips"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===========================
 # DATABASE SETUP (V7)
 # ===========================
 from flask_sqlalchemy import SQLAlchemy
@@ -5851,6 +5980,15 @@ def start_collectors():
     # V12.53: Email scheduler thread
     email_thread = threading.Thread(target=schedule_email_tasks, daemon=True)
     email_thread.start()
+
+    # V12.54: Autonomous city discovery engine
+    try:
+        from autonomy_engine import run_autonomy_engine
+        autonomy_thread = threading.Thread(target=run_autonomy_engine, daemon=True)
+        autonomy_thread.start()
+        print(f"[{datetime.now()}] V12.54: Autonomy engine thread started.")
+    except ImportError:
+        print(f"[{datetime.now()}] V12.54: autonomy_engine.py not found, skipping.")
 
     print(f"[{datetime.now()}] Collector and email threads started.")
 

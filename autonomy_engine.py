@@ -1,0 +1,560 @@
+"""
+PermitGrab V12.54 — Autonomy Engine
+The daemon thread. Processes counties first, then cities.
+Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
+
+CRITICAL: Each city/county is fully processed in ONE function call.
+          No "pending" state. No separate validation cron. No onboarding queue.
+"""
+
+import time
+import json
+import math
+import re
+from datetime import datetime, timedelta
+import db as permitdb
+from city_source_db import (
+    get_next_unsearched_county, get_next_unsearched_city,
+    update_county_status, update_city_status, upsert_city_source,
+    mark_county_cities_covered, increment_search_attempts,
+    record_collection, count_unsearched_counties, count_unsearched_cities,
+    log_discovery_run, update_source_status,
+)
+from auto_discover import (
+    search_socrata_catalog, search_socrata_domain, search_arcgis,
+    search_arcgis_hub, try_common_domains, generate_field_map,
+    find_city_field, score_dataset, fetch_sample, validate_sample,
+    check_data_recency, auto_fix_field_map, get_socrata_columns,
+    get_arcgis_columns, SEARCH_KEYWORDS,
+)
+
+
+def slugify(text):
+    """Convert text to URL-safe slug."""
+    text = text.lower().strip()
+    text = re.sub(r'[^a-z0-9\s-]', '', text)
+    text = re.sub(r'[\s]+', '-', text)
+    text = re.sub(r'-+', '-', text)
+    return text.strip('-')
+
+
+def create_source_key(name, state, mode='city'):
+    """Generate a unique source_key from name + state."""
+    slug = slugify(name)
+    return f"{slug}-{state.lower()}" if mode == 'city' else f"{slug}-{state.lower()}-bulk"
+
+
+def throttle(peak_hours=True):
+    """Rate limit between searches.
+    5 seconds during peak (7 AM - 11 PM ET), 1 second off-peak."""
+    try:
+        import pytz
+        et = pytz.timezone('America/New_York')
+        hour = datetime.now(et).hour
+    except ImportError:
+        hour = datetime.now().hour
+    if 7 <= hour <= 23:
+        time.sleep(5)
+    else:
+        time.sleep(1)
+
+
+def _parse_cost(value):
+    """Parse a cost value to float. Handles strings like '$1,234.56'."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.replace('$', '').replace(',', '').strip()
+        try:
+            return float(cleaned)
+        except (ValueError, TypeError):
+            return 0.0
+    return 0.0
+
+
+def fetch_permits_socrata(endpoint, date_field, days_back=180, limit=50000):
+    """Fetch permits from a Socrata endpoint."""
+    from auto_discover import SESSION
+    try:
+        cutoff = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        url = f"{endpoint}?$where={date_field} >= '{cutoff}'&$limit={limit}"
+        resp = SESSION.get(url, timeout=60)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        print(f"[Autonomy] Socrata fetch error: {e}")
+    return []
+
+
+def fetch_permits_arcgis(endpoint, date_field, days_back=180, limit=2000):
+    """Fetch permits from an ArcGIS endpoint."""
+    from auto_discover import SESSION
+    try:
+        cutoff_ms = int((datetime.now() - timedelta(days=days_back)).timestamp() * 1000)
+        params = {
+            'where': f"{date_field} >= {cutoff_ms}",
+            'outFields': '*',
+            'resultRecordCount': limit,
+            'f': 'json',
+        }
+        resp = SESSION.get(endpoint, params=params, timeout=60)
+        if resp.status_code == 200:
+            features = resp.json().get('features', [])
+            return [f.get('attributes', {}) for f in features]
+    except Exception as e:
+        print(f"[Autonomy] ArcGIS fetch error: {e}")
+    return []
+
+
+def process_county(county):
+    """SINGLE-PASS: search -> validate -> pull 6 months -> mark cities -> done.
+
+    Args: county dict with keys: county_name, state, fips, portal_domain, etc.
+    Returns: dict with keys: found, valid, permits, cities_covered, source_key
+    """
+    fips = county['fips']
+    name = county['county_name']
+    state = county['state']
+    update_county_status(fips, 'searching')
+
+    print(f"[Autonomy] Searching: {name} County, {state}...")
+
+    # 1. Search for a bulk permit dataset
+    candidates = []
+
+    # Search Socrata catalog with county name + state
+    for keyword in ['building permits', 'construction permits']:
+        results, _ = search_socrata_catalog(f"{name} {state} {keyword}", limit=20)
+        for r in results:
+            resource = r.get('resource', {})
+            metadata = r.get('metadata', {})
+            domain = metadata.get('domain', '')
+            resource_id = resource.get('id', '')
+            columns = resource.get('columns_field_name', [])
+            if resource_id and columns:
+                candidates.append({
+                    'name': resource.get('name', ''),
+                    'endpoint': f"https://{domain}/resource/{resource_id}.json",
+                    'platform': 'socrata',
+                    'dataset_id': resource_id,
+                    'columns': columns,
+                    'domain': domain,
+                })
+        time.sleep(0.5)
+
+    # Search specific portal domain if known
+    if county.get('portal_domain'):
+        domain = county['portal_domain']
+        for keyword in ['building permits', 'permits']:
+            results = search_socrata_domain(domain, keyword)
+            for r in results:
+                resource = r.get('resource', {})
+                resource_id = resource.get('id', '')
+                columns = resource.get('columns_field_name', [])
+                if resource_id:
+                    candidates.append({
+                        'name': resource.get('name', ''),
+                        'endpoint': f"https://{domain}/resource/{resource_id}.json",
+                        'platform': 'socrata',
+                        'dataset_id': resource_id,
+                        'columns': columns,
+                        'domain': domain,
+                    })
+            time.sleep(0.5)
+
+    # Search ArcGIS
+    arcgis_results = search_arcgis(name, state)
+    for r in arcgis_results:
+        columns = get_arcgis_columns(r['endpoint'])
+        r['columns'] = columns
+        candidates.append(r)
+        time.sleep(0.3)
+
+    # Filter: must have a city_field (since this is a county/bulk source)
+    bulk_candidates = []
+    for c in candidates:
+        if not c.get('columns'):
+            # Try to fetch columns
+            if c['platform'] == 'socrata':
+                c['columns'] = get_socrata_columns(c['endpoint'])
+            elif c['platform'] == 'arcgis':
+                c['columns'] = get_arcgis_columns(c['endpoint'])
+            time.sleep(0.3)
+
+        city_field = find_city_field(c.get('columns', []))
+        if city_field:
+            c['city_field'] = city_field
+            bulk_candidates.append(c)
+
+    if not bulk_candidates:
+        update_county_status(fips, 'no_data', 'no_bulk_dataset_with_city_field')
+        return {'found': False}
+
+    # 2. Score and pick best
+    for c in bulk_candidates:
+        sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
+        c['sample'] = sample
+        has_recent = check_data_recency(sample, generate_field_map(c['columns']).get('date'))
+        c['score'] = score_dataset(c['columns'], c.get('name', ''), has_recent)
+    bulk_candidates.sort(key=lambda x: x['score'], reverse=True)
+    best = bulk_candidates[0]
+
+    if best['score'] < 60:
+        update_county_status(fips, 'no_data', f"best_score_{best['score']}")
+        return {'found': False, 'best_score': best['score']}
+
+    # 3. Validate: generate field map, test on sample
+    field_map = generate_field_map(best['columns'])
+    sample = best.get('sample') or fetch_sample(best['endpoint'], best['platform'], limit=10)
+
+    if not validate_sample(sample, field_map):
+        field_map = auto_fix_field_map(sample)
+        if not field_map or not validate_sample(sample, field_map):
+            update_county_status(fips, 'no_data', 'validation_failed')
+            return {'found': True, 'valid': False}
+
+    # Find the date_field from the field_map
+    date_field = field_map.get('date') or field_map.get('filing_date')
+
+    # 4. Create city_sources row
+    source_key = create_source_key(name, state, mode='bulk')
+    upsert_city_source({
+        'source_key': source_key,
+        'name': best.get('name', f"{name} County Permits"),
+        'state': state,
+        'platform': best['platform'],
+        'mode': 'bulk',
+        'endpoint': best['endpoint'],
+        'dataset_id': best.get('dataset_id'),
+        'field_map': field_map,
+        'date_field': date_field,
+        'city_field': best.get('city_field'),
+        'status': 'active',
+        'discovery_score': best['score'],
+    })
+
+    # 5. PULL 6 MONTHS RIGHT NOW
+    permits_raw = []
+    try:
+        if best['platform'] == 'socrata':
+            permits_raw = fetch_permits_socrata(best['endpoint'], date_field, days_back=180)
+        elif best['platform'] == 'arcgis':
+            permits_raw = fetch_permits_arcgis(best['endpoint'], date_field, days_back=180)
+    except Exception as e:
+        print(f"[Autonomy] Fetch error for {name}: {e}")
+
+    # Normalize permits
+    normalized = []
+    for raw in permits_raw:
+        try:
+            permit = {
+                'permit_number': raw.get(field_map.get('permit_number', ''), ''),
+                'city': raw.get(best.get('city_field', ''), name),
+                'state': state,
+                'address': raw.get(field_map.get('address', ''), ''),
+                'zip': raw.get(field_map.get('zip', ''), ''),
+                'permit_type': raw.get(field_map.get('permit_type', ''), ''),
+                'description': raw.get(field_map.get('description', ''), ''),
+                'estimated_cost': _parse_cost(raw.get(field_map.get('estimated_cost', ''), 0)),
+                'status': raw.get(field_map.get('status', ''), ''),
+                'filing_date': raw.get(date_field, ''),
+                'date': raw.get(date_field, ''),
+                'contractor_name': raw.get(field_map.get('contractor_name', ''), ''),
+                'owner_name': raw.get(field_map.get('owner_name', ''), ''),
+            }
+            # Must have permit_number or address to be useful
+            if permit.get('permit_number') or permit.get('address'):
+                # Generate permit_number if missing
+                if not permit['permit_number']:
+                    permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
+                normalized.append(permit)
+        except Exception:
+            continue
+
+    # Upsert to SQLite — DATA IS NOW LIVE ON THE SITE
+    if normalized:
+        new_count, updated_count = permitdb.upsert_permits(normalized, source_city_key=source_key)
+        print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded ({new_count} new, {updated_count} updated)")
+    else:
+        print(f"[Autonomy] {name}, {state}: 0 permits after normalization")
+
+    # 6. Mark all cities in this county as covered
+    cities_covered = mark_county_cities_covered(fips, source_key)
+
+    update_county_status(fips, 'has_data')
+    record_collection(source_key, len(normalized))
+
+    return {
+        'found': True,
+        'valid': True,
+        'permits': len(normalized),
+        'cities_covered': cities_covered,
+        'source_key': source_key,
+    }
+
+
+def process_city(city):
+    """SINGLE-PASS for individual cities: search -> validate -> pull -> done.
+
+    Args: city dict with keys: city_name, state, slug, etc.
+    Returns: dict with keys: found, valid, permits
+    """
+    slug = city['slug']
+    name = city['city_name']
+    state = city['state']
+    update_city_status(slug, 'searching')
+
+    print(f"[Autonomy] Searching: {name}, {state}...")
+
+    # 1. Search
+    candidates = []
+
+    # Socrata catalog search
+    for keyword in ['building permits', 'construction permits']:
+        results, _ = search_socrata_catalog(f"{name} {state} {keyword}", limit=10)
+        for r in results:
+            resource = r.get('resource', {})
+            metadata = r.get('metadata', {})
+            domain = metadata.get('domain', '')
+            resource_id = resource.get('id', '')
+            columns = resource.get('columns_field_name', [])
+            if resource_id:
+                candidates.append({
+                    'name': resource.get('name', ''),
+                    'endpoint': f"https://{domain}/resource/{resource_id}.json",
+                    'platform': 'socrata',
+                    'dataset_id': resource_id,
+                    'columns': columns,
+                })
+        time.sleep(0.5)
+
+    # Try common domain patterns
+    domain_candidates = try_common_domains(name, state)
+    candidates.extend(domain_candidates)
+
+    # ArcGIS
+    arcgis_results = search_arcgis(name, state)
+    for r in arcgis_results:
+        columns = get_arcgis_columns(r['endpoint'])
+        r['columns'] = columns
+        candidates.append(r)
+        time.sleep(0.3)
+
+    if not candidates:
+        update_city_status(slug, 'no_data_available', 'no_candidates_found')
+        increment_search_attempts(slug)
+        return {'found': False}
+
+    # 2. Score
+    for c in candidates:
+        if not c.get('columns'):
+            if c['platform'] == 'socrata':
+                c['columns'] = get_socrata_columns(c['endpoint'])
+            elif c['platform'] == 'arcgis':
+                c['columns'] = get_arcgis_columns(c['endpoint'])
+            time.sleep(0.3)
+
+        sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
+        c['sample'] = sample
+        fm = generate_field_map(c.get('columns', []))
+        has_recent = check_data_recency(sample, fm.get('date'))
+        c['score'] = score_dataset(c.get('columns', []), c.get('name', ''), has_recent)
+
+    candidates.sort(key=lambda x: x.get('score', 0), reverse=True)
+    best = candidates[0]
+
+    if best.get('score', 0) < 60:
+        update_city_status(slug, 'no_data_available', f"best_score_{best.get('score', 0)}")
+        increment_search_attempts(slug)
+        return {'found': False, 'best_score': best.get('score', 0)}
+
+    # 3. Validate
+    field_map = generate_field_map(best.get('columns', []))
+    sample = best.get('sample') or fetch_sample(best['endpoint'], best['platform'], limit=10)
+
+    if not validate_sample(sample, field_map):
+        field_map = auto_fix_field_map(sample)
+        if not field_map or not validate_sample(sample, field_map):
+            update_city_status(slug, 'rejected', 'validation_failed')
+            increment_search_attempts(slug)
+            return {'found': True, 'valid': False}
+
+    date_field = field_map.get('date') or field_map.get('filing_date')
+
+    # 4. Create source + PULL 6 MONTHS
+    source_key = slug
+    upsert_city_source({
+        'source_key': source_key,
+        'name': name,
+        'state': state,
+        'platform': best['platform'],
+        'mode': 'city',
+        'endpoint': best['endpoint'],
+        'dataset_id': best.get('dataset_id'),
+        'field_map': field_map,
+        'date_field': date_field,
+        'status': 'active',
+        'discovery_score': best.get('score', 0),
+    })
+
+    permits_raw = []
+    try:
+        if best['platform'] == 'socrata':
+            permits_raw = fetch_permits_socrata(best['endpoint'], date_field, days_back=180)
+        elif best['platform'] == 'arcgis':
+            permits_raw = fetch_permits_arcgis(best['endpoint'], date_field, days_back=180)
+    except Exception as e:
+        print(f"[Autonomy] Fetch error for {name}: {e}")
+
+    # Normalize
+    normalized = []
+    for raw in permits_raw:
+        try:
+            permit = {
+                'permit_number': raw.get(field_map.get('permit_number', ''), ''),
+                'city': name,
+                'state': state,
+                'address': raw.get(field_map.get('address', ''), ''),
+                'zip': raw.get(field_map.get('zip', ''), ''),
+                'permit_type': raw.get(field_map.get('permit_type', ''), ''),
+                'description': raw.get(field_map.get('description', ''), ''),
+                'estimated_cost': _parse_cost(raw.get(field_map.get('estimated_cost', ''), 0)),
+                'status': raw.get(field_map.get('status', ''), ''),
+                'filing_date': raw.get(date_field, ''),
+                'date': raw.get(date_field, ''),
+                'contractor_name': raw.get(field_map.get('contractor_name', ''), ''),
+                'owner_name': raw.get(field_map.get('owner_name', ''), ''),
+            }
+            if permit.get('permit_number') or permit.get('address'):
+                if not permit['permit_number']:
+                    permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
+                normalized.append(permit)
+        except Exception:
+            continue
+
+    if normalized:
+        new_count, updated_count = permitdb.upsert_permits(normalized, source_city_key=source_key)
+        print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded")
+
+    # Quality gate: must have at least 10 permits
+    if len(normalized) < 10:
+        update_city_status(slug, 'rejected', f"only_{len(normalized)}_permits")
+        update_source_status(source_key, 'rejected', f"only_{len(normalized)}_permits")
+        return {'found': True, 'valid': True, 'permits': len(normalized), 'rejected': True}
+
+    update_city_status(slug, 'active')
+    record_collection(source_key, len(normalized))
+
+    return {'found': True, 'valid': True, 'permits': len(normalized)}
+
+
+def run_autonomy_engine():
+    """Main entry point. Runs as daemon thread in server.py."""
+    # Wait for startup + initial collection
+    print(f"[{datetime.now()}] V12.54: Autonomy engine waiting 10 minutes for startup...")
+    time.sleep(600)
+
+    while True:
+        try:
+            unsearched_counties = count_unsearched_counties()
+            unsearched_cities = count_unsearched_cities()
+
+            if unsearched_counties > 0 or unsearched_cities > 0:
+                run_search_cycle()
+            else:
+                run_maintenance_cycle()
+        except Exception as e:
+            print(f"[Autonomy] Engine error: {e}")
+            time.sleep(60)
+
+
+def run_search_cycle():
+    """Process counties first, then cities. Single-pass each."""
+    stats = {
+        'targets_searched': 0, 'sources_found': 0,
+        'permits_loaded': 0, 'cities_activated': 0, 'errors': []
+    }
+
+    # Phase A: Counties
+    county = get_next_unsearched_county()
+    while county:
+        try:
+            result = process_county(county)
+            stats['targets_searched'] += 1
+            if result.get('found') and result.get('valid'):
+                stats['sources_found'] += 1
+                stats['permits_loaded'] += result.get('permits', 0)
+                stats['cities_activated'] += result.get('cities_covered', 0)
+        except Exception as e:
+            stats['errors'].append(f"county:{county.get('county_name','?')}: {str(e)[:100]}")
+            print(f"[Autonomy] Error processing {county.get('county_name')}: {e}")
+
+        throttle()
+        county = get_next_unsearched_county()
+
+    # Phase B: Individual cities
+    city = get_next_unsearched_city()
+    while city:
+        try:
+            result = process_city(city)
+            stats['targets_searched'] += 1
+            if result.get('found') and result.get('valid') and not result.get('rejected'):
+                stats['sources_found'] += 1
+                stats['permits_loaded'] += result.get('permits', 0)
+                stats['cities_activated'] += 1
+        except Exception as e:
+            stats['errors'].append(f"city:{city.get('city_name','?')}: {str(e)[:100]}")
+            print(f"[Autonomy] Error processing {city.get('city_name')}: {e}")
+
+        throttle()
+        city = get_next_unsearched_city()
+
+    log_discovery_run('search', stats)
+    print(f"[Autonomy] Search cycle complete: {stats['sources_found']} sources, "
+          f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities")
+
+
+def run_maintenance_cycle():
+    """Runs after all cities/counties have been searched at least once.
+    Re-searches old no_data cities, triggers self-healing."""
+    print(f"[Autonomy] Maintenance mode. Sleeping 6 hours before next check.")
+
+    # Re-search cities that had no data 90+ days ago
+    conn = permitdb.get_connection()
+    stale = conn.execute("""
+        SELECT * FROM us_cities
+        WHERE status='no_data_available'
+        AND last_searched_at < datetime('now', '-90 days')
+        ORDER BY priority ASC
+        LIMIT 50
+    """).fetchall()
+
+    if stale:
+        print(f"[Autonomy] Re-searching {len(stale)} cities that had no data 90+ days ago")
+        for row in stale:
+            city = dict(row)
+            update_city_status(city['slug'], 'not_started')  # Reset to trigger re-search
+
+    # Re-search counties monthly
+    stale_counties = conn.execute("""
+        SELECT * FROM us_counties
+        WHERE status='no_data'
+        AND last_searched_at < datetime('now', '-30 days')
+        ORDER BY priority ASC
+        LIMIT 20
+    """).fetchall()
+
+    if stale_counties:
+        print(f"[Autonomy] Re-searching {len(stale_counties)} counties monthly")
+        for row in stale_counties:
+            county = dict(row)
+            update_county_status(county['fips'], 'not_started')
+
+    # Run self-healing
+    try:
+        from auto_heal import run_self_healing
+        run_self_healing()
+    except Exception as e:
+        print(f"[Autonomy] Self-healing error: {e}")
+
+    time.sleep(21600)  # 6 hours

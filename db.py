@@ -120,9 +120,97 @@ def init_db():
             error_message TEXT,
             details TEXT
         );
+
+        -- V12.54: Autonomy Engine Tables --
+
+        -- us_cities: Master list of every US incorporated place
+        CREATE TABLE IF NOT EXISTS us_cities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city_name TEXT NOT NULL,
+            state TEXT NOT NULL,
+            county TEXT,
+            county_fips TEXT,
+            population INTEGER DEFAULT 0,
+            latitude REAL,
+            longitude REAL,
+            slug TEXT UNIQUE,
+            status TEXT DEFAULT 'not_started',
+            status_reason TEXT,
+            covered_by_source TEXT,
+            priority INTEGER DEFAULT 99999,
+            last_searched_at TEXT,
+            search_attempts INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_us_cities_status ON us_cities(status);
+        CREATE INDEX IF NOT EXISTS idx_us_cities_priority ON us_cities(priority);
+        CREATE INDEX IF NOT EXISTS idx_us_cities_state ON us_cities(state);
+        CREATE INDEX IF NOT EXISTS idx_us_cities_slug ON us_cities(slug);
+        CREATE INDEX IF NOT EXISTS idx_us_cities_county_fips ON us_cities(county_fips);
+
+        -- us_counties: County targets (processed first for max coverage)
+        CREATE TABLE IF NOT EXISTS us_counties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            county_name TEXT NOT NULL,
+            state TEXT NOT NULL,
+            fips TEXT UNIQUE,
+            population INTEGER DEFAULT 0,
+            cities_in_county INTEGER DEFAULT 0,
+            portal_domain TEXT,
+            status TEXT DEFAULT 'not_started',
+            status_reason TEXT,
+            source_key TEXT,
+            last_searched_at TEXT,
+            priority INTEGER DEFAULT 99999,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_us_counties_status ON us_counties(status);
+        CREATE INDEX IF NOT EXISTS idx_us_counties_priority ON us_counties(priority);
+        CREATE INDEX IF NOT EXISTS idx_us_counties_fips ON us_counties(fips);
+
+        -- city_sources: Discovered data sources (replaces CITY_REGISTRY/BULK_SOURCES)
+        CREATE TABLE IF NOT EXISTS city_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_key TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            state TEXT,
+            platform TEXT NOT NULL,
+            mode TEXT DEFAULT 'city',
+            endpoint TEXT NOT NULL,
+            dataset_id TEXT,
+            field_map TEXT,
+            date_field TEXT,
+            city_field TEXT,
+            limit_per_page INTEGER DEFAULT 2000,
+            status TEXT DEFAULT 'active',
+            discovery_score INTEGER DEFAULT 0,
+            consecutive_failures INTEGER DEFAULT 0,
+            last_failure_reason TEXT,
+            last_collected_at TEXT,
+            total_permits_collected INTEGER DEFAULT 0,
+            covers_cities TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_city_sources_status ON city_sources(status);
+        CREATE INDEX IF NOT EXISTS idx_city_sources_platform ON city_sources(platform);
+        CREATE INDEX IF NOT EXISTS idx_city_sources_mode ON city_sources(mode);
+
+        -- discovery_runs: Audit log for autonomy engine runs
+        CREATE TABLE IF NOT EXISTS discovery_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_type TEXT NOT NULL,
+            started_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT,
+            targets_searched INTEGER DEFAULT 0,
+            sources_found INTEGER DEFAULT 0,
+            permits_loaded INTEGER DEFAULT 0,
+            cities_activated INTEGER DEFAULT 0,
+            errors TEXT
+        );
     """)
     conn.commit()
-    print(f"[DB] V12.50: Database initialized at {DB_PATH}")
+    print(f"[DB] V12.54: Database initialized at {DB_PATH}")
 
 
 # ---------------------------------------------------------------------------

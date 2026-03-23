@@ -11,10 +11,12 @@ import re
 import time
 import tempfile
 from datetime import datetime, timedelta
-from city_configs import (
-    CITY_REGISTRY, TRADE_CATEGORIES, PERMIT_VALUE_TIERS, BULK_SOURCES,
+# V12.54: Import static lookups from city_configs, but city/bulk source functions from SQLite wrapper
+from city_configs import TRADE_CATEGORIES, PERMIT_VALUE_TIERS
+from city_source_db import (
     get_active_cities, get_city_config,
-    get_active_bulk_sources, get_bulk_source_config
+    get_active_bulk_sources, get_bulk_source_config,
+    record_collection, reset_failure, increment_failure
 )
 import db as permitdb  # V12.50: SQLite database layer
 
@@ -1523,6 +1525,13 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                     "status": "success" if len(city_permits) > 0 else "success_empty",
                 }
                 print(f"  ✓ {config['name']}: {len(city_permits)} permits")
+                # V12.54: Track successful collection in SQLite
+                if len(city_permits) > 0:
+                    try:
+                        record_collection(city_key, len(city_permits))
+                        reset_failure(city_key)
+                    except Exception:
+                        pass  # Don't let tracking errors break collection
             elif fetch_status == "skip":
                 stats[city_key] = {
                     "raw": 0,
@@ -1538,6 +1547,11 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                     "status": fetch_status,
                 }
                 print(f"  ✗ {config['name'] if config else city_key}: FAILED ({fetch_status})")
+                # V12.54: Track failure in SQLite
+                try:
+                    increment_failure(city_key, fetch_status)
+                except Exception:
+                    pass
 
         except Exception as e:
             config_name = config.get("name", city_key) if config else city_key
