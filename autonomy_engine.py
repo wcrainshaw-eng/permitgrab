@@ -349,20 +349,39 @@ def process_county(county):
         c['has_recent'] = has_recent
         c['score'] = score_dataset(c['columns'], c.get('name', ''), has_recent)
 
-        # V12.55b: Verify dataset actually contains data for THIS county
+        # V12.55b/V12.57: Verify dataset actually contains data for THIS county
         # by checking if the county name appears in city_field values
         if sample and c.get('city_field'):
-            county_lower = name.lower()
+            county_lower = name.lower().replace(' county', '').strip()
+            domain_lower = c.get('domain', '').lower()
             city_vals = set()
             for rec in sample:
                 val = str(rec.get(c['city_field'], '')).lower().strip()
                 if val:
                     city_vals.add(val)
-            # If we got city values but none relate to this county, penalize heavily
+
+            # V12.57: Skip penalty if domain clearly belongs to this county
+            # e.g., datacatalog.cookcountyil.gov contains "cook" for Cook County
+            domain_matches_county = county_lower in domain_lower.replace('.', '').replace('-', '')
+
+            # V12.57: Check if domain is a state portal for the correct state
+            state_portals = STATE_PORTALS.get(state, [])
+            is_state_portal = any(portal in domain_lower for portal in state_portals)
+
             if city_vals and not any(county_lower in v or v in county_lower for v in city_vals):
-                c['score'] = max(0, c['score'] - 40)
-                print(f"[Autonomy] {name}, {state}: penalized {c.get('domain','')}/{c.get('dataset_id','')[:8]} "
-                      f"— city_field values {list(city_vals)[:5]} don't match county", flush=True)
+                if domain_matches_county:
+                    # Domain contains county name — trust it, no penalty
+                    print(f"[Autonomy] {name}, {state}: domain {domain_lower} matches county, skipping city_field penalty", flush=True)
+                elif is_state_portal:
+                    # State portal — light penalty (might serve multiple counties)
+                    c['score'] = max(0, c['score'] - 10)
+                    print(f"[Autonomy] {name}, {state}: state portal {domain_lower}, light penalty (-10) "
+                          f"— city_field values {list(city_vals)[:5]}", flush=True)
+                else:
+                    # Unknown domain with mismatched city values — full penalty
+                    c['score'] = max(0, c['score'] - 40)
+                    print(f"[Autonomy] {name}, {state}: penalized {c.get('domain','')}/{c.get('dataset_id','')[:8]} "
+                          f"— city_field values {list(city_vals)[:5]} don't match county", flush=True)
         time.sleep(0.3)
 
     bulk_candidates.sort(key=lambda x: x['score'], reverse=True)

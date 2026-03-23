@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request, send_from_directory, render_template_
 from difflib import SequenceMatcher
 import json
 import os
+import sqlite3
 import threading
 import time
 import secrets
@@ -88,7 +89,7 @@ def _fix_socrata_addresses():
     Uses ast.literal_eval because Python's str(dict) uses single quotes, not JSON double quotes."""
     import json as _json
     import ast
-    conn = permitdb.get_db()
+    conn = sqlite3.connect('/var/data/permitgrab.db')
     cursor = conn.execute(
         "SELECT permit_number, address, zip FROM permits WHERE address LIKE '%human_address%' OR address LIKE '%latitude%'"
     )
