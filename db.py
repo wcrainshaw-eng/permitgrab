@@ -230,6 +230,12 @@ def upsert_permits(permits, source_city_key=None):
     Returns:
         (new_count, updated_count)
     """
+    # V12.56: Safety net - convert any dict/list values to strings to prevent SQLite binding errors
+    for permit in permits:
+        for key, val in list(permit.items()):
+            if isinstance(val, (dict, list)):
+                permit[key] = str(val)
+
     conn = get_connection()
     now = datetime.now().isoformat()
     new_count = 0

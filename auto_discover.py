@@ -295,8 +295,10 @@ def score_dataset(columns, name='', has_recent_data=False, row_count=0):
       +10  has estimated_cost field
       +10  has permit_type or description field
       +5   has contractor field
-      +10  has recent data (within 90 days)
-      +5   has 100+ records
+      +10  has recent data (within N days)
+      +10  has 10,000+ records (V12.56: likely real permit DB)
+      +5   has 1,000+ records
+      +3   has 100+ records
       +5   name contains 'permit' or 'building'
       -10  NO recent data and no way to check
       -20  NO address field at all
@@ -320,7 +322,13 @@ def score_dataset(columns, name='', has_recent_data=False, row_count=0):
     if has_contractor: score += 5
     if has_recent_data: score += 10
     else: score -= 10
-    if row_count >= 100: score += 5
+    # V12.56: Enhanced scoring for large datasets (likely real permit databases)
+    if row_count and row_count > 10000:
+        score += 10
+    elif row_count and row_count > 1000:
+        score += 5
+    elif row_count and row_count >= 100:
+        score += 3
     if 'permit' in name.lower() or 'building' in name.lower(): score += 5
 
     return max(0, min(100, score))
@@ -374,12 +382,13 @@ def validate_sample(sample, field_map):
     return (has_address / total >= 0.5) and (has_date / total >= 0.5)
 
 
-def check_data_recency(sample, date_field):
-    """Check if sample has records from last 90 days.
-    Returns True if any record's date is within 90 days of now."""
+def check_data_recency(sample, date_field, days=90):
+    """Check if sample has records from last N days.
+    V12.56: Added days parameter (default 90, use 365 for initial discovery).
+    Returns True if any record's date is within N days of now."""
     if not sample or not date_field:
         return False
-    cutoff = (datetime.now() - timedelta(days=90)).isoformat()
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
     for record in sample:
         date_val = record.get(date_field, '')
         if isinstance(date_val, str) and date_val > cutoff:

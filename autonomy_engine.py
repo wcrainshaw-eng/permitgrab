@@ -1,15 +1,17 @@
 """
-PermitGrab V12.55c — Autonomy Engine
+PermitGrab V12.56 — Autonomy Engine (Discovery Overhaul)
 The daemon thread. Processes counties first, then cities.
 Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
 
 CRITICAL: Each city/county is fully processed in ONE function call.
           No "pending" state. No separate validation cron. No onboarding queue.
 
-V12.54c FIXES:
-  - flush=True on all [Autonomy] prints for Render visibility
-  - traceback.print_exc() on daemon errors
-  - See seed fix spec for us_counties data rebuild
+V12.56 OVERHAUL:
+  - STATE_PORTALS: Search state-level Socrata domains first
+  - Expanded search keywords (building inspection, code enforcement, etc.)
+  - Relaxed domain filter: accept ALL .gov/.us domains
+  - Loosened recency gate: 365 days for discovery (was 90)
+  - Enhanced scoring bonus for large datasets (10k+ records)
 """
 
 import time
@@ -132,12 +134,48 @@ US_STATES = {
 # Country TLDs that are NOT US (to reject foreign government portals)
 FOREIGN_TLDS = {'.ca', '.uk', '.au', '.nz', '.za', '.in', '.eu', '.de', '.fr', '.jp', '.cn', '.br', '.mx', '.it', '.es', '.nl', '.se', '.no', '.dk', '.fi', '.ie', '.at', '.ch', '.be', '.pt', '.pl', '.cz', '.hu', '.ro', '.bg', '.hr', '.sk', '.si', '.lt', '.lv', '.ee'}
 
+# V12.56: Known state-level Socrata portals — search these first for better hit rate
+STATE_PORTALS = {
+    'TX': ['data.texas.gov'],
+    'CA': ['data.ca.gov', 'data.lacity.org'],
+    'NY': ['data.ny.gov', 'data.cityofnewyork.us'],
+    'FL': ['data.florida.gov'],
+    'WA': ['data.wa.gov'],
+    'CO': ['data.colorado.gov'],
+    'IL': ['data.illinois.gov', 'data.cityofchicago.org'],
+    'MD': ['data.maryland.gov', 'data.montgomerycountymd.gov'],
+    'VA': ['data.virginia.gov'],
+    'PA': ['data.pa.gov'],
+    'OH': ['data.ohio.gov'],
+    'GA': ['data.georgia.gov'],
+    'NC': ['data.nc.gov'],
+    'MI': ['data.michigan.gov'],
+    'NJ': ['data.nj.gov'],
+    'MA': ['data.mass.gov'],
+    'AZ': ['data.az.gov'],
+    'MN': ['data.mn.gov'],
+    'MO': ['data.mo.gov'],
+    'WI': ['data.wi.gov'],
+    'OR': ['data.oregon.gov'],
+    'SC': ['data.sc.gov'],
+    'KY': ['data.ky.gov'],
+    'LA': ['data.la.gov'],
+    'OK': ['data.ok.gov'],
+    'CT': ['data.ct.gov'],
+    'UT': ['opendata.utah.gov'],
+    'NV': ['data.nv.gov'],
+    'NM': ['data.nm.gov'],
+    'KS': ['data.ks.gov'],
+    'NE': ['data.ne.gov'],
+    'IA': ['data.iowa.gov'],
+}
+
 
 def is_domain_relevant(domain, county_name, state_abbrev):
     """Check if a Socrata domain plausibly belongs to the target county/state.
 
+    V12.56: More permissive — accept all .gov/.us domains (they're US government by definition).
     Returns True if domain looks like it could be from the right jurisdiction.
-    This prevents onboarding Edmonton, CA datasets for King County, WA etc.
     """
     if not domain:
         return False
@@ -149,6 +187,11 @@ def is_domain_relevant(domain, county_name, state_abbrev):
         if domain_lower.endswith(tld):
             return False
 
+    # V12.56: Accept ALL .gov and .us domains — they're US government by definition
+    # The previous filter was too strict and rejected legitimate portals
+    if domain_lower.endswith('.gov') or domain_lower.endswith('.us'):
+        return True
+
     # Accept: domain contains county name (e.g. data.kingcounty.gov)
     county_slug = county_name.lower().replace(' ', '').replace('-', '')
     if county_slug in domain_lower.replace('.', '').replace('-', ''):
@@ -159,31 +202,10 @@ def is_domain_relevant(domain, county_name, state_abbrev):
     state_lower = state_abbrev.lower()
     if state_name and state_name in domain_lower.replace('.', '').replace('-', ''):
         return True
-    # Match state abbrev in domain parts (e.g. data.texas.gov, datahub.austintexas.gov)
-    # But be careful: "in" matches too many things, "or" matches oregon but also other words
-    if len(state_lower) > 2 or state_lower in ('tx', 'ca', 'ny', 'fl', 'il', 'pa', 'oh', 'wa', 'ma', 'nj', 'md', 'va', 'nc', 'az', 'co'):
-        if f".{state_lower}." in f".{domain_lower}" or domain_lower.endswith(f".{state_lower}"):
-            return True
 
-    # For .gov, .us, .org domains: accept only if they mention the state somewhere
-    # This prevents Howard County MD datasets from matching Orange FL just because .gov
-    if domain_lower.endswith('.gov') or domain_lower.endswith('.us') or domain_lower.endswith('.org'):
-        # Check if state abbrev appears as a domain part (e.g. "data.fl.gov", "cityofnewyork.us")
-        domain_parts = domain_lower.replace('.', ' ').replace('-', ' ').split()
-        if state_lower in domain_parts:
-            return True
-        # Check if state name appears in domain (e.g. "data.florida.gov")
-        if state_name and state_name in domain_lower.replace('.', '').replace('-', ''):
-            return True
-        # Check if state abbrev appears as suffix before TLD (e.g. "datahub.austintexas.gov")
-        if len(state_lower) == 2 and state_lower not in ('in', 'or', 'me', 'ok', 'hi', 'id'):
-            if state_lower in domain_lower.replace('.', '').replace('-', ''):
-                return True
-        # Accept national data portals (data.gov, census.gov, etc.)
-        if domain_lower in ('data.gov', 'www.data.gov', 'catalog.data.gov'):
-            return True
-        # No state match in a .gov/.us/.org domain — likely a different jurisdiction
-        return False
+    # Accept ArcGIS Hub domains
+    if 'arcgis' in domain_lower or 'hub.arcgis.com' in domain_lower:
+        return True
 
     # Reject everything else (foreign domains, commercial domains, etc.)
     return False
@@ -218,8 +240,29 @@ def process_county(county):
     # 1. Search for a bulk permit dataset
     candidates = []
 
-    # Search Socrata catalog with county name + state
-    for keyword in ['building permits', 'construction permits']:
+    # V12.56: Search state-level portals first (higher hit rate)
+    state_portals = STATE_PORTALS.get(state, [])
+    for portal in state_portals:
+        for keyword in ['building permits', 'permits', 'construction']:
+            results = search_socrata_domain(portal, f"{name} {keyword}")
+            for r in results:
+                resource = r.get('resource', {})
+                resource_id = resource.get('id', '')
+                columns = resource.get('columns_field_name', [])
+                if resource_id:
+                    candidates.append({
+                        'name': resource.get('name', ''),
+                        'endpoint': f"https://{portal}/resource/{resource_id}.json",
+                        'platform': 'socrata',
+                        'dataset_id': resource_id,
+                        'columns': columns,
+                        'domain': portal,
+                    })
+            time.sleep(0.3)
+
+    # V12.56: Search Socrata catalog with expanded keywords
+    for keyword in ['building permits', 'construction permits', 'permits',
+                    'building inspection', 'code enforcement', 'development permits']:
         results, _ = search_socrata_catalog(f"{name} {state} {keyword}", limit=20)
         for r in results:
             resource = r.get('resource', {})
@@ -241,7 +284,7 @@ def process_county(county):
     # Search specific portal domain if known
     if county.get('portal_domain'):
         domain = county['portal_domain']
-        for keyword in ['building permits', 'permits']:
+        for keyword in ['building permits', 'permits', 'construction', 'inspections']:
             results = search_socrata_domain(domain, keyword)
             for r in results:
                 resource = r.get('resource', {})
@@ -302,7 +345,7 @@ def process_county(county):
         sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
         c['sample'] = sample
         date_key = generate_field_map(c['columns']).get('date')
-        has_recent = check_data_recency(sample, date_key)
+        has_recent = check_data_recency(sample, date_key, days=365)  # V12.56: 365 days for discovery
         c['has_recent'] = has_recent
         c['score'] = score_dataset(c['columns'], c.get('name', ''), has_recent)
 
@@ -473,8 +516,9 @@ def process_city(city):
     # 1. Search
     candidates = []
 
-    # Socrata catalog search
-    for keyword in ['building permits', 'construction permits']:
+    # V12.56: Socrata catalog search with expanded keywords
+    for keyword in ['building permits', 'construction permits', 'permits',
+                    'building inspection', 'development permits']:
         results, _ = search_socrata_catalog(f"{name} {state} {keyword}", limit=10)
         for r in results:
             resource = r.get('resource', {})
@@ -523,7 +567,7 @@ def process_city(city):
         sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
         c['sample'] = sample
         fm = generate_field_map(c.get('columns', []))
-        has_recent = check_data_recency(sample, fm.get('date'))
+        has_recent = check_data_recency(sample, fm.get('date'), days=365)  # V12.56: 365 days for discovery
         c['score'] = score_dataset(c.get('columns', []), c.get('name', ''), has_recent)
 
     candidates.sort(key=lambda x: x.get('score', 0), reverse=True)
