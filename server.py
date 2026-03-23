@@ -62,6 +62,73 @@ def admin_reset_permits():
     })
 
 
+@app.route('/api/admin/fix-addresses', methods=['POST'])
+def admin_fix_addresses():
+    """V12.55c: Fix Socrata location objects stored as raw JSON in address field."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if secret != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    def run_fix():
+        try:
+            _fix_socrata_addresses()
+        except Exception as e:
+            print(f"[Admin] Address fix error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    thread = threading.Thread(target=run_fix, daemon=True)
+    thread.start()
+    return jsonify({'message': 'Address cleanup started in background'})
+
+
+def _fix_socrata_addresses():
+    """V12.55c: Find and fix permits with raw Socrata location JSON in the address field."""
+    import json as _json
+    conn = permitdb.get_db()
+    cursor = conn.execute(
+        "SELECT permit_number, address, zip FROM permits WHERE address LIKE '%human_address%' OR address LIKE '%latitude%'"
+    )
+    rows = cursor.fetchall()
+    if not rows:
+        print("[V12.55c] No bad addresses found — nothing to fix.", flush=True)
+        return
+    print(f"[V12.55c] Found {len(rows)} permits with raw location JSON in address field. Fixing...", flush=True)
+    fixed = 0
+    for row in rows:
+        pn, raw_addr, existing_zip = row['permit_number'], row['address'], row['zip']
+        try:
+            # Try to parse the stringified dict
+            parsed = _json.loads(raw_addr.replace("'", '"'))
+            clean_addr = ''
+            new_zip = existing_zip or ''
+            if isinstance(parsed, dict):
+                human = parsed.get('human_address', '')
+                if human:
+                    if isinstance(human, str):
+                        human = _json.loads(human)
+                    if isinstance(human, dict):
+                        clean_addr = human.get('address', '').strip()
+                        if not new_zip:
+                            new_zip = human.get('zip', '')
+                if not clean_addr:
+                    lat = parsed.get('latitude') or parsed.get('lat')
+                    lng = parsed.get('longitude') or parsed.get('lng') or parsed.get('lon')
+                    if lat and lng:
+                        clean_addr = f"Near {lat}, {lng}"
+            if clean_addr:
+                conn.execute(
+                    "UPDATE permits SET address = ?, zip = ? WHERE permit_number = ?",
+                    (clean_addr, new_zip, pn)
+                )
+                fixed += 1
+        except Exception:
+            continue
+    conn.commit()
+    print(f"[V12.55c] Fixed {fixed}/{len(rows)} permit addresses.", flush=True)
+
+
 @app.route('/api/admin/force-collection', methods=['POST'])
 def admin_force_collection():
     """V12.50: Trigger REFRESH collection (upserts to SQLite)."""
@@ -5998,6 +6065,14 @@ def start_collectors():
     # V12.53: Email scheduler thread
     email_thread = threading.Thread(target=schedule_email_tasks, daemon=True)
     email_thread.start()
+
+    # V12.55c: One-time fix for Socrata location JSON in address fields
+    try:
+        fix_thread = threading.Thread(target=_fix_socrata_addresses, daemon=True)
+        fix_thread.start()
+        print(f"[{datetime.now()}] V12.55c: Address cleanup thread started.")
+    except Exception as e:
+        print(f"[{datetime.now()}] V12.55c: Address cleanup error: {e}")
 
     # V12.54: Autonomous city discovery engine
     try:

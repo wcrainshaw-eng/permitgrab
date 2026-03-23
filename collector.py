@@ -20,6 +20,45 @@ from city_source_db import (
 )
 import db as permitdb  # V12.50: SQLite database layer
 
+
+def parse_address_value(val):
+    """V12.55c: Parse Socrata location fields that come as dicts with nested human_address JSON.
+    Input like: {'latitude': '39.23', 'longitude': '-77.27', 'human_address': '{"address": "123 MAIN ST", ...}'}
+    Returns: '123 MAIN ST' (just the street address portion).
+    If only coordinates exist, returns 'Near lat, lng'.
+    """
+    if not val:
+        return ''
+    if isinstance(val, dict):
+        human = val.get('human_address', '')
+        if human:
+            try:
+                if isinstance(human, str):
+                    human = json.loads(human)
+                if isinstance(human, dict):
+                    parts = []
+                    if human.get('address'):
+                        parts.append(human['address'].strip())
+                    return ' '.join(parts) if parts else str(val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if val.get('address'):
+            return str(val['address']).strip()
+        lat = val.get('latitude') or val.get('lat')
+        lng = val.get('longitude') or val.get('lng') or val.get('lon')
+        if lat and lng:
+            return f"Near {lat}, {lng}"
+        return ''
+    s = str(val).strip()
+    if s.startswith('{') and ('human_address' in s or 'latitude' in s):
+        try:
+            parsed = json.loads(s.replace("'", '"'))
+            return parse_address_value(parsed)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return s
+
+
 # Use Render persistent disk if available, otherwise local
 if os.path.isdir('/var/data'):
     DATA_DIR = '/var/data'
@@ -507,12 +546,18 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
             return ""
         return str(raw_record.get(raw_key, "")).strip()
 
-    # Build address
-    address = get_field("address")
+    # Build address — V12.55c: handle Socrata location objects
+    raw_addr = raw_record.get(fmap.get("address", ""), "")
+    address = parse_address_value(raw_addr)
+    if not address:
+        address = get_field("address")
     if not address:
         # Try common address field patterns
         for fallback in ["location", "property_address", "site_address", "street_address"]:
-            val = str(raw_record.get(fallback, "")).strip()
+            raw_val = raw_record.get(fallback, "")
+            val = parse_address_value(raw_val)
+            if not val:
+                val = str(raw_val).strip()
             if val and val.lower() not in ["none", "n/a", ""]:
                 address = val
                 break
@@ -694,9 +739,13 @@ def normalize_permit(raw_record, city_key):
             return ""
         return str(raw_record.get(raw_key, "")).strip()
 
-    # Build address
+    # Build address — V12.55c: handle Socrata location objects
+    raw_addr = raw_record.get(fmap.get("address", ""), "")
+    parsed_addr = parse_address_value(raw_addr)
     address_parts = []
-    if get_field("address"):
+    if parsed_addr:
+        address_parts.append(parsed_addr)
+    elif get_field("address"):
         address_parts.append(get_field("address"))
     if get_field("street"):
         address_parts.append(get_field("street"))
@@ -707,14 +756,17 @@ def normalize_permit(raw_record, city_key):
     elif not get_field("street") and get_field("street_name"):
         address_parts.append(get_field("street_name"))
 
-    address = " ".join(address_parts) if address_parts else get_field("address")
+    address = " ".join(address_parts) if address_parts else (parsed_addr or get_field("address"))
 
     # Fallback: try common address field names not in field_map
     if not address:
         for fallback_key in ["location", "project_address", "site_address",
                              "property_address", "address_full", "location_1",
                              "mapped_location"]:
-            val = str(raw_record.get(fallback_key, "")).strip()
+            raw_val = raw_record.get(fallback_key, "")
+            val = parse_address_value(raw_val)
+            if not val:
+                val = str(raw_val).strip()
             if val and val != "None":
                 address = val
                 break

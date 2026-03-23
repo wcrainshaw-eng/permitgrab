@@ -1,5 +1,5 @@
 """
-PermitGrab V12.55b — Autonomy Engine
+PermitGrab V12.55c — Autonomy Engine
 The daemon thread. Processes counties first, then cities.
 Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
 
@@ -36,6 +36,50 @@ from auto_discover import (
 )
 # V12.54b: Import from collector for trade classification and fetch functions
 from collector import classify_trade, score_value, fetch_socrata, fetch_arcgis
+
+
+def parse_address_value(val):
+    """V12.55c: Parse Socrata location fields that come as dicts with nested human_address JSON.
+    Input like: {'latitude': '39.23', 'longitude': '-77.27', 'human_address': '{"address": "123 MAIN ST", "city": "CLARKSBURG", "state": "MD", "zip": "20871"}'}
+    Returns: '123 MAIN ST' (just the street address portion).
+    If only coordinates exist (no human_address), returns 'Near 39.23, -77.27'.
+    Falls back to string representation for plain strings.
+    """
+    if not val:
+        return ''
+    if isinstance(val, dict):
+        # Socrata location object — extract human_address
+        human = val.get('human_address', '')
+        if human:
+            try:
+                if isinstance(human, str):
+                    human = json.loads(human)
+                if isinstance(human, dict):
+                    parts = []
+                    if human.get('address'):
+                        parts.append(human['address'].strip())
+                    return ' '.join(parts) if parts else str(val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # Fallback: if dict has 'address' key directly
+        if val.get('address'):
+            return str(val['address']).strip()
+        # Coordinates only — keep them as a displayable fallback
+        lat = val.get('latitude') or val.get('lat')
+        lng = val.get('longitude') or val.get('lng') or val.get('lon')
+        if lat and lng:
+            return f"Near {lat}, {lng}"
+        # Last resort — don't dump the whole dict
+        return ''
+    s = str(val).strip()
+    # Detect stringified dict that wasn't parsed
+    if s.startswith('{') and ('human_address' in s or 'latitude' in s):
+        try:
+            parsed = json.loads(s.replace("'", '"'))
+            return parse_address_value(parsed)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return s
 
 
 def slugify(text):
@@ -346,12 +390,26 @@ def process_county(county):
     normalized = []
     for raw in permits_raw:
         try:
+            # V12.55c: Parse Socrata location objects into clean addresses
+            raw_address = raw.get(field_map.get('address', ''), '')
+            clean_address = parse_address_value(raw_address)
+            # Also try to extract zip from location object if not in field_map
+            raw_zip = raw.get(field_map.get('zip', ''), '')
+            if not raw_zip and isinstance(raw_address, dict):
+                human = raw_address.get('human_address', '')
+                if isinstance(human, str):
+                    try:
+                        human = json.loads(human)
+                    except (json.JSONDecodeError, TypeError):
+                        human = {}
+                if isinstance(human, dict):
+                    raw_zip = human.get('zip', '')
             permit = {
                 'permit_number': raw.get(field_map.get('permit_number', ''), ''),
                 'city': raw.get(best.get('city_field', ''), name),
                 'state': state,
-                'address': raw.get(field_map.get('address', ''), ''),
-                'zip': raw.get(field_map.get('zip', ''), ''),
+                'address': clean_address,
+                'zip': raw_zip if isinstance(raw_zip, str) else str(raw_zip),
                 'permit_type': raw.get(field_map.get('permit_type', ''), ''),
                 'description': raw.get(field_map.get('description', ''), ''),
                 'estimated_cost': _parse_cost(raw.get(field_map.get('estimated_cost', ''), 0)),
@@ -524,12 +582,25 @@ def process_city(city):
     normalized = []
     for raw in permits_raw:
         try:
+            # V12.55c: Parse Socrata location objects into clean addresses
+            raw_address = raw.get(field_map.get('address', ''), '')
+            clean_address = parse_address_value(raw_address)
+            raw_zip = raw.get(field_map.get('zip', ''), '')
+            if not raw_zip and isinstance(raw_address, dict):
+                human = raw_address.get('human_address', '')
+                if isinstance(human, str):
+                    try:
+                        human = json.loads(human)
+                    except (json.JSONDecodeError, TypeError):
+                        human = {}
+                if isinstance(human, dict):
+                    raw_zip = human.get('zip', '')
             permit = {
                 'permit_number': raw.get(field_map.get('permit_number', ''), ''),
                 'city': name,
                 'state': state,
-                'address': raw.get(field_map.get('address', ''), ''),
-                'zip': raw.get(field_map.get('zip', ''), ''),
+                'address': clean_address,
+                'zip': raw_zip if isinstance(raw_zip, str) else str(raw_zip),
                 'permit_type': raw.get(field_map.get('permit_type', ''), ''),
                 'description': raw.get(field_map.get('description', ''), ''),
                 'estimated_cost': _parse_cost(raw.get(field_map.get('estimated_cost', ''), 0)),
