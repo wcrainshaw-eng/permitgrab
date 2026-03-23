@@ -84,8 +84,10 @@ def admin_fix_addresses():
 
 
 def _fix_socrata_addresses():
-    """V12.55c: Find and fix permits with raw Socrata location JSON in the address field."""
+    """V12.55c: Find and fix permits with raw Socrata location JSON in the address field.
+    Uses ast.literal_eval because Python's str(dict) uses single quotes, not JSON double quotes."""
     import json as _json
+    import ast
     conn = permitdb.get_db()
     cursor = conn.execute(
         "SELECT permit_number, address, zip FROM permits WHERE address LIKE '%human_address%' OR address LIKE '%latitude%'"
@@ -94,13 +96,13 @@ def _fix_socrata_addresses():
     if not rows:
         print("[V12.55c] No bad addresses found — nothing to fix.", flush=True)
         return
-    print(f"[V12.55c] Found {len(rows)} permits with raw location JSON in address field. Fixing...", flush=True)
+    print(f"[V12.55c] Found {len(rows)} permits with raw location data in address field. Fixing...", flush=True)
     fixed = 0
     for row in rows:
         pn, raw_addr, existing_zip = row['permit_number'], row['address'], row['zip']
         try:
-            # Try to parse the stringified dict
-            parsed = _json.loads(raw_addr.replace("'", '"'))
+            # Python str(dict) uses single quotes — use ast.literal_eval, not json.loads
+            parsed = ast.literal_eval(raw_addr)
             clean_addr = ''
             new_zip = existing_zip or ''
             if isinstance(parsed, dict):
@@ -120,7 +122,7 @@ def _fix_socrata_addresses():
             if clean_addr:
                 conn.execute(
                     "UPDATE permits SET address = ?, zip = ? WHERE permit_number = ?",
-                    (clean_addr, new_zip, pn)
+                    (clean_addr, new_zip or '', pn)
                 )
                 fixed += 1
         except Exception:
