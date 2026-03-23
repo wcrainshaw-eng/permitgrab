@@ -68,6 +68,72 @@ def throttle(peak_hours=True):
         time.sleep(1)
 
 
+# US state abbreviation -> full name mapping for domain matching
+US_STATES = {
+    'AL': 'alabama', 'AK': 'alaska', 'AZ': 'arizona', 'AR': 'arkansas',
+    'CA': 'california', 'CO': 'colorado', 'CT': 'connecticut', 'DE': 'delaware',
+    'FL': 'florida', 'GA': 'georgia', 'HI': 'hawaii', 'ID': 'idaho',
+    'IL': 'illinois', 'IN': 'indiana', 'IA': 'iowa', 'KS': 'kansas',
+    'KY': 'kentucky', 'LA': 'louisiana', 'ME': 'maine', 'MD': 'maryland',
+    'MA': 'massachusetts', 'MI': 'michigan', 'MN': 'minnesota', 'MS': 'mississippi',
+    'MO': 'missouri', 'MT': 'montana', 'NE': 'nebraska', 'NV': 'nevada',
+    'NH': 'newhampshire', 'NJ': 'newjersey', 'NM': 'newmexico', 'NY': 'newyork',
+    'NC': 'northcarolina', 'ND': 'northdakota', 'OH': 'ohio', 'OK': 'oklahoma',
+    'OR': 'oregon', 'PA': 'pennsylvania', 'RI': 'rhodeisland', 'SC': 'southcarolina',
+    'SD': 'southdakota', 'TN': 'tennessee', 'TX': 'texas', 'UT': 'utah',
+    'VT': 'vermont', 'VA': 'virginia', 'WA': 'washington', 'WV': 'westvirginia',
+    'WI': 'wisconsin', 'WY': 'wyoming', 'DC': 'districtofcolumbia',
+}
+
+# Country TLDs that are NOT US (to reject foreign government portals)
+FOREIGN_TLDS = {'.ca', '.uk', '.au', '.nz', '.za', '.in', '.eu', '.de', '.fr', '.jp', '.cn', '.br', '.mx', '.it', '.es', '.nl', '.se', '.no', '.dk', '.fi', '.ie', '.at', '.ch', '.be', '.pt', '.pl', '.cz', '.hu', '.ro', '.bg', '.hr', '.sk', '.si', '.lt', '.lv', '.ee'}
+
+
+def is_domain_relevant(domain, county_name, state_abbrev):
+    """Check if a Socrata domain plausibly belongs to the target county/state.
+
+    Returns True if domain looks like it could be from the right jurisdiction.
+    This prevents onboarding Edmonton, CA datasets for King County, WA etc.
+    """
+    if not domain:
+        return False
+
+    domain_lower = domain.lower()
+
+    # Reject foreign TLDs (e.g. data.edmonton.ca is Canadian)
+    for tld in FOREIGN_TLDS:
+        if domain_lower.endswith(tld):
+            return False
+
+    # Accept: domain contains county name (e.g. data.kingcounty.gov)
+    county_slug = county_name.lower().replace(' ', '').replace('-', '')
+    if county_slug in domain_lower.replace('.', '').replace('-', ''):
+        return True
+
+    # Accept: domain contains state name or abbreviation
+    state_name = US_STATES.get(state_abbrev.upper(), '')
+    state_lower = state_abbrev.lower()
+    if state_name and state_name in domain_lower.replace('.', '').replace('-', ''):
+        return True
+    # Match state abbrev in domain parts (e.g. data.texas.gov, datahub.austintexas.gov)
+    # But be careful: "in" matches too many things, "or" matches oregon but also other words
+    if len(state_lower) > 2 or state_lower in ('tx', 'ca', 'ny', 'fl', 'il', 'pa', 'oh', 'wa', 'ma', 'nj', 'md', 'va', 'nc', 'az', 'co'):
+        if f".{state_lower}." in f".{domain_lower}" or domain_lower.endswith(f".{state_lower}"):
+            return True
+
+    # Accept: any .gov or .us domain (US government portals are generally relevant)
+    # These are still US-based even if not perfectly matching the county
+    if domain_lower.endswith('.gov') or domain_lower.endswith('.us'):
+        return True
+
+    # Accept: .org domains (many transparency portals use .org)
+    if domain_lower.endswith('.org'):
+        return True
+
+    # Reject everything else (foreign domains, commercial domains, etc.)
+    return False
+
+
 def _parse_cost(value):
     """Parse a cost value to float. Handles strings like '$1,234.56'."""
     if isinstance(value, (int, float)):
@@ -145,9 +211,19 @@ def process_county(county):
         candidates.append(r)
         time.sleep(0.3)
 
+    # V12.54d: Filter out foreign/irrelevant domains BEFORE expensive validation
+    relevant_candidates = []
+    for c in candidates:
+        if c.get('platform') == 'socrata' and not is_domain_relevant(c.get('domain', ''), name, state):
+            continue  # Skip foreign/irrelevant Socrata domains
+        relevant_candidates.append(c)
+
+    if len(relevant_candidates) < len(candidates):
+        print(f"[Autonomy] {name}, {state}: filtered {len(candidates) - len(relevant_candidates)} irrelevant domains, {len(relevant_candidates)} remain", flush=True)
+
     # Filter: must have a city_field (since this is a county/bulk source)
     bulk_candidates = []
-    for c in candidates:
+    for c in relevant_candidates:
         if not c.get('columns'):
             # Try to fetch columns
             if c['platform'] == 'socrata':
@@ -303,13 +379,15 @@ def process_city(city):
             domain = metadata.get('domain', '')
             resource_id = resource.get('id', '')
             columns = resource.get('columns_field_name', [])
-            if resource_id:
+            # V12.54d: Skip foreign/irrelevant domains early
+            if resource_id and is_domain_relevant(domain, name, state):
                 candidates.append({
                     'name': resource.get('name', ''),
                     'endpoint': f"https://{domain}/resource/{resource_id}.json",
                     'platform': 'socrata',
                     'dataset_id': resource_id,
                     'columns': columns,
+                    'domain': domain,
                 })
         time.sleep(0.5)
 
