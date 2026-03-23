@@ -22,14 +22,20 @@ import db as permitdb  # V12.50: SQLite database layer
 
 
 def parse_address_value(val):
-    """V12.55c: Parse Socrata location fields that come as dicts with nested human_address JSON.
-    Input like: {'latitude': '39.23', 'longitude': '-77.27', 'human_address': '{"address": "123 MAIN ST", ...}'}
-    Returns: '123 MAIN ST' (just the street address portion).
-    If only coordinates exist, returns 'Near lat, lng'.
+    """V12.55c/V12.57: Parse Socrata location fields and GeoJSON points.
+    Handles:
+      - Socrata location: {'latitude': '39.23', 'longitude': '-77.27', 'human_address': '{"address": "123 MAIN ST", ...}'}
+      - GeoJSON Point: {'type': 'Point', 'coordinates': [-117.55, 33.83]}
+      - String representations of either format
+    Returns the street address, or empty string if only coordinates.
     """
     if not val:
         return ''
     if isinstance(val, dict):
+        # V12.57: Handle GeoJSON Point objects — these have no address, just coords
+        if val.get('type') == 'Point' and val.get('coordinates'):
+            return ''  # No address info in GeoJSON points
+
         human = val.get('human_address', '')
         if human:
             try:
@@ -47,15 +53,23 @@ def parse_address_value(val):
         lat = val.get('latitude') or val.get('lat')
         lng = val.get('longitude') or val.get('lng') or val.get('lon')
         if lat and lng:
-            return f"Near {lat}, {lng}"
+            return ''  # V12.57: Don't show "Near lat, lng" — not useful as address
         return ''
     s = str(val).strip()
+    # V12.57: Handle string representations of GeoJSON Point
+    if s.startswith('{') and "'type': 'Point'" in s:
+        return ''
     if s.startswith('{') and ('human_address' in s or 'latitude' in s):
         try:
-            parsed = json.loads(s.replace("'", '"'))
+            import ast
+            parsed = ast.literal_eval(s)
             return parse_address_value(parsed)
-        except (json.JSONDecodeError, ValueError):
-            pass
+        except (ValueError, SyntaxError):
+            try:
+                parsed = json.loads(s.replace("'", '"'))
+                return parse_address_value(parsed)
+            except (json.JSONDecodeError, ValueError):
+                pass
     return s
 
 

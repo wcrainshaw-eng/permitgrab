@@ -41,16 +41,20 @@ from collector import classify_trade, score_value, fetch_socrata, fetch_arcgis
 
 
 def parse_address_value(val):
-    """V12.55c: Parse Socrata location fields that come as dicts with nested human_address JSON.
-    Input like: {'latitude': '39.23', 'longitude': '-77.27', 'human_address': '{"address": "123 MAIN ST", "city": "CLARKSBURG", "state": "MD", "zip": "20871"}'}
-    Returns: '123 MAIN ST' (just the street address portion).
-    If only coordinates exist (no human_address), returns 'Near 39.23, -77.27'.
-    Falls back to string representation for plain strings.
+    """V12.55c/V12.57: Parse Socrata location fields and GeoJSON points.
+    Handles:
+      - Socrata location: {'latitude': '39.23', 'longitude': '-77.27', 'human_address': '{"address": "123 MAIN ST", ...}'}
+      - GeoJSON Point: {'type': 'Point', 'coordinates': [-117.55, 33.83]}
+      - String representations of either format
+    Returns the street address, or empty string if only coordinates.
     """
     if not val:
         return ''
     if isinstance(val, dict):
-        # Socrata location object — extract human_address
+        # V12.57: Handle GeoJSON Point objects
+        if val.get('type') == 'Point' and val.get('coordinates'):
+            return ''
+
         human = val.get('human_address', '')
         if human:
             try:
@@ -63,24 +67,28 @@ def parse_address_value(val):
                     return ' '.join(parts) if parts else str(val)
             except (json.JSONDecodeError, TypeError):
                 pass
-        # Fallback: if dict has 'address' key directly
         if val.get('address'):
             return str(val['address']).strip()
-        # Coordinates only — keep them as a displayable fallback
         lat = val.get('latitude') or val.get('lat')
         lng = val.get('longitude') or val.get('lng') or val.get('lon')
         if lat and lng:
-            return f"Near {lat}, {lng}"
-        # Last resort — don't dump the whole dict
+            return ''  # V12.57: Don't show coords as address
         return ''
     s = str(val).strip()
-    # Detect stringified dict that wasn't parsed
+    # V12.57: Handle stringified GeoJSON Point
+    if s.startswith('{') and "'type': 'Point'" in s:
+        return ''
     if s.startswith('{') and ('human_address' in s or 'latitude' in s):
         try:
-            parsed = json.loads(s.replace("'", '"'))
+            import ast
+            parsed = ast.literal_eval(s)
             return parse_address_value(parsed)
-        except (json.JSONDecodeError, ValueError):
-            pass
+        except (ValueError, SyntaxError):
+            try:
+                parsed = json.loads(s.replace("'", '"'))
+                return parse_address_value(parsed)
+            except (json.JSONDecodeError, ValueError):
+                pass
     return s
 
 

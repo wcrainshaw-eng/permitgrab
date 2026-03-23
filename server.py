@@ -85,51 +85,84 @@ def admin_fix_addresses():
 
 
 def _fix_socrata_addresses():
-    """V12.55c: Find and fix permits with raw Socrata location JSON in the address field.
-    Uses ast.literal_eval because Python's str(dict) uses single quotes, not JSON double quotes."""
-    import json as _json
+    """V12.57: Find and fix permits with raw JSON in address or description fields.
+    Handles Socrata location objects, GeoJSON Points, and regenerates descriptions."""
     import ast
-    conn = sqlite3.connect('/var/data/permitgrab.db')
+    from collector import parse_address_value
+
+    try:
+        conn = sqlite3.connect('/var/data/permitgrab.db')
+        conn.row_factory = sqlite3.Row
+    except Exception as e:
+        print(f"[V12.57] Address cleanup: cannot connect to DB: {e}", flush=True)
+        return
+
+    # Find permits with JSON in address field
     cursor = conn.execute(
-        "SELECT permit_number, address, zip FROM permits WHERE address LIKE '%human_address%' OR address LIKE '%latitude%'"
+        "SELECT permit_number, address, zip, description, display_description FROM permits "
+        "WHERE address LIKE '%{%' OR display_description LIKE '%{%'"
     )
     rows = cursor.fetchall()
     if not rows:
-        print("[V12.55c] No bad addresses found — nothing to fix.", flush=True)
+        print("[V12.57] No bad addresses/descriptions found — nothing to fix.", flush=True)
         return
-    print(f"[V12.55c] Found {len(rows)} permits with raw location data in address field. Fixing...", flush=True)
-    fixed = 0
+    print(f"[V12.57] Found {len(rows)} permits with JSON in address/description. Fixing...", flush=True)
+
+    fixed_addr = 0
+    fixed_desc = 0
     for row in rows:
-        pn, raw_addr, existing_zip = row['permit_number'], row['address'], row['zip']
-        try:
-            # Python str(dict) uses single quotes — use ast.literal_eval, not json.loads
-            parsed = ast.literal_eval(raw_addr)
-            clean_addr = ''
-            new_zip = existing_zip or ''
-            if isinstance(parsed, dict):
-                human = parsed.get('human_address', '')
-                if human:
-                    if isinstance(human, str):
-                        human = _json.loads(human)
-                    if isinstance(human, dict):
-                        clean_addr = human.get('address', '').strip()
-                        if not new_zip:
-                            new_zip = human.get('zip', '')
-                if not clean_addr:
-                    lat = parsed.get('latitude') or parsed.get('lat')
-                    lng = parsed.get('longitude') or parsed.get('lng') or parsed.get('lon')
-                    if lat and lng:
-                        clean_addr = f"Near {lat}, {lng}"
-            if clean_addr:
-                conn.execute(
-                    "UPDATE permits SET address = ?, zip = ? WHERE permit_number = ?",
-                    (clean_addr, new_zip or '', pn)
-                )
-                fixed += 1
-        except Exception:
-            continue
+        pn = row['permit_number']
+        raw_addr = row['address'] or ''
+        existing_zip = row['zip'] or ''
+        desc = row['description'] or ''
+        disp_desc = row['display_description'] or ''
+
+        updates = {}
+
+        # Fix address if it contains JSON
+        if '{' in raw_addr:
+            try:
+                clean_addr = parse_address_value(raw_addr)
+                if clean_addr != raw_addr:
+                    updates['address'] = clean_addr or ''
+                    fixed_addr += 1
+                    # Also try to extract zip from Socrata location
+                    if not existing_zip:
+                        try:
+                            parsed = ast.literal_eval(raw_addr)
+                            if isinstance(parsed, dict):
+                                human = parsed.get('human_address', '')
+                                if isinstance(human, str):
+                                    import json as _json
+                                    human = _json.loads(human)
+                                if isinstance(human, dict):
+                                    updates['zip'] = human.get('zip', '')
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        # Fix description/display_description if it contains JSON
+        for field in ['description', 'display_description']:
+            val = row[field] or ''
+            if '{' in val and ('human_address' in val or 'latitude' in val or "'type': 'Point'" in val or 'coordinates' in val):
+                # Strip out the JSON portion from the description
+                import re
+                cleaned = re.sub(r"\{[^}]*'(?:human_address|latitude|type)'[^}]*\}", '', val)
+                cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                cleaned = cleaned.replace('at  ', 'at ').replace('at [', '[').strip()
+                if cleaned != val:
+                    updates[field] = cleaned
+                    fixed_desc += 1
+
+        if updates:
+            set_clause = ', '.join(f"{k} = ?" for k in updates)
+            values = list(updates.values()) + [pn]
+            conn.execute(f"UPDATE permits SET {set_clause} WHERE permit_number = ?", values)
+
     conn.commit()
-    print(f"[V12.55c] Fixed {fixed}/{len(rows)} permit addresses.", flush=True)
+    conn.close()
+    print(f"[V12.57] Fixed {fixed_addr} addresses, {fixed_desc} descriptions.", flush=True)
 
 
 @app.route('/api/admin/force-collection', methods=['POST'])
@@ -730,7 +763,38 @@ class User(db.Model):
 # Create tables on startup
 with app.app_context():
     db.create_all()
-    print("[Database] Tables created/verified")
+
+    # V12.57: Auto-migrate missing columns — db.create_all() only creates new tables,
+    # it won't add columns to existing tables. This fixes the daily digest crash
+    # caused by users.watched_competitors not existing in Postgres.
+    migration_columns = [
+        ("watched_competitors", "TEXT DEFAULT '[]'"),
+        ("digest_cities", "TEXT DEFAULT '[]'"),
+        ("email_verified", "BOOLEAN DEFAULT FALSE"),
+        ("email_verified_at", "TIMESTAMP"),
+        ("email_verification_token", "VARCHAR(64)"),
+        ("unsubscribe_token", "VARCHAR(64)"),
+        ("digest_active", "BOOLEAN DEFAULT TRUE"),
+        ("last_login_at", "TIMESTAMP"),
+        ("last_digest_sent_at", "TIMESTAMP"),
+        ("last_reengagement_sent_at", "TIMESTAMP"),
+        ("trial_started_at", "TIMESTAMP"),
+        ("trial_end_date", "TIMESTAMP"),
+        ("trial_midpoint_sent", "BOOLEAN DEFAULT FALSE"),
+        ("trial_ending_sent", "BOOLEAN DEFAULT FALSE"),
+        ("trial_expired_sent", "BOOLEAN DEFAULT FALSE"),
+        ("welcome_email_sent", "BOOLEAN DEFAULT FALSE"),
+    ]
+    try:
+        for col_name, col_type in migration_columns:
+            db.session.execute(db.text(
+                f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+            ))
+        db.session.commit()
+        print("[Database] Tables created/verified, columns migrated")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Database] Tables created, migration warning: {e}")
 
 
 # Rate limiter setup
@@ -1247,8 +1311,12 @@ def generate_permit_description(permit):
         if not any(trade.lower() in p.lower() for p in parts):
             parts.append(f"({trade})")
 
-    # Address
+    # Address — V12.57: Clean raw JSON/GeoJSON before displaying
     address = permit.get('address', '')
+    if address and ('{' in str(address)):
+        # Address contains JSON — try to parse it
+        from collector import parse_address_value
+        address = parse_address_value(address)
     if address:
         parts.append(f"at {address}")
 
