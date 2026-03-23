@@ -81,8 +81,8 @@ SEARCH_KEYWORDS = [
 
 # Field matching patterns (case-insensitive contains match)
 FIELD_PATTERNS = {
-    'address':         ['address', 'site_address', 'street_address', 'location', 'project_address'],
-    'date':            ['issue_date', 'issued_date', 'filing_date', 'permit_date', 'application_date', 'created', 'permitdate', 'issueddate'],
+    'address':         ['address', 'site_address', 'street_address', 'location', 'project_address', 'addr', 'situs', 'job_site', 'work_site', 'premise'],
+    'date':            ['issue_date', 'issued_date', 'filing_date', 'permit_date', 'application_date', 'created', 'permitdate', 'issueddate', 'date_issued', 'date_filed', 'applied_date', 'file_date', 'open_date', 'record_date'],
     'permit_number':   ['permit_number', 'permit_no', 'permit_id', 'application_number', 'record_id', 'app_no', 'permitno'],
     'estimated_cost':  ['estimated_cost', 'job_value', 'valuation', 'construction_value', 'project_value', 'cost', 'constcost', 'declaredvaluation', 'jobvalue'],
     'permit_type':     ['permit_type', 'work_type', 'permit_class', 'record_type', 'type', 'permittypedesc'],

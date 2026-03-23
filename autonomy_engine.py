@@ -1,5 +1,5 @@
 """
-PermitGrab V12.54c — Autonomy Engine
+PermitGrab V12.54e — Autonomy Engine
 The daemon thread. Processes counties first, then cities.
 Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
 
@@ -121,14 +121,25 @@ def is_domain_relevant(domain, county_name, state_abbrev):
         if f".{state_lower}." in f".{domain_lower}" or domain_lower.endswith(f".{state_lower}"):
             return True
 
-    # Accept: any .gov or .us domain (US government portals are generally relevant)
-    # These are still US-based even if not perfectly matching the county
-    if domain_lower.endswith('.gov') or domain_lower.endswith('.us'):
-        return True
-
-    # Accept: .org domains (many transparency portals use .org)
-    if domain_lower.endswith('.org'):
-        return True
+    # For .gov, .us, .org domains: accept only if they mention the state somewhere
+    # This prevents Howard County MD datasets from matching Orange FL just because .gov
+    if domain_lower.endswith('.gov') or domain_lower.endswith('.us') or domain_lower.endswith('.org'):
+        # Check if state abbrev appears as a domain part (e.g. "data.fl.gov", "cityofnewyork.us")
+        domain_parts = domain_lower.replace('.', ' ').replace('-', ' ').split()
+        if state_lower in domain_parts:
+            return True
+        # Check if state name appears in domain (e.g. "data.florida.gov")
+        if state_name and state_name in domain_lower.replace('.', '').replace('-', ''):
+            return True
+        # Check if state abbrev appears as suffix before TLD (e.g. "datahub.austintexas.gov")
+        if len(state_lower) == 2 and state_lower not in ('in', 'or', 'me', 'ok', 'hi', 'id'):
+            if state_lower in domain_lower.replace('.', '').replace('-', ''):
+                return True
+        # Accept national data portals (data.gov, census.gov, etc.)
+        if domain_lower in ('data.gov', 'www.data.gov', 'catalog.data.gov'):
+            return True
+        # No state match in a .gov/.us/.org domain — likely a different jurisdiction
+        return False
 
     # Reject everything else (foreign domains, commercial domains, etc.)
     return False
@@ -238,6 +249,7 @@ def process_county(county):
             bulk_candidates.append(c)
 
     if not bulk_candidates:
+        print(f"[Autonomy] {name}, {state}: NO bulk candidates (had {len(relevant_candidates)} relevant, none with city_field)", flush=True)
         update_county_status(fips, 'no_data', 'no_bulk_dataset_with_city_field')
         return {'found': False}
 
@@ -251,6 +263,7 @@ def process_county(county):
     best = bulk_candidates[0]
 
     if best['score'] < 60:
+        print(f"[Autonomy] {name}, {state}: best score {best['score']} < 60 ({best.get('name', '')[:50]})", flush=True)
         update_county_status(fips, 'no_data', f"best_score_{best['score']}")
         return {'found': False, 'best_score': best['score']}
 
@@ -261,6 +274,10 @@ def process_county(county):
     if not validate_sample(sample, field_map):
         field_map = auto_fix_field_map(sample)
         if not field_map or not validate_sample(sample, field_map):
+            print(f"[Autonomy] {name}, {state}: validation FAILED — score={best['score']}, "
+                  f"address={field_map.get('address') if field_map else 'None'}, "
+                  f"date={field_map.get('date') if field_map else 'None'}, "
+                  f"domain={best.get('domain','')}, name={best.get('name','')[:50]}", flush=True)
             update_county_status(fips, 'no_data', 'validation_failed')
             return {'found': True, 'valid': False}
 
