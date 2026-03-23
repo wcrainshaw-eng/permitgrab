@@ -1,21 +1,23 @@
 """
-PermitGrab V12.54b — Autonomy Engine
+PermitGrab V12.54c — Autonomy Engine
 The daemon thread. Processes counties first, then cities.
 Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
 
 CRITICAL: Each city/county is fully processed in ONE function call.
           No "pending" state. No separate validation cron. No onboarding queue.
 
-V12.54b FIXES:
-  - Added 50/day onboard cap to prevent server overload
-  - Added trade_category + value_tier classification
-  - Reuses collector.py fetch functions instead of duplicates
+V12.54c FIXES:
+  - flush=True on all [Autonomy] prints for Render visibility
+  - traceback.print_exc() on daemon errors
+  - See seed fix spec for us_counties data rebuild
 """
 
 import time
 import json
 import math
 import re
+import sys
+import traceback
 from datetime import datetime, timedelta
 import db as permitdb
 from city_source_db import (
@@ -90,7 +92,7 @@ def process_county(county):
     state = county['state']
     update_county_status(fips, 'searching')
 
-    print(f"[Autonomy] Searching: {name} County, {state}...")
+    print(f"[Autonomy] Searching: {name} County, {state}...", flush=True)
 
     # 1. Search for a bulk permit dataset
     candidates = []
@@ -220,7 +222,7 @@ def process_county(county):
         elif best['platform'] == 'arcgis':
             permits_raw = fetch_arcgis(config, days_back=180)
     except Exception as e:
-        print(f"[Autonomy] Fetch error for {name}: {e}")
+        print(f"[Autonomy] Fetch error for {name}: {e}", flush=True)
 
     # Normalize permits
     normalized = []
@@ -257,9 +259,9 @@ def process_county(county):
     # Upsert to SQLite — DATA IS NOW LIVE ON THE SITE
     if normalized:
         new_count, updated_count = permitdb.upsert_permits(normalized, source_city_key=source_key)
-        print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded ({new_count} new, {updated_count} updated)")
+        print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded ({new_count} new, {updated_count} updated)", flush=True)
     else:
-        print(f"[Autonomy] {name}, {state}: 0 permits after normalization")
+        print(f"[Autonomy] {name}, {state}: 0 permits after normalization", flush=True)
 
     # 6. Mark all cities in this county as covered
     cities_covered = mark_county_cities_covered(fips, source_key)
@@ -287,7 +289,7 @@ def process_city(city):
     state = city['state']
     update_city_status(slug, 'searching')
 
-    print(f"[Autonomy] Searching: {name}, {state}...")
+    print(f"[Autonomy] Searching: {name}, {state}...", flush=True)
 
     # 1. Search
     candidates = []
@@ -393,7 +395,7 @@ def process_city(city):
         elif best['platform'] == 'arcgis':
             permits_raw = fetch_arcgis(config, days_back=180)
     except Exception as e:
-        print(f"[Autonomy] Fetch error for {name}: {e}")
+        print(f"[Autonomy] Fetch error for {name}: {e}", flush=True)
 
     # Normalize
     normalized = []
@@ -427,7 +429,7 @@ def process_city(city):
 
     if normalized:
         new_count, updated_count = permitdb.upsert_permits(normalized, source_city_key=source_key)
-        print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded")
+        print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded", flush=True)
 
     # Quality gate: must have at least 10 permits
     if len(normalized) < 10:
@@ -444,7 +446,7 @@ def process_city(city):
 def run_autonomy_engine():
     """Main entry point. Runs as daemon thread in server.py."""
     # Wait for startup + initial collection
-    print(f"[{datetime.now()}] V12.54: Autonomy engine waiting 10 minutes for startup...")
+    print(f"[{datetime.now()}] V12.54: Autonomy engine waiting 10 minutes for startup...", flush=True)
     time.sleep(600)
 
     while True:
@@ -457,7 +459,9 @@ def run_autonomy_engine():
             else:
                 run_maintenance_cycle()
         except Exception as e:
-            print(f"[Autonomy] Engine error: {e}")
+            print(f"[Autonomy] Engine error: {e}", flush=True)
+            traceback.print_exc()
+            sys.stdout.flush()
             time.sleep(60)
 
 
@@ -486,7 +490,7 @@ def run_search_cycle():
                     onboard_count += 1
         except Exception as e:
             stats['errors'].append(f"county:{county.get('county_name','?')}: {str(e)[:100]}")
-            print(f"[Autonomy] Error processing {county.get('county_name')}: {e}")
+            print(f"[Autonomy] Error processing {county.get('county_name')}: {e}", flush=True)
 
         throttle()
         county = get_next_unsearched_county()
@@ -506,7 +510,7 @@ def run_search_cycle():
                         onboard_count += 1
             except Exception as e:
                 stats['errors'].append(f"city:{city.get('city_name','?')}: {str(e)[:100]}")
-                print(f"[Autonomy] Error processing {city.get('city_name')}: {e}")
+                print(f"[Autonomy] Error processing {city.get('city_name')}: {e}", flush=True)
 
             throttle()
             city = get_next_unsearched_city()
@@ -514,22 +518,22 @@ def run_search_cycle():
     log_discovery_run('search', stats)
     print(f"[Autonomy] Search cycle complete: {stats['sources_found']} sources, "
           f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities, "
-          f"{onboard_count} onboards (cap: {MAX_ONBOARDS_PER_CYCLE})")
+          f"{onboard_count} onboards (cap: {MAX_ONBOARDS_PER_CYCLE})", flush=True)
 
     # Sleep until next cycle. If we hit the cap, come back in 6 hours.
     # If we didn't hit the cap (running low on targets), come back in 12 hours.
     if onboard_count >= MAX_ONBOARDS_PER_CYCLE:
-        print(f"[Autonomy] Hit daily cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 6 hours.")
+        print(f"[Autonomy] Hit daily cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 6 hours.", flush=True)
         time.sleep(21600)  # 6 hours
     else:
-        print(f"[Autonomy] Targets exhausted for now. Sleeping 12 hours.")
+        print(f"[Autonomy] Targets exhausted for now. Sleeping 12 hours.", flush=True)
         time.sleep(43200)  # 12 hours
 
 
 def run_maintenance_cycle():
     """Runs after all cities/counties have been searched at least once.
     Re-searches old no_data cities, triggers self-healing."""
-    print(f"[Autonomy] Maintenance mode. Sleeping 6 hours before next check.")
+    print(f"[Autonomy] Maintenance mode. Sleeping 6 hours before next check.", flush=True)
 
     # Re-search cities that had no data 90+ days ago
     conn = permitdb.get_connection()
@@ -542,7 +546,7 @@ def run_maintenance_cycle():
     """).fetchall()
 
     if stale:
-        print(f"[Autonomy] Re-searching {len(stale)} cities that had no data 90+ days ago")
+        print(f"[Autonomy] Re-searching {len(stale)} cities that had no data 90+ days ago", flush=True)
         for row in stale:
             city = dict(row)
             update_city_status(city['slug'], 'not_started')  # Reset to trigger re-search
@@ -557,7 +561,7 @@ def run_maintenance_cycle():
     """).fetchall()
 
     if stale_counties:
-        print(f"[Autonomy] Re-searching {len(stale_counties)} counties monthly")
+        print(f"[Autonomy] Re-searching {len(stale_counties)} counties monthly", flush=True)
         for row in stale_counties:
             county = dict(row)
             update_county_status(county['fips'], 'not_started')
@@ -567,6 +571,6 @@ def run_maintenance_cycle():
         from auto_heal import run_self_healing
         run_self_healing()
     except Exception as e:
-        print(f"[Autonomy] Self-healing error: {e}")
+        print(f"[Autonomy] Self-healing error: {e}", flush=True)
 
     time.sleep(21600)  # 6 hours
