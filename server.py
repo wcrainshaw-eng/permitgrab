@@ -39,13 +39,23 @@ def google_verification():
 # V12.19: ADMIN ENDPOINTS FOR DATA RECOVERY
 # ===========================
 
+def check_admin_key():
+    """V12.58: Validate admin key without hardcoded fallback. Returns (is_valid, error_response)."""
+    secret = request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY')
+    if not expected:
+        return False, (jsonify({'error': 'Admin key not configured'}), 503)
+    if secret != expected:
+        return False, (jsonify({'error': 'Unauthorized'}), 401)
+    return True, None
+
+
 @app.route('/api/admin/reset-permits', methods=['POST'])
 def admin_reset_permits():
     """Delete corrupted permits.json so next collection writes clean data."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     # DATA_DIR is defined later, use the same logic
     data_dir = '/var/data' if os.path.isdir('/var/data') else os.path.join(os.path.dirname(__file__), 'data')
@@ -66,10 +76,9 @@ def admin_reset_permits():
 @app.route('/api/admin/fix-addresses', methods=['POST'])
 def admin_fix_addresses():
     """V12.55c: Fix Socrata location objects stored as raw JSON in address field."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     def run_fix():
         try:
@@ -168,10 +177,9 @@ def _fix_socrata_addresses():
 @app.route('/api/admin/force-collection', methods=['POST'])
 def admin_force_collection():
     """V12.50: Trigger REFRESH collection (upserts to SQLite)."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     def run_collection():
         try:
@@ -194,10 +202,9 @@ def admin_force_collection():
 @app.route('/api/admin/full-collection', methods=['POST'])
 def admin_full_collection():
     """V12.50: Trigger FULL collection (rebuild SQLite)."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     def run_collection():
         try:
@@ -220,10 +227,9 @@ def admin_full_collection():
 @app.route('/api/admin/add-source', methods=['POST'])
 def admin_add_source():
     """V12.50: Add a single source and upsert to SQLite."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     source_key = request.args.get('source')
     source_type = request.args.get('type', 'bulk')  # 'bulk' or 'city'
@@ -252,10 +258,9 @@ def admin_add_source():
 @app.route('/api/admin/collection-status')
 def admin_collection_status():
     """V12.29: Get last collection run status for debugging."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     stats_file = os.path.join(DATA_DIR, "collection_stats.json")
     if not os.path.exists(stats_file):
@@ -300,10 +305,9 @@ def admin_collection_status():
 @app.route('/api/admin/validation-results')
 def admin_validation_results():
     """V12.31: Get endpoint validation results for applying fixes."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     validation_file = os.path.join(DATA_DIR, "endpoint_validation.json")
     if not os.path.exists(validation_file):
@@ -320,10 +324,9 @@ def admin_validation_results():
 @app.route('/api/admin/suggested-fixes')
 def admin_suggested_fixes():
     """V12.31: Get suggested fixes for broken endpoints."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     fixes_file = os.path.join(DATA_DIR, "suggested_fixes.json")
     if not os.path.exists(fixes_file):
@@ -340,10 +343,9 @@ def admin_suggested_fixes():
 @app.route('/api/admin/coverage')
 def admin_coverage():
     """V12.33: Get coverage statistics - which cities/states have data."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     # Load permits to analyze coverage
     permits_path = os.path.join(DATA_DIR, 'permits.json')
@@ -404,14 +406,15 @@ def admin_coverage():
 # ===========================
 
 @app.route('/api/admin/send-digest', methods=['POST'])
+@app.route('/api/admin/test-digest', methods=['POST'])  # V12.58: Route alias
 def admin_send_digest():
     """V12.53: Manually trigger daily digest for testing."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
-    email = request.args.get('email', '')
+    # V12.58: Read email from both query string and request body
+    email = request.args.get('email') or (request.json or {}).get('email', '')
 
     try:
         from email_alerts import send_daily_digest, send_test_digest
@@ -427,13 +430,64 @@ def admin_send_digest():
         return jsonify({'error': f'Digest failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/data-freshness', methods=['GET'])
+def admin_data_freshness():
+    """V12.58: Return data freshness stats for all cities. Useful for monitoring stale sources."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    conn = permitdb.get_connection()
+    cursor = conn.execute("""
+        SELECT city, state, COUNT(*) as total_permits, MAX(filing_date) as newest_date
+        FROM permits
+        WHERE filing_date IS NOT NULL AND filing_date != ''
+        GROUP BY city, state
+        ORDER BY newest_date ASC
+    """)
+
+    results = []
+    now = datetime.now()
+    for row in cursor:
+        newest = row['newest_date']
+        days_stale = None
+        if newest:
+            try:
+                newest_dt = datetime.strptime(newest[:10], '%Y-%m-%d')
+                days_stale = (now - newest_dt).days
+            except (ValueError, TypeError):
+                pass
+        results.append({
+            'city': row['city'],
+            'state': row['state'],
+            'total_permits': row['total_permits'],
+            'newest_filing_date': newest,
+            'days_stale': days_stale
+        })
+
+    # Also get cities with NULL dates
+    null_dates = conn.execute("""
+        SELECT city, state, COUNT(*) as count
+        FROM permits
+        WHERE filing_date IS NULL OR filing_date = ''
+        GROUP BY city, state
+        ORDER BY count DESC
+    """).fetchall()
+
+    return jsonify({
+        'cities': results,
+        'cities_with_null_dates': [dict(r) for r in null_dates],
+        'total_cities': len(results),
+        'stale_count': len([r for r in results if r['days_stale'] and r['days_stale'] > 30])
+    })
+
+
 @app.route('/api/admin/send-welcome', methods=['POST'])
 def admin_send_welcome():
     """V12.53: Send welcome email to a specific user."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     email = request.args.get('email', '')
     email_type = request.args.get('type', 'free')  # 'free' or 'pro'
@@ -459,10 +513,9 @@ def admin_send_welcome():
 @app.route('/api/admin/run-trial-check', methods=['POST'])
 def admin_run_trial_check():
     """V12.53: Manually run trial lifecycle check."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     try:
         from email_alerts import check_trial_lifecycle
@@ -475,10 +528,9 @@ def admin_run_trial_check():
 @app.route('/api/admin/run-onboarding-check', methods=['POST'])
 def admin_run_onboarding_check():
     """V12.53: Manually run onboarding nudge check."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     try:
         from email_alerts import check_onboarding_nudges
@@ -491,10 +543,9 @@ def admin_run_onboarding_check():
 @app.route('/api/admin/email-stats')
 def admin_email_stats():
     """V12.53: Get email system statistics."""
-    secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
-    if secret != expected:
-        return jsonify({'error': 'Unauthorized'}), 401
+    valid, error = check_admin_key()
+    if not valid:
+        return error
 
     try:
         users = User.query.all()

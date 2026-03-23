@@ -152,6 +152,30 @@ def _release_lock():
         pass
 
 
+def check_data_freshness(city_name, permits):
+    """V12.58: Log warning if newest permit is >30 days old.
+    Also returns (newest_date, days_stale) for metrics."""
+    if not permits:
+        return None, None
+    dates = [p.get('filing_date', '') for p in permits if p.get('filing_date')]
+    if not dates:
+        print(f"[FRESHNESS] WARNING: {city_name} has NO filing dates at all")
+        return None, None
+    newest = max(dates)
+    try:
+        # Handle various date formats
+        if 'T' in newest:
+            newest_dt = datetime.fromisoformat(newest.replace('Z', '+00:00').split('+')[0])
+        else:
+            newest_dt = datetime.strptime(newest[:10], '%Y-%m-%d')
+        days_old = (datetime.now() - newest_dt).days
+        if days_old > 30:
+            print(f"[FRESHNESS] WARNING: {city_name} data is {days_old} days stale (newest: {newest})")
+        return newest[:10], days_old
+    except (ValueError, TypeError):
+        return newest[:10] if newest else None, None
+
+
 def atomic_write_json(filepath, data, indent=2):
     """
     V12.16: Atomic JSON write to prevent corruption.
@@ -603,6 +627,15 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
                 break
             except ValueError:
                 continue
+        # V12.58: Handle single-digit M/D/YYYY (e.g., San Jose CKAN: "9/9/2025")
+        if not parsed_date and '/' in str(date_str):
+            try:
+                parts = str(date_str).split()[0].split('/')
+                if len(parts) == 3:
+                    m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
+                    parsed_date = f"{y:04d}-{m:02d}-{d:02d}"
+            except (ValueError, IndexError):
+                pass
         if not parsed_date:
             parsed_date = str(date_str)[:10]
 
@@ -821,6 +854,15 @@ def normalize_permit(raw_record, city_key):
                     break
                 except ValueError:
                     continue
+        # V12.58: Handle single-digit M/D/YYYY (e.g., San Jose CKAN: "9/9/2025")
+        if not parsed_date and '/' in str(date_str):
+            try:
+                parts = str(date_str).split()[0].split('/')
+                if len(parts) == 3:
+                    m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
+                    parsed_date = f"{y:04d}-{m:02d}-{d:02d}"
+            except (ValueError, IndexError):
+                pass
         if not parsed_date:
             parsed_date = str(date_str)[:10]
 

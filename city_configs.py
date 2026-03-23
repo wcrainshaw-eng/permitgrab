@@ -42,6 +42,7 @@ CITY_REGISTRY = {
             "description": "job_description",
             "contractor_name": "applicant_license",
             "status": "permit_status",
+            "filing_date": "issued_date",  # V12.58: Fix NULL filing dates
         },
         "date_field": "issued_date",
         "limit": 2000,
@@ -157,6 +158,7 @@ CITY_REGISTRY = {
             "address": "originaladdress1",
             "description": "permittypedesc",
             "status": "statuscurrent",
+            "filing_date": "issueddate",  # V12.58: Fix NULL filing dates
         },
         "date_field": "issueddate",
         "limit": 2000,
@@ -1229,6 +1231,7 @@ CITY_REGISTRY = {
             "status": "application_status",
             "estimated_cost": "estimated_cost",
             "work_type": "worktype",
+            "filing_date": "processed_date",  # V12.58: Fix NULL filing dates
         },
         "date_field": "processed_date",
         "limit": 2000,
@@ -7718,6 +7721,7 @@ CITY_REGISTRY = {
             "permit_type": "def_type",
             "owner_name": "contractor",
             "estimated_cost": "valuation",
+            "filing_date": "date_issued",  # V12.58: Fix NULL filing dates
         },
         "date_field": "date_issued",
         "limit": 2000,
