@@ -697,6 +697,87 @@ def admin_trigger_search():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/traffic', methods=['GET'])
+def admin_traffic():
+    """V12.59b: Query persistent page view data from PostgreSQL."""
+    admin_key = request.headers.get('X-Admin-Key', '')
+    if admin_key != os.environ.get('ADMIN_KEY', ''):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(os.environ.get('DATABASE_URL', ''))
+        cur = conn.cursor()
+
+        hours = int(request.args.get('hours', 24))
+
+        # Total page views
+        cur.execute("SELECT COUNT(*) FROM page_views WHERE created_at > NOW() - INTERVAL '%s hours'", (hours,))
+        total_views = cur.fetchone()[0]
+
+        # Unique IPs (proxy for unique visitors)
+        cur.execute("SELECT COUNT(DISTINCT ip_address) FROM page_views WHERE created_at > NOW() - INTERVAL '%s hours'", (hours,))
+        unique_ips = cur.fetchone()[0]
+
+        # Views by path
+        cur.execute("""
+            SELECT path, COUNT(*) as hits
+            FROM page_views WHERE created_at > NOW() - INTERVAL '%s hours'
+            GROUP BY path ORDER BY hits DESC LIMIT 20
+        """, (hours,))
+        paths = [{'path': r[0], 'hits': r[1]} for r in cur.fetchall()]
+
+        # Views by user agent type
+        cur.execute("""
+            SELECT
+                CASE
+                    WHEN user_agent ILIKE '%%googlebot%%' THEN 'Googlebot'
+                    WHEN user_agent ILIKE '%%bingbot%%' THEN 'Bingbot'
+                    WHEN user_agent ILIKE '%%curl%%' THEN 'curl'
+                    WHEN user_agent ILIKE '%%python%%' THEN 'Python'
+                    WHEN user_agent ILIKE '%%chrome%%' THEN 'Chrome'
+                    WHEN user_agent ILIKE '%%firefox%%' THEN 'Firefox'
+                    WHEN user_agent ILIKE '%%safari%%' AND user_agent NOT ILIKE '%%chrome%%' THEN 'Safari'
+                    WHEN user_agent ILIKE '%%bot%%' OR user_agent ILIKE '%%spider%%' OR user_agent ILIKE '%%crawl%%' THEN 'Other Bot'
+                    ELSE 'Other'
+                END as agent_type,
+                COUNT(*) as hits
+            FROM page_views WHERE created_at > NOW() - INTERVAL '%s hours'
+            GROUP BY agent_type ORDER BY hits DESC
+        """, (hours,))
+        agents = [{'agent': r[0], 'hits': r[1]} for r in cur.fetchall()]
+
+        # Recent views (last 10)
+        cur.execute("""
+            SELECT path, user_agent, ip_address, created_at::text
+            FROM page_views ORDER BY created_at DESC LIMIT 10
+        """)
+        recent = [{'path': r[0], 'user_agent': r[1][:80] if r[1] else '', 'ip': r[2], 'time': r[3]} for r in cur.fetchall()]
+
+        # Hourly breakdown (last 24h)
+        cur.execute("""
+            SELECT date_trunc('hour', created_at)::text as hour, COUNT(*) as hits
+            FROM page_views WHERE created_at > NOW() - INTERVAL '24 hours'
+            GROUP BY hour ORDER BY hour
+        """)
+        hourly = [{'hour': r[0], 'hits': r[1]} for r in cur.fetchall()]
+
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            'period_hours': hours,
+            'total_views': total_views,
+            'unique_visitors': unique_ips,
+            'paths': paths,
+            'user_agents': agents,
+            'recent': recent,
+            'hourly': hourly
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ===========================
 # DATABASE SETUP (V7)
 # ===========================
@@ -1772,6 +1853,30 @@ def analytics_track_page_view(response):
                         'method': request.method
                     }
                 )
+                # V12.59b: Persistent page view logging to PostgreSQL
+                try:
+                    import psycopg2
+                    pg_conn = psycopg2.connect(os.environ.get('DATABASE_URL', ''))
+                    pg_cur = pg_conn.cursor()
+                    pg_cur.execute(
+                        """INSERT INTO page_views (path, method, status_code, user_agent, ip_address, referrer, session_id, user_id)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                        (
+                            request.path,
+                            request.method,
+                            response.status_code,
+                            request.headers.get('User-Agent', '')[:500],
+                            request.headers.get('X-Forwarded-For', request.remote_addr or ''),
+                            request.headers.get('Referer', ''),
+                            request.cookies.get('session_id', ''),
+                            getattr(g, 'user_id', None) if hasattr(g, 'user_id') else None
+                        )
+                    )
+                    pg_conn.commit()
+                    pg_cur.close()
+                    pg_conn.close()
+                except Exception:
+                    pass  # Never break the page for analytics
     except Exception:
         pass  # Never break the response
     return response
