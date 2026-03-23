@@ -269,6 +269,11 @@ def get_permits_for_digest(cities, since_date, limit=25):
     """
     Get recent permits for a user's digest from SQLite.
     Returns permits filed since since_date in the specified cities.
+
+    V12.57d: Use filing_date only (not collected_at) to avoid showing
+    old permits that were merely re-collected by the REFRESH collector.
+    Sort by filing_date DESC so newest permits appear first, then by
+    estimated_cost DESC as a tiebreaker.
     """
     if not cities:
         return []
@@ -280,11 +285,11 @@ def get_permits_for_digest(cities, since_date, limit=25):
     query = f"""
         SELECT * FROM permits
         WHERE city IN ({placeholders})
-        AND (filing_date >= ? OR collected_at >= ?)
-        ORDER BY estimated_cost DESC
+        AND filing_date >= ?
+        ORDER BY filing_date DESC, estimated_cost DESC
         LIMIT ?
     """
-    params = list(cities) + [since_date, since_date, limit]
+    params = list(cities) + [since_date, limit]
 
     cursor = conn.execute(query, params)
     return [dict(row) for row in cursor]
@@ -392,12 +397,13 @@ def send_daily_digest_to_user(user):
     if not cities:
         return False, "no_cities"
 
-    # Get yesterday's permits
-    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    # V12.57d: Look back 7 days instead of 1 to catch permits with delayed filing data.
+    # The query now uses filing_date only (no collected_at), so this window matters.
+    since = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     is_pro = user.plan in ('professional', 'pro', 'enterprise')
     limit = 50 if is_pro else 20  # Fetch more, display limited
 
-    permits = get_permits_for_digest(cities, yesterday, limit)
+    permits = get_permits_for_digest(cities, since, limit)
 
     # Build and send
     html = build_digest_html(user, permits, is_pro)
