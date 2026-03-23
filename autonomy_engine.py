@@ -1,5 +1,5 @@
 """
-PermitGrab V12.54e — Autonomy Engine
+PermitGrab V12.55b — Autonomy Engine
 The daemon thread. Processes counties first, then cities.
 Uses single-pass pipeline: search -> validate -> pull 6 months -> done.
 
@@ -253,12 +253,31 @@ def process_county(county):
         update_county_status(fips, 'no_data', 'no_bulk_dataset_with_city_field')
         return {'found': False}
 
-    # 2. Score and pick best
+    # 2. Score and pick best — REQUIRE recent data
     for c in bulk_candidates:
         sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
         c['sample'] = sample
-        has_recent = check_data_recency(sample, generate_field_map(c['columns']).get('date'))
+        date_key = generate_field_map(c['columns']).get('date')
+        has_recent = check_data_recency(sample, date_key)
+        c['has_recent'] = has_recent
         c['score'] = score_dataset(c['columns'], c.get('name', ''), has_recent)
+
+        # V12.55b: Verify dataset actually contains data for THIS county
+        # by checking if the county name appears in city_field values
+        if sample and c.get('city_field'):
+            county_lower = name.lower()
+            city_vals = set()
+            for rec in sample:
+                val = str(rec.get(c['city_field'], '')).lower().strip()
+                if val:
+                    city_vals.add(val)
+            # If we got city values but none relate to this county, penalize heavily
+            if city_vals and not any(county_lower in v or v in county_lower for v in city_vals):
+                c['score'] = max(0, c['score'] - 40)
+                print(f"[Autonomy] {name}, {state}: penalized {c.get('domain','')}/{c.get('dataset_id','')[:8]} "
+                      f"— city_field values {list(city_vals)[:5]} don't match county", flush=True)
+        time.sleep(0.3)
+
     bulk_candidates.sort(key=lambda x: x['score'], reverse=True)
     best = bulk_candidates[0]
 
@@ -266,6 +285,12 @@ def process_county(county):
         print(f"[Autonomy] {name}, {state}: best score {best['score']} < 60 ({best.get('name', '')[:50]})", flush=True)
         update_county_status(fips, 'no_data', f"best_score_{best['score']}")
         return {'found': False, 'best_score': best['score']}
+
+    # V12.55b: Hard gate — must have data from last 90 days to be worth onboarding
+    if not best.get('has_recent'):
+        print(f"[Autonomy] {name}, {state}: best dataset has NO recent data ({best.get('name', '')[:50]})", flush=True)
+        update_county_status(fips, 'no_data', 'no_recent_data')
+        return {'found': True, 'valid': False}
 
     # 3. Validate: generate field map, test on sample
     field_map = generate_field_map(best['columns'])
@@ -353,14 +378,17 @@ def process_county(county):
     if normalized:
         new_count, updated_count = permitdb.upsert_permits(normalized, source_city_key=source_key)
         print(f"[Autonomy] {name}, {state}: {len(normalized)} permits loaded ({new_count} new, {updated_count} updated)", flush=True)
+
+        # 6. Mark all cities in this county as covered
+        cities_covered = mark_county_cities_covered(fips, source_key)
+        update_county_status(fips, 'has_data')
+        record_collection(source_key, len(normalized))
     else:
-        print(f"[Autonomy] {name}, {state}: 0 permits after normalization", flush=True)
-
-    # 6. Mark all cities in this county as covered
-    cities_covered = mark_county_cities_covered(fips, source_key)
-
-    update_county_status(fips, 'has_data')
-    record_collection(source_key, len(normalized))
+        print(f"[Autonomy] {name}, {state}: 0 permits after normalization — marking no_data", flush=True)
+        update_county_status(fips, 'no_data', 'zero_permits_after_fetch')
+        # Deactivate the source since it produced nothing
+        update_source_status(source_key, 'inactive', 'zero_permits')
+        cities_covered = 0
 
     return {
         'found': True,
