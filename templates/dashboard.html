@@ -1836,15 +1836,28 @@ function formatTimeAgo(dateStr) {
 }
 
 function populateFilters() {
-  const cities = [...new Set(allPermits.map(p => p.city))].sort();
+  // V12.55: Build city-state pairs, sort by state then city, display as "STATE - City"
+  const cityStateMap = new Map();
+  allPermits.forEach(p => {
+    if (p.city && !cityStateMap.has(p.city)) {
+      cityStateMap.set(p.city, p.state || '');
+    }
+  });
+  const cityEntries = [...cityStateMap.entries()].sort((a, b) => {
+    const stateCompare = (a[1] || 'ZZ').localeCompare(b[1] || 'ZZ');
+    if (stateCompare !== 0) return stateCompare;
+    return a[0].localeCompare(b[0]);
+  });
+
   const trades = [...new Set(allPermits.map(p => p.trade_category))].sort();
   const statuses = [...new Set(allPermits.map(p => p.status))].sort();
 
   const citySelect = document.getElementById('filter-city');
   const alertCity = document.getElementById('alert-city');
-  cities.forEach(c => {
-    citySelect.add(new Option(c, c));
-    alertCity.add(new Option(c, c));
+  cityEntries.forEach(([city, state]) => {
+    const label = state ? `${state} - ${city}` : city;
+    citySelect.add(new Option(label, city));
+    alertCity.add(new Option(label, city));
   });
 
   const tradeSelect = document.getElementById('filter-trade');

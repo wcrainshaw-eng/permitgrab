@@ -2669,11 +2669,29 @@ def api_top_contractors():
 
     limit = int(request.args.get('limit', 5))
 
-    # Aggregate by contractor
+    # V12.55: Aggregate by contractor with improved junk name filter
+    JUNK_NAMES = {'n/a', 'unknown', 'none', 'na', 'tbd', 'tba', 'pending',
+                  'various', 'multiple', 'owner', 'owner/builder', 'self',
+                  'homeowner', 'not provided', 'not applicable', 'see plans',
+                  'not listed', 'not available', 'exempt', '---', '--', '-'}
+
     contractors = {}
     for p in permits:
-        name = p.get('contact_name', '').strip()
-        if not name or name.lower() in ('n/a', 'unknown', 'none', ''):
+        name = (p.get('contact_name') or '').strip()
+        if not name:
+            continue
+        name_lower = name.lower()
+
+        # Skip exact junk matches
+        if name_lower in JUNK_NAMES:
+            continue
+
+        # Skip names that START with common junk prefixes
+        if name_lower.startswith(('none ', 'n/a ', 'unknown ', 'tbd ', 'owner ')):
+            continue
+
+        # Skip very short names (likely data artifacts)
+        if len(name) < 3:
             continue
 
         if name not in contractors:
