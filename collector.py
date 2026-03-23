@@ -109,16 +109,19 @@ COLLECTION_LOCK_FILE = os.path.join(DATA_DIR, ".collection_lock")
 
 
 def _acquire_lock():
-    """Prevent concurrent collection runs."""
+    """Prevent concurrent collection runs. V12.57: Reduced stale timeout to 30 min."""
     if os.path.exists(COLLECTION_LOCK_FILE):
         try:
             with open(COLLECTION_LOCK_FILE) as f:
                 lock_data = json.load(f)
             lock_time = datetime.fromisoformat(lock_data["started"])
-            # If lock is older than 2 hours, assume it's stale
-            if (datetime.now() - lock_time).total_seconds() < 7200:
+            # V12.57: Reduced from 2 hours to 30 min — instances get killed on deploy
+            # and leave orphaned locks. 30 min is enough for a normal collection cycle.
+            if (datetime.now() - lock_time).total_seconds() < 1800:
                 print(f"  [SKIP] Collection already running since {lock_data['started']}")
                 return False
+            else:
+                print(f"  [LOCK] Stale lock from {lock_data['started']} — overriding")
         except Exception:
             pass
 

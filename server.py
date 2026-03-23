@@ -5968,14 +5968,24 @@ def schedule_email_tasks():
 
 
 def run_initial_collection():
-    """Run initial data collection on startup."""
+    """V12.57: Clear stale lock, then run a quick REFRESH (not full 365-day rebuild).
+    The SQLite DB on the persistent disk already has all historical data.
+    Full collections blocked every REFRESH cycle by holding the lock for hours."""
     try:
-        print(f"[{datetime.now()}] Running initial data collection...")
+        # V12.57: Clear orphaned lock files from killed instances
+        lock_file = os.path.join(DATA_DIR, ".collection_lock")
+        if os.path.exists(lock_file):
+            try:
+                os.remove(lock_file)
+                print(f"[{datetime.now()}] V12.57: Cleared stale collection lock file.")
+            except Exception as e:
+                print(f"[{datetime.now()}] V12.57: Could not clear lock: {e}")
 
-        # Regular permit collection
-        # V12.4: Increased from 60 to 365 days to catch stale datasets
-        from collector import collect_all, collect_permit_history
-        collect_all(days_back=365)
+        print(f"[{datetime.now()}] V12.57: Running initial REFRESH collection (7 days)...")
+
+        # V12.57: Quick 7-day refresh instead of 365-day full rebuild
+        from collector import collect_refresh
+        collect_refresh(days_back=7)
 
         # Violation collection
         try:
@@ -5991,13 +6001,7 @@ def run_initial_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Initial signal collection error: {e}")
 
-        # Permit history collection (first run)
-        try:
-            collect_permit_history(years_back=3)
-        except Exception as e:
-            print(f"[{datetime.now()}] Initial history collection error: {e}")
-
-        print(f"[{datetime.now()}] Initial collection complete.")
+        print(f"[{datetime.now()}] V12.57: Initial collection complete.")
     except Exception as e:
         print(f"[{datetime.now()}] Initial collection error: {e}")
 
