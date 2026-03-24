@@ -798,18 +798,41 @@ def bootstrap_existing_sources():
         name = source['name']
         state = source['state']
 
-        # Parse field_map from JSON
-        field_map = source.get('field_map', '{}')
-        if isinstance(field_map, str):
-            try:
-                field_map = json.loads(field_map)
-            except (json.JSONDecodeError, TypeError):
-                field_map = {}
-
-        date_field = source.get('date_field') or field_map.get('date')
-        if not date_field:
-            print(f"[Autonomy] Bootstrap: {name} — no date_field, skipping", flush=True)
+        # V12.61: Re-discover field_map from live API instead of trusting stored values
+        # The pre-seeded field_maps are often wrong (e.g., "work_permit" mapped as permit_number
+        # when it's actually a status field, or date_field referencing a non-existent column)
+        try:
+            sample = fetch_sample(source['endpoint'], source['platform'], limit=10)
+        except Exception as e:
+            print(f"[Autonomy] Bootstrap: {name} sample fetch error: {e}", flush=True)
+            # Mark dead endpoints as inactive
+            if '404' in str(e) or '403' in str(e) or '401' in str(e):
+                update_source_status(source_key, 'inactive', f'dead_endpoint_{str(e)[:50]}')
+                print(f"[Autonomy] Bootstrap: {name} — dead endpoint, marked inactive", flush=True)
             continue
+
+        if not sample:
+            print(f"[Autonomy] Bootstrap: {name} — empty sample, skipping", flush=True)
+            continue
+
+        # Re-discover field_map from the actual column names in the sample
+        sample_columns = list(sample[0].keys()) if sample else []
+        field_map = generate_field_map(sample_columns)
+        date_field = field_map.get('date') or field_map.get('filing_date')
+
+        if not date_field:
+            print(f"[Autonomy] Bootstrap: {name} — no date field found in columns: "
+                  f"{sample_columns[:10]}", flush=True)
+            continue
+
+        if not field_map.get('address') and not field_map.get('permit_number'):
+            print(f"[Autonomy] Bootstrap: {name} — no address or permit_number in field_map: "
+                  f"{field_map}", flush=True)
+            continue
+
+        print(f"[Autonomy] Bootstrap: {name} — re-discovered field_map: "
+              f"address={field_map.get('address')}, date={date_field}, "
+              f"permit_number={field_map.get('permit_number')}", flush=True)
 
         try:
             config = {
@@ -865,9 +888,17 @@ def bootstrap_existing_sources():
             total_loaded += len(normalized)
             print(f"[Autonomy] Bootstrap: {name}, {state}: {len(normalized)} permits "
                   f"({new_count} new, {updated_count} updated)", flush=True)
+            # V12.61: Update stored field_map and date_field since re-discovery worked
+            _conn = permitdb.get_connection()
+            _conn.execute(
+                "UPDATE city_sources SET field_map=?, date_field=? WHERE source_key=?",
+                (json.dumps(field_map), date_field, source_key)
+            )
+            _conn.commit()
         else:
-            print(f"[Autonomy] Bootstrap: {name}, {state}: 0 permits after normalization", flush=True)
-            # Don't deactivate — might just need better field mapping
+            print(f"[Autonomy] Bootstrap: {name}, {state}: 0 permits after normalization "
+                  f"(field_map={field_map})", flush=True)
+            # Don't deactivate — log field_map for debugging
 
         time.sleep(2)  # Be gentle on APIs
 
