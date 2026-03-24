@@ -109,7 +109,7 @@ def create_source_key(name, state, mode='city'):
 
 def throttle(peak_hours=True):
     """Rate limit between searches.
-    5 seconds during peak (7 AM - 11 PM ET), 1 second off-peak."""
+    V14: Accelerated — 2s peak, 0.5s off-peak (was 5s/1s)."""
     try:
         import pytz
         et = pytz.timezone('America/New_York')
@@ -117,9 +117,9 @@ def throttle(peak_hours=True):
     except ImportError:
         hour = datetime.now().hour
     if 7 <= hour <= 23:
-        time.sleep(5)
+        time.sleep(2)
     else:
-        time.sleep(1)
+        time.sleep(0.5)
 
 
 # US state abbreviation -> full name mapping for domain matching
@@ -968,8 +968,8 @@ def run_autonomy_engine():
 
 def run_search_cycle():
     """Process counties first, then cities. Single-pass each.
-    V12.54b: Caps at 50 successful onboards per cycle to protect server resources."""
-    MAX_ONBOARDS_PER_CYCLE = 50
+    V14: Raised cap from 50 to 200 onboards per cycle to accelerate toward 2000 cities."""
+    MAX_ONBOARDS_PER_CYCLE = 200
     onboard_count = 0
 
     stats = {
@@ -1021,14 +1021,13 @@ def run_search_cycle():
           f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities, "
           f"{onboard_count} onboards (cap: {MAX_ONBOARDS_PER_CYCLE})", flush=True)
 
-    # Sleep until next cycle. If we hit the cap, come back in 6 hours.
-    # If we didn't hit the cap (running low on targets), come back in 12 hours.
+    # V14: Accelerated cycle sleep — 2h if cap hit, 4h if targets exhausted (was 6h/12h)
     if onboard_count >= MAX_ONBOARDS_PER_CYCLE:
-        print(f"[Autonomy] Hit daily cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 6 hours.", flush=True)
-        time.sleep(21600)  # 6 hours
+        print(f"[Autonomy] Hit cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 2 hours.", flush=True)
+        time.sleep(7200)  # 2 hours
     else:
-        print(f"[Autonomy] Targets exhausted for now. Sleeping 12 hours.", flush=True)
-        time.sleep(43200)  # 12 hours
+        print(f"[Autonomy] Targets exhausted for now. Sleeping 4 hours.", flush=True)
+        time.sleep(14400)  # 4 hours
 
 
 def run_maintenance_cycle():

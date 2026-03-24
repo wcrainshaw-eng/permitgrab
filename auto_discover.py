@@ -27,7 +27,7 @@ if SOCRATA_APP_TOKEN:
 # V12.54b: Per-domain rate limiting
 _domain_last_request = {}
 _global_lock = threading.Lock()
-MIN_DOMAIN_INTERVAL = 1.0  # seconds between requests to same domain
+MIN_DOMAIN_INTERVAL = 0.3  # V14: Accelerated from 1.0s to 0.3s
 
 
 def rate_limit_domain(url):
@@ -436,10 +436,10 @@ def run_full_discovery(max_results=200):
     sources_failed = 0
 
     # Search Socrata Discovery API for permit-related datasets
-    for keyword in SEARCH_KEYWORDS[:5]:  # Use top 5 keywords
+    for keyword in SEARCH_KEYWORDS:  # V14: Use all keywords (was top 5)
         print(f"[Discovery] Searching for: {keyword}")
 
-        results, total = search_socrata_catalog(keyword, limit=50)
+        results, total = search_socrata_catalog(keyword, limit=100)  # V14: 100 results per keyword (was 50)
         print(f"[Discovery] Found {len(results)} results (total: {total})")
 
         for result in results:
