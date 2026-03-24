@@ -1594,11 +1594,16 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
     skipped_count = 0
     filtered_cities = []
-    for city_key in active_cities:
+    for city_info in active_cities:
+        # V13.3: Handle both dict format (SQLite) and string format (legacy)
+        if isinstance(city_info, dict):
+            city_key = city_info.get('source_key', '')
+        else:
+            city_key = city_info
         if failure_tracker.get(city_key, 0) >= 10:
             skipped_count += 1
         else:
-            filtered_cities.append(city_key)
+            filtered_cities.append(city_info)  # Keep original format for downstream
 
     if skipped_count > 0:
         print(f"  Skipping {skipped_count} cities with 10+ consecutive failures")
@@ -1811,6 +1816,15 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             failure_tracker = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         failure_tracker = {}
+
+    # V13.3: Clean up stale failure tracker entries
+    # Remove entries with 0 failures (useless) and entries for unknown sources
+    valid_source_keys = set(stats.keys())
+    stale_keys = [k for k, v in failure_tracker.items() if v == 0 or k not in valid_source_keys]
+    if stale_keys:
+        for k in stale_keys:
+            del failure_tracker[k]
+        print(f"[V13.3] Cleaned up {len(stale_keys)} stale failure tracker entries")
 
     # V12.2: Fixed failure tracker logic
     for key, s in stats.items():

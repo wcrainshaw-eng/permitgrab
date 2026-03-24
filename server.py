@@ -6086,72 +6086,75 @@ def scheduled_collection():
     last_discovery_run = None
 
     while True:
-        try:
-            print(f"[{datetime.now()}] V12.50: Running scheduled REFRESH collection...")
+        print(f"[{datetime.now()}] V12.50: Starting scheduled collection cycle...")
 
-            # V12.50: Use collect_refresh for delta collection
+        # V13.3: Each task has its own try/except so one failure doesn't block others
+        # Permit collection
+        try:
             from collector import collect_refresh, collect_permit_history
             collect_refresh(days_back=7)
             print(f"[{datetime.now()}] Refresh collection complete.")
-
-            # V12.50: Prune old permits (keep last 90 days)
-            try:
-                deleted = permitdb.delete_old_permits(days=90)
-                if deleted > 0:
-                    print(f"[{datetime.now()}] Pruned {deleted} old permits.")
-            except Exception as e:
-                print(f"[{datetime.now()}] Prune error: {e}")
-
-            # Violation collection (daily)
-            try:
-                from violation_collector import collect_all_violations
-                collect_all_violations(days_back=90)
-                print(f"[{datetime.now()}] Violation collection complete.")
-            except Exception as e:
-                print(f"[{datetime.now()}] Violation collection error: {e}")
-
-            # Signal collection (daily)
-            try:
-                from signal_collector import collect_all_signals
-                collect_all_signals(days_back=90)
-                print(f"[{datetime.now()}] Signal collection complete.")
-            except Exception as e:
-                print(f"[{datetime.now()}] Signal collection error: {e}")
-
-            # Permit history collection (weekly or first run)
-            now = datetime.now()
-            if last_history_run is None or (now - last_history_run).days >= 7:
-                try:
-                    collect_permit_history(years_back=1)
-                    last_history_run = now
-                    print(f"[{datetime.now()}] Permit history collection complete.")
-                except Exception as e:
-                    print(f"[{datetime.now()}] Permit history collection error: {e}")
-
-            # City health check (daily)
-            try:
-                from city_health import check_all_cities
-                check_all_cities()
-                print(f"[{datetime.now()}] City health check complete.")
-            except Exception as e:
-                print(f"[{datetime.now()}] City health check error: {e}")
-
-            # V13.2: Auto-discovery (daily) — find new permit data sources
-            now = datetime.now()
-            if last_discovery_run is None or (now - last_discovery_run).days >= 1:
-                try:
-                    from auto_discover import run_full_discovery
-                    new_sources = run_full_discovery()
-                    last_discovery_run = now
-                    print(f"[{datetime.now()}] Auto-discovery complete: {new_sources} new sources found.")
-                except ImportError:
-                    print(f"[{datetime.now()}] Auto-discovery skipped: run_full_discovery not implemented yet.")
-                except Exception as e:
-                    print(f"[{datetime.now()}] Auto-discovery error: {e}")
-
-            print(f"[{datetime.now()}] All collection tasks complete.")
         except Exception as e:
-            print(f"[{datetime.now()}] Collection error: {e}")
+            print(f"[{datetime.now()}] Permit collection error: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # V12.50: Prune old permits (keep last 90 days)
+        try:
+            deleted = permitdb.delete_old_permits(days=90)
+            if deleted > 0:
+                print(f"[{datetime.now()}] Pruned {deleted} old permits.")
+        except Exception as e:
+            print(f"[{datetime.now()}] Prune error: {e}")
+
+        # Violation collection (daily)
+        try:
+            from violation_collector import collect_all_violations
+            collect_all_violations(days_back=90)
+            print(f"[{datetime.now()}] Violation collection complete.")
+        except Exception as e:
+            print(f"[{datetime.now()}] Violation collection error: {e}")
+
+        # Signal collection (daily)
+        try:
+            from signal_collector import collect_all_signals
+            collect_all_signals(days_back=90)
+            print(f"[{datetime.now()}] Signal collection complete.")
+        except Exception as e:
+            print(f"[{datetime.now()}] Signal collection error: {e}")
+
+        # Permit history collection (weekly or first run)
+        now = datetime.now()
+        if last_history_run is None or (now - last_history_run).days >= 7:
+            try:
+                collect_permit_history(years_back=1)
+                last_history_run = now
+                print(f"[{datetime.now()}] Permit history collection complete.")
+            except Exception as e:
+                print(f"[{datetime.now()}] Permit history collection error: {e}")
+
+        # City health check (daily)
+        try:
+            from city_health import check_all_cities
+            check_all_cities()
+            print(f"[{datetime.now()}] City health check complete.")
+        except Exception as e:
+            print(f"[{datetime.now()}] City health check error: {e}")
+
+        # V13.2: Auto-discovery (daily) — find new permit data sources
+        now = datetime.now()
+        if last_discovery_run is None or (now - last_discovery_run).days >= 1:
+            try:
+                from auto_discover import run_full_discovery
+                new_sources = run_full_discovery()
+                last_discovery_run = now
+                print(f"[{datetime.now()}] Auto-discovery complete: {new_sources} new sources found.")
+            except ImportError:
+                print(f"[{datetime.now()}] Auto-discovery skipped: run_full_discovery not implemented yet.")
+            except Exception as e:
+                print(f"[{datetime.now()}] Auto-discovery error: {e}")
+
+        print(f"[{datetime.now()}] All collection tasks complete.")
 
         # V12.50: Sleep 6 hours (reduced from 24 — deltas are lightweight)
         time.sleep(21600)
