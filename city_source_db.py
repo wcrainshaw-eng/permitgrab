@@ -25,6 +25,9 @@ def get_active_cities():
                     d['field_map'] = json.loads(d['field_map'])
                 except (json.JSONDecodeError, TypeError):
                     d['field_map'] = {}
+            # V13.4: Bridge status/active key mismatch
+            if 'active' not in d and d.get('status') == 'active':
+                d['active'] = True
             results.append(d)
         return results
     # Fallback: city_configs.py
@@ -45,6 +48,10 @@ def get_city_config(source_key):
                 d['field_map'] = json.loads(d['field_map'])
             except (json.JSONDecodeError, TypeError):
                 d['field_map'] = {}
+        # V13.4: Bridge status/active key mismatch — DB uses "status"
+        # but fetch_permits/city_health check config.get("active", False)
+        if 'active' not in d and d.get('status') == 'active':
+            d['active'] = True
         return d
     # Fallback
     from city_configs import get_city_config as _legacy_get
