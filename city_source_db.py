@@ -220,18 +220,22 @@ def count_unsearched_cities():
 
 
 def log_discovery_run(run_type, stats):
-    """Log a discovery run to the audit table."""
+    """Log a discovery run to the audit table.
+    V12.60: Include started_at to prevent NOT NULL constraint failure."""
     conn = permitdb.get_connection()
-    conn.execute("""
-        INSERT INTO discovery_runs (run_type, completed_at, targets_searched,
-            sources_found, permits_loaded, cities_activated, errors)
-        VALUES (?, datetime('now'), ?, ?, ?, ?, ?)
-    """, (
-        run_type, stats.get('targets_searched', 0), stats.get('sources_found', 0),
-        stats.get('permits_loaded', 0), stats.get('cities_activated', 0),
-        json.dumps(stats.get('errors', []))
-    ))
-    conn.commit()
+    try:
+        conn.execute("""
+            INSERT INTO discovery_runs (run_type, started_at, completed_at,
+                targets_searched, sources_found, permits_loaded, cities_activated, errors)
+            VALUES (?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?)
+        """, (
+            run_type, stats.get('targets_searched', 0), stats.get('sources_found', 0),
+            stats.get('permits_loaded', 0), stats.get('cities_activated', 0),
+            json.dumps(stats.get('errors', []))
+        ))
+        conn.commit()
+    except Exception as e:
+        print(f"[Autonomy] log_discovery_run error: {e}", flush=True)
 
 
 def get_autonomy_status():

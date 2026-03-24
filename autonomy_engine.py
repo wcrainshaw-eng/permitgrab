@@ -180,10 +180,11 @@ STATE_PORTALS = {
 
 
 def is_domain_relevant(domain, county_name, state_abbrev):
-    """Check if a Socrata domain plausibly belongs to the target county/state.
+    """V12.60: Check if a Socrata domain plausibly belongs to the target county/state.
 
-    V12.56: More permissive — accept all .gov/.us domains (they're US government by definition).
-    Returns True if domain looks like it could be from the right jurisdiction.
+    STRICTER than V12.56: Instead of accepting ALL .gov/.us domains, we now
+    reject domains that clearly belong to a DIFFERENT city/state.
+    e.g., data.cityofnewyork.us is rejected when searching for Kalamazoo MI.
     """
     if not domain:
         return False
@@ -195,27 +196,49 @@ def is_domain_relevant(domain, county_name, state_abbrev):
         if domain_lower.endswith(tld):
             return False
 
-    # V12.56: Accept ALL .gov and .us domains — they're US government by definition
-    # The previous filter was too strict and rejected legitimate portals
-    if domain_lower.endswith('.gov') or domain_lower.endswith('.us'):
-        return True
-
-    # Accept: domain contains county name (e.g. data.kingcounty.gov)
-    county_slug = county_name.lower().replace(' ', '').replace('-', '')
-    if county_slug in domain_lower.replace('.', '').replace('-', ''):
-        return True
-
-    # Accept: domain contains state name or abbreviation
-    state_name = US_STATES.get(state_abbrev.upper(), '')
-    state_lower = state_abbrev.lower()
-    if state_name and state_name in domain_lower.replace('.', '').replace('-', ''):
-        return True
-
-    # Accept ArcGIS Hub domains
+    # Accept ArcGIS Hub domains (geography checked later via city_field)
     if 'arcgis' in domain_lower or 'hub.arcgis.com' in domain_lower:
         return True
 
-    # Reject everything else (foreign domains, commercial domains, etc.)
+    # Accept: domain contains county/city name (e.g. data.kingcounty.gov)
+    county_slug = county_name.lower().replace(' ', '').replace('-', '')
+    domain_slug = domain_lower.replace('.', '').replace('-', '')
+    if county_slug in domain_slug:
+        return True
+
+    # Accept: domain contains target state name or abbreviation
+    state_name = US_STATES.get(state_abbrev.upper(), '')
+    state_lower = state_abbrev.lower()
+    if state_name and state_name in domain_slug:
+        return True
+    # Check 2-letter abbreviation in domain parts (e.g., data.wa.gov)
+    domain_parts = domain_lower.split('.')
+    if state_lower in domain_parts:
+        return True
+
+    # V12.60: REJECT domains that contain a DIFFERENT city or state name.
+    # This prevents data.cityofnewyork.us from being used for Kalamazoo MI.
+    _OTHER_CITY_MARKERS = [
+        'newyork', 'losangeles', 'lacity', 'chicago', 'houston', 'phoenix',
+        'philadelphia', 'sanantonio', 'sandiego', 'dallas', 'austin',
+        'jacksonville', 'sanfrancisco', 'sfgov', 'columbus', 'charlotte',
+        'indianapolis', 'seattle', 'denver', 'boston', 'nashville',
+        'detroit', 'portland', 'memphis', 'louisville', 'baltimore',
+        'milwaukee', 'albuquerque', 'tucson', 'fresno', 'sacramento',
+        'mesa', 'kansascity', 'atlanta', 'omaha', 'miami', 'tulsa',
+        'minneapolis', 'stpaul', 'pittsburgh', 'stlouis', 'cincinnati',
+        'tampa', 'oakland', 'raleigh', 'arlington', 'anaheim',
+        'honolulu', 'santaana', 'riverside', 'stockton', 'irvine',
+    ]
+    for marker in _OTHER_CITY_MARKERS:
+        if marker in domain_slug and marker != county_slug:
+            return False
+
+    # Accept generic .gov and .us domains that don't belong to another city
+    if domain_lower.endswith('.gov') or domain_lower.endswith('.us'):
+        return True
+
+    # Reject everything else
     return False
 
 
@@ -349,6 +372,27 @@ def process_county(county):
         return {'found': False}
 
     # 2. Score and pick best — REQUIRE recent data
+    # V12.60 FIX: Skip datasets we've already tried (dedup by dataset_id)
+    import db as _permitdb
+    _dedup_conn = _permitdb.get_connection()
+    _existing_dataset_ids = set()
+    for _row in _dedup_conn.execute(
+        "SELECT DISTINCT dataset_id FROM city_sources WHERE dataset_id IS NOT NULL"
+    ).fetchall():
+        _existing_dataset_ids.add(_row[0])
+
+    _before_dedup = len(bulk_candidates)
+    bulk_candidates = [c for c in bulk_candidates
+                       if not c.get('dataset_id') or c['dataset_id'] not in _existing_dataset_ids]
+    if len(bulk_candidates) < _before_dedup:
+        print(f"[Autonomy] {name}, {state}: deduped {_before_dedup - len(bulk_candidates)} "
+              f"already-known datasets, {len(bulk_candidates)} remain", flush=True)
+
+    if not bulk_candidates:
+        print(f"[Autonomy] {name}, {state}: ALL candidates already known — skipping", flush=True)
+        update_county_status(fips, 'no_data', 'all_datasets_already_known')
+        return {'found': False}
+
     for c in bulk_candidates:
         sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
         c['sample'] = sample
@@ -583,6 +627,21 @@ def process_city(city):
         return {'found': False}
 
     # 2. Score
+    # V12.60 FIX: Skip datasets we've already tried (dedup by dataset_id)
+    _dedup_conn = permitdb.get_connection()
+    _existing_ids = set(row[0] for row in _dedup_conn.execute(
+        "SELECT DISTINCT dataset_id FROM city_sources WHERE dataset_id IS NOT NULL"
+    ).fetchall())
+    _pre = len(candidates)
+    candidates = [c for c in candidates
+                  if not c.get('dataset_id') or c['dataset_id'] not in _existing_ids]
+    if len(candidates) < _pre:
+        print(f"[Autonomy] {name}, {state}: deduped {_pre - len(candidates)} known datasets", flush=True)
+    if not candidates:
+        update_city_status(slug, 'no_data_available', 'all_datasets_already_known')
+        increment_search_attempts(slug)
+        return {'found': False}
+
     for c in candidates:
         if not c.get('columns'):
             if c['platform'] == 'socrata':
@@ -708,11 +767,125 @@ def process_city(city):
     return {'found': True, 'valid': True, 'permits': len(normalized)}
 
 
+def bootstrap_existing_sources():
+    """V12.60: One-time collection for pre-seeded sources that have never been collected.
+    These are city_sources entries (like NYC, Chicago, etc.) that were loaded
+    with valid endpoints and high scores but never had permits collected."""
+    conn = permitdb.get_connection()
+    uncollected = conn.execute("""
+        SELECT source_key, name, state, platform, endpoint, date_field,
+               field_map, city_field, mode, discovery_score
+        FROM city_sources
+        WHERE status = 'active'
+          AND total_permits_collected = 0
+          AND endpoint IS NOT NULL
+          AND endpoint != ''
+          AND discovery_score >= 60
+        ORDER BY discovery_score DESC
+        LIMIT 20
+    """).fetchall()
+
+    if not uncollected:
+        print("[Autonomy] Bootstrap: no uncollected sources to bootstrap", flush=True)
+        return
+
+    print(f"[Autonomy] Bootstrap: found {len(uncollected)} uncollected sources, collecting...", flush=True)
+    total_loaded = 0
+
+    for row in uncollected:
+        source = dict(row)
+        source_key = source['source_key']
+        name = source['name']
+        state = source['state']
+
+        # Parse field_map from JSON
+        field_map = source.get('field_map', '{}')
+        if isinstance(field_map, str):
+            try:
+                field_map = json.loads(field_map)
+            except (json.JSONDecodeError, TypeError):
+                field_map = {}
+
+        date_field = source.get('date_field') or field_map.get('date')
+        if not date_field:
+            print(f"[Autonomy] Bootstrap: {name} — no date_field, skipping", flush=True)
+            continue
+
+        try:
+            config = {
+                'endpoint': source['endpoint'],
+                'date_field': date_field,
+                'limit': 50000 if source['platform'] == 'socrata' else 2000,
+                'field_map': field_map,
+            }
+            if source['platform'] == 'socrata':
+                permits_raw = fetch_socrata(config, days_back=180)
+            elif source['platform'] == 'arcgis':
+                permits_raw = fetch_arcgis(config, days_back=180)
+            else:
+                continue
+        except Exception as e:
+            print(f"[Autonomy] Bootstrap: {name} fetch error: {e}", flush=True)
+            continue
+
+        # Normalize
+        normalized = []
+        for raw in permits_raw:
+            try:
+                raw_address = raw.get(field_map.get('address', ''), '')
+                clean_address = parse_address_value(raw_address)
+                permit = {
+                    'permit_number': raw.get(field_map.get('permit_number', ''), ''),
+                    'city': raw.get(source.get('city_field', ''), name) if source.get('city_field') else name,
+                    'state': state,
+                    'address': clean_address,
+                    'zip': str(raw.get(field_map.get('zip', ''), '')),
+                    'permit_type': raw.get(field_map.get('permit_type', ''), ''),
+                    'description': raw.get(field_map.get('description', ''), ''),
+                    'estimated_cost': _parse_cost(raw.get(field_map.get('estimated_cost', ''), 0)),
+                    'status': raw.get(field_map.get('status', ''), ''),
+                    'filing_date': raw.get(date_field, ''),
+                    'date': raw.get(date_field, ''),
+                    'contractor_name': raw.get(field_map.get('contractor_name', ''), ''),
+                    'owner_name': raw.get(field_map.get('owner_name', ''), ''),
+                }
+                permit['trade_category'] = classify_trade(
+                    permit.get('description', ''), permit.get('permit_type', ''))
+                permit['value_tier'] = score_value(permit.get('estimated_cost', 0))
+                if permit.get('permit_number') or permit.get('address'):
+                    if not permit['permit_number']:
+                        permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
+                    normalized.append(permit)
+            except Exception:
+                continue
+
+        if normalized:
+            new_count, updated_count = permitdb.upsert_permits(normalized, source_city_key=source_key)
+            record_collection(source_key, len(normalized))
+            total_loaded += len(normalized)
+            print(f"[Autonomy] Bootstrap: {name}, {state}: {len(normalized)} permits "
+                  f"({new_count} new, {updated_count} updated)", flush=True)
+        else:
+            print(f"[Autonomy] Bootstrap: {name}, {state}: 0 permits after normalization", flush=True)
+            # Don't deactivate — might just need better field mapping
+
+        time.sleep(2)  # Be gentle on APIs
+
+    print(f"[Autonomy] Bootstrap complete: {total_loaded} total permits loaded", flush=True)
+
+
 def run_autonomy_engine():
     """Main entry point. Runs as daemon thread in server.py."""
     # Wait for startup + initial collection
-    print(f"[{datetime.now()}] V12.54: Autonomy engine waiting 10 minutes for startup...", flush=True)
+    print(f"[{datetime.now()}] V12.60: Autonomy engine waiting 10 minutes for startup...", flush=True)
     time.sleep(600)
+
+    # V12.60: One-time bootstrap for pre-seeded sources
+    try:
+        bootstrap_existing_sources()
+    except Exception as e:
+        print(f"[Autonomy] Bootstrap error: {e}", flush=True)
+        traceback.print_exc()
 
     while True:
         try:
