@@ -189,6 +189,25 @@ def is_domain_relevant(domain, county_name, state_abbrev):
     if not domain:
         return False
 
+    # V12.62: Reject domains containing other US state abbreviations
+    # e.g., "data.montgomerycountymd.gov" contains "md" for Maryland
+    US_STATE_ABBREVS = {
+        'al','ak','az','ar','ca','co','ct','de','fl','ga','hi','id','il','in',
+        'ia','ks','ky','la','me','md','ma','mi','mn','ms','mo','mt','ne','nv',
+        'nh','nj','nm','ny','nc','nd','oh','ok','or','pa','ri','sc','sd','tn',
+        'tx','ut','vt','va','wa','wv','wi','wy','dc'
+    }
+    if state_abbrev:
+        domain_check = domain.lower()
+        target_abbrev = state_abbrev.lower()
+        # Check if domain contains a different state abbreviation at a boundary
+        import re
+        for abbrev in US_STATE_ABBREVS:
+            if abbrev != target_abbrev:
+                # Check for state abbrev at domain boundary (after dot, before dot, or at end)
+                if re.search(rf'(?:^|[.\-/]){abbrev}(?:[.\-/]|gov|$)', domain_check):
+                    return False
+
     domain_lower = domain.lower()
 
     # Reject foreign TLDs (e.g. data.edmonton.ca is Canadian)
@@ -502,6 +521,7 @@ def process_county(county):
 
     # Normalize permits
     normalized = []
+    normalize_errors = type('', (), {})()  # V12.62: simple object for error tracking
     for raw in permits_raw:
         try:
             # V12.55c: Parse Socrata location objects into clean addresses
@@ -535,7 +555,7 @@ def process_county(county):
             }
             # V12.54b: Classify trade and value tier (same as collector.py)
             permit['trade_category'] = classify_trade(
-                permit.get('description', ''), permit.get('permit_type', ''))
+                f"{permit.get('description', '')} {permit.get('permit_type', '')}")
             permit['value_tier'] = score_value(permit.get('estimated_cost', 0))
             # Must have permit_number or address to be useful
             if permit.get('permit_number') or permit.get('address'):
@@ -543,7 +563,10 @@ def process_county(county):
                 if not permit['permit_number']:
                     permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
                 normalized.append(permit)
-        except Exception:
+        except Exception as e:
+            if not hasattr(normalize_errors, 'logged'):
+                print(f"[Autonomy] Normalization error (first of batch): {e}", flush=True)
+                normalize_errors.logged = True
             continue
 
     # Upsert to SQLite — DATA IS NOW LIVE ON THE SITE
@@ -710,6 +733,7 @@ def process_city(city):
 
     # Normalize
     normalized = []
+    normalize_errors = type('', (), {})()  # V12.62: simple object for error tracking
     for raw in permits_raw:
         try:
             # V12.55c: Parse Socrata location objects into clean addresses
@@ -742,13 +766,16 @@ def process_city(city):
             }
             # V12.54b: Classify trade and value tier (same as collector.py)
             permit['trade_category'] = classify_trade(
-                permit.get('description', ''), permit.get('permit_type', ''))
+                f"{permit.get('description', '')} {permit.get('permit_type', '')}")
             permit['value_tier'] = score_value(permit.get('estimated_cost', 0))
             if permit.get('permit_number') or permit.get('address'):
                 if not permit['permit_number']:
                     permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
                 normalized.append(permit)
-        except Exception:
+        except Exception as e:
+            if not hasattr(normalize_errors, 'logged'):
+                print(f"[Autonomy] Normalization error (first of batch): {e}", flush=True)
+                normalize_errors.logged = True
             continue
 
     if normalized:
@@ -853,6 +880,7 @@ def bootstrap_existing_sources():
 
         # Normalize
         normalized = []
+        normalize_errors = type('', (), {})()  # V12.62: simple object for error tracking
         for raw in permits_raw:
             try:
                 raw_address = raw.get(field_map.get('address', ''), '')
@@ -873,13 +901,16 @@ def bootstrap_existing_sources():
                     'owner_name': raw.get(field_map.get('owner_name', ''), ''),
                 }
                 permit['trade_category'] = classify_trade(
-                    permit.get('description', ''), permit.get('permit_type', ''))
+                    f"{permit.get('description', '')} {permit.get('permit_type', '')}")
                 permit['value_tier'] = score_value(permit.get('estimated_cost', 0))
                 if permit.get('permit_number') or permit.get('address'):
                     if not permit['permit_number']:
                         permit['permit_number'] = f"AUTO-{hash(str(raw)) % 10000000}"
                     normalized.append(permit)
-            except Exception:
+            except Exception as e:
+                if not hasattr(normalize_errors, 'logged'):
+                    print(f"[Autonomy] Normalization error (first of batch): {e}", flush=True)
+                    normalize_errors.logged = True
                 continue
 
         if normalized:
