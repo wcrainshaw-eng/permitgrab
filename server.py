@@ -29,6 +29,26 @@ app = Flask(__name__, static_folder='static', static_url_path='', template_folde
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 
+# V13.1: Jinja filter for human-readable date formatting
+@app.template_filter('format_date')
+def format_date_filter(date_str):
+    """Format date string to human-readable format: Mar 24, 2026"""
+    if not date_str:
+        return 'Date not available'
+    try:
+        # Handle ISO format dates
+        if isinstance(date_str, str):
+            # Check if it starts with a digit (valid date format)
+            if not date_str[0].isdigit():
+                return 'Date not available'
+            date_obj = datetime.strptime(date_str[:10], '%Y-%m-%d')
+        else:
+            date_obj = date_str
+        return date_obj.strftime('%b %d, %Y')  # Mar 24, 2026
+    except (ValueError, TypeError):
+        return 'Date not available'
+
+
 # V12.17: Google Search Console verification - MUST be registered first before any catch-alls
 @app.route('/google3ef154d70f8049a0.html')
 def google_verification():
@@ -1180,20 +1200,19 @@ import hashlib
 
 def calculate_lead_score(permit):
     """
-    V13: ABSOLUTE lead scoring — each permit scored independently.
-    Returns integer 40-99. No normalization across dataset.
+    V13.1: ABSOLUTE lead scoring with WIDER SPREAD for better differentiation.
+    Returns integer 0-100. No normalization across dataset.
 
-    Score breakdown (max 99 points):
-      A: Project value     0-30 pts (absolute brackets)
-      B: Recency          0-25 pts (days since filed)
-      C: Contact info     0-20 pts (phone/email/names)
-      D: Status           0-15 pts (issued > filed > pending)
-      E: Address quality  0-5 pts  (has street number)
-      F: Jitter           0-4 pts  (deterministic variety)
+    Score breakdown (max 100 points):
+      A: Project value     0-35 pts (absolute brackets)
+      B: Recency          0-30 pts (days since filed)
+      C: Address quality  0-15 pts (has street number)
+      D: Contact info     0-15 pts (phone/email/names)
+      E: Status           0-5 pts  (issued > pending > other)
     """
     score = 0.0
 
-    # A: Project value (0-30 pts) — ABSOLUTE brackets
+    # A: Project value (0-35 pts) — ABSOLUTE brackets with wider spread
     value = 0.0
     for key in ['estimated_cost', 'project_value', 'value']:
         v = permit.get(key)
@@ -1205,90 +1224,91 @@ def calculate_lead_score(permit):
                 pass
 
     if value <= 0:
-        score += 8    # Unknown — don't penalize too much
-    elif value < 50000:
+        score += 0    # V13.1: Missing = 0 (creates bigger gap)
+    elif value < 10000:
         score += 5
-    elif value < 100000:
+    elif value < 50000:
         score += 10
+    elif value < 100000:
+        score += 16
+    elif value < 200000:
+        score += 22
     elif value < 500000:
-        score += 15
-    elif value < 1000000:
-        score += 20
-    elif value < 5000000:
-        score += 25
+        score += 28
     else:
-        score += 30
+        score += 35   # $500K+ = max
 
-    # B: Recency (0-25 pts)
+    # B: Recency (0-30 pts) — V13.1: Invalid dates = 0, not default
     recency_added = False
     for key in ['filing_date', 'issued_date', 'date']:
         d = permit.get(key)
         if d:
             try:
                 if isinstance(d, str):
+                    # V13.1: Must start with digit to be a valid date
+                    if not d[0].isdigit():
+                        continue  # Skip non-date strings like "WROCCO"
                     d = datetime.strptime(d[:10], '%Y-%m-%d')
                 days_old = (datetime.now() - d).days
                 if days_old < 0:
                     score += 0    # Future date = bad data
-                elif days_old <= 1:
-                    score += 25
-                elif days_old <= 3:
-                    score += 20
                 elif days_old <= 7:
-                    score += 15
-                elif days_old <= 14:
-                    score += 10
+                    score += 30
                 elif days_old <= 30:
-                    score += 5
+                    score += 24
+                elif days_old <= 90:
+                    score += 18
+                elif days_old <= 180:
+                    score += 12
+                elif days_old <= 365:
+                    score += 6
                 else:
-                    score += 2
+                    score += 0    # V13.1: Older than 1 year = 0
                 recency_added = True
                 break
             except (ValueError, TypeError):
                 pass
-    if not recency_added:
-        score += 8  # No date = moderate default
+    # V13.1: No valid date = 0 (not 8), creates bigger differentiation
+    # recency_added stays False, score += 0 implied
 
-    # C: Contact info (0-20 pts)
-    if permit.get('contact_phone'):
-        score += 10
-    if permit.get('contact_email'):
-        score += 5
-    has_name = any(permit.get(k) for k in
-        ['contact_name', 'owner_name', 'contractor_name'])
-    if has_name:
-        score += 5
-
-    # D: Status (0-15 pts)
-    status = str(permit.get('status', '')).lower().strip()
-    status_map = {
-        'issued': 15, 'approved': 15, 'active': 13,
-        'permitted': 12, 'filed': 10, 'submitted': 10,
-        'under review': 8, 'in review': 8, 'pending': 6,
-        'plan review': 6, 'completed': 3, 'closed': 1,
-        'expired': 0, 'voided': 0, 'cancelled': 0
-    }
-    score += status_map.get(status, 7)
-
-    # E: Address quality (0-5 pts)
+    # C: Address quality (0-15 pts) — V13.1: Increased weight
     address = str(permit.get('address', '')).strip()
     if address and any(c.isdigit() for c in address):
-        score += 5   # Has street number
+        score += 15   # Has street number = full points
     elif address and len(address) > 5:
-        score += 2   # Has name but no number
+        score += 7    # Has name but no number
     # else 0
 
-    # F: Deterministic jitter (0-4 pts) for visual variety
-    pid = str(permit.get('id', permit.get('permit_number', id(permit))))
-    jitter = (int(hashlib.md5(pid.encode()).hexdigest()[:4], 16) % 40) / 10.0
-    score += jitter
+    # D: Contact info (0-15 pts) — V13.1: More granular
+    has_phone = bool(permit.get('contact_phone'))
+    has_email = bool(permit.get('contact_email'))
+    has_contractor = bool(permit.get('contractor_name'))
+    has_owner = bool(permit.get('owner_name'))
 
-    return max(40, min(99, round(score)))
+    if has_phone and has_email:
+        score += 15
+    elif has_phone or has_email:
+        score += 12
+    elif has_contractor:
+        score += 8
+    elif has_owner:
+        score += 5
+    # else 0
+
+    # E: Status (0-5 pts) — V13.1: Reduced weight, least important
+    status = str(permit.get('status', '')).lower().strip()
+    if status in ('issued', 'approved', 'active', 'permitted', 'finaled'):
+        score += 5
+    elif status in ('pending', 'in review', 'under review', 'plan review', 'filed', 'submitted'):
+        score += 3
+    # else 0
+
+    return max(0, min(100, round(score)))
 
 
 def add_lead_scores(permits):
     """
-    V13: Apply absolute lead scoring to each permit independently.
+    V13.1: Apply absolute lead scoring with wider spread.
     Also assigns lead_quality tier based on score.
     """
     if not permits:
@@ -1298,10 +1318,10 @@ def add_lead_scores(permits):
         score = calculate_lead_score(p)
         p['lead_score'] = score
 
-        # Determine quality tier
-        if score >= 85:
+        # V13.1: Adjusted thresholds for wider score distribution
+        if score >= 60:
             p['lead_quality'] = 'hot'
-        elif score >= 70:
+        elif score >= 40:
             p['lead_quality'] = 'warm'
         else:
             p['lead_quality'] = 'standard'

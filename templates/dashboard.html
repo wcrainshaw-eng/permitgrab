@@ -1966,6 +1966,8 @@ function updateStats(useFiltered = false) {
 // ===========================
 // FILTERS
 // ===========================
+let lastApiCity = '';  // V13.1: Track last API city to know when to refetch
+
 function applyFilters() {
   // V12.59: Don't run until data is loaded
   if (!dataReady) return;
@@ -1977,6 +1979,15 @@ function applyFilters() {
   const quality = document.getElementById('filter-quality').value;
   const search = document.getElementById('filter-search').value.toLowerCase();
 
+  // V13.1: If city changed, fetch fresh data from API instead of filtering in-memory
+  // This is critical because allPermits only contains one city's data initially
+  if (city !== lastApiCity) {
+    lastApiCity = city;
+    fetchPermitsWithFilters();
+    return;
+  }
+
+  // For non-city filter changes, filter the in-memory data (fast path)
   filteredPermits = allPermits.filter(p => {
     if (city && p.city !== city) return false;
     if (trade && p.trade_category !== trade) return false;
@@ -2013,6 +2024,62 @@ function applyFilters() {
   renderSidebar();
   updateResultsCount();
   updateStats(true); // V8: Update hero stats to reflect filters
+}
+
+// V13.1: Fetch permits from API with all current filter values
+async function fetchPermitsWithFilters() {
+  const city = document.getElementById('filter-city').value;
+  const trade = document.getElementById('filter-trade').value;
+  const value = document.getElementById('filter-value').value;
+  const status = document.getElementById('filter-status').value;
+  const quality = document.getElementById('filter-quality').value;
+  const search = document.getElementById('filter-search').value;
+
+  const params = new URLSearchParams();
+  if (city) params.set('city', city);
+  if (trade) params.set('trade', trade);
+  if (value) params.set('value', value);
+  if (status) params.set('status', status);
+  if (quality) params.set('quality', quality);
+  if (search) params.set('search', search);
+  params.set('page', '1');
+  params.set('per_page', '10000');  // Get all matching permits for client-side operations
+
+  try {
+    const resp = await fetch(`/api/permits?${params.toString()}`);
+    const data = await resp.json();
+
+    // Update the global permits array with fresh data
+    allPermits = data.permits || [];
+    filteredPermits = [...allPermits];
+    totalPermitsFromAPI = data.total || allPermits.length;
+
+    // Apply any client-side sorting
+    const sortBy = document.getElementById('filter-sort')?.value || 'score-desc';
+    filteredPermits.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.issue_date || b.filed_date || 0) - new Date(a.issue_date || a.filed_date || 0);
+        case 'oldest':
+          return new Date(a.issue_date || a.filed_date || 0) - new Date(b.issue_date || b.filed_date || 0);
+        case 'value-desc':
+          return (b.estimated_cost || 0) - (a.estimated_cost || 0);
+        case 'score-desc':
+          return (b.lead_score || 0) - (a.lead_score || 0);
+        default:
+          return 0;
+      }
+    });
+
+    currentPage = 1;
+    renderPermits();
+    renderSidebar();
+    updateResultsCount();
+    updateStats(true);
+  } catch (err) {
+    console.error('Error fetching permits:', err);
+    showToast('Error loading permits. Please try again.');
+  }
 }
 
 // Attach filter listeners
@@ -2381,6 +2448,10 @@ function formatPermitDate(dateStr) {
   if (!dateStr) return 'Date not available';
   try {
     const date = new Date(dateStr);
+    // V13.1: Check for invalid dates (e.g., "WROCCO" parses to Invalid Date)
+    if (isNaN(date.getTime())) {
+      return 'Date not available';
+    }
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -2400,7 +2471,7 @@ function formatPermitDate(dateStr) {
       return `Filed: ${formatted}`;
     }
   } catch (e) {
-    return dateStr;  // Return as-is if parsing fails
+    return 'Date not available';
   }
 }
 
@@ -2408,6 +2479,7 @@ function formatPermitDate(dateStr) {
 function isWithinDays(dateStr, days) {
   if (!dateStr) return false;
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return false;  // V13.1: Handle invalid dates
   const now = new Date();
   const diffMs = now - date;
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
