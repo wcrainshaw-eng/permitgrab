@@ -1611,9 +1611,32 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     print(f"Pulling permits from {len(active_cities)} direct city APIs (last {days_back} days)")
     print("=" * 60)
 
-    for i, city_key in enumerate(active_cities):
-        try:
+    # V13.2: Track collection stats for diagnostics
+    sources_attempted = 0
+    sources_succeeded = 0
+    sources_failed = 0
+
+    for i, city_info in enumerate(active_cities):
+        # V13.2: Handle both dict format (SQLite) and string format (legacy)
+        if isinstance(city_info, dict):
+            city_key = city_info.get('source_key')
+            config = city_info  # Already have full config from SQLite
+        else:
+            city_key = city_info
             config = get_city_config(city_key)
+
+        if not city_key:
+            print(f"  ⚠ Skipping source {i}: missing source_key")
+            continue
+
+        if not config:
+            print(f"  ⚠ Skipping {city_key}: no config found")
+            sources_failed += 1
+            continue
+
+        sources_attempted += 1
+
+        try:
             raw, fetch_status = fetch_permits(city_key, days_back)
             city_permits = []
 
@@ -1627,15 +1650,19 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
             all_permits.extend(city_permits)
 
+            # V13.2: Get display name (handles both dict and legacy config)
+            display_name = config.get("name", city_key) if config else city_key
+
             # V12.2: Use the ACTUAL fetch status, not always "success"
             if fetch_status == "success":
                 stats[city_key] = {
                     "raw": len(raw),
                     "normalized": len(city_permits),
-                    "city_name": config["name"],
+                    "city_name": display_name,
                     "status": "success" if len(city_permits) > 0 else "success_empty",
                 }
-                print(f"  ✓ {config['name']}: {len(city_permits)} permits")
+                print(f"  ✓ {display_name}: {len(city_permits)} permits")
+                sources_succeeded += 1
                 # V12.54: Track successful collection in SQLite
                 if len(city_permits) > 0:
                     try:
@@ -1647,17 +1674,18 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                 stats[city_key] = {
                     "raw": 0,
                     "normalized": 0,
-                    "city_name": config["name"] if config else city_key,
+                    "city_name": display_name,
                     "status": "skip",
                 }
             else:
                 stats[city_key] = {
                     "raw": 0,
                     "normalized": 0,
-                    "city_name": config["name"] if config else city_key,
+                    "city_name": display_name,
                     "status": fetch_status,
                 }
-                print(f"  ✗ {config['name'] if config else city_key}: FAILED ({fetch_status})")
+                print(f"  ✗ {display_name}: FAILED ({fetch_status})")
+                sources_failed += 1
                 # V12.54: Track failure in SQLite
                 try:
                     increment_failure(city_key, fetch_status)
@@ -1665,14 +1693,15 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                     pass
 
         except Exception as e:
-            config_name = config.get("name", city_key) if config else city_key
+            display_name = config.get("name", city_key) if config else city_key
             stats[city_key] = {
                 "raw": 0,
                 "normalized": 0,
-                "city_name": config_name,
+                "city_name": display_name,
                 "status": f"error: {str(e)[:100]}",
             }
             print(f"  ✗ {city_key}: {str(e)[:100]}")
+            sources_failed += 1
 
         # Rate limiting
         time.sleep(RATE_LIMIT_DELAY)
@@ -1695,6 +1724,15 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             print(f"  [Batch {(i+1)//BATCH_SIZE}: {len(all_permits)} permits after {i+1} cities]")
             print(f"  [Pausing {BATCH_PAUSE_SECONDS}s before next batch...]")
             time.sleep(BATCH_PAUSE_SECONDS)
+
+    # V13.2: Summary logging for diagnostics
+    print("\n" + "-" * 60)
+    print(f"[V13.2] CITY COLLECTION SUMMARY:")
+    print(f"  Sources attempted: {sources_attempted}")
+    print(f"  Sources succeeded: {sources_succeeded} ({sources_succeeded*100//max(1,sources_attempted)}%)")
+    print(f"  Sources failed:    {sources_failed}")
+    print(f"  Permits collected: {len(all_permits)}")
+    print("-" * 60)
 
     # V12.22: Deduplicate permits by permit_number
     # County datasets split by city_filter can cause the same permit to appear

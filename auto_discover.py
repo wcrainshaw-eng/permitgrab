@@ -410,3 +410,118 @@ def auto_fix_field_map(sample):
         return None
     columns = list(sample[0].keys())
     return generate_field_map(columns)
+
+
+# ============================================================================
+# V13.2: FULL DISCOVERY ENGINE
+# ============================================================================
+
+def run_full_discovery(max_results=200):
+    """
+    V13.2: Run a full discovery cycle to find new permit data sources.
+
+    Searches the Socrata Discovery API for building permit datasets,
+    evaluates their quality, generates field maps, and inserts new
+    sources into the city_sources table.
+
+    Returns:
+        int: Number of new sources added
+    """
+    import db as permitdb
+    from city_source_db import upsert_city_source, get_city_config
+
+    print(f"[Discovery] V13.2: Starting full discovery cycle...")
+    new_sources_added = 0
+    sources_skipped = 0
+    sources_failed = 0
+
+    # Search Socrata Discovery API for permit-related datasets
+    for keyword in SEARCH_KEYWORDS[:5]:  # Use top 5 keywords
+        print(f"[Discovery] Searching for: {keyword}")
+
+        results, total = search_socrata_catalog(keyword, limit=50)
+        print(f"[Discovery] Found {len(results)} results (total: {total})")
+
+        for result in results:
+            try:
+                resource = result.get('resource', {})
+                metadata = result.get('metadata', {})
+
+                dataset_id = resource.get('id')
+                domain = metadata.get('domain', '')
+                name = resource.get('name', '')
+                columns = resource.get('columns_field_name', [])
+
+                if not dataset_id or not domain:
+                    continue
+
+                # Generate source_key
+                source_key = f"{domain}_{dataset_id}"
+
+                # Skip if already exists
+                existing = get_city_config(source_key)
+                if existing:
+                    sources_skipped += 1
+                    continue
+
+                # Score the dataset
+                score = score_dataset(columns, name=name)
+                if score < 50:  # Skip low-quality datasets
+                    continue
+
+                # Generate field map
+                field_map = generate_field_map(columns)
+                if not field_map.get('address'):
+                    continue  # Must have address field
+
+                # Build endpoint URL
+                endpoint = f"https://{domain}/resource/{dataset_id}.json"
+
+                # Extract city/state from metadata if available
+                city_name = name.split(' - ')[0] if ' - ' in name else name.split(',')[0]
+                city_name = city_name.replace(' Building Permits', '').replace(' Permits', '').strip()
+
+                # Create source config
+                source_config = {
+                    'source_key': source_key,
+                    'name': city_name[:50],  # Truncate long names
+                    'state': '',  # Will be populated by first collection
+                    'platform': 'socrata',
+                    'mode': 'city',
+                    'endpoint': endpoint,
+                    'dataset_id': dataset_id,
+                    'field_map': field_map,
+                    'date_field': field_map.get('date') or field_map.get('filing_date'),
+                    'status': 'active',
+                    'discovery_score': score,
+                }
+
+                # Insert into city_sources
+                upsert_city_source(source_config)
+                new_sources_added += 1
+                print(f"[Discovery] ✓ Added: {city_name} ({source_key}) score={score}")
+
+            except Exception as e:
+                sources_failed += 1
+                print(f"[Discovery] ✗ Error processing result: {str(e)[:100]}")
+
+        # Rate limit between keyword searches
+        time.sleep(2)
+
+        # Stop if we've added enough
+        if new_sources_added >= max_results:
+            break
+
+    # Log discovery run to database
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("""
+            INSERT INTO discovery_runs (run_type, completed_at, sources_found)
+            VALUES ('full', datetime('now'), ?)
+        """, (new_sources_added,))
+        conn.commit()
+    except Exception as e:
+        print(f"[Discovery] Warning: Failed to log run: {e}")
+
+    print(f"[Discovery] Complete: {new_sources_added} added, {sources_skipped} skipped, {sources_failed} failed")
+    return new_sources_added

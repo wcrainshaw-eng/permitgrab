@@ -6075,13 +6075,15 @@ def blog_post(slug):
 # SCHEDULED DATA COLLECTION
 # ===========================
 def scheduled_collection():
-    """V12.50: Run delta collection every 6 hours."""
+    """V12.50: Run delta collection every 6 hours. V13.2: Added auto-discovery."""
     # Wait for initial data to be ready (reduced from 30 — SQLite startup is instant)
     print(f"[{datetime.now()}] V12.50: Scheduled collector waiting 5 minutes for startup...")
     time.sleep(300)  # 5 minutes
 
     # Track when we last ran permit history (run weekly)
     last_history_run = None
+    # V13.2: Track when we last ran auto-discovery (run daily)
+    last_discovery_run = None
 
     while True:
         try:
@@ -6133,6 +6135,19 @@ def scheduled_collection():
                 print(f"[{datetime.now()}] City health check complete.")
             except Exception as e:
                 print(f"[{datetime.now()}] City health check error: {e}")
+
+            # V13.2: Auto-discovery (daily) — find new permit data sources
+            now = datetime.now()
+            if last_discovery_run is None or (now - last_discovery_run).days >= 1:
+                try:
+                    from auto_discover import run_full_discovery
+                    new_sources = run_full_discovery()
+                    last_discovery_run = now
+                    print(f"[{datetime.now()}] Auto-discovery complete: {new_sources} new sources found.")
+                except ImportError:
+                    print(f"[{datetime.now()}] Auto-discovery skipped: run_full_discovery not implemented yet.")
+                except Exception as e:
+                    print(f"[{datetime.now()}] Auto-discovery error: {e}")
 
             print(f"[{datetime.now()}] All collection tasks complete.")
         except Exception as e:
