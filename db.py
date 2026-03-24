@@ -236,6 +236,27 @@ def upsert_permits(permits, source_city_key=None):
             if isinstance(val, (dict, list)):
                 permit[key] = str(val)
 
+        # V13.2: Validate date fields - clear if they don't look like dates
+        # This fixes Mesa issue where reviewer names ("WROCCO") were stored as filing_date
+        for date_field in ['filing_date', 'issued_date', 'date']:
+            date_val = permit.get(date_field)
+            if date_val and isinstance(date_val, str):
+                # Valid dates start with digit (e.g., "2026-03-24" or "03/24/2026")
+                if not date_val[0].isdigit():
+                    permit[date_field] = None
+
+        # V13.2: Validate estimated_cost - clear suspicious placeholder values
+        # Common bad values: exactly $50M or $100M (likely parsing errors or defaults)
+        cost = permit.get('estimated_cost')
+        if cost:
+            try:
+                cost_float = float(cost)
+                # Clear exact round millions that are likely placeholders
+                if cost_float in (50000000, 100000000, 50000000.0, 100000000.0):
+                    permit['estimated_cost'] = None
+            except (ValueError, TypeError):
+                pass
+
     conn = get_connection()
     now = datetime.now().isoformat()
     new_count = 0
@@ -403,6 +424,51 @@ def delete_old_permits(days=90):
     if deleted > 0:
         print(f"[DB] Pruned {deleted} permits older than {days} days")
     return deleted
+
+
+def cleanup_invalid_dates():
+    """
+    V13.2: Fix permits with invalid date fields (e.g., reviewer names like "WROCCO").
+    Sets filing_date/issued_date/date to NULL if they don't start with a digit.
+    This is a one-time cleanup for existing bad data (e.g., Mesa AZ permits).
+
+    Returns:
+        dict with counts of fixed records per field
+    """
+    conn = get_connection()
+    fixed = {}
+
+    for field in ['filing_date', 'issued_date', 'date']:
+        # Find and fix records where date field doesn't start with digit
+        cursor = conn.execute(f"""
+            UPDATE permits
+            SET {field} = NULL
+            WHERE {field} IS NOT NULL
+              AND {field} != ''
+              AND SUBSTR({field}, 1, 1) NOT GLOB '[0-9]'
+        """)
+        conn.commit()
+        fixed[field] = cursor.rowcount
+        if cursor.rowcount > 0:
+            print(f"[DB] V13.2: Cleaned {cursor.rowcount} invalid {field} values")
+
+    total = sum(fixed.values())
+    if total > 0:
+        print(f"[DB] V13.2: Total date cleanup: {total} records fixed")
+
+    # V13.2: Also clean up suspicious cost values (exact $50M or $100M = likely placeholders)
+    cost_cursor = conn.execute("""
+        UPDATE permits
+        SET estimated_cost = NULL
+        WHERE estimated_cost IN (50000000, 100000000)
+    """)
+    conn.commit()
+    cost_fixed = cost_cursor.rowcount
+    if cost_fixed > 0:
+        print(f"[DB] V13.2: Cleaned {cost_fixed} suspicious cost values ($50M/$100M placeholders)")
+        fixed['estimated_cost'] = cost_fixed
+
+    return fixed
 
 
 # ---------------------------------------------------------------------------

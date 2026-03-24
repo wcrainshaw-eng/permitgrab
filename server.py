@@ -1171,6 +1171,10 @@ def preload_data_from_disk():
     global _initial_data_loaded
 
     permitdb.init_db()
+
+    # V13.2: Clean up invalid date fields (e.g., Mesa permits with reviewer names)
+    permitdb.cleanup_invalid_dates()
+
     stats = permitdb.get_permit_stats()
     print(f"[Server] V12.51: SQLite ready - {stats['total_permits']} permits, {stats['city_count']} cities")
     _initial_data_loaded = True
@@ -2083,6 +2087,23 @@ def api_permits():
         else:
             trade_name = trade  # Use as-is if not a valid slug
 
+    # V13.2: SQL ORDER BY prioritizes data quality so "All Cities" default shows
+    # best data first, not just Mesa permits with garbage dates (which sort high
+    # lexicographically because "WROCCO" > "2026-03-24").
+    #
+    # Priority: high cost → valid date → has address → has contact → recent date
+    # This ensures Austin (85 pts) and Chicago (72 pts) surface before Mesa (28 pts).
+    data_quality_order = """
+        CASE WHEN estimated_cost > 100000 THEN 0
+             WHEN estimated_cost > 10000 THEN 1
+             WHEN estimated_cost > 0 THEN 2
+             ELSE 3 END,
+        CASE WHEN filing_date GLOB '[0-9][0-9][0-9][0-9]-*' THEN 0 ELSE 1 END,
+        CASE WHEN address IS NOT NULL AND address != '' THEN 0 ELSE 1 END,
+        CASE WHEN contractor_name IS NOT NULL OR contact_phone IS NOT NULL THEN 0 ELSE 1 END,
+        filing_date DESC
+    """
+
     # V12.50: Query SQLite database (replaces loading 100K permits into memory)
     permits, total = permitdb.query_permits(
         city=city_name,
@@ -2092,7 +2113,7 @@ def api_permits():
         search=search or None,
         page=page,
         per_page=per_page,
-        order_by='filing_date DESC'
+        order_by=data_quality_order
     )
 
     # Add lead scores to page results
