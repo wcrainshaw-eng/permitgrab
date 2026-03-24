@@ -1879,7 +1879,8 @@ function populateFilters() {
   });
 
   // V9 Fix 5: Apply user's default filter preferences from onboarding
-  if (defaultCity && cities.includes(defaultCity)) {
+  // V12.63: Fix ReferenceError — use cityStateMap.has() instead of undefined cities array
+  if (defaultCity && cityStateMap.has(defaultCity)) {
     citySelect.value = defaultCity;
   }
   if (defaultTrade && trades.includes(defaultTrade)) {
