@@ -617,16 +617,24 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
     if cost > 50_000_000:
         cost = 50_000_000
 
-    # Parse date
-    date_str = get_field("filing_date")
+    # Parse date — V15: Try filing_date, then date, then issued_date field_map keys
+    date_str = get_field("filing_date") or get_field("date") or get_field("issued_date")
     parsed_date = ""
     if date_str:
-        for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+        # Check if it's an epoch timestamp (milliseconds)
+        if str(date_str).isdigit() and len(str(date_str)) >= 10:
             try:
-                parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
-                break
-            except ValueError:
-                continue
+                epoch_ms = int(date_str)
+                parsed_date = datetime.fromtimestamp(epoch_ms / 1000).strftime("%Y-%m-%d")
+            except (ValueError, OSError):
+                pass
+        if not parsed_date:
+            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+                try:
+                    parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    continue
         # V12.58: Handle single-digit M/D/YYYY (e.g., San Jose CKAN: "9/9/2025")
         if not parsed_date and '/' in str(date_str):
             try:
@@ -668,6 +676,8 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
         "address": sanitize_string(address),
         "zip": sanitize_string(get_field("zip")),
         "filing_date": parsed_date,
+        "date": parsed_date,  # V15: populate both date columns
+        "issued_date": parsed_date,  # V15: populate all date columns
         "status": sanitize_string(get_field("status")),
         "estimated_cost": cost,
         "value_tier": value_tier,
@@ -836,8 +846,8 @@ def normalize_permit(raw_record, city_key):
     if cost > MAX_REASONABLE_COST:
         cost = MAX_REASONABLE_COST
 
-    # Parse date
-    date_str = get_field("filing_date")
+    # Parse date — V15: Try filing_date, then date, then issued_date field_map keys
+    date_str = get_field("filing_date") or get_field("date") or get_field("issued_date")
     parsed_date = ""
     if date_str:
         # Check if it's an epoch timestamp (milliseconds)
@@ -901,6 +911,8 @@ def normalize_permit(raw_record, city_key):
         "address": sanitize_string(address),
         "zip": sanitize_string(get_field("zip")),
         "filing_date": parsed_date,
+        "date": parsed_date,  # V15: populate both date columns
+        "issued_date": parsed_date,  # V15: populate all date columns
         "status": sanitize_string(get_field("status")),
         "estimated_cost": cost,
         "value_tier": value_tier,

@@ -109,7 +109,7 @@ def create_source_key(name, state, mode='city'):
 
 def throttle(peak_hours=True):
     """Rate limit between searches.
-    V14: Accelerated — 2s peak, 0.5s off-peak (was 5s/1s)."""
+    V15: Cranked to 11 — 0.5s peak, 0.1s off-peak."""
     try:
         import pytz
         et = pytz.timezone('America/New_York')
@@ -117,7 +117,7 @@ def throttle(peak_hours=True):
     except ImportError:
         hour = datetime.now().hour
     if 7 <= hour <= 23:
-        time.sleep(2)
+        time.sleep(0.5)
     else:
         time.sleep(0.1)
 
@@ -939,8 +939,8 @@ def bootstrap_existing_sources():
 def run_autonomy_engine():
     """Main entry point. Runs as daemon thread in server.py."""
     # Wait for startup + initial collection
-    print(f"[{datetime.now()}] V12.60: Autonomy engine waiting 10 minutes for startup...", flush=True)
-    time.sleep(30)  # V14b: was 600
+    print(f"[{datetime.now()}] V15: Autonomy engine starting in 10 seconds...", flush=True)
+    time.sleep(10)  # V15: was 30
 
     # V12.60: One-time bootstrap for pre-seeded sources
     try:
@@ -967,8 +967,8 @@ def run_autonomy_engine():
 
 def run_search_cycle():
     """Process counties first, then cities. Single-pass each.
-    V14: Raised cap from 50 to 200 onboards per cycle to accelerate toward 2000 cities."""
-    MAX_ONBOARDS_PER_CYCLE = 200
+    V15: No cap — process everything available in one continuous cycle."""
+    MAX_ONBOARDS_PER_CYCLE = 9999  # V15: effectively unlimited
     onboard_count = 0
 
     stats = {
@@ -1020,13 +1020,13 @@ def run_search_cycle():
           f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities, "
           f"{onboard_count} onboards (cap: {MAX_ONBOARDS_PER_CYCLE})", flush=True)
 
-    # V14b: Aggressive cycle sleep — 30min if cap hit, 1h if targets exhausted
+    # V15: No sleep between cycles — continuous processing
     if onboard_count >= MAX_ONBOARDS_PER_CYCLE:
-        print(f"[Autonomy] Hit cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 30 min.", flush=True)
-        time.sleep(1800)  # 30 min
+        print(f"[Autonomy] Hit cap ({MAX_ONBOARDS_PER_CYCLE}). Continuing immediately.", flush=True)
+        time.sleep(5)  # V15: just a breath, then keep going
     else:
-        print(f"[Autonomy] Targets exhausted for now. Sleeping 1 hour.", flush=True)
-        time.sleep(3600)  # 1 hour
+        print(f"[Autonomy] Targets exhausted for now. Sleeping 5 min then retrying.", flush=True)
+        time.sleep(300)  # 5 min — only when truly nothing left to search
 
 
 def run_maintenance_cycle():
