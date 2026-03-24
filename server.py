@@ -2222,7 +2222,7 @@ def api_subscribe():
         return jsonify({'error': 'Email required'}), 400
 
     email = data['email'].strip().lower()
-    city = data.get('city', '')
+    city = data.get('city', '').strip().title()  # V12.64: Normalize to titlecase
     trade = data.get('trade', '')
 
     # Check if user already exists

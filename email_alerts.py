@@ -280,8 +280,14 @@ def get_permits_for_digest(cities, since_date, limit=25):
 
     conn = permitdb.get_connection()
 
+    # V12.64: Normalize city names to titlecase for case-insensitive matching
+    # User subscriptions may store "atlanta" but permits have "Atlanta"
+    cities_normalized = [c.strip().title() for c in cities if c]
+    if not cities_normalized:
+        return []
+
     # Build city filter
-    placeholders = ','.join('?' * len(cities))
+    placeholders = ','.join('?' * len(cities_normalized))
     query = f"""
         SELECT * FROM permits
         WHERE city IN ({placeholders})
@@ -289,7 +295,7 @@ def get_permits_for_digest(cities, since_date, limit=25):
         ORDER BY filing_date DESC, estimated_cost DESC
         LIMIT ?
     """
-    params = list(cities) + [since_date, limit]
+    params = cities_normalized + [since_date, limit]
 
     cursor = conn.execute(query, params)
     return [dict(row) for row in cursor]
@@ -398,9 +404,13 @@ def send_daily_digest_to_user(user):
     if not cities:
         return False, "no_cities"
 
-    # V12.57d: Look back 7 days instead of 1 to catch permits with delayed filing data.
-    # The query now uses filing_date only (no collected_at), so this window matters.
-    since = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    # V12.64: Use last_digest_sent_at to avoid sending duplicate permits.
+    # Only show permits filed AFTER the last digest was sent.
+    # Fall back to 7-day window for new users who haven't received a digest yet.
+    if user.last_digest_sent_at:
+        since = user.last_digest_sent_at.strftime('%Y-%m-%d')
+    else:
+        since = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     is_pro = user.plan in ('professional', 'pro', 'enterprise')
     limit = 50 if is_pro else 20  # Fetch more, display limited
 
