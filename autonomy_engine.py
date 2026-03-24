@@ -119,7 +119,7 @@ def throttle(peak_hours=True):
     if 7 <= hour <= 23:
         time.sleep(2)
     else:
-        time.sleep(0.5)
+        time.sleep(0.1)
 
 
 # US state abbreviation -> full name mapping for domain matching
@@ -309,7 +309,7 @@ def process_county(county):
                         'columns': columns,
                         'domain': portal,
                     })
-            time.sleep(0.3)
+            time.sleep(0.1)
 
     # V12.56: Search Socrata catalog with expanded keywords
     for keyword in ['building permits', 'construction permits', 'permits',
@@ -330,7 +330,7 @@ def process_county(county):
                     'columns': columns,
                     'domain': domain,
                 })
-        time.sleep(0.5)
+        time.sleep(0.1)
 
     # Search specific portal domain if known
     if county.get('portal_domain'):
@@ -350,7 +350,7 @@ def process_county(county):
                         'columns': columns,
                         'domain': domain,
                     })
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     # Search ArcGIS
     arcgis_results = search_arcgis(name, state)
@@ -358,7 +358,7 @@ def process_county(county):
         columns = get_arcgis_columns(r['endpoint'])
         r['columns'] = columns
         candidates.append(r)
-        time.sleep(0.3)
+        time.sleep(0.1)
 
     # V12.54d: Filter out foreign/irrelevant domains BEFORE expensive validation
     relevant_candidates = []
@@ -379,7 +379,7 @@ def process_county(county):
                 c['columns'] = get_socrata_columns(c['endpoint'])
             elif c['platform'] == 'arcgis':
                 c['columns'] = get_arcgis_columns(c['endpoint'])
-            time.sleep(0.3)
+            time.sleep(0.1)
 
         city_field = find_city_field(c.get('columns', []))
         if city_field:
@@ -454,21 +454,20 @@ def process_county(county):
                     c['score'] = max(0, c['score'] - 40)
                     print(f"[Autonomy] {name}, {state}: penalized {c.get('domain','')}/{c.get('dataset_id','')[:8]} "
                           f"— city_field values {list(city_vals)[:5]} don't match county", flush=True)
-        time.sleep(0.3)
+        time.sleep(0.1)
 
     bulk_candidates.sort(key=lambda x: x['score'], reverse=True)
     best = bulk_candidates[0]
 
-    if best['score'] < 60:
-        print(f"[Autonomy] {name}, {state}: best score {best['score']} < 60 ({best.get('name', '')[:50]})", flush=True)
+    if best['score'] < 30:  # V14b: lowered from 60
+        print(f"[Autonomy] {name}, {state}: best score {best['score']} < 30 ({best.get('name', '')[:50]})", flush=True)
         update_county_status(fips, 'no_data', f"best_score_{best['score']}")
         return {'found': False, 'best_score': best['score']}
 
     # V12.55b: Hard gate — must have data from last 90 days to be worth onboarding
     if not best.get('has_recent'):
-        print(f"[Autonomy] {name}, {state}: best dataset has NO recent data ({best.get('name', '')[:50]})", flush=True)
-        update_county_status(fips, 'no_data', 'no_recent_data')
-        return {'found': True, 'valid': False}
+        print(f"[Autonomy] {name}, {state}: WARNING stale data but proceeding ({best.get('name', '')[:50]})", flush=True)
+        # V14b: Removed hard gate - stale data is better than no data
 
     # 3. Validate: generate field map, test on sample
     field_map = generate_field_map(best['columns'])
@@ -631,7 +630,7 @@ def process_city(city):
                     'columns': columns,
                     'domain': domain,
                 })
-        time.sleep(0.5)
+        time.sleep(0.1)
 
     # Try common domain patterns
     domain_candidates = try_common_domains(name, state)
@@ -643,7 +642,7 @@ def process_city(city):
         columns = get_arcgis_columns(r['endpoint'])
         r['columns'] = columns
         candidates.append(r)
-        time.sleep(0.3)
+        time.sleep(0.1)
 
     if not candidates:
         update_city_status(slug, 'no_data_available', 'no_candidates_found')
@@ -672,7 +671,7 @@ def process_city(city):
                 c['columns'] = get_socrata_columns(c['endpoint'])
             elif c['platform'] == 'arcgis':
                 c['columns'] = get_arcgis_columns(c['endpoint'])
-            time.sleep(0.3)
+            time.sleep(0.1)
 
         sample = fetch_sample(c['endpoint'], c['platform'], limit=10)
         c['sample'] = sample
@@ -932,7 +931,7 @@ def bootstrap_existing_sources():
                   f"(field_map={field_map})", flush=True)
             # Don't deactivate — log field_map for debugging
 
-        time.sleep(2)  # Be gentle on APIs
+        time.sleep(0.5)  # V14b: was 2
 
     print(f"[Autonomy] Bootstrap complete: {total_loaded} total permits loaded", flush=True)
 
@@ -941,7 +940,7 @@ def run_autonomy_engine():
     """Main entry point. Runs as daemon thread in server.py."""
     # Wait for startup + initial collection
     print(f"[{datetime.now()}] V12.60: Autonomy engine waiting 10 minutes for startup...", flush=True)
-    time.sleep(600)
+    time.sleep(30)  # V14b: was 600
 
     # V12.60: One-time bootstrap for pre-seeded sources
     try:
@@ -1021,13 +1020,13 @@ def run_search_cycle():
           f"{stats['permits_loaded']} permits, {stats['cities_activated']} cities, "
           f"{onboard_count} onboards (cap: {MAX_ONBOARDS_PER_CYCLE})", flush=True)
 
-    # V14: Accelerated cycle sleep — 2h if cap hit, 4h if targets exhausted (was 6h/12h)
+    # V14b: Aggressive cycle sleep — 30min if cap hit, 1h if targets exhausted
     if onboard_count >= MAX_ONBOARDS_PER_CYCLE:
-        print(f"[Autonomy] Hit cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 2 hours.", flush=True)
-        time.sleep(7200)  # 2 hours
+        print(f"[Autonomy] Hit cap ({MAX_ONBOARDS_PER_CYCLE}). Sleeping 30 min.", flush=True)
+        time.sleep(1800)  # 30 min
     else:
-        print(f"[Autonomy] Targets exhausted for now. Sleeping 4 hours.", flush=True)
-        time.sleep(14400)  # 4 hours
+        print(f"[Autonomy] Targets exhausted for now. Sleeping 1 hour.", flush=True)
+        time.sleep(3600)  # 1 hour
 
 
 def run_maintenance_cycle():

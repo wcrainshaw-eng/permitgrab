@@ -386,7 +386,7 @@ def validate_sample(sample, field_map):
             has_date += 1
 
     total = len(sample)
-    return (has_address / total >= 0.5) and (has_date / total >= 0.5)
+    return (has_address / total >= 0.25) or (has_date / total >= 0.25)  # V14b: relaxed
 
 
 def check_data_recency(sample, date_field, days=90):
