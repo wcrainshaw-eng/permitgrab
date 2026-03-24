@@ -1039,6 +1039,17 @@ footer a:hover { color: white; }
   .pagination { flex-wrap: wrap; gap: 8px; justify-content: center; }
   .page-btn { padding: 8px 12px; }
 
+  /* V13: Touch target improvements for mobile */
+  .contact-btn, .page-btn, .permit-history-toggle {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+  .filter-group select, .filter-group input {
+    min-height: 44px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
   /* Footer */
   .footer-inner { flex-direction: column; gap: 32px; }
 
@@ -1769,6 +1780,14 @@ let savedLeadIds = new Set();
 const defaultCity = '{{ default_city|default("", true) }}';
 const defaultTrade = '{{ default_trade|default("", true) }}';
 
+// V13: Server-side list of ALL cities with permits (555+ cities)
+// This ensures dropdown shows all cities, not just those in paginated API response
+const allDropdownCities = [
+  {% for city in all_dropdown_cities %}
+  { name: "{{ city.name }}", state: "{{ city.state|default('', true) }}", count: {{ city.permit_count|default(0) }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
 // ===========================
 // LOAD DATA
 // ===========================
@@ -1847,39 +1866,38 @@ function formatTimeAgo(dateStr) {
 }
 
 function populateFilters() {
-  // V12.55: Build city-state pairs, sort by state then city, display as "STATE - City"
-  const cityStateMap = new Map();
-  allPermits.forEach(p => {
-    if (p.city && !cityStateMap.has(p.city)) {
-      cityStateMap.set(p.city, p.state || '');
-    }
-  });
-  const cityEntries = [...cityStateMap.entries()].sort((a, b) => {
-    const stateCompare = (a[1] || 'ZZ').localeCompare(b[1] || 'ZZ');
+  // V13: Use server-side allDropdownCities (555+ cities) instead of deriving from paginated allPermits
+  // Sort by state then city name
+  const sortedCities = [...allDropdownCities].sort((a, b) => {
+    const stateCompare = (a.state || 'ZZ').localeCompare(b.state || 'ZZ');
     if (stateCompare !== 0) return stateCompare;
-    return a[0].localeCompare(b[0]);
+    return a.name.localeCompare(b.name);
   });
 
-  const trades = [...new Set(allPermits.map(p => p.trade_category))].sort();
-  const statuses = [...new Set(allPermits.map(p => p.status))].sort();
+  // Build cityStateMap for backward compatibility
+  const cityStateMap = new Map();
+  sortedCities.forEach(c => cityStateMap.set(c.name, c.state));
+
+  const trades = [...new Set(allPermits.map(p => p.trade_category))].filter(t => t).sort();
+  const statuses = [...new Set(allPermits.map(p => p.status))].filter(s => s).sort();
 
   const citySelect = document.getElementById('filter-city');
   const alertCity = document.getElementById('alert-city');
-  cityEntries.forEach(([city, state]) => {
-    const label = state ? `${state} - ${city}` : city;
-    citySelect.add(new Option(label, city));
-    alertCity.add(new Option(label, city));
+  // V13: Populate from server-side list of ALL cities
+  sortedCities.forEach(city => {
+    const label = city.state ? `${city.state} - ${city.name}` : city.name;
+    citySelect.add(new Option(label, city.name));
+    if (alertCity) alertCity.add(new Option(label, city.name));
   });
 
   const tradeSelect = document.getElementById('filter-trade');
   const alertTrade = document.getElementById('alert-trade');
   trades.forEach(t => {
     tradeSelect.add(new Option(t, t));
-    alertTrade.add(new Option(t, t));
+    if (alertTrade) alertTrade.add(new Option(t, t));
   });
 
   // V9 Fix 5: Apply user's default filter preferences from onboarding
-  // V12.63: Fix ReferenceError — use cityStateMap.has() instead of undefined cities array
   if (defaultCity && cityStateMap.has(defaultCity)) {
     citySelect.value = defaultCity;
   }
@@ -2050,15 +2068,15 @@ function renderPermits() {
     const isLocked = globalIdx >= freePreviewLimit;
     const tradeClass = getTradeClass(p.trade_category);
     const valueClass = p.value_tier === 'high' ? 'value-high' : p.value_tier === 'medium' ? 'value-medium' : 'value-low';
-    // V12.23: Format values with abbreviations, show "Not listed on permit" for missing or capped values
-    // If value equals exactly $50M (the MAX_REASONABLE_COST cap), show as "Not listed" since it's a capped outlier
-    const cost = p.estimated_cost && p.estimated_cost !== 50000000
+    // V13: Format values with abbreviations, show "Not reported" for missing, $0, or capped values
+    // If value equals exactly $50M (the MAX_REASONABLE_COST cap), show as "Not reported" since it's a capped outlier
+    const cost = p.estimated_cost && p.estimated_cost > 0 && p.estimated_cost !== 50000000
       ? (p.estimated_cost >= 1000000000
           ? '$' + (p.estimated_cost / 1000000000).toFixed(1) + 'B'
           : p.estimated_cost >= 1000000
             ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M'
             : '$' + p.estimated_cost.toLocaleString())
-      : '<span class="value-not-listed">Not listed on permit</span>';
+      : '<span class="value-not-listed">Not reported</span>';
     const leadScore = p.lead_score || 0;
     const leadQuality = p.lead_quality || 'standard';
     const scoreIcon = leadQuality === 'hot' ? '&#128293;' : leadQuality === 'warm' ? '&#128293;' : '';
@@ -2083,17 +2101,27 @@ function renderPermits() {
         <div class="permit-meta">
           <div class="permit-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            ${p.filing_date}
+            ${formatPermitDate(p.filing_date)}
           </div>
           <div class="permit-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-            ${escapeHtml(p.permit_type || 'N/A')}
+            ${escapeHtml(cleanPermitType(p.permit_type))}
           </div>
           <div class="permit-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            ${escapeHtml(p.status)}
+            ${escapeHtml(cleanStatus(p.status))}
           </div>
-          ${!isLocked && p.contact_name ? `
+          ${!isLocked && p.owner_name ? `
+          <div class="permit-meta-item contact-info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Owner: ${escapeHtml(p.owner_name)}
+          </div>` : ''}
+          ${!isLocked && p.contractor_name ? `
+          <div class="permit-meta-item contact-info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+            Contractor: ${escapeHtml(p.contractor_name)}
+          </div>` : ''}
+          ${!isLocked && p.contact_name && !p.owner_name && !p.contractor_name ? `
           <div class="permit-meta-item contact-info">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             ${escapeHtml(p.contact_name)}
@@ -2101,7 +2129,7 @@ function renderPermits() {
         </div>
         ${!isLocked ? `
         <div class="permit-contact">
-          ${p.contact_phone && isValidPhone(p.contact_phone) ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : '<span class="contact-btn" style="color: var(--gray-400); cursor: default;">No phone on file</span>'}
+          ${p.contact_phone && isValidPhone(p.contact_phone) ? `<a class="contact-btn primary" href="tel:${p.contact_phone}">${p.contact_phone}</a>` : p.contact_email ? `<a class="contact-btn primary" href="mailto:${escapeHtml(p.contact_email)}">${escapeHtml(p.contact_email)}</a>` : '<span class="contact-btn" style="color: var(--gray-400); cursor: default;">Phone not in source data</span>'}
           <button class="contact-btn save-lead-btn" data-save-permit="${p.permit_number}" onclick="savePermit('${p.permit_number}', this)"${savedLeadIds.has(p.permit_number) ? ' disabled style="background:#27AE60;color:white;border-color:#27AE60;"' : ''}>
             ${savedLeadIds.has(p.permit_number) ? '✓ Saved' : 'Save Lead'}
           </button>
@@ -2117,7 +2145,7 @@ function renderPermits() {
             <div><strong>Permit #:</strong> ${escapeHtml(p.permit_number)}</div>
             <div><strong>Type:</strong> ${escapeHtml(p.permit_type || 'N/A')}</div>
             <div><strong>Status:</strong> ${escapeHtml(p.status)}</div>
-            <div><strong>Filed:</strong> ${p.filing_date || 'N/A'}</div>
+            <div>${formatPermitDate(p.filing_date)}</div>
             ${p.issue_date ? `<div><strong>Issued:</strong> ${p.issue_date}</div>` : ''}
             <div><strong>Value:</strong> ${cost}</div>
             <div><strong>Lead Score:</strong> ${leadScore} pts (${leadQuality})</div>
@@ -2305,6 +2333,75 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// V13: Clean up permit type abbreviations and filter reviewer codes
+function cleanPermitType(typeStr) {
+  if (!typeStr) return 'N/A';
+  const str = typeStr.trim();
+
+  // Map common abbreviations
+  const abbrevMap = {
+    'COM': 'Commercial', 'RES': 'Residential', 'IND': 'Industrial',
+    'SFR': 'Single Family', 'MFR': 'Multi-Family', 'MIX': 'Mixed Use',
+    'BLDG': 'Building', 'ELEC': 'Electrical', 'PLMB': 'Plumbing',
+    'MECH': 'Mechanical', 'DEMO': 'Demolition', 'ALT': 'Alteration',
+    'ADD': 'Addition', 'NEW': 'New Construction'
+  };
+  const upper = str.toUpperCase();
+  if (abbrevMap[upper]) return abbrevMap[upper];
+
+  // Filter out all-caps reviewer codes (likely internal codes)
+  if (/^[A-Z]{2,10}$/.test(str) && str.length <= 10) {
+    return 'N/A';  // Hide cryptic codes like "TMARTIN"
+  }
+
+  return str;
+}
+
+// V13: Clean up status values
+function cleanStatus(statusStr) {
+  if (!statusStr) return 'N/A';
+  const str = statusStr.trim();
+
+  // Already shown as status badge, so if it's a duplicate value, hide it
+  const statusMap = {
+    'Issued': 'Issued', 'ISSUED': 'Issued',
+    'Permitted': 'Permitted', 'PERMITTED': 'Permitted',
+    'Approved': 'Approved', 'APPROVED': 'Approved',
+    'Pending': 'Pending', 'PENDING': 'Pending',
+    'Active': 'Active', 'ACTIVE': 'Active',
+    'Filed': 'Filed', 'FILED': 'Filed'
+  };
+  return statusMap[str] || str;
+}
+
+// V13: Format date with future date handling and relative time for recent permits
+function formatPermitDate(dateStr) {
+  if (!dateStr) return 'Date not available';
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const isFuture = diffDays < 0;
+    // Format as "Mar 24, 2026"
+    const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    if (isFuture) {
+      return `Expires: ${formatted}`;
+    } else if (diffDays === 0) {
+      return 'Filed: Today';
+    } else if (diffDays === 1) {
+      return 'Filed: Yesterday';
+    } else if (diffDays <= 7) {
+      return `Filed: ${diffDays} days ago`;
+    } else {
+      return `Filed: ${formatted}`;
+    }
+  } catch (e) {
+    return dateStr;  // Return as-is if parsing fails
+  }
 }
 
 // V12.17: Check if a date is within the last N days
@@ -2973,9 +3070,9 @@ async function togglePermitHistory(address, cardId) {
               <div class="date">${p.filing_date || 'N/A'}</div>
               ${p.contractor ? `<div class="contractor">${escapeHtml(p.contractor)}</div>` : ''}
             </div>
-            <div class="value">${p.estimated_cost && p.estimated_cost !== 50000000
+            <div class="value">${p.estimated_cost && p.estimated_cost > 0 && p.estimated_cost !== 50000000
               ? (p.estimated_cost >= 1000000 ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M' : '$' + p.estimated_cost.toLocaleString())
-              : '<span class="value-not-listed">Not listed on permit</span>'}</div>
+              : '<span class="value-not-listed">Not reported</span>'}</div>
           </div>
         `).join('')}
         ${history.permits.length > 10 ? `<div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">+ ${history.permits.length - 10} more permits</div>` : ''}

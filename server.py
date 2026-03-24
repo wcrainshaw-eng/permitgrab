@@ -1119,9 +1119,14 @@ def get_cities_by_state_auto(state_abbrev):
 
 
 def get_total_city_count_auto():
-    """V12.32: Get total count of all cities with permit data."""
-    discovered = discover_cities_from_permits()
-    return len(discovered)
+    """V13: Get total count of all unique cities in permit data from SQLite.
+    Previous version read from deprecated JSON file. Now queries DB directly."""
+    try:
+        city_rows = permitdb.get_cities_with_permits()
+        return len(city_rows)
+    except Exception as e:
+        print(f"[V13] Error getting city count: {e}")
+        return 160  # Fallback
 
 
 # V12.53: DEPRECATED - subscribers now stored in User model with digest_cities field
@@ -1173,185 +1178,124 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 import hashlib
 
 
-def calculate_lead_scores(permits):
+def calculate_lead_score(permit):
     """
-    V7 lead scoring with FORCED LINEAR SPREAD.
-    Takes a list of permit dicts, returns a list of integer scores.
-    Output range: 40-99, guaranteed by linear mapping.
+    V13: ABSOLUTE lead scoring — each permit scored independently.
+    Returns integer 40-99. No normalization across dataset.
 
-    PROOF: When raw == min(raws) → output = 40 + 0 = 40
-           When raw == max(raws) → output = 40 + 59 = 99
-    If the minimum output score is not 40, this function is not being called.
+    Score breakdown (max 99 points):
+      A: Project value     0-30 pts (absolute brackets)
+      B: Recency          0-25 pts (days since filed)
+      C: Contact info     0-20 pts (phone/email/names)
+      D: Status           0-15 pts (issued > filed > pending)
+      E: Address quality  0-5 pts  (has street number)
+      F: Jitter           0-4 pts  (deterministic variety)
     """
-    from datetime import datetime
+    score = 0.0
 
-    if not permits:
-        return []
-
-    if len(permits) == 1:
-        return [70]  # Single permit gets middle score
-
-    # PHASE 1: Compute a raw score for each permit
-    raw_scores = []
-    for p in permits:
-        raw = 0.0
-
-        # Component A: Project value (will be normalized in phase 2)
-        value = 0.0
-        for key in ['project_value', 'estimated_cost', 'value', 'cost', 'amount']:
-            v = p.get(key)
-            if v is not None:
-                try:
-                    value = float(str(v).replace('$', '').replace(',', ''))
-                    break
-                except (ValueError, TypeError):
-                    pass
-        # Store raw value; normalization happens in phase 2
-
-        # Component B: Recency (0-25 points)
-        recency = 12.0  # default if no date found
-        for key in ['filed_date', 'filing_date', 'date', 'created_date', 'issue_date']:
-            d = p.get(key)
-            if d:
-                try:
-                    if isinstance(d, str):
-                        d = datetime.strptime(d[:10], '%Y-%m-%d')
-                    days_old = (datetime.now() - d).days
-                    # V12.27: Penalize future-dated permits (bad source data)
-                    if days_old < 0:
-                        recency = 0.0  # Future dates get zero recency points
-                    else:
-                        recency = max(0.0, 25.0 - (days_old * 0.8))
-                    break
-                except (ValueError, TypeError):
-                    pass
-
-        # Component C: Status (0-15 points)
-        status_str = ''
-        for key in ['status', 'permit_status', 'state']:
-            s = p.get(key)
-            if s:
-                status_str = str(s).lower().strip()
+    # A: Project value (0-30 pts) — ABSOLUTE brackets
+    value = 0.0
+    for key in ['estimated_cost', 'project_value', 'value']:
+        v = permit.get(key)
+        if v is not None:
+            try:
+                value = float(str(v).replace('$', '').replace(',', ''))
                 break
-        status_scores = {
-            'filed': 15, 'new': 15, 'active': 13, 'issued': 11,
-            'approved': 11, 'permitted': 9, 'pending': 7, 'review': 7,
-            'in progress': 6, 'completed': 3, 'closed': 1, 'expired': 1
-        }
-        status_pts = status_scores.get(status_str, 7.0)
+            except (ValueError, TypeError):
+                pass
 
-        # Component D: Contact info (0-10 points)
-        has_phone = False
-        for key in ['phone', 'contact_phone', 'phone_number', 'tel']:
-            if p.get(key):
-                has_phone = True
+    if value <= 0:
+        score += 8    # Unknown — don't penalize too much
+    elif value < 50000:
+        score += 5
+    elif value < 100000:
+        score += 10
+    elif value < 500000:
+        score += 15
+    elif value < 1000000:
+        score += 20
+    elif value < 5000000:
+        score += 25
+    else:
+        score += 30
+
+    # B: Recency (0-25 pts)
+    recency_added = False
+    for key in ['filing_date', 'issued_date', 'date']:
+        d = permit.get(key)
+        if d:
+            try:
+                if isinstance(d, str):
+                    d = datetime.strptime(d[:10], '%Y-%m-%d')
+                days_old = (datetime.now() - d).days
+                if days_old < 0:
+                    score += 0    # Future date = bad data
+                elif days_old <= 1:
+                    score += 25
+                elif days_old <= 3:
+                    score += 20
+                elif days_old <= 7:
+                    score += 15
+                elif days_old <= 14:
+                    score += 10
+                elif days_old <= 30:
+                    score += 5
+                else:
+                    score += 2
+                recency_added = True
                 break
-        has_name = False
-        for key in ['contact_name', 'owner', 'owner_name', 'applicant', 'name']:
-            if p.get(key):
-                has_name = True
-                break
-        contact_pts = (5.0 if has_phone else 0.0) + (5.0 if has_name else 0.0)
+            except (ValueError, TypeError):
+                pass
+    if not recency_added:
+        score += 8  # No date = moderate default
 
-        # V12.9: Component D2: Address quality (0-10 points)
-        # Penalize permits without addresses - they're low-quality leads
-        address = p.get('address', '') or ''
-        address_clean = address.strip().lower()
-        if not address_clean or address_clean in ['not provided', 'address not provided', 'n/a', 'none', '']:
-            address_pts = 0.0
-        elif len(address_clean) < 10:  # Very short addresses (just area names)
-            address_pts = 3.0
-        elif any(char.isdigit() for char in address_clean):  # Has street number
-            address_pts = 10.0
-        else:  # Has address but no street number
-            address_pts = 5.0
+    # C: Contact info (0-20 pts)
+    if permit.get('contact_phone'):
+        score += 10
+    if permit.get('contact_email'):
+        score += 5
+    has_name = any(permit.get(k) for k in
+        ['contact_name', 'owner_name', 'contractor_name'])
+    if has_name:
+        score += 5
 
-        # Component E: Trade type (0-10 points)
-        trade_str = ''
-        for key in ['trade', 'permit_type', 'trade_category', 'type', 'work_type']:
-            t = p.get(key)
-            if t:
-                trade_str = str(t).lower()
-                break
-        high_value = ['electrical', 'hvac', 'plumbing', 'new construction', 'fire']
-        mid_value = ['roofing', 'interior', 'demolition', 'addition', 'structural']
-        if any(h in trade_str for h in high_value):
-            trade_pts = 10.0
-        elif any(m in trade_str for m in mid_value):
-            trade_pts = 7.0
-        else:
-            trade_pts = 4.0
+    # D: Status (0-15 pts)
+    status = str(permit.get('status', '')).lower().strip()
+    status_map = {
+        'issued': 15, 'approved': 15, 'active': 13,
+        'permitted': 12, 'filed': 10, 'submitted': 10,
+        'under review': 8, 'in review': 8, 'pending': 6,
+        'plan review': 6, 'completed': 3, 'closed': 1,
+        'expired': 0, 'voided': 0, 'cancelled': 0
+    }
+    score += status_map.get(status, 7)
 
-        # Component F: Deterministic jitter (0-5 points, from permit ID hash)
-        permit_id_str = ''
-        for key in ['id', 'permit_number', 'permit_id', 'number']:
-            pid = p.get(key)
-            if pid is not None:
-                permit_id_str = str(pid)
-                break
-        if not permit_id_str:
-            permit_id_str = str(id(p))
-        jitter = (int(hashlib.md5(permit_id_str.encode()).hexdigest()[:6], 16) % 50) / 10.0
+    # E: Address quality (0-5 pts)
+    address = str(permit.get('address', '')).strip()
+    if address and any(c.isdigit() for c in address):
+        score += 5   # Has street number
+    elif address and len(address) > 5:
+        score += 2   # Has name but no number
+    # else 0
 
-        raw_scores.append({
-            'value': value,
-            'non_value_score': recency + status_pts + contact_pts + trade_pts + address_pts + jitter
-        })
+    # F: Deterministic jitter (0-4 pts) for visual variety
+    pid = str(permit.get('id', permit.get('permit_number', id(permit))))
+    jitter = (int(hashlib.md5(pid.encode()).hexdigest()[:4], 16) % 40) / 10.0
+    score += jitter
 
-    # PHASE 2: Normalize the value component within this dataset
-    values = [r['value'] for r in raw_scores]
-    min_val = min(values)
-    max_val = max(values)
-    val_range = max_val - min_val if max_val != min_val else 1.0
-
-    composite_scores = []
-    for r in raw_scores:
-        normalized_value = ((r['value'] - min_val) / val_range) * 35.0
-        composite = normalized_value + r['non_value_score']
-        composite_scores.append(composite)
-
-    # PHASE 3: FORCED LINEAR SPREAD — THIS IS THE CRITICAL PART
-    # Map the composite scores linearly so that:
-    #   - The permit with the LOWEST composite score gets exactly 40
-    #   - The permit with the HIGHEST composite score gets exactly 99
-    #   - Everything else is evenly distributed between 40 and 99
-    #
-    # THIS IS NON-NEGOTIABLE. If the output min is not ~40, this step is broken.
-
-    score_min = min(composite_scores)
-    score_max = max(composite_scores)
-    score_range = score_max - score_min if score_max != score_min else 1.0
-
-    final_scores = []
-    for cs in composite_scores:
-        # Linear interpolation: score_min → 40, score_max → 99
-        normalized = 40.0 + ((cs - score_min) / score_range) * 59.0
-        final_scores.append(max(40, min(99, round(normalized))))
-
-    return final_scores
+    return max(40, min(99, round(score)))
 
 
 def add_lead_scores(permits):
     """
-    Wrapper that calls calculate_lead_scores and assigns scores to permits.
+    V13: Apply absolute lead scoring to each permit independently.
     Also assigns lead_quality tier based on score.
     """
     if not permits:
         return permits
 
-    scores = calculate_lead_scores(permits)
-
-    for i, p in enumerate(permits):
-        score = scores[i] if i < len(scores) else 70
-
-        # V12.21: Address quality penalty (replaces hard cap that clustered 95% at 65)
-        # Use a percentage reduction to maintain differentiation between permits
-        address = p.get('address', '') or ''
-        address_clean = address.strip().lower()
-        if not address_clean or address_clean in ['not provided', 'address not provided', 'n/a', 'none', '', 'location']:
-            # V12.23: Reduce score by 50% for missing address (stronger penalty to push addressless permits down)
-            score = max(40, round(score * 0.50))
-
+    for p in permits:
+        score = calculate_lead_score(p)
         p['lead_score'] = score
 
         # Determine quality tier
@@ -1593,21 +1537,42 @@ def load_stats():
         return {}
 
 def get_cities_with_data():
-    """V12.51: Get cities sorted by permit volume (SQL-backed)."""
-    # Get city counts from SQLite
+    """V13: Get ALL cities from permits table sorted by permit volume.
+
+    Previous version only returned cities in the static CITY_REGISTRY.
+    Now returns ALL 555+ cities that have actual permit data.
+    """
+    # Get city counts from SQLite - this has ALL cities with permits
     city_rows = permitdb.get_cities_with_permits()
 
-    # Convert to city info format with slug
+    # Get static registry for cities that have extra config
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
 
     cities_with_counts = []
     for row in city_rows:
         name = row['city']
+        state = row.get('state', '')
+        permit_count = row.get('permit_count', 0)
+
+        if not name or not name.strip():
+            continue
+
         if name in city_lookup:
+            # City exists in static registry - use its config
             city_info = city_lookup[name].copy()
-            city_info['permit_count'] = row['permit_count']
-            cities_with_counts.append(city_info)
+            city_info['permit_count'] = permit_count
+        else:
+            # V13: City NOT in registry - create dynamic entry
+            slug = name.lower().replace(' ', '-').replace(',', '').replace('.', '')
+            city_info = {
+                'name': name,
+                'state': state,
+                'slug': slug,
+                'permit_count': permit_count,
+                'active': True
+            }
+        cities_with_counts.append(city_info)
 
     # Sort by permit count descending (top cities first)
     cities_with_counts.sort(key=lambda x: x.get('permit_count', 0), reverse=True)
@@ -2009,9 +1974,14 @@ def index():
 
     # V12.32: Pass city_count including auto-discovered bulk source cities
     city_count = get_total_city_count_auto()
+
+    # V13: Pass ALL cities for dropdown (sorted by state then city name)
+    # This ensures dropdown shows all 555+ cities, not just those in the paginated API response
+    all_dropdown_cities = get_cities_with_data()  # Now returns all cities from permits table
+
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
-                          city_count=city_count)
+                          city_count=city_count, all_dropdown_cities=all_dropdown_cities)
 
 
 # V9 Fix 9: /dashboard redirects to homepage
