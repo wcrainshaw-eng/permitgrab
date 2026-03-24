@@ -204,8 +204,9 @@ def is_domain_relevant(domain, county_name, state_abbrev):
         import re
         for abbrev in US_STATE_ABBREVS:
             if abbrev != target_abbrev:
-                # Check for state abbrev at domain boundary (after dot, before dot, or at end)
-                if re.search(rf'(?:^|[.\-/]){abbrev}(?:[.\-/]|gov|$)', domain_check):
+                # Check for state abbrev at domain boundary OR embedded before .gov
+                # V12.65: Added |{abbrev}\.gov to catch montgomerycountymd.gov pattern
+                if re.search(rf'(?:^|[.\-/]){abbrev}(?:[.\-/]|gov|$)|{abbrev}\.gov', domain_check):
                     return False
 
     domain_lower = domain.lower()

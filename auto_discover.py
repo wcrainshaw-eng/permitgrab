@@ -82,7 +82,10 @@ SEARCH_KEYWORDS = [
 # Field matching patterns (case-insensitive contains match)
 FIELD_PATTERNS = {
     'address':         ['address', 'site_address', 'street_address', 'location', 'project_address', 'addr', 'situs', 'job_site', 'work_site', 'premise'],
-    'date':            ['issue_date', 'issued_date', 'filing_date', 'permit_date', 'application_date', 'created', 'permitdate', 'issueddate', 'date_issued', 'date_filed', 'applied_date', 'file_date', 'open_date', 'record_date'],
+    'date':            ['issue_date', 'issued_date', 'filing_date', 'permit_date', 'application_date', 'created', 'permitdate', 'issueddate',
+                        'filingdate', 'applicationdate', 'applydate', 'applied',  # V12.65: New Orleans + app variants
+                        'date_issued', 'date_filed', 'applied_date', 'file_date', 'open_date', 'record_date',
+                        'permit_issued_date', 'permitissuedate', 'processed_date', 'date_opened', 'inspection_date'],  # V12.65: more variants
     'permit_number':   ['permit_number', 'permit_no', 'permit_id', 'application_number', 'record_id', 'app_no', 'permitno'],
     'estimated_cost':  ['estimated_cost', 'job_value', 'valuation', 'construction_value', 'project_value', 'cost', 'constcost', 'declaredvaluation', 'jobvalue'],
     'permit_type':     ['permit_type', 'work_type', 'permit_class', 'record_type', 'type', 'permittypedesc'],
@@ -258,14 +261,18 @@ def match_field(column_name, field_patterns):
 
 def generate_field_map(columns):
     """Auto-generate field_map by matching column names to standard fields.
-    Returns dict like {'address': 'site_address', 'date': 'issue_date', ...}"""
+    Returns dict like {'address': 'site_address', 'date': 'issue_date', ...}
+
+    V12.65: Normalizes underscores for matching — "filing_date" matches "filingdate"."""
     field_map = {}
     columns_lower = {c.lower(): c for c in columns}
 
     for our_field, patterns in FIELD_PATTERNS.items():
         for pattern in patterns:
+            pat_norm = pattern.replace('_', '')  # V12.65: underscore-agnostic matching
             for col_lower, col_actual in columns_lower.items():
-                if pattern in col_lower:
+                col_norm = col_lower.replace('_', '')  # V12.65: normalize column too
+                if pat_norm in col_norm:
                     field_map[our_field] = col_actual
                     break
             if our_field in field_map:
