@@ -5593,6 +5593,31 @@ def city_landing_inner(city_slug):
         except (ValueError, TypeError):
             last_collected = None
 
+    # V17d: Related blog articles for cross-linking SEO
+    related_articles = []
+    try:
+        all_posts = get_all_blog_posts()
+        city_lower = config['name'].lower()
+        state_lower = current_state.lower() if current_state else ''
+        for post in all_posts:
+            title_lower = post.get('title', '').lower()
+            keywords_lower = post.get('keywords', '').lower()
+            slug_lower = post.get('slug', '').lower()
+            # Match city name, state, or general permit/contractor topics
+            if city_lower in title_lower or city_lower in keywords_lower or city_lower in slug_lower:
+                related_articles.append(post)
+            elif state_lower and (state_lower in title_lower or state_lower in keywords_lower):
+                related_articles.append(post)
+        # If no city/state matches, add general articles
+        if not related_articles:
+            general_slugs = ['what-is-a-building-permit', 'how-to-find-construction-leads', 'construction-leads-from-building-permits']
+            for post in all_posts:
+                if post.get('slug') in general_slugs:
+                    related_articles.append(post)
+        related_articles = related_articles[:3]  # Max 3 articles
+    except Exception:
+        pass
+
     # V12.17: Other cities for footer links - sorted by permit volume
     cities_by_volume = get_cities_with_data()  # Pre-sorted by permit count descending
     other_cities = [c for c in cities_by_volume if c['slug'] != city_slug]
@@ -5627,6 +5652,7 @@ def city_landing_inner(city_slug):
         current_year=datetime.now().year,
         current_date=datetime.now().strftime('%Y-%m-%d'),
         last_collected=last_collected,  # V17c: Freshness badge
+        related_articles=related_articles,  # V17d: Cross-linked blog articles
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
     )
 

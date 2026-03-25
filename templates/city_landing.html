@@ -1024,6 +1024,22 @@ body {
   <a href="/?city={{ city_name }}" class="btn-cta">Browse {{ city_name }} Permits Free</a>
 </section>
 
+<!-- V17d: Related Articles for cross-linking SEO -->
+{% if related_articles %}
+<section style="max-width: 1200px; margin: 0 auto; padding: 48px 32px 24px;">
+  <h2 style="font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 24px;">{{ city_name }} Construction Insights</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+    {% for article in related_articles %}
+    <a href="/blog/{{ article.slug }}" style="display: block; background: white; border-radius: var(--radius-lg); padding: 24px; text-decoration: none; border: 1px solid var(--gray-200); transition: all .2s;">
+      <div style="font-size: 12px; color: var(--primary); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;">Guide</div>
+      <div style="font-size: 16px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px; line-height: 1.4;">{{ article.title }}</div>
+      <div style="font-size: 14px; color: var(--gray-500); line-height: 1.5;">{{ article.excerpt }}</div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <!-- EXPLORE OTHER CITIES -->
 <section class="explore-cities">
   <div class="explore-inner">

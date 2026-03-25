@@ -17,6 +17,46 @@
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 {% include 'partials/analytics.html' %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ProductCollection",
+  "name": "PermitGrab Pricing Plans",
+  "description": "Construction permit leads platform with flexible pricing tiers",
+  "url": "https://permitgrab.com/pricing",
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "PermitGrab Plans",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "@id": "https://permitgrab.com/pricing#free-plan",
+        "name": "Free Plan",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "Browse all building permits, filter by city, trade, and value, see permit details and descriptions, view project values. Contact information is available with the Professional plan.",
+        "availability": "https://schema.org/InStock"
+      },
+      {
+        "@type": "Offer",
+        "@id": "https://permitgrab.com/pricing#professional-plan",
+        "name": "Professional Plan",
+        "price": "149",
+        "priceCurrency": "USD",
+        "priceValidUntil": "2027-03-24",
+        "billingDuration": "P1M",
+        "description": "Full access to construction permit leads including contact information, contractor intelligence dashboard, early Intel signals, market analytics, daily email alerts, CSV export, lead management, and priority support.",
+        "availability": "https://schema.org/InStock",
+        "areaServed": {
+          "@type": "Place",
+          "@id": "https://permitgrab.com/pricing#us-coverage",
+          "name": "140+ US metro areas"
+        }
+      }
+    ]
+  }
+}
+</script>
 <!-- V12.23 SEO: FAQ structured data for rich snippets -->
 <script type="application/ld+json">
 {
