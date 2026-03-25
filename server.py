@@ -5749,6 +5749,53 @@ def city_trade_landing(city_slug, trade_slug):
 
 
 # ===========================
+# V17e: CITIES BROWSE PAGE — Hub for all city landing pages
+# ===========================
+
+@app.route('/cities')
+def cities_browse():
+    """V17e: Dedicated browse page for all cities, organized by state.
+    Reduces homepage link dilution by moving 300+ city links here.
+    Acts as an SEO hub that distributes PageRank to all city pages.
+    """
+    all_cities = get_cities_with_data()
+    footer_cities = all_cities
+
+    # Group cities by state
+    states = {}
+    no_state = []
+    for city in all_cities:
+        state = city.get('state', '').strip()
+        if state:
+            if state not in states:
+                states[state] = []
+            states[state].append(city)
+        else:
+            no_state.append(city)
+
+    # Sort states alphabetically, cities within each state by permit count
+    sorted_states = sorted(states.items(), key=lambda x: x[0])
+    for state_name, cities in sorted_states:
+        cities.sort(key=lambda c: c.get('permit_count', 0), reverse=True)
+
+    # Top cities across all states (for hero section)
+    top_cities = all_cities[:12]
+
+    total_cities = len(all_cities)
+    total_states = len(states)
+
+    return render_template('cities_browse.html',
+        footer_cities=footer_cities,
+        sorted_states=sorted_states,
+        no_state_cities=no_state,
+        top_cities=top_cities,
+        total_cities=total_cities,
+        total_states=total_states,
+        canonical_url=f"{SITE_URL}/cities",
+    )
+
+
+# ===========================
 # SITEMAP & ROBOTS.TXT
 # ===========================
 
@@ -5764,6 +5811,7 @@ def sitemap():
         {'loc': f"{SITE_URL}/map", 'changefreq': 'daily', 'priority': '0.8'},  # V12.26: Permit heat map
         {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7'},
         {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
+        {'loc': f"{SITE_URL}/cities", 'changefreq': 'daily', 'priority': '0.9'},  # V17e: Cities hub page
         {'loc': f"{SITE_URL}/stats", 'changefreq': 'daily', 'priority': '0.7'},  # V12.23 SEO
         {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6'},
         {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5'},
@@ -5788,13 +5836,31 @@ def sitemap():
     cities_with_data = get_cities_with_data()
     cities_with_permits = {c['name'] for c in cities_with_data}
 
+    # V17e: Get real lastmod timestamps per city from permit data
+    city_lastmod = {}
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute("SELECT city, MAX(collected_at) as latest FROM permits GROUP BY city").fetchall()
+        for row in rows:
+            if row['city'] and row['latest']:
+                city_slug_key = row['city'].lower().replace(' ', '-').replace(',', '').replace('.', '')
+                try:
+                    city_lastmod[city_slug_key] = row['latest'][:10]  # YYYY-MM-DD
+                except (TypeError, IndexError):
+                    pass
+        conn.close()
+    except Exception:
+        pass
+
     for slug, city_info in all_discovered_cities.items():
         # Skip cities with no permits (these have noindex anyway)
         if city_info['name'] not in cities_with_permits:
             continue
 
+        lastmod = city_lastmod.get(slug, today)
         urls.append({
             'loc': f"{SITE_URL}/permits/{slug}",
+            'lastmod': lastmod,
             'changefreq': 'daily',
             'priority': '0.8',
         })
@@ -5803,6 +5869,7 @@ def sitemap():
         for trade_slug in get_trade_slugs():
             urls.append({
                 'loc': f"{SITE_URL}/permits/{slug}/{trade_slug}",
+                'lastmod': lastmod,
                 'changefreq': 'daily',
                 'priority': '0.8',
             })
@@ -5825,7 +5892,7 @@ def sitemap():
     for url in urls:
         xml += '  <url>\n'
         xml += f"    <loc>{url['loc']}</loc>\n"
-        xml += f"    <lastmod>{today}</lastmod>\n"
+        xml += f"    <lastmod>{url.get('lastmod', today)}</lastmod>\n"
         xml += f"    <changefreq>{url['changefreq']}</changefreq>\n"
         xml += f"    <priority>{url['priority']}</priority>\n"
         xml += '  </url>\n'

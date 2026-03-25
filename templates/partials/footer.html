@@ -9,9 +9,10 @@
     <div class="footer-links">
       <h4>Top Cities</h4>
       {% if footer_cities %}
-      {% for city in footer_cities[:10] %}
+      {% for city in footer_cities[:8] %}
       <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
       {% endfor %}
+      <a href="/cities" style="font-weight: 600;">Browse All Cities &rarr;</a>
       {% else %}
       <a href="/permits/chicago">Chicago</a>
       <a href="/permits/new-york">New York</a>

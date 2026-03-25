@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse All {{ total_cities }}+ Cities with Building Permits | PermitGrab</title>
+<meta name="description" content="Browse building permits across {{ total_cities }}+ cities in {{ total_states }} states. Find construction leads by city — real-time permit data for contractors nationwide.">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:title" content="Browse All Cities | PermitGrab">
+<meta property="og:description" content="Building permits and contractor leads in {{ total_cities }}+ cities across {{ total_states }} states.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+
+<!-- V17e: Cities hub structured data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "Browse All Cities — Building Permits",
+  "description": "Browse building permits across {{ total_cities }}+ cities in {{ total_states }} states",
+  "url": "{{ canonical_url }}",
+  "numberOfItems": {{ total_cities }},
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
+  }
+}
+</script>
+
+<!-- V17e: BreadcrumbList -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://permitgrab.com"},
+    {"@type": "ListItem", "position": 2, "name": "Cities"}
+  ]
+}
+</script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --green: #16a34a;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+
+/* NAV */
+.nav-bar {
+  background: var(--gray-900);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-bar a { color: #fff; text-decoration: none; font-size: 14px; margin-left: 24px; }
+.nav-bar a:hover { color: var(--accent); }
+.nav-logo { font-size: 20px; font-weight: 800; color: #fff; text-decoration: none; }
+.nav-logo span { color: var(--accent); }
+
+/* HERO */
+.cities-hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #374151 100%);
+  color: #fff;
+  padding: 64px 32px 48px;
+  text-align: center;
+}
+.cities-hero h1 { font-size: 36px; font-weight: 800; margin-bottom: 12px; }
+.cities-hero p { font-size: 18px; opacity: 0.8; max-width: 640px; margin: 0 auto 32px; }
+
+/* SEARCH */
+.search-box {
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+}
+.search-box input {
+  width: 100%;
+  padding: 14px 20px 14px 44px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-box input::placeholder { color: rgba(255,255,255,0.5); }
+.search-box input:focus { border-color: var(--accent); }
+.search-box svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.5;
+}
+
+/* TOP CITIES */
+.top-cities {
+  max-width: 1200px;
+  margin: -32px auto 0;
+  padding: 0 32px;
+  position: relative;
+  z-index: 1;
+}
+.top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.top-city-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  text-decoration: none;
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.top-city-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.15);
+  transform: translateY(-2px);
+}
+.top-city-name { font-weight: 700; font-size: 15px; }
+.top-city-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+.top-city-count { font-size: 13px; color: var(--primary); font-weight: 600; margin-top: 8px; }
+
+/* STATE SECTIONS */
+.state-directory {
+  max-width: 1200px;
+  margin: 48px auto;
+  padding: 0 32px;
+}
+.state-directory h2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.state-directory > p {
+  color: var(--gray-500);
+  margin-bottom: 32px;
+}
+.alpha-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 32px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--gray-200);
+}
+.alpha-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gray-600);
+  transition: all 0.15s;
+}
+.alpha-nav a:hover { background: var(--primary); color: #fff; }
+
+.state-section {
+  margin-bottom: 40px;
+  scroll-margin-top: 80px;
+}
+.state-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gray-200);
+}
+.state-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+.state-count {
+  font-size: 12px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.city-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.city-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--gray-700);
+  font-size: 14px;
+  transition: all 0.15s;
+}
+.city-link:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f0f4ff;
+}
+.city-link .count {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .cities-hero { padding: 48px 20px 40px; }
+  .cities-hero h1 { font-size: 28px; }
+  .top-grid { grid-template-columns: repeat(2, 1fr); }
+  .city-grid { grid-template-columns: 1fr; }
+  .state-directory { padding: 0 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav-bar">
+  <a href="/" class="nav-logo">Permit<span>Grab</span></a>
+  <div>
+    <a href="/">Dashboard</a>
+    <a href="/cities" style="color: var(--accent);">Cities</a>
+    <a href="/contractors">Contractors</a>
+    <a href="/blog">Blog</a>
+    <a href="/pricing">Pricing</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="cities-hero">
+  <h1>Browse {{ total_cities }}+ Cities</h1>
+  <p>Real-time building permit data across {{ total_states }} states. Find construction leads in your market.</p>
+  <div class="search-box">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="citySearch" placeholder="Search cities..." oninput="filterCities(this.value)">
+  </div>
+</section>
+
+<!-- TOP CITIES BY VOLUME -->
+<section class="top-cities">
+  <div class="top-grid">
+    {% for city in top_cities %}
+    <a href="/permits/{{ city.slug }}" class="top-city-card">
+      <span class="top-city-name">{{ city.name }}</span>
+      <span class="top-city-meta">{{ city.state }}</span>
+      <span class="top-city-count">{{ "{:,}".format(city.permit_count) }} permits</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- STATE DIRECTORY -->
+<section class="state-directory">
+  <h2>All Cities by State</h2>
+  <p>{{ total_cities }} cities across {{ total_states }} states with active building permit data.</p>
+
+  <!-- Alphabet quick nav -->
+  <div class="alpha-nav">
+    {% set letters_used = [] %}
+    {% for state_name, cities in sorted_states %}
+      {% set first = state_name[0]|upper %}
+      {% if first not in letters_used %}
+        {% if letters_used.append(first) %}{% endif %}
+        <a href="#state-{{ first }}">{{ first }}</a>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {% set current_letter = [None] %}
+  {% for state_name, cities in sorted_states %}
+    {% set first = state_name[0]|upper %}
+    {% if first != current_letter[0] %}
+      {% if current_letter.append(first) %}{% endif %}
+      <div id="state-{{ first }}"></div>
+    {% endif %}
+    <div class="state-section" data-state="{{ state_name|lower }}">
+      <div class="state-header">
+        <h3>{{ state_name }}</h3>
+        <span class="state-count">{{ cities|length }} {{ 'city' if cities|length == 1 else 'cities' }}</span>
+      </div>
+      <div class="city-grid">
+        {% for city in cities %}
+        <a href="/permits/{{ city.slug }}" class="city-link" data-city="{{ city.name|lower }}">
+          <span>{{ city.name }}</span>
+          <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+
+  {% if no_state_cities %}
+  <div class="state-section" data-state="other">
+    <div class="state-header">
+      <h3>Other Locations</h3>
+      <span class="state-count">{{ no_state_cities|length }}</span>
+    </div>
+    <div class="city-grid">
+      {% for city in no_state_cities %}
+      <a href="/permits/{{ city.slug }}" class="city-link" data-city="{{ city.name|lower }}">
+        <span>{{ city.name }}</span>
+        <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{% include 'partials/footer.html' %}
+
+<script>
+function filterCities(query) {
+  const q = query.toLowerCase().trim();
+  const sections = document.querySelectorAll('.state-section');
+  const links = document.querySelectorAll('.city-link');
+
+  if (!q) {
+    sections.forEach(s => s.style.display = '');
+    links.forEach(l => l.style.display = '');
+    return;
+  }
+
+  sections.forEach(section => {
+    const state = section.dataset.state;
+    const cityLinks = section.querySelectorAll('.city-link');
+    let hasVisible = false;
+
+    cityLinks.forEach(link => {
+      const city = link.dataset.city;
+      const match = city.includes(q) || state.includes(q);
+      link.style.display = match ? '' : 'none';
+      if (match) hasVisible = true;
+    });
+
+    section.style.display = hasVisible ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

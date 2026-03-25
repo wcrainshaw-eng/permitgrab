@@ -1360,9 +1360,10 @@ footer a:hover { color: white; }
       <div class="nav-dropdown">
         <a href="#" class="dropdown-toggle">Cities <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
         <div class="dropdown-menu" id="cities-dropdown" style="max-height: 400px; overflow-y: auto; columns: 2; column-gap: 20px;">
-          {% for city in footer_cities %}
+          {% for city in footer_cities[:20] %}
           <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
           {% endfor %}
+          <a href="/cities" style="color: var(--accent); font-weight: 700; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; margin-top: 4px;">Browse All Cities &rarr;</a>
         </div>
       </div>
       <a href="/contractors">Contractors</a>
