@@ -23,14 +23,14 @@ import requests
 from datetime import datetime, timedelta
 from collections import OrderedDict
 
-# ââ Imports from the PermitGrab codebase ââââââââââââââââââââââââââââââââââââââ
+# ── Imports from the PermitGrab codebase ──────────────────────────────────────
 # Adjust PYTHONPATH so we can import sibling modules when run standalone.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from city_source_db import get_active_cities, get_city_config
 from city_configs import CITY_REGISTRY
 
-# ââ Constants âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ── Constants ─────────────────────────────────────────────────────────────────
 DEFAULT_STALE_DAYS = 7          # Flag if no permit newer than this many days
 REQUEST_TIMEOUT    = 30         # seconds
 RETRY_LIMIT        = 2          # per endpoint
@@ -43,9 +43,9 @@ SESSION.headers.update({
 })
 
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # Per-platform "latest permit date" fetchers
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # Each returns an ISO date string (YYYY-MM-DD) or None.
 
 def _latest_socrata(config):
@@ -160,9 +160,9 @@ PLATFORM_FETCHERS = {
 }
 
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # Date parsing helpers
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 
 def _parse_date(raw, date_format="iso"):
     """Normalise whatever the API returns into YYYY-MM-DD."""
@@ -176,7 +176,7 @@ def _parse_date(raw, date_format="iso"):
         except (ValueError, OSError):
             return None
 
-    # "none" format â value is epoch ms stored as number
+    # "none" format — value is epoch ms stored as number
     if date_format == "none" and isinstance(raw, (int, float)):
         try:
             return datetime.utcfromtimestamp(int(raw) / 1000).strftime("%Y-%m-%d")
@@ -200,9 +200,9 @@ def _parse_date(raw, date_format="iso"):
     return None
 
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # Main health-check driver
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 
 def run_health_check(stale_days=DEFAULT_STALE_DAYS, verbose=True):
     """
@@ -235,7 +235,7 @@ def run_health_check(stale_days=DEFAULT_STALE_DAYS, verbose=True):
 
     if verbose:
         print(f"\n{'='*72}")
-        print(f"  PermitGrab Endpoint Health Check â {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        print(f"  PermitGrab Endpoint Health Check — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         print(f"  Active endpoints: {len(active_cities)}   Stale threshold: {stale_days} days")
         print(f"{'='*72}\n")
 
@@ -331,7 +331,7 @@ def run_health_check(stale_days=DEFAULT_STALE_DAYS, verbose=True):
 
         time.sleep(PAUSE_BETWEEN)
 
-    # ââ Summary âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ── Summary ───────────────────────────────────────────────────────────
     if verbose:
         fresh = sum(1 for r in results if r["status"] == "fresh")
         stale = sum(1 for r in results if r["status"] == "stale")
@@ -342,19 +342,19 @@ def run_health_check(stale_days=DEFAULT_STALE_DAYS, verbose=True):
         print(f"{'='*72}")
 
         if stale + error > 0:
-            print(f"\n  â   Problem endpoints:")
+            print(f"\n  ⚠  Problem endpoints:")
             for r in results:
                 if r["status"] in ("stale", "error"):
                     tag = "STALE" if r["status"] == "stale" else "ERROR"
                     detail = f"last={r['latest_date']} ({r['days_since']}d)" if r["latest_date"] else r["error"]
-                    print(f"     [{tag}] {r['name']}, {r['state']} â {detail}")
+                    print(f"     [{tag}] {r['name']}, {r['state']} — {detail}")
 
     return results
 
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # XLSX Tracker Updater
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 
 def update_tracker_xlsx(results, xlsx_path):
     """
@@ -365,7 +365,7 @@ def update_tracker_xlsx(results, xlsx_path):
     try:
         from openpyxl import load_workbook
     except ImportError:
-        print("[ERROR] openpyxl not installed â cannot update XLSX")
+        print("[ERROR] openpyxl not installed — cannot update XLSX")
         return False
 
     if not os.path.exists(xlsx_path):
@@ -408,9 +408,9 @@ def update_tracker_xlsx(results, xlsx_path):
                 current_notes = ws.cell(row=row, column=9).value or ""
                 tag = f"[HEALTH {datetime.now().strftime('%m/%d')}] "
                 if result["status"] == "stale":
-                    tag += f"STALE â last permit {result['latest_date']} ({result['days_since']}d ago)"
+                    tag += f"STALE — last permit {result['latest_date']} ({result['days_since']}d ago)"
                 else:
-                    tag += f"ERROR â {result['error']}"
+                    tag += f"ERROR — {result['error']}"
                 # Don't duplicate notes
                 if tag not in current_notes:
                     ws.cell(row=row, column=9, value=tag if not current_notes else f"{current_notes}; {tag}")
@@ -420,9 +420,9 @@ def update_tracker_xlsx(results, xlsx_path):
     return True
 
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # JSON report writer
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 
 def save_json_report(results, path="data/health_check_report.json"):
     """Write full results to JSON for dashboarding / history."""
@@ -443,9 +443,9 @@ def save_json_report(results, path="data/health_check_report.json"):
     print(f"[JSON] Report saved to {path}")
 
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 # CLI entry point
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ══════════════════════════════════════════════════════════════════════════════
 
 def main():
     parser = argparse.ArgumentParser(description="PermitGrab Endpoint Health Check")
