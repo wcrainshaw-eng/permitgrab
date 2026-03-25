@@ -452,6 +452,116 @@ def fetch_socrata_bulk(config, days_back=90):
     return all_records
 
 
+# V17: ArcGIS bulk page size (smaller than Socrata — ArcGIS servers often cap at 1000-2000)
+ARCGIS_BULK_PAGE_SIZE = 2000
+ARCGIS_BULK_MAX_PAGES = 100  # 200K records max
+
+
+def fetch_arcgis_bulk(config, days_back=90):
+    """
+    V17: Fetch ALL permits from a bulk ArcGIS FeatureServer with pagination.
+    Returns all records without city filtering — caller handles grouping.
+    Mirrors fetch_socrata_bulk() pattern with ArcGIS query API.
+    """
+    endpoint = config["endpoint"]
+    date_field = config.get("date_field", "")
+    date_format = config.get("date_format", "date")
+    source_name = config.get("name", "Unknown")
+
+    # Calculate date filter
+    since_dt = datetime.now() - timedelta(days=days_back)
+
+    if date_format == "epoch":
+        since_epoch = int(since_dt.timestamp() * 1000)
+        where_clause = f"{date_field} >= {since_epoch}" if date_field else "1=1"
+    elif date_format == "none" or not date_field:
+        where_clause = "1=1"
+    else:
+        since_date = since_dt.strftime("%Y-%m-%d")
+        where_clause = f"{date_field} >= DATE '{since_date}'"
+
+    print(f"    [V17] Starting ArcGIS bulk fetch: {source_name}", flush=True)
+    print(f"    [V17] Endpoint: {endpoint}", flush=True)
+    print(f"    [V17] Where: {where_clause}", flush=True)
+
+    all_records = []
+    offset = 0
+
+    for page in range(ARCGIS_BULK_MAX_PAGES):
+        params = {
+            "where": where_clause,
+            "outFields": "*",
+            "resultRecordCount": ARCGIS_BULK_PAGE_SIZE,
+            "resultOffset": offset,
+            "f": "json",
+        }
+
+        if date_field and date_field != "none":
+            params["orderByFields"] = f"{date_field} DESC"
+
+        print(f"    Fetching page {page + 1} (offset {offset})...", flush=True)
+
+        try:
+            resp = SESSION.get(endpoint, params=params, timeout=90)
+            print(f"    [V17] Response status: {resp.status_code}", flush=True)
+            resp.raise_for_status()
+
+            try:
+                data = resp.json()
+            except Exception as json_err:
+                print(f"    [V17] JSON parse error: {json_err}", flush=True)
+                print(f"    [V17] Response text: {resp.text[:500]}", flush=True)
+                break
+
+            # ArcGIS error responses come as HTTP 200 with error body
+            if "error" in data:
+                error_msg = data["error"].get("message", "Unknown")
+                error_code = data["error"].get("code", "unknown")
+                print(f"    [V17] ArcGIS error {error_code}: {error_msg}", flush=True)
+                break
+
+            if "features" not in data or not data["features"]:
+                print(f"    No more records at page {page + 1}", flush=True)
+                break
+
+            records = [f["attributes"] for f in data["features"]]
+            all_records.extend(records)
+            print(f"    Got {len(records)} records (total: {len(all_records)})", flush=True)
+
+            if len(records) < ARCGIS_BULK_PAGE_SIZE:
+                # Last page
+                break
+
+            # Check if server supports pagination (exceededTransferLimit)
+            if not data.get("exceededTransferLimit", False) and len(records) < ARCGIS_BULK_PAGE_SIZE:
+                break
+
+            offset += ARCGIS_BULK_PAGE_SIZE
+            time.sleep(1)  # Rate limit between pages
+
+        except requests.exceptions.Timeout as e:
+            print(f"    [V17] TIMEOUT on page {page + 1}: {e}", flush=True)
+            break
+        except requests.exceptions.RequestException as e:
+            print(f"    [V17] REQUEST ERROR on page {page + 1}: {type(e).__name__}: {e}", flush=True)
+            break
+        except Exception as e:
+            print(f"    [V17] UNEXPECTED ERROR on page {page + 1}: {type(e).__name__}: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            break
+
+    # Post-fetch: if date_format is "none", filter by epoch in Python
+    if date_format == "none" and date_field and all_records:
+        since_epoch = int(since_dt.timestamp() * 1000)
+        before_count = len(all_records)
+        all_records = [r for r in all_records if r.get(date_field, 0) and r[date_field] >= since_epoch]
+        print(f"    [V17] Date filter (epoch): {before_count} -> {len(all_records)} records", flush=True)
+
+    print(f"    [V17] ArcGIS bulk fetch complete: {len(all_records)} total records", flush=True)
+    return all_records
+
+
 def slugify_city_name(city_name, state):
     """
     V12.31: Convert a city name to a URL-safe slug.
@@ -492,6 +602,8 @@ def collect_bulk_source(source_key, config, days_back=90):
     # Fetch all records
     if platform == "socrata":
         raw_records = fetch_socrata_bulk(config, days_back)
+    elif platform == "arcgis":
+        raw_records = fetch_arcgis_bulk(config, days_back)
     else:
         print(f"    [ERROR] Bulk mode not yet supported for platform: {platform}")
         return {}, {"status": f"error_unsupported_platform_{platform}"}
