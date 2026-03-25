@@ -5571,6 +5571,28 @@ def city_landing_inner(city_slug):
         """, (filter_name,)).fetchone()
         unique_contractors = contractor_row['cnt'] if contractor_row and contractor_row['cnt'] > 0 else '50+'
 
+    # V17c: Freshness badge — compute human-readable "last updated" time
+    last_collected_row = conn.execute("""
+        SELECT MAX(collected_at) as latest FROM permits WHERE city = ?
+    """, (filter_name,)).fetchone()
+    last_collected = None
+    if last_collected_row and last_collected_row['latest']:
+        try:
+            latest_dt = datetime.strptime(last_collected_row['latest'], '%Y-%m-%d %H:%M:%S')
+            delta = datetime.now() - latest_dt
+            if delta.total_seconds() < 3600:
+                last_collected = f"{int(delta.total_seconds() / 60)} minutes ago"
+            elif delta.total_seconds() < 86400:
+                last_collected = f"{int(delta.total_seconds() / 3600)} hours ago"
+            elif delta.days == 1:
+                last_collected = "yesterday"
+            elif delta.days < 7:
+                last_collected = f"{delta.days} days ago"
+            else:
+                last_collected = latest_dt.strftime('%b %d, %Y')
+        except (ValueError, TypeError):
+            last_collected = None
+
     # V12.17: Other cities for footer links - sorted by permit volume
     cities_by_volume = get_cities_with_data()  # Pre-sorted by permit count descending
     other_cities = [c for c in cities_by_volume if c['slug'] != city_slug]
@@ -5604,6 +5626,7 @@ def city_landing_inner(city_slug):
         nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
         current_year=datetime.now().year,
         current_date=datetime.now().strftime('%Y-%m-%d'),
+        last_collected=last_collected,  # V17c: Freshness badge
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
     )
 

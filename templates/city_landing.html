@@ -134,6 +134,7 @@
 </script>
 
 <style>
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -858,6 +859,16 @@ body {
     </div>
     {% endif %}
   </div>
+
+  <!-- V17c: Freshness badge — signals to Google + users that data is live -->
+  {% if last_collected %}
+  <div style="margin-bottom: 24px;">
+    <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(22,163,74,.15); color: #4ade80; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+      <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block; animation: pulse 2s infinite;"></span>
+      Data updated {{ last_collected }}
+    </span>
+  </div>
+  {% endif %}
 
   <div class="hero-cta">
     <a href="/?city={{ city_name }}" class="btn-primary">View {{ city_name }} Permits</a>
