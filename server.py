@@ -5603,6 +5603,7 @@ def city_landing_inner(city_slug):
         other_cities=other_cities,
         nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
         current_year=datetime.now().year,
+        current_date=datetime.now().strftime('%Y-%m-%d'),
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
     )
 

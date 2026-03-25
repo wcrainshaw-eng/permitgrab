@@ -67,6 +67,72 @@
 }
 </script>
 
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "{{ city_name }} Building Permits",
+  "description": "{{ meta_description }}",
+  "url": "{{ canonical_url }}",
+  "dateModified": "{{ current_date }}",
+  "about": {
+    "@type": "GovernmentPermit",
+    "name": "Building Permit",
+    "issuedBy": {
+      "@type": "GovernmentOrganization",
+      "name": "{{ city_name }} Building Department"
+    },
+    "validIn": {
+      "@type": "AdministrativeArea",
+      "name": "{{ city_name }}, {{ city_state }}"
+    }
+  },
+  "mainEntity": {
+    "@type": "ItemList",
+    "name": "{{ city_name }} Building Permits",
+    "numberOfItems": {{ permit_count }},
+    "itemListElement": [
+      {% for trade, count in trade_breakdown.items() %}{% if loop.index <= 5 %}
+      {"@type": "ListItem", "position": {{ loop.index }}, "name": "{{ trade }}", "description": "{{ count }} permits"}{% if not loop.last and loop.index < 5 %},{% endif %}
+      {% endif %}{% endfor %}
+    ]
+  }
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How many active building permits are there in {{ city_name }}?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "PermitGrab currently tracks {{ permit_count }} building permits in {{ city_name }}, {{ city_state }}{% if total_value > 0 %}, with a total project value of ${{ '{:,.0f}'.format(total_value) }}{% endif %}. Data is updated daily."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What types of construction permits are most common in {{ city_name }}?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The most common permit types in {{ city_name }} include {% for trade, count in trade_breakdown.items() %}{% if loop.index <= 3 %}{{ trade }} ({{ count }} permits){% if not loop.last and loop.index < 3 %}, {% endif %}{% endif %}{% endfor %}."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How can contractors find construction leads in {{ city_name }}?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Contractors can find real-time construction leads in {{ city_name }} through PermitGrab, which aggregates building permit data including project addresses, estimated costs, contractor information, and permit types. New permits are added daily as they are filed with the {{ city_name }} building department."
+      }
+    }
+  ]
+}
+</script>
+
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
