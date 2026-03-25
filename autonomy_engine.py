@@ -35,6 +35,7 @@ from auto_discover import (
     find_city_field, score_dataset, fetch_sample, validate_sample,
     check_data_recency, auto_fix_field_map, get_socrata_columns,
     get_arcgis_columns, SEARCH_KEYWORDS,
+    run_arcgis_bulk_discovery,  # V16: ArcGIS bulk catalog sweep
 )
 # V12.54b: Import from collector for trade classification and fetch functions
 from collector import classify_trade, score_value, fetch_socrata, fetch_arcgis
@@ -936,17 +937,47 @@ def bootstrap_existing_sources():
     print(f"[Autonomy] Bootstrap complete: {total_loaded} total permits loaded", flush=True)
 
 
+def _fix_stuck_searching():
+    """V16: Reset counties/cities stuck in 'searching' status back to not_started.
+    This happens when the engine crashes mid-search."""
+    conn = permitdb.get_connection()
+    stuck_counties = conn.execute(
+        "UPDATE us_counties SET status='not_started' WHERE status='searching'"
+    ).rowcount
+    stuck_cities = conn.execute(
+        "UPDATE us_cities SET status='not_started' WHERE status='searching'"
+    ).rowcount
+    conn.commit()
+    if stuck_counties or stuck_cities:
+        print(f"[Autonomy] V16: Reset {stuck_counties} stuck counties, {stuck_cities} stuck cities", flush=True)
+
+
 def run_autonomy_engine():
     """Main entry point. Runs as daemon thread in server.py."""
     # Wait for startup + initial collection
-    print(f"[{datetime.now()}] V15: Autonomy engine starting in 10 seconds...", flush=True)
+    print(f"[{datetime.now()}] V16: Autonomy engine starting in 10 seconds...", flush=True)
     time.sleep(10)  # V15: was 30
+
+    # V16: Fix any stuck searching status from previous crash
+    try:
+        _fix_stuck_searching()
+    except Exception as e:
+        print(f"[Autonomy] Fix stuck error: {e}", flush=True)
 
     # V12.60: One-time bootstrap for pre-seeded sources
     try:
         bootstrap_existing_sources()
     except Exception as e:
         print(f"[Autonomy] Bootstrap error: {e}", flush=True)
+        traceback.print_exc()
+
+    # V16: Run ArcGIS bulk discovery on startup to find new sources fast
+    try:
+        print(f"[Autonomy] V16: Running ArcGIS bulk discovery...", flush=True)
+        arcgis_added = run_arcgis_bulk_discovery(max_results=500)
+        print(f"[Autonomy] V16: ArcGIS bulk discovery added {arcgis_added} new sources", flush=True)
+    except Exception as e:
+        print(f"[Autonomy] ArcGIS bulk discovery error: {e}", flush=True)
         traceback.print_exc()
 
     while True:
@@ -1064,6 +1095,14 @@ def run_maintenance_cycle():
         for row in stale_counties:
             county = dict(row)
             update_county_status(county['fips'], 'not_started')
+
+    # V16: Re-run ArcGIS bulk discovery during maintenance
+    try:
+        print(f"[Autonomy] V16: Periodic ArcGIS bulk discovery...", flush=True)
+        arcgis_added = run_arcgis_bulk_discovery(max_results=200)
+        print(f"[Autonomy] V16: ArcGIS periodic added {arcgis_added} sources", flush=True)
+    except Exception as e:
+        print(f"[Autonomy] ArcGIS periodic error: {e}", flush=True)
 
     # Run self-healing
     try:

@@ -525,3 +525,250 @@ def run_full_discovery(max_results=200):
 
     print(f"[Discovery] Complete: {new_sources_added} added, {sources_skipped} skipped, {sources_failed} failed")
     return new_sources_added
+
+
+# ============================================================================
+# V16: ARCGIS BULK DISCOVERY — sweep the entire ArcGIS Online catalog
+# ============================================================================
+
+ARCGIS_SEARCH_KEYWORDS = [
+    "building permits",
+    "building permits issued",
+    "construction permits",
+    "permit applications",
+    "development permits",
+    "building inspections",
+    "zoning permits",
+    "code enforcement",
+]
+
+# US state abbreviations for extracting state from ArcGIS metadata
+US_STATES = {
+    'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+    'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+    'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+    'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
+    'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+    'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
+    'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+    'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+    'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
+    'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+    'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
+    'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+    'wisconsin': 'WI', 'wyoming': 'WY', 'district of columbia': 'DC',
+}
+US_STATE_ABBREVS = set(US_STATES.values())
+
+
+def _extract_city_state_from_arcgis(result):
+    """Extract city name and state from ArcGIS search result metadata.
+    Uses title, snippet, tags, and owner fields to guess location.
+    Returns (city_name, state_abbrev) or (None, None)."""
+
+    title = result.get('title', '')
+    snippet = result.get('snippet', '') or ''
+    tags = result.get('tags', []) or []
+    owner = result.get('owner', '')
+    all_text = f"{title} {snippet} {' '.join(tags)} {owner}".lower()
+
+    state = ''
+    # Check for state abbreviations in tags first (most reliable)
+    for tag in tags:
+        tag_upper = tag.strip().upper()
+        if tag_upper in US_STATE_ABBREVS:
+            state = tag_upper
+            break
+    # Check for full state names in text
+    if not state:
+        for state_name, abbrev in US_STATES.items():
+            if state_name in all_text:
+                state = abbrev
+                break
+
+    # Extract city from title — strip common suffixes
+    city = title
+    for suffix in [' Building Permits', ' Permits', ' Permit', ' Construction',
+                   ' Building', ' Development', ' - Building', ' - Permits',
+                   ' Issued Permits', ' Active Permits', ' Residential Permits',
+                   ' Commercial Permits', ' Inspections', ' Code Enforcement',
+                   ' Planning', ' Zoning']:
+        if city.lower().endswith(suffix.lower()):
+            city = city[:len(city) - len(suffix)].strip()
+    # Strip "City of " prefix
+    if city.lower().startswith('city of '):
+        city = city[8:].strip()
+    # Strip state from end like "Austin, TX" or "Austin TX"
+    city = re.sub(r',?\s*[A-Z]{2}\s*$', '', city).strip()
+    # Strip trailing " - " fragments
+    if ' - ' in city:
+        city = city.split(' - ')[0].strip()
+
+    if not city or len(city) < 3 or len(city) > 60:
+        return None, None
+
+    return city, state
+
+
+def run_arcgis_bulk_discovery(max_results=500):
+    """
+    V16: Sweep ArcGIS Online catalog for ALL building permit Feature Services.
+    Unlike per-city ArcGIS search, this does a broad catalog scan and onboards
+    every valid permit service it finds.
+
+    Returns: int — number of new sources added
+    """
+    import db as permitdb
+    from city_source_db import upsert_city_source, get_city_config
+
+    print(f"[Discovery] V16: Starting ArcGIS bulk discovery...", flush=True)
+    new_sources_added = 0
+    sources_skipped = 0
+    sources_failed = 0
+    seen_ids = set()
+
+    for keyword in ARCGIS_SEARCH_KEYWORDS:
+        start = 1
+        while start < 500:  # Up to 500 results per keyword
+            url = "https://www.arcgis.com/sharing/rest/search"
+            params = {
+                'q': f'{keyword} type:"Feature Service"',
+                'f': 'json',
+                'num': 100,
+                'start': start,
+                'sortField': 'numviews',
+                'sortOrder': 'desc',
+            }
+
+            try:
+                resp = request_with_backoff(url, params=params, timeout=30)
+                if resp.status_code != 200:
+                    print(f"[Discovery] ArcGIS search failed ({resp.status_code}) for '{keyword}' start={start}", flush=True)
+                    break
+
+                data = resp.json()
+                results = data.get('results', [])
+                total = data.get('total', 0)
+
+                if not results:
+                    break
+
+                print(f"[Discovery] ArcGIS '{keyword}' start={start}: {len(results)} results (total: {total})", flush=True)
+
+                for r in results:
+                    try:
+                        item_id = r.get('id', '')
+                        if not item_id or item_id in seen_ids:
+                            continue
+                        seen_ids.add(item_id)
+
+                        # Must be a Feature Service
+                        if 'Feature Service' not in r.get('type', ''):
+                            continue
+
+                        service_url = r.get('url', '')
+                        if not service_url or 'FeatureServer' not in service_url:
+                            continue
+
+                        # Skip non-US services (check for common international patterns)
+                        title_lower = r.get('title', '').lower()
+                        if any(x in title_lower for x in ['canada', 'ontario', 'british columbia', 'uk ', 'australia']):
+                            continue
+
+                        # Extract city and state
+                        city, state = _extract_city_state_from_arcgis(r)
+                        if not city:
+                            continue
+
+                        # Build source key and endpoint
+                        source_key = f"arcgis_{item_id}"
+                        query_url = service_url.rstrip('/') + '/0/query'
+
+                        # Skip if already exists
+                        existing = get_city_config(source_key)
+                        if existing:
+                            sources_skipped += 1
+                            continue
+
+                        # Fetch columns to score and generate field map
+                        columns = get_arcgis_columns(query_url)
+                        if not columns:
+                            continue
+
+                        # Score
+                        score = score_dataset(columns, name=r.get('title', ''))
+                        if score < 50:
+                            continue
+
+                        # Generate field map
+                        field_map = generate_field_map(columns)
+                        if not field_map.get('address'):
+                            continue
+
+                        date_field = field_map.get('date') or field_map.get('filing_date')
+
+                        # Detect if this is a bulk/county source (has city_field)
+                        city_field = find_city_field(columns)
+                        mode = 'bulk' if city_field else 'city'
+
+                        source_config = {
+                            'source_key': source_key,
+                            'name': city[:50],
+                            'state': state,
+                            'platform': 'arcgis',
+                            'mode': mode,
+                            'endpoint': query_url,
+                            'dataset_id': item_id,
+                            'field_map': field_map,
+                            'date_field': date_field,
+                            'status': 'active',
+                            'discovery_score': score,
+                        }
+                        if city_field:
+                            source_config['city_field'] = city_field
+
+                        upsert_city_source(source_config)
+                        new_sources_added += 1
+                        print(f"[Discovery] ✓ ArcGIS: {city}, {state} ({source_key}) score={score} mode={mode}", flush=True)
+
+                        if new_sources_added >= max_results:
+                            break
+
+                    except Exception as e:
+                        sources_failed += 1
+                        if sources_failed <= 5:
+                            print(f"[Discovery] ✗ ArcGIS error: {str(e)[:100]}", flush=True)
+                        continue
+
+                if new_sources_added >= max_results:
+                    break
+
+                # Next page
+                next_start = data.get('nextStart', -1)
+                if next_start <= 0 or next_start <= start:
+                    break
+                start = next_start
+                time.sleep(0.5)  # Rate limit between pages
+
+            except Exception as e:
+                print(f"[Discovery] ArcGIS search error for '{keyword}': {e}", flush=True)
+                break
+
+        if new_sources_added >= max_results:
+            break
+        time.sleep(1)  # Rate limit between keywords
+
+    # Log discovery run
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("""
+            INSERT INTO discovery_runs (run_type, completed_at, sources_found)
+            VALUES ('arcgis_bulk', datetime('now'), ?)
+        """, (new_sources_added,))
+        conn.commit()
+    except Exception as e:
+        print(f"[Discovery] Warning: Failed to log arcgis run: {e}")
+
+    print(f"[Discovery] ArcGIS bulk complete: {new_sources_added} added, "
+          f"{sources_skipped} skipped, {sources_failed} failed, {len(seen_ids)} unique items scanned", flush=True)
+    return new_sources_added
