@@ -1576,10 +1576,11 @@ def load_stats():
         return {}
 
 def get_cities_with_data():
-    """V13.2: Get ALL cities from permits table sorted by permit volume.
+    """V13.3: Get ALL cities from permits table sorted by permit volume.
 
     V13.1: Normalize and deduplicate city names (handles inconsistent casing)
     V13.2: Filter state names as cities, filter non-US entries, cross-state dedup
+    V13.3: Filter garbage city names, fix OK state corruption by prioritizing registry
     """
     # V13.2: Valid US state/territory codes - filter out Canadian provinces etc.
     VALID_US_STATES = {
@@ -1605,6 +1606,15 @@ def get_cities_with_data():
         'west virginia', 'wisconsin', 'wyoming', 'district of columbia'
     }
 
+    # V13.3: Garbage patterns - dataset names, permit types, and other junk
+    GARBAGE_PATTERNS = [
+        'dob now', 'build –', 'build-', 'applications', 'certificate',
+        'permits table', 'data_wfl', 'epic-la', 'bureau of', '_wgs84',
+        'inspections', 'case history', 'building and safety',
+        'development permits', 'sewer data', 'engineering permit',
+        'permit information', 'county permit', 'limited alteration'
+    ]
+
     # Get city counts from SQLite - this has ALL cities with permits
     city_rows = permitdb.get_cities_with_permits()
 
@@ -1612,6 +1622,12 @@ def get_cities_with_data():
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
     city_lookup_lower = {c['name'].lower(): c for c in all_cities}
+
+    # V13.3: Build registry lookup by (city_lower, state_upper) for state priority
+    registry_by_city_state = {}
+    for c in all_cities:
+        key = (c['name'].lower(), c.get('state', '').upper())
+        registry_by_city_state[key] = c
 
     # Known city name corrections (partial names -> full names)
     CITY_NAME_FIXES = {
@@ -1638,6 +1654,14 @@ def get_cities_with_data():
 
         # V13.2: Filter out state names appearing as city names
         if name_lower in US_STATE_NAMES:
+            continue
+
+        # V13.3: Filter garbage city names (dataset names, permit types, etc.)
+        if any(p in name_lower for p in GARBAGE_PATTERNS):
+            continue
+
+        # V13.3: Skip names that are too long (real city names are rarely >35 chars)
+        if len(name) > 35:
             continue
 
         # Apply known fixes for partial names
@@ -1671,29 +1695,43 @@ def get_cities_with_data():
             'permit_count': group['permit_count']
         })
 
-    # Build final city list - for each city name, use state with highest count
+    # Build final city list - for each city name, pick best state
     cities_with_counts = []
     for name_lower, state_entries in name_only_groups.items():
-        # Pick the state entry with highest permit count
-        best_entry = max(state_entries, key=lambda x: x['permit_count'])
         # Sum ALL permit counts across all states for this city
         total_count = sum(e['permit_count'] for e in state_entries)
 
-        # Pick the best display name
-        best_name = None
+        # V13.3: Prioritize registry state over permit count
+        # First check if any (city, state) combo is in the registry
+        registry_entry = None
+        registry_state_entry = None
+        for entry in state_entries:
+            key = (name_lower, entry['state_code'])
+            if key in registry_by_city_state:
+                registry_entry = registry_by_city_state[key]
+                registry_state_entry = entry
+                break
 
-        # Check if city is in registry (case-insensitive)
+        # If registry match found, use that; otherwise use highest permit count
+        if registry_entry:
+            city_info = registry_entry.copy()
+            city_info['permit_count'] = total_count
+            cities_with_counts.append(city_info)
+            continue
+
+        # Also check registry by name only (case-insensitive)
         if name_lower in city_lookup_lower:
             registry_city = city_lookup_lower[name_lower]
             city_info = registry_city.copy()
             city_info['permit_count'] = total_count
-            # Use best state if registry doesn't have one
-            if not city_info.get('state'):
-                city_info['state'] = best_entry['state']
             cities_with_counts.append(city_info)
             continue
 
-        # Not in registry - pick best name from variants
+        # Not in registry - pick state with highest permit count
+        best_entry = max(state_entries, key=lambda x: x['permit_count'])
+
+        # Pick best display name from variants
+        best_name = None
         for n in best_entry['names']:
             if n == n.title():
                 best_name = n
@@ -6014,10 +6052,19 @@ def sitemap():
                     'priority': '0.6',
                 })
 
+    # V13.3: Deduplicate URLs before rendering (fixes regression where all URLs appeared 2x)
+    seen_locs = set()
+    unique_urls = []
+    for url in urls:
+        loc = url['loc']
+        if loc not in seen_locs:
+            seen_locs.add(loc)
+            unique_urls.append(url)
+
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
 
-    for url in urls:
+    for url in unique_urls:
         xml += '  <url>\n'
         xml += f"    <loc>{url['loc']}</loc>\n"
         xml += f"    <lastmod>{url.get('lastmod', today)}</lastmod>\n"
