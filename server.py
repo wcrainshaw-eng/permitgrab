@@ -1576,20 +1576,40 @@ def load_stats():
         return {}
 
 def get_cities_with_data():
-    """V13: Get ALL cities from permits table sorted by permit volume.
+    """V13.2: Get ALL cities from permits table sorted by permit volume.
 
-    Previous version only returned cities in the static CITY_REGISTRY.
-    Now returns ALL 555+ cities that have actual permit data.
-
-    V13.1: Normalize and deduplicate city names (handles inconsistent casing
-    like 'LITTLE ROCK' vs 'Little Rock', and partial names like 'Orleans').
+    V13.1: Normalize and deduplicate city names (handles inconsistent casing)
+    V13.2: Filter state names as cities, filter non-US entries, cross-state dedup
     """
+    # V13.2: Valid US state/territory codes - filter out Canadian provinces etc.
+    VALID_US_STATES = {
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA',
+        'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
+        'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX',
+        'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+        'AS', 'GU', 'MP', 'PR', 'VI'  # territories
+    }
+
+    # V13.2: US state names to filter out as city entries
+    US_STATE_NAMES = {
+        'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+        'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho',
+        'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana',
+        'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota',
+        'mississippi', 'missouri', 'montana', 'nebraska', 'nevada',
+        'new hampshire', 'new jersey', 'new mexico', 'new york',
+        'north carolina', 'north dakota', 'ohio', 'oklahoma', 'oregon',
+        'pennsylvania', 'rhode island', 'south carolina', 'south dakota',
+        'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington',
+        'west virginia', 'wisconsin', 'wyoming', 'district of columbia'
+    }
+
     # Get city counts from SQLite - this has ALL cities with permits
     city_rows = permitdb.get_cities_with_permits()
 
     # Get static registry for cities that have extra config
     all_cities = get_all_cities_info()
-    # Create lookup by both exact name AND lowercased name
     city_lookup = {c['name']: c for c in all_cities}
     city_lookup_lower = {c['name'].lower(): c for c in all_cities}
 
@@ -1599,7 +1619,7 @@ def get_cities_with_data():
         'york': 'New York',
     }
 
-    # Group by normalized key (lowercase city + state) to deduplicate
+    # PASS 1: Group by normalized key (lowercase city + state) to deduplicate
     city_groups = {}
     for row in city_rows:
         name = row['city']
@@ -1609,16 +1629,24 @@ def get_cities_with_data():
         if not name or not name.strip():
             continue
 
+        # V13.2: Filter out non-US states (Canadian provinces like AB, ON, etc.)
+        if state and state.upper() not in VALID_US_STATES:
+            continue
+
         # Normalize the city name
         name_lower = name.lower().strip()
+
+        # V13.2: Filter out state names appearing as city names
+        if name_lower in US_STATE_NAMES:
+            continue
 
         # Apply known fixes for partial names
         if name_lower in CITY_NAME_FIXES:
             name = CITY_NAME_FIXES[name_lower]
             name_lower = name.lower()
 
-        # Create dedup key
-        key = (name_lower, state.lower() if state else '')
+        # Create dedup key (city + state)
+        key = (name_lower, state.upper() if state else '')
 
         if key not in city_groups:
             city_groups[key] = {
@@ -1630,37 +1658,57 @@ def get_cities_with_data():
         city_groups[key]['names'].append(name)
         city_groups[key]['permit_count'] += permit_count
 
-    # Build final city list with proper names
+    # PASS 2: Cross-state dedup - merge same city name across different states
+    # Group by city name only, then pick the state with highest permit count
+    name_only_groups = {}
+    for (name_lower, state_code), group in city_groups.items():
+        if name_lower not in name_only_groups:
+            name_only_groups[name_lower] = []
+        name_only_groups[name_lower].append({
+            'state_code': state_code,
+            'state': group['state'],
+            'names': group['names'],
+            'permit_count': group['permit_count']
+        })
+
+    # Build final city list - for each city name, use state with highest count
     cities_with_counts = []
-    for (name_lower, state_lower), group in city_groups.items():
-        # Pick the best name: prefer registry name, then title case
+    for name_lower, state_entries in name_only_groups.items():
+        # Pick the state entry with highest permit count
+        best_entry = max(state_entries, key=lambda x: x['permit_count'])
+        # Sum ALL permit counts across all states for this city
+        total_count = sum(e['permit_count'] for e in state_entries)
+
+        # Pick the best display name
         best_name = None
 
         # Check if city is in registry (case-insensitive)
         if name_lower in city_lookup_lower:
             registry_city = city_lookup_lower[name_lower]
             city_info = registry_city.copy()
-            city_info['permit_count'] = group['permit_count']
+            city_info['permit_count'] = total_count
+            # Use best state if registry doesn't have one
+            if not city_info.get('state'):
+                city_info['state'] = best_entry['state']
             cities_with_counts.append(city_info)
             continue
 
         # Not in registry - pick best name from variants
-        # Prefer title case version, or create one
-        for n in group['names']:
+        for n in best_entry['names']:
             if n == n.title():
                 best_name = n
                 break
         if not best_name:
-            best_name = group['names'][0].title()
+            best_name = best_entry['names'][0].title()
 
-        state = group['state']
+        state = best_entry['state']
         slug = best_name.lower().replace(' ', '-').replace(',', '').replace('.', '')
 
         city_info = {
             'name': best_name,
             'state': state,
             'slug': slug,
-            'permit_count': group['permit_count'],
+            'permit_count': total_count,
             'active': True
         }
         cities_with_counts.append(city_info)
@@ -5849,7 +5897,8 @@ def cities_browse():
         cities.sort(key=lambda c: c.get('permit_count', 0), reverse=True)
 
     # Top cities across all states (for hero section)
-    top_cities = all_cities[:12]
+    # V13.2: Increased from 12 to 20 for better coverage
+    top_cities = all_cities[:20]
 
     total_cities = len(all_cities)
     total_states = len(states)
@@ -5922,7 +5971,14 @@ def sitemap():
     except Exception:
         pass
 
+    # V13.2: Prevent duplicate sitemap URLs - city slugs that match state slugs
+    state_slugs = set(STATE_CONFIG.keys())
+
     for slug, city_info in all_discovered_cities.items():
+        # V13.2: Skip if this slug is already listed as a state hub
+        if slug in state_slugs:
+            continue
+
         # Skip cities with no permits (these have noindex anyway)
         if city_info['name'] not in cities_with_permits:
             continue

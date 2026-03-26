@@ -350,13 +350,32 @@ function filterCities(query) {
   const q = query.toLowerCase().trim();
   const sections = document.querySelectorAll('.state-section');
   const links = document.querySelectorAll('.city-link');
+  const topCards = document.querySelectorAll('.top-city-card');
+  const topSection = document.querySelector('.top-cities');
 
   if (!q) {
     sections.forEach(s => s.style.display = '');
     links.forEach(l => l.style.display = '');
+    topCards.forEach(c => c.style.display = '');
+    if (topSection) topSection.style.display = '';
     return;
   }
 
+  // V13.2: Filter top city cards
+  let topVisible = 0;
+  topCards.forEach(card => {
+    const name = card.querySelector('.top-city-name');
+    const state = card.querySelector('.top-city-meta');
+    const cityName = name ? name.textContent.toLowerCase() : '';
+    const stateName = state ? state.textContent.toLowerCase() : '';
+    const match = cityName.includes(q) || stateName.includes(q);
+    card.style.display = match ? '' : 'none';
+    if (match) topVisible++;
+  });
+  // Hide entire top section if no matches
+  if (topSection) topSection.style.display = topVisible ? '' : 'none';
+
+  // Filter state sections
   sections.forEach(section => {
     const state = section.dataset.state;
     const cityLinks = section.querySelectorAll('.city-link');
