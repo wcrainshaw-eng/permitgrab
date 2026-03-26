@@ -1580,15 +1580,27 @@ def get_cities_with_data():
 
     Previous version only returned cities in the static CITY_REGISTRY.
     Now returns ALL 555+ cities that have actual permit data.
+
+    V13.1: Normalize and deduplicate city names (handles inconsistent casing
+    like 'LITTLE ROCK' vs 'Little Rock', and partial names like 'Orleans').
     """
     # Get city counts from SQLite - this has ALL cities with permits
     city_rows = permitdb.get_cities_with_permits()
 
     # Get static registry for cities that have extra config
     all_cities = get_all_cities_info()
+    # Create lookup by both exact name AND lowercased name
     city_lookup = {c['name']: c for c in all_cities}
+    city_lookup_lower = {c['name'].lower(): c for c in all_cities}
 
-    cities_with_counts = []
+    # Known city name corrections (partial names -> full names)
+    CITY_NAME_FIXES = {
+        'orleans': 'New Orleans',
+        'york': 'New York',
+    }
+
+    # Group by normalized key (lowercase city + state) to deduplicate
+    city_groups = {}
     for row in city_rows:
         name = row['city']
         state = row.get('state', '')
@@ -1597,20 +1609,60 @@ def get_cities_with_data():
         if not name or not name.strip():
             continue
 
-        if name in city_lookup:
-            # City exists in static registry - use its config
-            city_info = city_lookup[name].copy()
-            city_info['permit_count'] = permit_count
-        else:
-            # V13: City NOT in registry - create dynamic entry
-            slug = name.lower().replace(' ', '-').replace(',', '').replace('.', '')
-            city_info = {
-                'name': name,
+        # Normalize the city name
+        name_lower = name.lower().strip()
+
+        # Apply known fixes for partial names
+        if name_lower in CITY_NAME_FIXES:
+            name = CITY_NAME_FIXES[name_lower]
+            name_lower = name.lower()
+
+        # Create dedup key
+        key = (name_lower, state.lower() if state else '')
+
+        if key not in city_groups:
+            city_groups[key] = {
+                'names': [],
                 'state': state,
-                'slug': slug,
-                'permit_count': permit_count,
-                'active': True
+                'permit_count': 0
             }
+
+        city_groups[key]['names'].append(name)
+        city_groups[key]['permit_count'] += permit_count
+
+    # Build final city list with proper names
+    cities_with_counts = []
+    for (name_lower, state_lower), group in city_groups.items():
+        # Pick the best name: prefer registry name, then title case
+        best_name = None
+
+        # Check if city is in registry (case-insensitive)
+        if name_lower in city_lookup_lower:
+            registry_city = city_lookup_lower[name_lower]
+            city_info = registry_city.copy()
+            city_info['permit_count'] = group['permit_count']
+            cities_with_counts.append(city_info)
+            continue
+
+        # Not in registry - pick best name from variants
+        # Prefer title case version, or create one
+        for n in group['names']:
+            if n == n.title():
+                best_name = n
+                break
+        if not best_name:
+            best_name = group['names'][0].title()
+
+        state = group['state']
+        slug = best_name.lower().replace(' ', '-').replace(',', '').replace('.', '')
+
+        city_info = {
+            'name': best_name,
+            'state': state,
+            'slug': slug,
+            'permit_count': group['permit_count'],
+            'active': True
+        }
         cities_with_counts.append(city_info)
 
     # Sort by permit count descending (top cities first)

@@ -2163,7 +2163,7 @@ function renderPermits() {
           <span class="lead-score-badge ${leadQuality}">${scoreIcon} ${leadScore} pts</span>
           <span class="permit-value ${valueClass}">${cost}</span>
         </div>
-        <div class="permit-address"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address + ', ' + p.city + ', ' + p.state)}" target="_blank" rel="noopener" title="View on Google Maps" style="color: inherit; text-decoration: none;">${escapeHtml(p.display_address || p.address)} <span style="font-size: 12px;">&#128205;</span></a></div>
+        <div class="permit-address"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanAddress(p.address) + ', ' + p.city + ', ' + p.state)}" target="_blank" rel="noopener" title="View on Google Maps" style="color: inherit; text-decoration: none;">${escapeHtml(cleanAddress(p.display_address || p.address))} <span style="font-size: 12px;">&#128205;</span></a></div>
         <div class="permit-city-state">${escapeHtml(p.city)}, ${p.state} ${p.zip || ''}</div>
         <div class="permit-description">${escapeHtml(p.display_description || p.description)}</div>
         <div class="permit-meta">
@@ -2401,6 +2401,37 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// V13.1: Clean raw Socrata location JSON from address fields
+function cleanAddress(addr) {
+  if (!addr) return '';
+  const s = String(addr).trim();
+  // Check if it looks like Socrata location JSON
+  if (s.startsWith('{') && (s.includes('latitude') || s.includes('human_address'))) {
+    try {
+      // Handle Python dict format with single quotes
+      const jsonStr = s.replace(/'/g, '"');
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.human_address) {
+        let human = parsed.human_address;
+        if (typeof human === 'string') {
+          human = JSON.parse(human);
+        }
+        if (human && human.address && human.address.trim()) {
+          return human.address.trim();
+        }
+      }
+      // No valid address in JSON - return empty
+      return '';
+    } catch (e) {
+      // If parsing fails and it looks like coord JSON, return empty
+      if (s.includes('latitude') && s.includes('longitude')) {
+        return '';
+      }
+    }
+  }
+  return s;
 }
 
 // V13: Clean up permit type abbreviations and filter reviewer codes

@@ -45,7 +45,9 @@ def parse_address_value(val):
                     parts = []
                     if human.get('address'):
                         parts.append(human['address'].strip())
-                    return ' '.join(parts) if parts else str(val)
+                    # V13.1: Return empty string if human_address has no useful data
+                    # (all fields empty), NOT the raw JSON object
+                    return ' '.join(parts) if parts else ''
             except (json.JSONDecodeError, TypeError):
                 pass
         if val.get('address'):

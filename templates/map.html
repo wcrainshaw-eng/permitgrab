@@ -287,6 +287,27 @@ const cityCoords = {
   // Default for unknown cities - will be scattered slightly
 };
 
+// V13.1: Clean raw Socrata location JSON from address fields
+function cleanAddress(addr) {
+  if (!addr) return '';
+  const s = String(addr).trim();
+  if (s.startsWith('{') && (s.includes('latitude') || s.includes('human_address'))) {
+    try {
+      const jsonStr = s.replace(/'/g, '"');
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.human_address) {
+        let human = parsed.human_address;
+        if (typeof human === 'string') human = JSON.parse(human);
+        if (human && human.address && human.address.trim()) return human.address.trim();
+      }
+      return '';
+    } catch (e) {
+      if (s.includes('latitude') && s.includes('longitude')) return '';
+    }
+  }
+  return s;
+}
+
 function initMap() {
   // Center on US
   map = L.map('map').setView([39.8283, -98.5795], 4);
@@ -387,9 +408,10 @@ function addMarkersToMap(permits) {
           : '$' + permit.estimated_cost.toLocaleString())
       : 'Not listed';
 
+    const displayAddr = cleanAddress(permit.address) || 'Address not available';
     let popupContent = `
       <div class="permit-popup">
-        <h4>${permit.address || 'Address not available'}</h4>
+        <h4>${displayAddr}</h4>
         <p><strong>${permit.city || 'Unknown'}, ${permit.state || ''}</strong></p>
         <p>Value: <span class="value">${value}</span></p>
         <span class="trade-badge">${permit.trade_category || 'General'}</span>
@@ -397,7 +419,7 @@ function addMarkersToMap(permits) {
 
     if (isPro) {
       popupContent += `
-        <br><a href="/?search=${encodeURIComponent(permit.address || '')}" class="view-link">View Details &rarr;</a>
+        <br><a href="/?search=${encodeURIComponent(displayAddr)}" class="view-link">View Details &rarr;</a>
       </div>`;
     } else {
       popupContent += `
