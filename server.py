@@ -1664,6 +1664,18 @@ def get_cities_with_data():
         if registry_state:
             state = registry_state
 
+        # V13.5: Fix OK state corruption - reassign non-Oklahoma cities to TX
+        # The DB has ~1100 Texas cities incorrectly tagged as "OK" from a past bulk run
+        KNOWN_OK_CITIES = {
+            'oklahoma city', 'tulsa', 'norman', 'broken arrow', 'edmond',
+            'lawton', 'moore', 'midwest city', 'enid', 'stillwater',
+            'muskogee', 'bartlesville', 'owasso', 'shawnee', 'ponca city',
+            'ardmore', 'duncan', 'del city', 'bixby', 'sapulpa', 'altus',
+            'bethany', 'sand springs', 'yukon', 'mustang', 'claremore'
+        }
+        if state and state.upper() == 'OK' and name_lower not in KNOWN_OK_CITIES:
+            state = 'TX'  # These are Texas cities incorrectly tagged as OK
+
         # V13.4: Require valid US state (eliminates "Other Locations" garbage)
         if not state or state.upper() not in VALID_US_STATES:
             continue
@@ -5979,9 +5991,11 @@ def sitemap():
 
     # V13.4: Use dict keyed by URL to guarantee no duplicates
     url_map = {}
+    _add_count = [0]  # Use list to allow modification in nested function
 
     def add_url(loc, changefreq='daily', priority='0.5', lastmod=None):
         """Add URL to sitemap, skipping if already exists."""
+        _add_count[0] += 1
         if loc not in url_map:
             url_map[loc] = {
                 'loc': loc,
@@ -6057,20 +6071,28 @@ def sitemap():
                 slug = filename.replace('.md', '')
                 add_url(f"{SITE_URL}/blog/{slug}", 'monthly', '0.6')
 
+    # V13.5: Debug logging to trace sitemap duplication
+    print(f"[SITEMAP DEBUG] add_url called {_add_count[0]} times, url_map has {len(url_map)} unique URLs")
+
     # V13.4: Generate XML from url_map (dict guarantees no duplicates)
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n',
+                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
 
+    url_count = 0
     for url in url_map.values():
-        xml += '  <url>\n'
-        xml += f"    <loc>{url['loc']}</loc>\n"
-        xml += f"    <lastmod>{url['lastmod']}</lastmod>\n"
-        xml += f"    <changefreq>{url['changefreq']}</changefreq>\n"
-        xml += f"    <priority>{url['priority']}</priority>\n"
-        xml += '  </url>\n'
+        xml_parts.append('  <url>\n')
+        xml_parts.append(f"    <loc>{url['loc']}</loc>\n")
+        xml_parts.append(f"    <lastmod>{url['lastmod']}</lastmod>\n")
+        xml_parts.append(f"    <changefreq>{url['changefreq']}</changefreq>\n")
+        xml_parts.append(f"    <priority>{url['priority']}</priority>\n")
+        xml_parts.append('  </url>\n')
+        url_count += 1
 
-    xml += '</urlset>'
+    xml_parts.append('</urlset>')
 
+    print(f"[SITEMAP DEBUG] Generated XML with {url_count} URL entries")
+
+    xml = ''.join(xml_parts)
     return Response(xml, mimetype='application/xml')
 
 
