@@ -1619,9 +1619,20 @@ def get_cities_with_data():
     city_rows = permitdb.get_cities_with_permits()
 
     # Get static registry for cities that have extra config
-    all_cities = get_all_cities_info()
+    all_cities = get_all_cities_info()  # Active only - for display
     city_lookup = {c['name']: c for c in all_cities}
     city_lookup_lower = {c['name'].lower(): c for c in all_cities}
+
+    # V13.4: Build registry lookup from ALL configs (including inactive)
+    # This fixes Houston OK -> TX (Houston's config is inactive but has state="TX")
+    registry_state_by_city = {}
+    for key, cfg in CITY_REGISTRY.items():
+        city_lower = cfg.get('name', '').lower()
+        state = cfg.get('state', '').upper()
+        if city_lower and state:
+            # If city appears multiple times, prefer active config's state
+            if city_lower not in registry_state_by_city or cfg.get('active'):
+                registry_state_by_city[city_lower] = state
 
     # V13.3: Build registry lookup by (city_lower, state_upper) for state priority
     registry_by_city_state = {}
@@ -1645,12 +1656,17 @@ def get_cities_with_data():
         if not name or not name.strip():
             continue
 
-        # V13.2: Filter out non-US states (Canadian provinces like AB, ON, etc.)
-        if state and state.upper() not in VALID_US_STATES:
-            continue
-
-        # Normalize the city name
+        # Normalize the city name first (needed for registry lookup)
         name_lower = name.lower().strip()
+
+        # V13.4: Use registry to correct state (fixes Houston OK -> TX)
+        registry_state = registry_state_by_city.get(name_lower)
+        if registry_state:
+            state = registry_state
+
+        # V13.4: Require valid US state (eliminates "Other Locations" garbage)
+        if not state or state.upper() not in VALID_US_STATES:
+            continue
 
         # V13.2: Filter out state names appearing as city names
         if name_lower in US_STATE_NAMES:
@@ -5958,42 +5974,45 @@ def cities_browse():
 
 @app.route('/sitemap.xml')
 def sitemap():
-    """Generate XML sitemap for SEO - fully dynamic."""
+    """V13.4: Generate XML sitemap for SEO - uses dict to prevent duplicates."""
     today = datetime.now().strftime('%Y-%m-%d')
 
-    urls = [
-        {'loc': SITE_URL, 'changefreq': 'daily', 'priority': '1.0'},
-        {'loc': f"{SITE_URL}/pricing", 'changefreq': 'weekly', 'priority': '0.9'},
-        {'loc': f"{SITE_URL}/contractors", 'changefreq': 'daily', 'priority': '0.8'},
-        {'loc': f"{SITE_URL}/map", 'changefreq': 'daily', 'priority': '0.8'},  # V12.26: Permit heat map
-        {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7'},
-        {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7'},
-        {'loc': f"{SITE_URL}/cities", 'changefreq': 'daily', 'priority': '0.9'},  # V17e: Cities hub page
-        {'loc': f"{SITE_URL}/stats", 'changefreq': 'daily', 'priority': '0.7'},  # V12.23 SEO
-        {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6'},
-        {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5'},
-        # V12.23 SEO: Removed /login, /signup from sitemap - auth pages shouldn't be indexed
-        {'loc': f"{SITE_URL}/privacy", 'changefreq': 'monthly', 'priority': '0.3'},
-        {'loc': f"{SITE_URL}/terms", 'changefreq': 'monthly', 'priority': '0.3'},
-    ]
+    # V13.4: Use dict keyed by URL to guarantee no duplicates
+    url_map = {}
 
-    # V12.23 SEO: Add state hub pages to sitemap
+    def add_url(loc, changefreq='daily', priority='0.5', lastmod=None):
+        """Add URL to sitemap, skipping if already exists."""
+        if loc not in url_map:
+            url_map[loc] = {
+                'loc': loc,
+                'changefreq': changefreq,
+                'priority': priority,
+                'lastmod': lastmod or today
+            }
+
+    # Static pages
+    add_url(SITE_URL, 'daily', '1.0')
+    add_url(f"{SITE_URL}/pricing", 'weekly', '0.9')
+    add_url(f"{SITE_URL}/contractors", 'daily', '0.8')
+    add_url(f"{SITE_URL}/map", 'daily', '0.8')
+    add_url(f"{SITE_URL}/get-alerts", 'weekly', '0.7')
+    add_url(f"{SITE_URL}/blog", 'weekly', '0.7')
+    add_url(f"{SITE_URL}/cities", 'daily', '0.9')
+    add_url(f"{SITE_URL}/stats", 'daily', '0.7')
+    add_url(f"{SITE_URL}/about", 'monthly', '0.6')
+    add_url(f"{SITE_URL}/contact", 'monthly', '0.5')
+    add_url(f"{SITE_URL}/privacy", 'monthly', '0.3')
+    add_url(f"{SITE_URL}/terms", 'monthly', '0.3')
+
+    # State hub pages (higher priority than city pages)
     for state_slug in STATE_CONFIG.keys():
-        urls.append({
-            'loc': f"{SITE_URL}/permits/{state_slug}",
-            'changefreq': 'daily',
-            'priority': '0.85',  # Between homepage and city pages
-        })
-
-    # V12.32: Include auto-discovered cities from bulk sources in sitemap
-    # Use dynamic discovery instead of static ALL_CITIES
-    all_discovered_cities = discover_cities_from_permits()
+        add_url(f"{SITE_URL}/permits/{state_slug}", 'daily', '0.85')
 
     # Get cities with permits for filtering
     cities_with_data = get_cities_with_data()
     cities_with_permits = {c['name'] for c in cities_with_data}
 
-    # V17e: Get real lastmod timestamps per city from permit data
+    # Get real lastmod timestamps per city from permit data
     city_lastmod = {}
     try:
         conn = permitdb.get_connection()
@@ -6005,40 +6024,30 @@ def sitemap():
                     city_lastmod[city_slug_key] = row['latest'][:10]  # YYYY-MM-DD
                 except (TypeError, IndexError):
                     pass
-        # V12.60: Do NOT close thread-local SQLite connection — it poisons the pool
     except Exception:
         pass
 
-    # V13.2: Prevent duplicate sitemap URLs - city slugs that match state slugs
+    # V13.4: Use state_slugs set to skip city slugs that match state hub slugs
     state_slugs = set(STATE_CONFIG.keys())
 
+    # Include auto-discovered cities from bulk sources
+    all_discovered_cities = discover_cities_from_permits()
     for slug, city_info in all_discovered_cities.items():
-        # V13.2: Skip if this slug is already listed as a state hub
+        # Skip if this slug is already a state hub (add_url won't duplicate anyway)
         if slug in state_slugs:
             continue
-
-        # Skip cities with no permits (these have noindex anyway)
+        # Skip cities with no permits
         if city_info['name'] not in cities_with_permits:
             continue
 
         lastmod = city_lastmod.get(slug, today)
-        urls.append({
-            'loc': f"{SITE_URL}/permits/{slug}",
-            'lastmod': lastmod,
-            'changefreq': 'daily',
-            'priority': '0.8',
-        })
+        add_url(f"{SITE_URL}/permits/{slug}", 'daily', '0.8', lastmod)
 
-        # V12.60: Add city × trade pages, but skip 'all-trades' (renders empty, wastes crawl budget)
+        # Add city × trade pages (skip 'all-trades')
         for trade_slug in get_trade_slugs():
             if trade_slug == 'all-trades':
                 continue
-            urls.append({
-                'loc': f"{SITE_URL}/permits/{slug}/{trade_slug}",
-                'lastmod': lastmod,
-                'changefreq': 'daily',
-                'priority': '0.7',
-            })
+            add_url(f"{SITE_URL}/permits/{slug}/{trade_slug}", 'daily', '0.7', lastmod)
 
     # Add blog posts
     blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
@@ -6046,28 +6055,16 @@ def sitemap():
         for filename in os.listdir(blog_dir):
             if filename.endswith('.md'):
                 slug = filename.replace('.md', '')
-                urls.append({
-                    'loc': f"{SITE_URL}/blog/{slug}",
-                    'changefreq': 'monthly',
-                    'priority': '0.6',
-                })
+                add_url(f"{SITE_URL}/blog/{slug}", 'monthly', '0.6')
 
-    # V13.3: Deduplicate URLs before rendering (fixes regression where all URLs appeared 2x)
-    seen_locs = set()
-    unique_urls = []
-    for url in urls:
-        loc = url['loc']
-        if loc not in seen_locs:
-            seen_locs.add(loc)
-            unique_urls.append(url)
-
+    # V13.4: Generate XML from url_map (dict guarantees no duplicates)
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
 
-    for url in unique_urls:
+    for url in url_map.values():
         xml += '  <url>\n'
         xml += f"    <loc>{url['loc']}</loc>\n"
-        xml += f"    <lastmod>{url.get('lastmod', today)}</lastmod>\n"
+        xml += f"    <lastmod>{url['lastmod']}</lastmod>\n"
         xml += f"    <changefreq>{url['changefreq']}</changefreq>\n"
         xml += f"    <priority>{url['priority']}</priority>\n"
         xml += '  </url>\n'
