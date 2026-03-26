@@ -292,7 +292,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V19: Full 35-field map — owner name, applicant, construction value, total/unpaid fees, bond amount, beds/baths, building area, second floor/basement, land use, zoning, council district, subdivision, parcel PIN, inspections, days open/issued, open comments. Same-day data Mar 24, 2026. GOLD.",
     },
 
@@ -368,7 +368,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.6: Verified working — data.cambridgema.gov",
     },
 
@@ -1108,7 +1108,7 @@ CITY_REGISTRY = {
         },
         "date_field": "createddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V19: Replaced fabricated msmn-pn2k with real dataset 4vab-c87q. Rich data: applicant, estimatedvalueofwork, address, TMK, statusdescription, boolean work-type flags (addition/alteration/demolition/pool/solar/ADU/EV charger), fee calculation, CO issued. Data 2005-Jun 2025. Verified Mar 2026.",
     },
 
@@ -1226,7 +1226,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.32: Verified live — premium: contractor name+address, applicant, sq_ft, valuation",
     },
 
@@ -4642,7 +4642,7 @@ CITY_REGISTRY = {
         },
         "date_field": "year",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "Historical data 2000-2009",
     },
 
@@ -4822,7 +4822,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "nola_blds": {
@@ -4843,7 +4843,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.8: Deactivated - duplicate slug with new_orleans",
     },
 
@@ -7792,7 +7792,7 @@ CITY_REGISTRY = {
         "date_field": "permit_issue_date",
         "default_filter": "$where=permit_type='Building'",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "Mixed permits/inspections dataset; filter by permit_type='Building' for building permits only.",
     },
 
@@ -10960,7 +10960,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "situscity", "value": "ALLEN"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -11006,7 +11006,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "situscity", "value": "WYLIE"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -13213,7 +13213,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Austin TX construction permits from datahub. 82 columns, massive dataset.",
     },
 
@@ -13237,7 +13237,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Norfolk VA permits and inspections. 32 fields incl. fees, work items.",
     },
 
@@ -13260,7 +13260,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Dallas TX building permits. Includes contractor info.",
     },
 
@@ -13283,7 +13283,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Cincinnati OH building permits. 27 fields, updated daily.",
     },
 
@@ -13307,7 +13307,7 @@ CITY_REGISTRY = {
         },
         "date_field": "processed_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Orlando FL permit applications. Includes worktype, square footage.",
     },
 
@@ -13331,7 +13331,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Corona CA building permits. Pop ~157K. Good field coverage.",
     },
 
@@ -13355,7 +13355,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Mesa AZ building permits. Pop ~518K. 34 fields, updated daily.",
     },
 
@@ -13377,7 +13377,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Buffalo NY building permits. Includes applicant, license info.",
     },
 
@@ -13402,7 +13402,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: San Diego County permits. Covers Alpine, Valley Center, Fallbrook, etc.",
     },
 
@@ -13425,7 +13425,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: College Station TX permits. Pop ~120K. Home of Texas A&M.",
     },
 
@@ -13448,8 +13448,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.60: Gainesville FL building permits. Includes business, primary party.",
+        "active": False,
+        "notes": "V12.60: Gainesville FL building permits. Deactivated - duplicate of gainesville.",
     },
 
     # --- Little Rock AR ---
@@ -13472,7 +13472,7 @@ CITY_REGISTRY = {
         },
         "date_field": "appdate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Little Rock AR permits. Pop ~202K. First AR city! Includes sq ft, contractor.",
     },
 
@@ -13496,7 +13496,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Fort Worth TX development permits. Pop ~978K. 25 fields.",
     },
 
@@ -13520,7 +13520,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Framingham MA building permits. Pop ~73K.",
     },
 
@@ -13759,7 +13759,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Pierce County WA Socrata permits. Covers Tacoma unincorp, Lakewood, etc.",
     },
 
@@ -14410,7 +14410,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: San Diego County public endpoint. Alpine, Borrego Springs, Fallbrook, Lakeside, Ramona, Valley Center.",
     },
 
@@ -14459,7 +14459,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Dallas TX building permits. Covers all zip codes.",
     },
 
@@ -14483,7 +14483,7 @@ BULK_SOURCES = {
         },
         "date_field": "processed_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Orlando FL permit applications. Covers all neighborhoods/districts.",
     },
 
@@ -14507,7 +14507,7 @@ BULK_SOURCES = {
         },
         "date_field": "permit_application_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Norfolk VA permits. All wards covered.",
     },
 
@@ -14555,7 +14555,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Mesa AZ building permits. 34 fields, includes sq ft and fees.",
     },
 
@@ -14579,7 +14579,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Corona CA building permits. Includes applied, approved, issued dates.",
     },
 
@@ -14603,7 +14603,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Fort Worth TX development permits. Pop ~978K.",
     },
 
@@ -14628,7 +14628,7 @@ BULK_SOURCES = {
         },
         "date_field": "issue_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Austin TX datahub permits. 82 columns, massive dataset. Covers metro area.",
     },
 
@@ -14652,7 +14652,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Pierce County WA Socrata permits. 27 fields, good coverage.",
     },
 
