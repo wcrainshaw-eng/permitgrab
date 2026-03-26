@@ -190,7 +190,7 @@ def _fix_socrata_addresses():
             conn.execute(f"UPDATE permits SET {set_clause} WHERE permit_number = ?", values)
 
     conn.commit()
-    conn.close()
+    # V12.60: Do NOT close thread-local SQLite connection — it poisons the pool
     print(f"[V12.57] Fixed {fixed_addr} addresses, {fixed_desc} descriptions.", flush=True)
 
 
@@ -5593,6 +5593,9 @@ def city_landing_inner(city_slug):
         except (ValueError, TypeError):
             last_collected = None
 
+    # V12.60: Moved current_state assignment before its first use (was at line 5626)
+    current_state = config.get('state', '')
+
     # V17d: Related blog articles for cross-linking SEO
     related_articles = []
     try:
@@ -5623,7 +5626,6 @@ def city_landing_inner(city_slug):
     other_cities = [c for c in cities_by_volume if c['slug'] != city_slug]
 
     # V12.17: Nearby cities sorted by permit volume (not alphabetical)
-    current_state = config.get('state', '')
     nearby_cities = [c for c in cities_by_volume if c.get('state') == current_state and c['slug'] != city_slug]
     # If fewer than 6 same-state cities, add top cities from other states
     if len(nearby_cities) < 6:
@@ -5660,15 +5662,16 @@ def city_landing_inner(city_slug):
 @app.route('/permits/<city_slug>/<trade_slug>')
 def city_trade_landing(city_slug, trade_slug):
     """Render SEO-optimized city × trade landing page."""
-    # Get city from config
-    city_key, city_config = get_city_by_slug(city_slug)
+    # V12.60: Use get_city_by_slug_auto() to match sitemap-generated URLs
+    # (previously used get_city_by_slug which missed auto-discovered cities)
+    city_key, city_config = get_city_by_slug_auto(city_slug)
     if not city_config:
         return render_city_not_found(city_slug)
 
     # Get trade from config
     trade = get_trade(trade_slug)
     if not trade:
-        return "Trade not found", 404
+        return render_city_not_found(trade_slug)
 
     # V12.51: Use SQLite for city permits
     conn = permitdb.get_connection()
@@ -5848,7 +5851,7 @@ def sitemap():
                     city_lastmod[city_slug_key] = row['latest'][:10]  # YYYY-MM-DD
                 except (TypeError, IndexError):
                     pass
-        conn.close()
+        # V12.60: Do NOT close thread-local SQLite connection — it poisons the pool
     except Exception:
         pass
 
@@ -5865,13 +5868,15 @@ def sitemap():
             'priority': '0.8',
         })
 
-        # Add city × trade pages for each trade
+        # V12.60: Add city × trade pages, but skip 'all-trades' (renders empty, wastes crawl budget)
         for trade_slug in get_trade_slugs():
+            if trade_slug == 'all-trades':
+                continue
             urls.append({
                 'loc': f"{SITE_URL}/permits/{slug}/{trade_slug}",
                 'lastmod': lastmod,
                 'changefreq': 'daily',
-                'priority': '0.8',
+                'priority': '0.7',
             })
 
     # Add blog posts
@@ -6184,7 +6189,9 @@ def blog_post(slug):
     """Individual blog post page."""
     post = parse_blog_post(f"{slug}.md")
     if not post:
-        return "Post not found", 404
+        # V12.60: Use branded 404 instead of bare string
+        footer_cities = get_cities_with_data()
+        return render_template('404.html', footer_cities=footer_cities), 404
     return render_template('blog_post.html', post=post)
 
 

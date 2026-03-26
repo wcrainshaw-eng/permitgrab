@@ -25,6 +25,8 @@ def get_connection():
 
     V12.51: Process-aware — resets connection after Gunicorn fork to avoid
     sharing connections across worker processes.
+    V12.60: Validates connection is still open before returning. If a stale
+    conn.close() poisoned the thread-local, we detect it and reconnect.
     """
     pid = os.getpid()
 
@@ -32,6 +34,13 @@ def get_connection():
     if not hasattr(_local, 'pid') or _local.pid != pid:
         _local.pid = pid
         _local.conn = None
+
+    # V12.60: Check if existing connection was closed (e.g. by stale conn.close())
+    if _local.conn is not None:
+        try:
+            _local.conn.execute("SELECT 1")
+        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+            _local.conn = None
 
     if _local.conn is None:
         # Ensure data directory exists
