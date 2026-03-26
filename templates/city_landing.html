@@ -921,7 +921,7 @@ body {
         <h4>
           <span class="permit-trade">{{ permit.trade_category }}</span>
           {% if permit.is_new %}<span class="new-badge">NEW</span>{% endif %}
-          {{ permit.display_address or permit.address }}
+          {{ (permit.display_address or permit.address) | clean_address }}
         </h4>
         <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; {{ permit.date_label | default('Filed') }}: {{ permit.filing_date | format_date }}</p>
       </div>

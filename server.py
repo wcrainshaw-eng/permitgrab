@@ -49,6 +49,21 @@ def format_date_filter(date_str):
         return 'Date not available'
 
 
+@app.template_filter('clean_address')
+def clean_address_filter(val):
+    """V12.60: Clean raw GeoJSON/Socrata JSON from address fields at display time."""
+    if not val:
+        return ''
+    s = str(val).strip()
+    # Quick check — if no curly brace, it's already clean
+    if '{' not in s:
+        return s
+    # Contains JSON — run through parse_address_value
+    from collector import parse_address_value
+    cleaned = parse_address_value(s)
+    return cleaned if cleaned else ''
+
+
 # V12.17: Google Search Console verification - MUST be registered first before any catch-alls
 @app.route('/google3ef154d70f8049a0.html')
 def google_verification():
