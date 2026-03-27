@@ -1,88 +1,95 @@
 -- ============================================================================
--- MIGRATION 002: Seed prod_cities with 17 known-fresh cities
+-- MIGRATION 002: Seed prod_cities with verified working sources
 -- PermitGrab Collector Redesign - Phase 1
--- Date: March 27, 2026
+-- Date: March 27, 2026 (Updated after endpoint verification)
 -- ============================================================================
 --
--- These 17 cities have fresh data (0-2 days old as of March 27, 2026)
--- and are confirmed working sources.
+-- Only cities with VERIFIED WORKING endpoints as of March 27, 2026.
+-- Removed: Houston (no endpoint), Tyler, Utica, San Antonio, Lubbock,
+--          Corpus Christi (all connection failures)
 --
 -- Run after: 001_prod_cities_and_scraper_runs.sql
 -- ============================================================================
 
--- San Marcos, TX (0 days stale) - freshest city
+-- San Marcos, TX - ArcGIS endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('San Marcos', 'TX', 'san-marcos-tx', 'socrata', 'san_marcos', 'city', 'active', 'migration', 'Fresh as of Mar 27, 2026 (0 days)');
+VALUES ('San Marcos', 'TX', 'san-marcos-tx', 'arcgis', 'san_marcos', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Houston, TX (1 day stale)
+-- Nashville, TN - ArcGIS endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Houston', 'TX', 'houston-tx', 'socrata', 'houston', 'city', 'active', 'migration', 'Fresh as of Mar 26, 2026 (1 day)');
+VALUES ('Nashville', 'TN', 'nashville-tn', 'arcgis', 'nashville', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Nashville, TN (1 day stale)
+-- Orlando, FL - Socrata endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Nashville', 'TN', 'nashville-tn', 'socrata', 'nashville', 'city', 'active', 'migration', 'Fresh as of Mar 26, 2026 (1 day)');
+VALUES ('Orlando', 'FL', 'orlando-fl', 'socrata', 'orlando', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Orlando, FL (1 day stale)
+-- Buffalo, NY - Socrata endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Orlando', 'FL', 'orlando-fl', 'socrata', 'orlando', 'city', 'active', 'migration', 'Fresh as of Mar 26, 2026 (1 day)');
+VALUES ('Buffalo', 'NY', 'buffalo-ny', 'socrata', 'buffalo', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Buffalo, NY (1 day stale)
+-- New York City, NY - Socrata endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Buffalo', 'NY', 'buffalo-ny', 'socrata', 'buffalo', 'city', 'active', 'migration', 'Fresh as of Mar 26, 2026 (1 day)');
+VALUES ('New York City', 'NY', 'new-york-ny', 'socrata', 'new_york', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Tyler, TX (1 day stale)
+-- San Francisco, CA - Socrata endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Tyler', 'TX', 'tyler-tx', 'socrata', 'tyler', 'city', 'active', 'migration', 'Fresh as of Mar 26, 2026 (1 day)');
+VALUES ('San Francisco', 'CA', 'san-francisco-ca', 'socrata', 'san_francisco', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Utica, NY (1 day stale)
+-- Seattle, WA - Socrata endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Utica', 'NY', 'utica-ny', 'socrata', 'utica', 'city', 'active', 'migration', 'Fresh as of Mar 26, 2026 (1 day)');
+VALUES ('Seattle', 'WA', 'seattle-wa', 'socrata', 'seattle', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- New York, NY (2 days stale)
+-- Fairfax, CA - Socrata via Marin County verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('New York City', 'NY', 'new-york-ny', 'socrata', 'new_york', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Fairfax', 'CA', 'fairfax-ca', 'socrata', 'fairfax', 'county', 'active', 'migration', 'Via Marin County. Verified Mar 27, 2026');
 
--- San Antonio, TX (2 days stale)
+-- Rockwall, TX - Socrata endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('San Antonio', 'TX', 'san-antonio-tx', 'socrata', 'san_antonio', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Rockwall', 'TX', 'rockwall-tx', 'socrata', 'rockwall', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- San Francisco, CA (2 days stale)
+-- Bellevue, WA - ArcGIS endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('San Francisco', 'CA', 'san-francisco-ca', 'socrata', 'san_francisco', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Bellevue', 'WA', 'bellevue-wa', 'arcgis', 'bellevue', 'city', 'active', 'migration', 'Endpoint verified Mar 27, 2026');
 
--- Seattle, WA (2 days stale)
+-- Rolling Meadows, IL - Socrata via Cook County verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Seattle', 'WA', 'seattle-wa', 'socrata', 'seattle', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Rolling Meadows', 'IL', 'rolling-meadows-il', 'socrata', 'rolling_meadows_il', 'county', 'active', 'migration', 'Via Cook County. Verified Mar 27, 2026');
 
--- Lubbock, TX (2 days stale)
+-- ============================================================================
+-- BULK SOURCES - Cover multiple cities each
+-- ============================================================================
+
+-- Miami-Dade County, FL - ArcGIS endpoint verified working (covers 34 cities)
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Lubbock', 'TX', 'lubbock-tx', 'socrata', 'lubbock', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Miami-Dade County', 'FL', 'miami-dade-fl', 'arcgis', 'miami_dade_county', 'county', 'active', 'migration', 'Bulk source covering 34 cities. ArcGIS verified Mar 27, 2026');
 
--- Corpus Christi, TX (2 days stale)
+-- Fort Worth, TX - ArcGIS endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Corpus Christi', 'TX', 'corpus-christi-tx', 'socrata', 'corpus_christi', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Fort Worth', 'TX', 'fort-worth-tx', 'arcgis', 'fort_worth_tx_bulk', 'city', 'active', 'migration', 'ArcGIS endpoint verified Mar 27, 2026. Pop ~978K');
 
--- Fairfax, CA (2 days stale) - Note: This is Fairfax CA, not VA
--- The audit mentioned "Fairfax VA" but config shows Fairfax CA (Marin County)
+-- Dallas, TX - Socrata bulk endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Fairfax', 'CA', 'fairfax-ca', 'socrata', 'fairfax', 'county', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days). Via Marin County bulk source.');
+VALUES ('Dallas', 'TX', 'dallas-tx', 'socrata', 'dallas_tx_bulk', 'city', 'active', 'migration', 'Bulk source verified Mar 27, 2026. Pop ~1.3M');
 
--- Rockwall, TX (2 days stale)
+-- Mesa, AZ - Socrata bulk endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Rockwall', 'TX', 'rockwall-tx', 'socrata', 'rockwall', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Mesa', 'AZ', 'mesa-az', 'socrata', 'mesa_az_bulk', 'city', 'active', 'migration', 'Bulk source verified Mar 27, 2026. Pop ~500K');
 
--- Bellevue, WA (2 days stale)
+-- Norfolk, VA - Socrata bulk endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Bellevue', 'WA', 'bellevue-wa', 'socrata', 'bellevue', 'city', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days)');
+VALUES ('Norfolk', 'VA', 'norfolk-va', 'socrata', 'norfolk_va_bulk', 'city', 'active', 'migration', 'Bulk source verified Mar 27, 2026. Pop ~245K');
 
--- Rolling Meadows, IL (2 days stale)
+-- Corona, CA - Socrata bulk endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Rolling Meadows', 'IL', 'rolling-meadows-il', 'socrata', 'rolling_meadows_il', 'county', 'active', 'migration', 'Fresh as of Mar 25, 2026 (2 days). Via Cook County bulk source.');
+VALUES ('Corona', 'CA', 'corona-ca', 'socrata', 'corona_ca_bulk', 'city', 'active', 'migration', 'Bulk source verified Mar 27, 2026. Pop ~157K');
 
+-- Orlando, FL - Socrata bulk endpoint verified working (separate from individual orlando config)
+INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
+VALUES ('Orlando Metro', 'FL', 'orlando-metro-fl', 'socrata', 'orlando_fl_bulk', 'city', 'active', 'migration', 'Bulk source verified Mar 27, 2026. Metro area coverage');
 
 -- ============================================================================
 -- VERIFICATION QUERY
 -- After running this migration, verify with:
 --   SELECT city, state, city_slug, status FROM prod_cities ORDER BY city;
--- Should return 17 rows, all with status='active'
+-- Should return 18 rows, all with status='active'
 -- ============================================================================

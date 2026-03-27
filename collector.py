@@ -21,6 +21,20 @@ from city_source_db import (
 import db as permitdb  # V12.50: SQLite database layer
 
 
+# V15: Helper function to get source config from either CITY_REGISTRY or BULK_SOURCES
+def _get_source_config(source_id):
+    """V15: Look up config by source_id, trying CITY_REGISTRY first then BULK_SOURCES."""
+    config = get_city_config(source_id)
+    if config:
+        config['_source_type'] = 'city'
+        return config
+    config = get_bulk_source_config(source_id)
+    if config:
+        config['_source_type'] = 'bulk'
+        return config
+    return None
+
+
 # V15: Helper function for logging collection runs to scraper_runs table
 def _log_v15_collection(city_key, city_name, state, permits_found, permits_inserted,
                         status, error_message=None, duration_ms=None):
@@ -1721,11 +1735,146 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     V12.33: additive_mode controls whether we save incrementally:
       - True (default): Returns permits without saving (caller handles merge)
       - False: Saves directly (full rebuild mode)
+
+    V15: If prod_cities table exists and has data, use it to drive collection.
+         Otherwise fall back to CITY_REGISTRY + BULK_SOURCES.
     """
     all_permits = []
     stats = {}
     bulk_stats = {}
     cities_from_bulk = set()  # Track cities covered by bulk sources
+
+    # V15: Check if we should use prod_cities mode
+    use_prod_cities = False
+    prod_cities_list = []
+    try:
+        if permitdb.prod_cities_table_exists():
+            prod_cities_list = permitdb.get_prod_cities(status='active')
+            if prod_cities_list:
+                use_prod_cities = True
+                print("=" * 60)
+                print("PermitGrab - V15 PROD_CITIES Collection Mode")
+                print(f"Collecting from {len(prod_cities_list)} verified cities")
+                print("=" * 60)
+    except Exception as e:
+        print(f"[V15] Error checking prod_cities: {e}, falling back to legacy mode")
+
+    # V15: If using prod_cities, iterate through those sources
+    if use_prod_cities:
+        for city_info in prod_cities_list:
+            source_id = city_info.get('source_id')
+            city_name = city_info.get('name')
+            state = city_info.get('state')
+            city_slug = city_info.get('slug')
+
+            if not source_id:
+                print(f"  ⚠ {city_name}: No source_id configured, skipping")
+                continue
+
+            # Get config from CITY_REGISTRY or BULK_SOURCES
+            config = _get_source_config(source_id)
+            if not config:
+                print(f"  ⚠ {city_name}: Config not found for source_id '{source_id}'")
+                continue
+
+            start_time = time.time()
+            source_type = config.get('_source_type', 'city')
+
+            try:
+                if source_type == 'bulk':
+                    # Bulk source collection
+                    city_permits_dict, source_stats = collect_bulk_source(source_id, config, days_back=90)
+                    total_permits = source_stats.get('total_normalized', 0)
+
+                    for slug, permits in city_permits_dict.items():
+                        all_permits.extend(permits)
+                        cities_from_bulk.add(slug)
+
+                    bulk_stats[source_id] = source_stats
+                    print(f"  ✓ {city_name}: {total_permits} permits (bulk)")
+
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    _log_v15_collection(
+                        city_key=source_id,
+                        city_name=city_name,
+                        state=state,
+                        permits_found=total_permits,
+                        permits_inserted=total_permits,
+                        status='success' if total_permits > 0 else 'no_new',
+                        duration_ms=duration_ms
+                    )
+                else:
+                    # Individual city collection
+                    raw, fetch_status = fetch_permits(source_id, days_back)
+                    city_permits = []
+
+                    for record in raw:
+                        try:
+                            normalized = normalize_permit(record, source_id)
+                            if normalized and normalized.get("permit_number"):
+                                city_permits.append(normalized)
+                        except Exception:
+                            continue
+
+                    all_permits.extend(city_permits)
+                    permit_count = len(city_permits)
+
+                    stats[source_id] = {
+                        "raw": len(raw),
+                        "normalized": permit_count,
+                        "city_name": city_name,
+                        "status": fetch_status,
+                    }
+
+                    if fetch_status == "success":
+                        print(f"  ✓ {city_name}: {permit_count} permits")
+                        if permit_count > 0:
+                            try:
+                                record_collection(source_id, permit_count)
+                                reset_failure(source_id)
+                            except Exception:
+                                pass
+                    else:
+                        print(f"  ✗ {city_name}: {fetch_status}")
+                        try:
+                            increment_failure(source_id, fetch_status)
+                        except Exception:
+                            pass
+
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    _log_v15_collection(
+                        city_key=source_id,
+                        city_name=city_name,
+                        state=state,
+                        permits_found=permit_count,
+                        permits_inserted=permit_count,
+                        status='success' if fetch_status == 'success' and permit_count > 0 else ('no_new' if fetch_status == 'success' else 'error'),
+                        error_message=None if fetch_status == 'success' else fetch_status,
+                        duration_ms=duration_ms
+                    )
+
+            except Exception as e:
+                print(f"  ✗ {city_name}: {str(e)[:100]}")
+                duration_ms = int((time.time() - start_time) * 1000)
+                _log_v15_collection(
+                    city_key=source_id,
+                    city_name=city_name,
+                    state=state,
+                    permits_found=0,
+                    permits_inserted=0,
+                    status='error',
+                    error_message=str(e)[:200],
+                    duration_ms=duration_ms
+                )
+
+            time.sleep(RATE_LIMIT_DELAY)
+
+        print(f"\n  V15 collection complete: {len(all_permits)} permits from {len(prod_cities_list)} sources")
+        # Return early - don't run legacy collection
+        return all_permits, {**stats, **bulk_stats}
+
+    # LEGACY MODE: Fall back to CITY_REGISTRY + BULK_SOURCES if no prod_cities
+    print("[V15] No prod_cities data, using legacy collection mode")
 
     # V12.31: First, process bulk sources (county/state-level datasets)
     active_bulk_sources = get_active_bulk_sources()
