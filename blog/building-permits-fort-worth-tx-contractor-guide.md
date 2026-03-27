@@ -127,6 +127,13 @@ Fort Worth's permit data includes rich detail on every record, making it easy to
 
 The contractors thriving in Fort Worth's booming market aren't waiting for referrals — they're tracking permit data and positioning themselves where the highest-value work is happening. Join them.
 
+## Browse Fort Worth Permits by Trade
+
+- [Plumbing Permits in Fort Worth](/permits/fort-worth/plumbing)
+- [Electrical Permits in Fort Worth](/permits/fort-worth/electrical)
+- [HVAC Permits in Fort Worth](/permits/fort-worth/hvac)
+- [Roofing Permits in Fort Worth](/permits/fort-worth/roofing)
+- [General Construction Permits in Fort Worth](/permits/fort-worth/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Fort Worth Development Services Department.*

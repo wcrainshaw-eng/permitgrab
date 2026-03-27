@@ -130,6 +130,13 @@ Tallahassee's permit data is particularly valuable because it includes full cont
 
 The contractors winning in Tallahassee's construction market aren't waiting for referrals — they're tracking permit data and positioning themselves where the growth is happening. Join them.
 
+## Browse Tallahassee Permits by Trade
+
+- [Plumbing Permits in Tallahassee](/permits/tallahassee/plumbing)
+- [Electrical Permits in Tallahassee](/permits/tallahassee/electrical)
+- [HVAC Permits in Tallahassee](/permits/tallahassee/hvac)
+- [Roofing Permits in Tallahassee](/permits/tallahassee/roofing)
+- [General Construction Permits in Tallahassee](/permits/tallahassee/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with Leon County Growth Management and the City of Tallahassee Planning Department.*

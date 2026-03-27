@@ -122,6 +122,13 @@ DC's permit data includes comprehensive zoning and neighborhood context unavaila
 
 The contractors thriving in DC's premium construction market aren't hoping for calls — they're tracking permit data and positioning themselves in high-growth neighborhoods and with institutional developers. Join them.
 
+## Browse Washington DC Permits by Trade
+
+- [Plumbing Permits in Washington DC](/permits/washington/plumbing)
+- [Electrical Permits in Washington DC](/permits/washington/electrical)
+- [HVAC Permits in Washington DC](/permits/washington/hvac)
+- [Roofing Permits in Washington DC](/permits/washington/roofing)
+- [General Construction Permits in Washington DC](/permits/washington/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the District of Columbia Department of Consumer and Regulatory Affairs (DCRA).*

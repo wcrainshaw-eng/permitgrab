@@ -127,6 +127,13 @@ Contractors using permit data report capturing 50-60% more leads in Sacramento's
 
 The contractors thriving in Sacramento aren't limited to downtown — they're following the permit data into high-growth suburbs and positioning themselves as ADU specialists. Join them.
 
+## Browse Sacramento Permits by Trade
+
+- [Plumbing Permits in Sacramento](/permits/sacramento/plumbing)
+- [Electrical Permits in Sacramento](/permits/sacramento/electrical)
+- [HVAC Permits in Sacramento](/permits/sacramento/hvac)
+- [Roofing Permits in Sacramento](/permits/sacramento/roofing)
+- [General Construction Permits in Sacramento](/permits/sacramento/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Sacramento Development Services Department and current California Building Code requirements.*

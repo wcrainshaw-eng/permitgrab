@@ -159,6 +159,13 @@ NYC's permit dataset is among the richest in America, with specific permit type,
 
 The contractors thriving in America's largest construction market aren't waiting for referrals — they're analyzing permit data, identifying trends across neighborhoods, and positioning themselves directly in front of the work. Join them.
 
+## Browse New York City Permits by Trade
+
+- [Plumbing Permits in New York City](/permits/new-york/plumbing)
+- [Electrical Permits in New York City](/permits/new-york/electrical)
+- [HVAC Permits in New York City](/permits/new-york/hvac)
+- [Roofing Permits in New York City](/permits/new-york/roofing)
+- [General Construction Permits in New York City](/permits/new-york/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the NYC Department of Buildings at dob.nyc.gov or by calling 311.*

@@ -144,6 +144,13 @@ Contractors using permit data report converting 40-50% more leads than those rel
 
 The contractors thriving in Chicago's competitive market aren't hoping for leads — they're following the permit data and staying aggressive. Join them.
 
+## Browse Chicago Permits by Trade
+
+- [Plumbing Permits in Chicago](/permits/chicago/plumbing)
+- [Electrical Permits in Chicago](/permits/chicago/electrical)
+- [HVAC Permits in Chicago](/permits/chicago/hvac)
+- [Roofing Permits in Chicago](/permits/chicago/roofing)
+- [General Construction Permits in Chicago](/permits/chicago/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Chicago Department of Buildings.*

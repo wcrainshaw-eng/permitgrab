@@ -126,6 +126,13 @@ Contractors using PermitGrab's Albuquerque database close leads 40% faster becau
 
 The construction leads are out there — you just need to know where to look.
 
+## Browse Albuquerque Permits by Trade
+
+- [Plumbing Permits in Albuquerque](/permits/albuquerque/plumbing)
+- [Electrical Permits in Albuquerque](/permits/albuquerque/electrical)
+- [HVAC Permits in Albuquerque](/permits/albuquerque/hvac)
+- [Roofing Permits in Albuquerque](/permits/albuquerque/roofing)
+- [General Construction Permits in Albuquerque](/permits/albuquerque/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Albuquerque Community Development Department.*

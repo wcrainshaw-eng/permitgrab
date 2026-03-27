@@ -137,6 +137,13 @@ Fort Lauderdale's permit data is particularly valuable because it includes full 
 
 The contractors winning in Fort Lauderdale's booming luxury construction market aren't waiting for referrals — they're tracking permit data and positioning themselves where the growth is happening. Join them.
 
+## Browse Fort Lauderdale Permits by Trade
+
+- [Plumbing Permits in Fort Lauderdale](/permits/fort-lauderdale/plumbing)
+- [Electrical Permits in Fort Lauderdale](/permits/fort-lauderdale/electrical)
+- [HVAC Permits in Fort Lauderdale](/permits/fort-lauderdale/hvac)
+- [Roofing Permits in Fort Lauderdale](/permits/fort-lauderdale/roofing)
+- [General Construction Permits in Fort Lauderdale](/permits/fort-lauderdale/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Fort Lauderdale Development Services Department.*

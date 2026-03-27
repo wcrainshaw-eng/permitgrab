@@ -133,6 +133,13 @@ Nashville's permit data includes permit type, subtype, address, ZIP code, contra
 
 The contractors thriving in Nashville's booming market aren't waiting for word-of-mouth referrals — they're tracking permit data and positioning themselves where rapid growth is happening. Join them.
 
+## Browse Nashville Permits by Trade
+
+- [Plumbing Permits in Nashville](/permits/nashville/plumbing)
+- [Electrical Permits in Nashville](/permits/nashville/electrical)
+- [HVAC Permits in Nashville](/permits/nashville/hvac)
+- [Roofing Permits in Nashville](/permits/nashville/roofing)
+- [General Construction Permits in Nashville](/permits/nashville/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Nashville Department of Codes & Building Safety or the Metropolitan Government of Nashville and Davidson.*

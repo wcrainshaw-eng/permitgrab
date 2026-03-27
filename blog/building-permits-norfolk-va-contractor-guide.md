@@ -132,6 +132,13 @@ Contractors using permit data in Norfolk report capturing 2-4x more leads than t
 
 The contractors thriving in Norfolk's military-driven boom and waterfront revitalization aren't hoping for work — they're tracking permit data and positioning themselves in high-growth neighborhoods and with key players. Join them.
 
+## Browse Norfolk Permits by Trade
+
+- [Plumbing Permits in Norfolk](/permits/norfolk/plumbing)
+- [Electrical Permits in Norfolk](/permits/norfolk/electrical)
+- [HVAC Permits in Norfolk](/permits/norfolk/hvac)
+- [Roofing Permits in Norfolk](/permits/norfolk/roofing)
+- [General Construction Permits in Norfolk](/permits/norfolk/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Norfolk Department of City Planning - Bureau of Development Services at (757) 664-6510 or data.norfolk.gov.*

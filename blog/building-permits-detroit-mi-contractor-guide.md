@@ -122,6 +122,13 @@ Contractors using permit data in Detroit report capturing 3-5x more leads than t
 
 The contractors thriving in Detroit's revitalization aren't hoping for renovation work — they're tracking permit data and positioning themselves in high-growth neighborhoods. Join them.
 
+## Browse Detroit Permits by Trade
+
+- [Plumbing Permits in Detroit](/permits/detroit/plumbing)
+- [Electrical Permits in Detroit](/permits/detroit/electrical)
+- [HVAC Permits in Detroit](/permits/detroit/hvac)
+- [Roofing Permits in Detroit](/permits/detroit/roofing)
+- [General Construction Permits in Detroit](/permits/detroit/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Detroit Building, Safety, Engineering and Environmental Department (BSEED).*

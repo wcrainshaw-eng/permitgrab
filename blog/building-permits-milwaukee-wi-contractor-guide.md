@@ -126,6 +126,13 @@ Contractors using permit data in Milwaukee report 45-55% improvement in lead con
 
 The contractors thriving in Milwaukee's transformation aren't hoping for work — they're tracking permit data, building relationships in Deer District, and positioning themselves as specialists in adaptive reuse and historic renovation. Join them.
 
+## Browse Milwaukee Permits by Trade
+
+- [Plumbing Permits in Milwaukee](/permits/milwaukee/plumbing)
+- [Electrical Permits in Milwaukee](/permits/milwaukee/electrical)
+- [HVAC Permits in Milwaukee](/permits/milwaukee/hvac)
+- [Roofing Permits in Milwaukee](/permits/milwaukee/roofing)
+- [General Construction Permits in Milwaukee](/permits/milwaukee/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Milwaukee Department of Neighborhood Services and current Wisconsin Building Code requirements.*

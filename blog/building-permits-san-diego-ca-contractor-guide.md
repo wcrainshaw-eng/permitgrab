@@ -141,6 +141,13 @@ Contractors using San Diego permit data report 40-50% increases in qualified lea
 
 The contractors winning the most profitable work in San Diego aren't hoping for leads — they're using permit data to build relationships with active GCs, monitor their markets daily, and move fast when opportunity appears. Join them.
 
+## Browse San Diego County Permits by Trade
+
+- [Plumbing Permits in San Diego County](/permits/san-diego/plumbing)
+- [Electrical Permits in San Diego County](/permits/san-diego/electrical)
+- [HVAC Permits in San Diego County](/permits/san-diego/hvac)
+- [Roofing Permits in San Diego County](/permits/san-diego/roofing)
+- [General Construction Permits in San Diego County](/permits/san-diego/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the San Diego County Department of Planning & Development Services.*

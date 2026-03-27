@@ -129,6 +129,13 @@ Contractors using Tacoma's permit data consistently report 45-50% higher lead co
 
 The most successful Tacoma contractors aren't waiting for leads to find them — they're actively monitoring permit data, identifying opportunities, and reaching out to project owners before their competitors. The waterfront boom, downtown redevelopment, and industrial expansion are creating unprecedented opportunities for contractors willing to be proactive.
 
+## Browse Tacoma Permits by Trade
+
+- [Plumbing Permits in Tacoma](/permits/tacoma/plumbing)
+- [Electrical Permits in Tacoma](/permits/tacoma/electrical)
+- [HVAC Permits in Tacoma](/permits/tacoma/hvac)
+- [Roofing Permits in Tacoma](/permits/tacoma/roofing)
+- [General Construction Permits in Tacoma](/permits/tacoma/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Tacoma Department of Community & Economic Development.*

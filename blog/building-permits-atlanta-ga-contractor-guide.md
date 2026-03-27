@@ -119,6 +119,13 @@ Contractors using permit data report 50%+ increases in qualified leads compared 
 
 Atlanta's construction market is competitive, but the contractors winning work are the ones using permit data strategically. Join them and capture your share of Georgia's building boom.
 
+## Browse Atlanta Permits by Trade
+
+- [Plumbing Permits in Atlanta](/permits/atlanta/plumbing)
+- [Electrical Permits in Atlanta](/permits/atlanta/electrical)
+- [HVAC Permits in Atlanta](/permits/atlanta/hvac)
+- [Roofing Permits in Atlanta](/permits/atlanta/roofing)
+- [General Construction Permits in Atlanta](/permits/atlanta/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Atlanta Department of Buildings.*

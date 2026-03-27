@@ -126,6 +126,13 @@ Contractors using permit data in Sioux Falls report capturing 2-4x more leads th
 
 The contractors thriving in Sioux Falls' rapid growth aren't hoping for phone calls — they're tracking permit data and positioning themselves in high-growth neighborhoods. Join them and capture leads before your competition even knows a project exists.
 
+## Browse Sioux Falls Permits by Trade
+
+- [Plumbing Permits in Sioux Falls](/permits/sioux-falls/plumbing)
+- [Electrical Permits in Sioux Falls](/permits/sioux-falls/electrical)
+- [HVAC Permits in Sioux Falls](/permits/sioux-falls/hvac)
+- [Roofing Permits in Sioux Falls](/permits/sioux-falls/roofing)
+- [General Construction Permits in Sioux Falls](/permits/sioux-falls/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Sioux Falls Building Services Division.*

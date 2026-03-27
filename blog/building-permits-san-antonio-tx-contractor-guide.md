@@ -15,6 +15,13 @@ faqs:
     answer: "Yes, PermitGrab lets you set custom alerts for San Antonio by neighborhood, project type, and value. You'll receive instant notifications when permits matching your criteria are filed, allowing you to contact prospects quickly and establish yourself as a responsive local expert."
   - question: "Is San Antonio a good market for contractors starting out?"
     answer: "Definitely. San Antonio's lower cost of living compared to Dallas or Houston, combined with steady development activity, makes it attractive for contractors at every level. Single-person operations can find residential work; small firms can access commercial opportunity. The market rewards reliability and quality over lowest cost."
+## Browse San Antonio Permits by Trade
+
+- [Plumbing Permits in San Antonio](/permits/san-antonio/plumbing)
+- [Electrical Permits in San Antonio](/permits/san-antonio/electrical)
+- [HVAC Permits in San Antonio](/permits/san-antonio/hvac)
+- [Roofing Permits in San Antonio](/permits/san-antonio/roofing)
+- [General Construction Permits in San Antonio](/permits/san-antonio/general-construction)
 ---
 
 ## San Antonio's Steady Growth: Reliable Opportunity in the Alamo City

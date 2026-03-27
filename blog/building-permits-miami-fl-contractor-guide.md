@@ -124,6 +124,13 @@ Miami-Dade's permit data is exceptionally rich, with contractor contact informat
 
 The contractors winning in Miami-Dade's booming construction market aren't waiting for referrals — they're tracking permit data and positioning themselves where the highest-value work is happening. Join them.
 
+## Browse Miami Permits by Trade
+
+- [Plumbing Permits in Miami](/permits/miami/plumbing)
+- [Electrical Permits in Miami](/permits/miami/electrical)
+- [HVAC Permits in Miami](/permits/miami/hvac)
+- [Roofing Permits in Miami](/permits/miami/roofing)
+- [General Construction Permits in Miami](/permits/miami/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Miami-Dade County Building Department.*

@@ -129,6 +129,13 @@ Contractors using permit data in Chattanooga report significantly increased lead
 
 The contractors thriving in Chattanooga's growth aren't waiting for phone calls — they're tracking permit data and positioning themselves in high-activity neighborhoods. Join them.
 
+## Browse Chattanooga Permits by Trade
+
+- [Plumbing Permits in Chattanooga](/permits/chattanooga/plumbing)
+- [Electrical Permits in Chattanooga](/permits/chattanooga/electrical)
+- [HVAC Permits in Chattanooga](/permits/chattanooga/hvac)
+- [Roofing Permits in Chattanooga](/permits/chattanooga/roofing)
+- [General Construction Permits in Chattanooga](/permits/chattanooga/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Chattanooga Development Services at (423) 643-7152.*

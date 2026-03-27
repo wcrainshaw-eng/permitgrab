@@ -128,6 +128,13 @@ Contractors using permit data in Kansas City report capturing 3-5x more leads th
 
 The contractors thriving in Kansas City's transformation aren't hoping for renovation work — they're tracking permit data, understanding neighborhood trajectories, and positioning themselves in high-growth areas. Join them.
 
+## Browse Kansas City Permits by Trade
+
+- [Plumbing Permits in Kansas City](/permits/kansas-city/plumbing)
+- [Electrical Permits in Kansas City](/permits/kansas-city/electrical)
+- [HVAC Permits in Kansas City](/permits/kansas-city/hvac)
+- [Roofing Permits in Kansas City](/permits/kansas-city/roofing)
+- [General Construction Permits in Kansas City](/permits/kansas-city/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Kansas City Planning & Development (CPD) department at compasskc.kcmo.org or (816) 513-1500.*

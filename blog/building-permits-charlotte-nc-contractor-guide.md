@@ -134,6 +134,13 @@ Charlotte's permit data is comprehensive, with building type, square footage, co
 
 The contractors thriving in Charlotte's booming market aren't waiting for referrals — they're tracking permit data and positioning themselves where the highest-activity work is happening. Join them.
 
+## Browse Charlotte Permits by Trade
+
+- [Plumbing Permits in Charlotte](/permits/charlotte/plumbing)
+- [Electrical Permits in Charlotte](/permits/charlotte/electrical)
+- [HVAC Permits in Charlotte](/permits/charlotte/hvac)
+- [Roofing Permits in Charlotte](/permits/charlotte/roofing)
+- [General Construction Permits in Charlotte](/permits/charlotte/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with Charlotte-Mecklenburg Code Enforcement at (704) 336-2474 or online at the city's eservices portal.*

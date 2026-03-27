@@ -129,6 +129,13 @@ Cape Coral's permit data includes comprehensive contractor and builder informati
 
 The contractors winning in Cape Coral's booming construction market aren't waiting for referrals — they're tracking permit data and positioning themselves where the growth is happening. Join them.
 
+## Browse Cape Coral Permits by Trade
+
+- [Plumbing Permits in Cape Coral](/permits/cape-coral/plumbing)
+- [Electrical Permits in Cape Coral](/permits/cape-coral/electrical)
+- [HVAC Permits in Cape Coral](/permits/cape-coral/hvac)
+- [Roofing Permits in Cape Coral](/permits/cape-coral/roofing)
+- [General Construction Permits in Cape Coral](/permits/cape-coral/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Cape Coral Community Development department.*

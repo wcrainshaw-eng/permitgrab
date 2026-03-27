@@ -109,6 +109,13 @@ Contractors using permit data close leads 40% faster because they reach prospect
 
 [Track all Houston building permits on PermitGrab](/permits/houston). See who's building, what they're building, and how much it's worth. Stay ahead of your competition with daily permit updates.
 
+## Browse Houston Permits by Trade
+
+- [Plumbing Permits in Houston](/permits/houston/plumbing)
+- [Electrical Permits in Houston](/permits/houston/electrical)
+- [HVAC Permits in Houston](/permits/houston/hvac)
+- [Roofing Permits in Houston](/permits/houston/roofing)
+- [General Construction Permits in Houston](/permits/houston/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Houston Development Services Department.*

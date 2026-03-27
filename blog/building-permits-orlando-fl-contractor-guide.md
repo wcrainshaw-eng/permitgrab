@@ -124,6 +124,13 @@ Orlando's permit data is particularly valuable because it includes full contract
 
 The contractors winning in Orlando's booming construction market aren't waiting for referrals — they're tracking permit data and positioning themselves where the growth is happening. Join them.
 
+## Browse Orlando Permits by Trade
+
+- [Plumbing Permits in Orlando](/permits/orlando/plumbing)
+- [Electrical Permits in Orlando](/permits/orlando/electrical)
+- [HVAC Permits in Orlando](/permits/orlando/hvac)
+- [Roofing Permits in Orlando](/permits/orlando/roofing)
+- [General Construction Permits in Orlando](/permits/orlando/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Orlando Permitting Services Division.*

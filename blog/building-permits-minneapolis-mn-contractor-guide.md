@@ -127,6 +127,13 @@ Minneapolis's rich permit data includes detailed neighborhood and ward informati
 
 The contractors thriving in Minneapolis's revitalization aren't waiting for referrals — they're tracking permit data and positioning themselves in high-growth neighborhoods before competition saturates the market. Join them.
 
+## Browse Minneapolis Permits by Trade
+
+- [Plumbing Permits in Minneapolis](/permits/minneapolis/plumbing)
+- [Electrical Permits in Minneapolis](/permits/minneapolis/electrical)
+- [HVAC Permits in Minneapolis](/permits/minneapolis/hvac)
+- [Roofing Permits in Minneapolis](/permits/minneapolis/roofing)
+- [General Construction Permits in Minneapolis](/permits/minneapolis/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Minneapolis Construction Code Services (CCS) department at Minneapolis City Hall, 350 S 5th St.*

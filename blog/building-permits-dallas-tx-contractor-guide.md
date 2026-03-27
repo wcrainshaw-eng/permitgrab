@@ -15,6 +15,13 @@ faqs:
     answer: "Yes! PermitGrab's automated alerts notify you the moment permits are filed in Dallas, letting you contact prospects before your competitors. You can set alerts by location, project type, and estimated value."
   - question: "What's the Dallas permit application process for contractors?"
     answer: "Contractors must submit plans, obtain owner signatures, and handle separate trade-specific permits. The Building Inspection Department has specific requirements for residential vs. commercial projects. Having a local permit expediter familiar with Dallas requirements often accelerates approval."
+## Browse Dallas Permits by Trade
+
+- [Plumbing Permits in Dallas](/permits/dallas/plumbing)
+- [Electrical Permits in Dallas](/permits/dallas/electrical)
+- [HVAC Permits in Dallas](/permits/dallas/hvac)
+- [Roofing Permits in Dallas](/permits/dallas/roofing)
+- [General Construction Permits in Dallas](/permits/dallas/general-construction)
 ---
 
 ## Dallas's Construction Boom: The Contractor's Goldmine

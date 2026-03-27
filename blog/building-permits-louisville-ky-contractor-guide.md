@@ -133,6 +133,13 @@ Contractors using permit data in Louisville report capturing 3-5x more leads tha
 
 The contractors thriving in Louisville's construction boom aren't hoping for renovation work—they're tracking permit data and positioning themselves in high-growth neighborhoods. The bourbon district's hospitality expansion, NuLu's residential renaissance, and emerging neighborhoods like Butchertown and Germantown are creating unprecedented opportunity. Join the contractors capturing market share with permit intelligence.
 
+## Browse Louisville Permits by Trade
+
+- [Plumbing Permits in Louisville](/permits/louisville/plumbing)
+- [Electrical Permits in Louisville](/permits/louisville/electrical)
+- [HVAC Permits in Louisville](/permits/louisville/hvac)
+- [Roofing Permits in Louisville](/permits/louisville/roofing)
+- [General Construction Permits in Louisville](/permits/louisville/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Louisville Metro Department of Codes and Regulations.*

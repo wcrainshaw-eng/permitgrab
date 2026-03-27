@@ -131,6 +131,13 @@ Contractors using St. Paul's permit data report 50-55% higher lead conversion ra
 
 St. Paul's exceptional permit transparency means contractors willing to do homework can identify opportunities and reach out to decision-makers before their competition even knows work is being planned. The downtown renaissance, light rail development, and historic preservation boom are creating sustained opportunity for contractors willing to be proactive and data-driven.
 
+## Browse St Paul Permits by Trade
+
+- [Plumbing Permits in St Paul](/permits/st-paul/plumbing)
+- [Electrical Permits in St Paul](/permits/st-paul/electrical)
+- [HVAC Permits in St Paul](/permits/st-paul/hvac)
+- [Roofing Permits in St Paul](/permits/st-paul/roofing)
+- [General Construction Permits in St Paul](/permits/st-paul/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of St. Paul Department of Planning and Economic Development.*

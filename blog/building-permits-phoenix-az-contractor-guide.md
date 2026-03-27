@@ -129,6 +129,13 @@ Phoenix's permit database is comprehensive, with permit details, project scope, 
 
 The contractors thriving in Phoenix's booming market aren't waiting for referrals — they're tracking permit data and positioning themselves where the work is happening. Join them.
 
+## Browse Phoenix Permits by Trade
+
+- [Plumbing Permits in Phoenix](/permits/phoenix/plumbing)
+- [Electrical Permits in Phoenix](/permits/phoenix/electrical)
+- [HVAC Permits in Phoenix](/permits/phoenix/hvac)
+- [Roofing Permits in Phoenix](/permits/phoenix/roofing)
+- [General Construction Permits in Phoenix](/permits/phoenix/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Phoenix Planning and Development Department.*

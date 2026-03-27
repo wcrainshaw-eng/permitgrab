@@ -132,6 +132,13 @@ Las Vegas permit data provides comprehensive information across residential, com
 
 The contractors thriving in Las Vegas aren't waiting for referrals — they're tracking permit data and positioning themselves where the highest-value work is happening. From the Strip to downtown, from Summerlin to Henderson, from hospitality to residential to commercial, Las Vegas construction opportunity is tracked in permit data. Join them.
 
+## Browse Las Vegas Permits by Trade
+
+- [Plumbing Permits in Las Vegas](/permits/las-vegas/plumbing)
+- [Electrical Permits in Las Vegas](/permits/las-vegas/electrical)
+- [HVAC Permits in Las Vegas](/permits/las-vegas/hvac)
+- [Roofing Permits in Las Vegas](/permits/las-vegas/roofing)
+- [General Construction Permits in Las Vegas](/permits/las-vegas/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Las Vegas Department of Building and Safety.*

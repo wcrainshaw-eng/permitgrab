@@ -130,6 +130,13 @@ Contractors leveraging Mesa's detailed permit data report converting 40-55% more
 
 The contractors capturing the biggest opportunities in Mesa's booming market aren't hoping for work — they're actively tracking permits, analyzing permit data, and strategically positioning themselves in high-growth areas. Join the successful contractors already using permit intelligence and premium contractor data to dominate their market.
 
+## Browse Mesa Permits by Trade
+
+- [Plumbing Permits in Mesa](/permits/mesa/plumbing)
+- [Electrical Permits in Mesa](/permits/mesa/electrical)
+- [HVAC Permits in Mesa](/permits/mesa/hvac)
+- [Roofing Permits in Mesa](/permits/mesa/roofing)
+- [General Construction Permits in Mesa](/permits/mesa/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements and fees with the City of Mesa Community Development Department.*

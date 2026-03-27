@@ -14,6 +14,13 @@ faqs:
     answer: "Columbus's construction market is dominated by the Intel chip fabrication plant investment ($20 billion) and related semiconductor manufacturing. Ohio State University area development includes dormitories, research facilities, and student housing. Residential growth centers on Short North, Clintonville, German Village, and Worthington neighborhoods with strong renovation and new multi-family activity. Downtown medical district expansion supports healthcare facility construction. Tech headquarters and office development concentrate in New Albany. Suburban growth stretches through Westerville, Polaris, and eastern Franklin County."
   - question: "Do I need an Ohio contractor's license to pull permits in Columbus?"
     answer: "Ohio does not require a state contractor's license to pull building permits for non-residential projects under certain thresholds, though all work must comply with the Ohio Building Code. Electrical, plumbing, mechanical, and gas work must be performed by appropriately licensed Ohio specialists in those trades. Homeowners can pull permits for owner-occupied residential work. Bonded general contractors are required for commercial and institutional projects over $10,000. Keeping current with the Ohio Building Code (based on International Building Code) and local Columbus amendments is essential."
+## Browse Columbus Permits by Trade
+
+- [Plumbing Permits in Columbus](/permits/columbus/plumbing)
+- [Electrical Permits in Columbus](/permits/columbus/electrical)
+- [HVAC Permits in Columbus](/permits/columbus/hvac)
+- [Roofing Permits in Columbus](/permits/columbus/roofing)
+- [General Construction Permits in Columbus](/permits/columbus/general-construction)
 ---
 
 ## Columbus: Ohio's Dynamic Growth Engine

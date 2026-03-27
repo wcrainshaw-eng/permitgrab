@@ -133,6 +133,13 @@ Contractors using PermitGrab's Virginia Beach database close leads 40% faster be
 
 The construction leads are waiting. You just need to access the right data.
 
+## Browse Virginia Beach Permits by Trade
+
+- [Plumbing Permits in Virginia Beach](/permits/virginia-beach/plumbing)
+- [Electrical Permits in Virginia Beach](/permits/virginia-beach/electrical)
+- [HVAC Permits in Virginia Beach](/permits/virginia-beach/hvac)
+- [Roofing Permits in Virginia Beach](/permits/virginia-beach/roofing)
+- [General Construction Permits in Virginia Beach](/permits/virginia-beach/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Virginia Beach Department of Planning & Community Development.*

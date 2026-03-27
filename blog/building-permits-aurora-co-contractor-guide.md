@@ -126,6 +126,13 @@ Aurora's permit data provides building address, permit type, project description
 
 The contractors thriving in Aurora's fast-growing market aren't waiting for referrals — they're tracking permit data and positioning themselves where the highest-volume, highest-value work is happening. Join them.
 
+## Browse Aurora Permits by Trade
+
+- [Plumbing Permits in Aurora](/permits/aurora/plumbing)
+- [Electrical Permits in Aurora](/permits/aurora/electrical)
+- [HVAC Permits in Aurora](/permits/aurora/hvac)
+- [Roofing Permits in Aurora](/permits/aurora/roofing)
+- [General Construction Permits in Aurora](/permits/aurora/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with Aurora Planning and Development Services at (303) 739-7420.*

@@ -136,6 +136,13 @@ Contractors using Spokane's permit data report 45-50% higher lead conversion rat
 
 Spokane represents an exceptional opportunity for contractors willing to be proactive and data-driven. Unlike coastal markets where competition is fierce and margins are tight, Spokane's growing market offers room to scale profitably. The downtown renaissance, healthcare expansion, and multifamily boom are creating sustained opportunity for contractors willing to track the permit pipeline and reach out to decision-makers early.
 
+## Browse Spokane Permits by Trade
+
+- [Plumbing Permits in Spokane](/permits/spokane/plumbing)
+- [Electrical Permits in Spokane](/permits/spokane/electrical)
+- [HVAC Permits in Spokane](/permits/spokane/hvac)
+- [Roofing Permits in Spokane](/permits/spokane/roofing)
+- [General Construction Permits in Spokane](/permits/spokane/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Spokane Department of Building Services.*

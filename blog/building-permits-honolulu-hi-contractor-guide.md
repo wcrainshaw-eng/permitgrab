@@ -147,6 +147,13 @@ Hawaii contractors using permit data report 35-45% higher lead conversion than t
 
 Honolulu's construction market reward contractors who follow permit data and move decisively. The island's unique logistics and booming development create opportunity for strategically positioned firms. Join them.
 
+## Browse Honolulu Permits by Trade
+
+- [Plumbing Permits in Honolulu](/permits/honolulu/plumbing)
+- [Electrical Permits in Honolulu](/permits/honolulu/electrical)
+- [HVAC Permits in Honolulu](/permits/honolulu/hvac)
+- [Roofing Permits in Honolulu](/permits/honolulu/roofing)
+- [General Construction Permits in Honolulu](/permits/honolulu/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City and County of Honolulu Department of Planning and Permitting.*

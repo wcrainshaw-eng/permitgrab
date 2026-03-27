@@ -14,6 +14,13 @@ faqs:
     answer: "Tampa's construction market is dominated by hospitality and mixed-use development along the Tampa Bay waterfront, particularly in the Water Street Tampa district. Residential construction remains strong with apartment and condo development concentrated in Channelside, Hyde Park, and Downtown. Commercial growth centers on Westshore Boulevard and the International Mall area. Industrial and warehouse construction is booming in Riverview and Brandon suburbs due to freight and logistics demand. Renovation of historic structures in Ybor City continues to attract investment."
   - question: "Do I need a Florida contractor's license to pull permits in Tampa?"
     answer: "Florida does not require a state contractor's license to pull building permits, though all construction must be performed by appropriately licensed contractors. However, electrical, plumbing, mechanical, and HVAC work must be performed by licensed specialists in those trades. General contractors benefit from having a Construction Industry Licensing Board (CILB) certification to bid on larger projects. Homeowners can pull permits for their own primary residence, but commercial work always requires licensed contractors. Keep current on Florida Building Code (7th Edition) requirements, which emphasize wind resistance and flood protection."
+## Browse Tampa Permits by Trade
+
+- [Plumbing Permits in Tampa](/permits/tampa/plumbing)
+- [Electrical Permits in Tampa](/permits/tampa/electrical)
+- [HVAC Permits in Tampa](/permits/tampa/hvac)
+- [Roofing Permits in Tampa](/permits/tampa/roofing)
+- [General Construction Permits in Tampa](/permits/tampa/general-construction)
 ---
 
 ## Tampa's Explosive Construction Boom

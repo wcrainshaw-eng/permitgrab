@@ -135,6 +135,13 @@ Contractors using PermitGrab's Arlington database close leads 40% faster because
 
 The construction leads are out there. You just need the right data to find them.
 
+## Browse Arlington Permits by Trade
+
+- [Plumbing Permits in Arlington](/permits/arlington/plumbing)
+- [Electrical Permits in Arlington](/permits/arlington/electrical)
+- [HVAC Permits in Arlington](/permits/arlington/hvac)
+- [Roofing Permits in Arlington](/permits/arlington/roofing)
+- [General Construction Permits in Arlington](/permits/arlington/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Arlington Development Services Department.*

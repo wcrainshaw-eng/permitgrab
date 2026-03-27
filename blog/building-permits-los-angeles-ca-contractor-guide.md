@@ -144,6 +144,13 @@ LA's permit data is among the richest in California, with comprehensive project 
 
 LA's construction market is too massive to rely on referrals alone. The contractors thriving in this competitive market are actively tracking permit data, identifying opportunities in growth neighborhoods, and positioning themselves where the work is happening. Join them.
 
+## Browse Los Angeles Permits by Trade
+
+- [Plumbing Permits in Los Angeles](/permits/los-angeles/plumbing)
+- [Electrical Permits in Los Angeles](/permits/los-angeles/electrical)
+- [HVAC Permits in Los Angeles](/permits/los-angeles/hvac)
+- [Roofing Permits in Los Angeles](/permits/los-angeles/roofing)
+- [General Construction Permits in Los Angeles](/permits/los-angeles/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the Los Angeles Department of Building and Safety (LADBS) at ladbsservices2.lacity.org or (213) 482-6800.*

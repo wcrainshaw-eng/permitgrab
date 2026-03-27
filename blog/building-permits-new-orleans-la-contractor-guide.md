@@ -136,6 +136,13 @@ New Orleans's permit data is drawn directly from data.nola.gov and includes rich
 
 The contractors winning in New Orleans's booming market aren't waiting for referrals — they're tracking permit data, identifying emerging opportunities, and positioning themselves where growth is happening. Join them.
 
+## Browse New Orleans Permits by Trade
+
+- [Plumbing Permits in New Orleans](/permits/new-orleans/plumbing)
+- [Electrical Permits in New Orleans](/permits/new-orleans/electrical)
+- [HVAC Permits in New Orleans](/permits/new-orleans/hvac)
+- [Roofing Permits in New Orleans](/permits/new-orleans/roofing)
+- [General Construction Permits in New Orleans](/permits/new-orleans/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the New Orleans Department of Safety and Permits at (504) 658-7100.*

@@ -132,6 +132,13 @@ Raleigh's permit data is exceptionally rich, including estimated project costs, 
 
 The contractors thriving in Raleigh's tech-driven boom aren't waiting for the phone to ring — they're tracking permit data daily and positioning themselves where the highest-value construction work is happening. The Research Triangle's growth isn't slowing down. Join the most successful Raleigh contractors and start capturing leads from one of the Southeast's hottest construction markets.
 
+## Browse Raleigh Permits by Trade
+
+- [Plumbing Permits in Raleigh](/permits/raleigh/plumbing)
+- [Electrical Permits in Raleigh](/permits/raleigh/electrical)
+- [HVAC Permits in Raleigh](/permits/raleigh/hvac)
+- [Roofing Permits in Raleigh](/permits/raleigh/roofing)
+- [General Construction Permits in Raleigh](/permits/raleigh/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with Raleigh Development Services and the City of Raleigh.*

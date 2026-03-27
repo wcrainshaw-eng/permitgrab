@@ -136,6 +136,13 @@ Greensboro's permit data includes all the key fields needed for effective lead g
 
 The contractors thriving in Greensboro's emerging market aren't waiting for referrals — they're tracking permit data and positioning themselves where the strongest growth is happening. Join them.
 
+## Browse Greensboro Permits by Trade
+
+- [Plumbing Permits in Greensboro](/permits/greensboro/plumbing)
+- [Electrical Permits in Greensboro](/permits/greensboro/electrical)
+- [HVAC Permits in Greensboro](/permits/greensboro/hvac)
+- [Roofing Permits in Greensboro](/permits/greensboro/roofing)
+- [General Construction Permits in Greensboro](/permits/greensboro/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Greensboro Development Services and Inspections Department or visit their office during standard business hours.*

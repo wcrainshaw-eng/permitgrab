@@ -131,6 +131,13 @@ Knoxville's permit data includes address, permit type, contractor, owner, square
 
 The contractors thriving in Knoxville's diverse market aren't waiting for referrals — they're tracking permit data and positioning themselves where the growth is happening. Join them.
 
+## Browse Knoxville Permits by Trade
+
+- [Plumbing Permits in Knoxville](/permits/knoxville/plumbing)
+- [Electrical Permits in Knoxville](/permits/knoxville/electrical)
+- [HVAC Permits in Knoxville](/permits/knoxville/hvac)
+- [Roofing Permits in Knoxville](/permits/knoxville/roofing)
+- [General Construction Permits in Knoxville](/permits/knoxville/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with Knox County Building Division at (865) 215-2110 or the City of Knoxville.*

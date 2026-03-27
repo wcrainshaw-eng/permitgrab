@@ -131,6 +131,13 @@ Contractors using permit data in Durham report capturing 3-5x more leads than tr
 
 The contractors thriving in Durham's boom aren't hoping for work — they're tracking permit data, positioning themselves near growth sectors, and building relationships with the institutional players and developers driving the Research Triangle's continued expansion. Join them.
 
+## Browse Durham Permits by Trade
+
+- [Plumbing Permits in Durham](/permits/durham/plumbing)
+- [Electrical Permits in Durham](/permits/durham/electrical)
+- [HVAC Permits in Durham](/permits/durham/hvac)
+- [Roofing Permits in Durham](/permits/durham/roofing)
+- [General Construction Permits in Durham](/permits/durham/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City-County Inspections Department.*

@@ -123,6 +123,13 @@ Scottsdale's permit data is among the richest in Arizona, with builder name, own
 
 The contractors thriving in Scottsdale's luxury market aren't waiting for referrals — they're tracking permit data and positioning themselves where the highest-value work is happening. Join them.
 
+## Browse Scottsdale Permits by Trade
+
+- [Plumbing Permits in Scottsdale](/permits/scottsdale/plumbing)
+- [Electrical Permits in Scottsdale](/permits/scottsdale/electrical)
+- [HVAC Permits in Scottsdale](/permits/scottsdale/hvac)
+- [Roofing Permits in Scottsdale](/permits/scottsdale/roofing)
+- [General Construction Permits in Scottsdale](/permits/scottsdale/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Scottsdale Planning and Development Department.*

@@ -138,6 +138,13 @@ Tucson's permit data is rich with actionable information, making it one of Arizo
 
 The contractors thriving in Tucson's growing market aren't waiting for referrals — they're tracking permit data, building relationships with active developers, and positioning themselves in high-growth neighborhoods. Join them.
 
+## Browse Tucson Permits by Trade
+
+- [Plumbing Permits in Tucson](/permits/tucson/plumbing)
+- [Electrical Permits in Tucson](/permits/tucson/electrical)
+- [HVAC Permits in Tucson](/permits/tucson/hvac)
+- [Roofing Permits in Tucson](/permits/tucson/roofing)
+- [General Construction Permits in Tucson](/permits/tucson/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Tucson Planning & Development Services at (520) 791-5550 or gis.tucsonaz.gov.*

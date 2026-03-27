@@ -15,6 +15,13 @@ faqs:
     answer: "PermitGrab's alert system monitors Seattle permits continuously and notifies you immediately when permits matching your criteria are filed. Set alerts by neighborhood, project size, and type to stay ahead of competition and contact prospects before others do."
   - question: "What makes Seattle's permit process different from other cities?"
     answer: "Seattle emphasizes sustainability, affordability requirements, and design quality more than most cities. Environmental review, tree protection, and stormwater management requirements are strict. The city also has extensive Design Review in historic and designated neighborhoods, which can extend timelines by 30+ days."
+## Browse Seattle Permits by Trade
+
+- [Plumbing Permits in Seattle](/permits/seattle/plumbing)
+- [Electrical Permits in Seattle](/permits/seattle/electrical)
+- [HVAC Permits in Seattle](/permits/seattle/hvac)
+- [Roofing Permits in Seattle](/permits/seattle/roofing)
+- [General Construction Permits in Seattle](/permits/seattle/general-construction)
 ---
 
 ## Seattle's Unique Construction Market: Opportunity in a Green City

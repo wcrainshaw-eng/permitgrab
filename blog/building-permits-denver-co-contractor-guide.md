@@ -119,6 +119,13 @@ Contractors using permit data report converting 40-50% more leads than those rel
 
 The contractors thriving in Denver's booming market aren't hoping for leads — they're following the permit data and staying aggressive. Join them.
 
+## Browse Denver Permits by Trade
+
+- [Plumbing Permits in Denver](/permits/denver/plumbing)
+- [Electrical Permits in Denver](/permits/denver/electrical)
+- [HVAC Permits in Denver](/permits/denver/hvac)
+- [Roofing Permits in Denver](/permits/denver/roofing)
+- [General Construction Permits in Denver](/permits/denver/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Denver Department of Community Planning and Development.*

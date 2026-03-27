@@ -141,6 +141,13 @@ Cleveland contractors using permit data report 30-40% increases in qualified lea
 
 The contractors winning the most consistent work in Cleveland aren't relying on word-of-mouth — they're using permit data to build relationships with decision-makers, monitor their markets daily, and position themselves for opportunity. Join them and grow your construction business in this undervalued market.
 
+## Browse Cleveland Permits by Trade
+
+- [Plumbing Permits in Cleveland](/permits/cleveland/plumbing)
+- [Electrical Permits in Cleveland](/permits/cleveland/electrical)
+- [HVAC Permits in Cleveland](/permits/cleveland/hvac)
+- [Roofing Permits in Cleveland](/permits/cleveland/roofing)
+- [General Construction Permits in Cleveland](/permits/cleveland/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Cleveland Department of Building and Housing.*

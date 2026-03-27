@@ -123,6 +123,13 @@ Contractors using permit data strategically report converting 35-45% more qualif
 
 The contractors capturing the biggest opportunities in Boise's red-hot market aren't waiting for leads to find them — they're actively tracking permits and positioning themselves strategically. Join the successful contractors already using permit intelligence to grow their business.
 
+## Browse Boise Permits by Trade
+
+- [Plumbing Permits in Boise](/permits/boise/plumbing)
+- [Electrical Permits in Boise](/permits/boise/electrical)
+- [HVAC Permits in Boise](/permits/boise/hvac)
+- [Roofing Permits in Boise](/permits/boise/roofing)
+- [General Construction Permits in Boise](/permits/boise/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements and fees with the City of Boise Community Planning & Development Department.*

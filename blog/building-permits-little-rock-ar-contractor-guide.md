@@ -130,6 +130,13 @@ Contractors using permit data in Little Rock report capturing 2-4x more leads th
 
 The contractors thriving in Little Rock's growth market aren't hoping for renovation work — they're tracking permit data and positioning themselves in high-growth neighborhoods and with active developers. Join them and start finding leads in Central Arkansas's most dynamic market.
 
+## Browse Little Rock Permits by Trade
+
+- [Plumbing Permits in Little Rock](/permits/little-rock/plumbing)
+- [Electrical Permits in Little Rock](/permits/little-rock/electrical)
+- [HVAC Permits in Little Rock](/permits/little-rock/hvac)
+- [Roofing Permits in Little Rock](/permits/little-rock/roofing)
+- [General Construction Permits in Little Rock](/permits/little-rock/general-construction)
 ---
 
 *Last updated: March 2026. Always verify current permit requirements with the City of Little Rock Planning and Development Department at (501) 371-4790 or data.littlerock.gov.*
