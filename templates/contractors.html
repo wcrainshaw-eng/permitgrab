@@ -14,7 +14,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-<!-- V13.9 SEO: WebPage + Dataset schema for contractors page -->
+<!-- V13.9.2 SEO: WebPage schema for contractors page -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -26,16 +26,30 @@
     "@type": "WebSite",
     "name": "PermitGrab",
     "url": "https://permitgrab.com"
-  },
-  "mainEntity": {
-    "@type": "Dataset",
-    "name": "Active Contractors by Permit Activity",
-    "description": "Real-time contractor intelligence showing permit counts, project values, and trade specializations",
-    "provider": {
-      "@type": "Organization",
-      "name": "PermitGrab"
-    }
   }
+}
+</script>
+<!-- V13.9.2 SEO: Dataset schema for contractors page -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  "name": "Active Construction Contractors Database",
+  "description": "Track which contractors are pulling building permits in your target markets. See who's most active, their total project value, and primary trade categories. Updated daily from municipal permit records.",
+  "url": "https://permitgrab.com/contractors",
+  "spatialCoverage": "United States",
+  "temporalCoverage": "2024/..",
+  "creator": {
+    "@type": "Organization",
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
+  },
+  "distribution": {
+    "@type": "DataDownload",
+    "encodingFormat": "text/html",
+    "contentUrl": "https://permitgrab.com/contractors"
+  },
+  "measurementTechnique": "Municipal building permit records"
 }
 </script>
 <style>
