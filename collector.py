@@ -23,15 +23,26 @@ import db as permitdb  # V12.50: SQLite database layer
 
 # V15: Helper function to get source config from either CITY_REGISTRY or BULK_SOURCES
 def _get_source_config(source_id):
-    """V15: Look up config by source_id, trying CITY_REGISTRY first then BULK_SOURCES."""
+    """V15: Look up config by source_id, trying city_source_db first, then direct dict lookup."""
+    # Try city_source_db (SQLite) first
     config = get_city_config(source_id)
     if config:
         config['_source_type'] = 'city'
         return config
+
+    # Try bulk source from city_source_db
     config = get_bulk_source_config(source_id)
     if config:
         config['_source_type'] = 'bulk'
         return config
+
+    # V15: Fallback to direct dict lookup in BULK_SOURCES
+    from city_configs import BULK_SOURCES
+    if source_id in BULK_SOURCES:
+        config = BULK_SOURCES[source_id].copy()
+        config['_source_type'] = 'bulk'
+        return config
+
     return None
 
 
