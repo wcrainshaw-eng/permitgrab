@@ -566,7 +566,7 @@ CITY_REGISTRY = {
         "platform": "arcgis",
         "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/Building_Permit_latest/FeatureServer/0/query",
         "dataset_id": "Building_Permit_latest",
-        "description": "Building Permits (2019-Present)",
+        "description": "Building Permits (2019-2024) - DATA STALE",
         "field_map": {
             "permit_number": "RecordID",
             "permit_type": "TypeCombo",
@@ -579,9 +579,14 @@ CITY_REGISTRY = {
             "description": "Name",
         },
         "date_field": "Opend",
-        "date_format": "none",  # V12.4: Changed from epoch — data not updated since Dec 2024
+        "date_format": "none",
         "limit": 2000,
         "active": True,
+        # V18: Atlanta Open Data only publishes 2019-2024 data. Source last updated Dec 28, 2024.
+        # The dataset "All Building Permits 2019-2024" at dpcd-coaplangis.opendata.arcgis.com
+        # does not include 2025+ permits. Need to find alternative source or contact Atlanta DCP.
+        "data_stale_since": "2024-12-28",
+        "stale_reason": "Atlanta Open Data portal only publishes 2019-2024 permits",
     },
 
     "nashville": {
@@ -853,22 +858,22 @@ CITY_REGISTRY = {
         "dataset_id": "6ddcd912-32a0-43df-9908-63574f8c7e77",
         "description": "Approved Building Permits",
         "field_map": {
-            "permit_number": "PermitNumber",
-            "permit_type": "PERMITTYPEDESCR",
-            "work_type": "WORKTYPE",
-            "address": "ADDRESS",
-            "zip": "ZIP",
-            "owner_name": "OWNER",
-            "contact_name": "APPLICANT",
-            "filing_date": "ISSUED_DATE",
-            "status": "STATUS",
-            "estimated_cost": "TOTAL_FEES",
-            "description": "DESCRIPTION",
+            "permit_number": "permitnumber",  # V19: Fixed to lowercase
+            "permit_type": "permittypedescr",
+            "work_type": "worktype",
+            "address": "address",
+            "zip": "zip",
+            "owner_name": "owner",
+            "contact_name": "applicant",
+            "filing_date": "issued_date",
+            "status": "status",
+            "estimated_cost": "total_fees",
+            "description": "description",
         },
-        "date_field": "ISSUED_DATE",
+        "date_field": "issued_date",  # V19: Fixed to lowercase
         "limit": 2000,
         "active": True,
-        "notes": "V17g: Re-enabled — data.boston.gov CKAN datastore_search is a known working endpoint",
+        "notes": "V19: Fixed field names to lowercase per actual CKAN schema",
     },
 
     # =========================================================================
@@ -1211,7 +1216,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,  # V19: Re-activated - endpoint verified working
         "notes": "V12.32: Verified live — premium: contractor name+address, applicant, sq_ft, valuation",
     },
 

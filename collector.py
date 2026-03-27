@@ -19,6 +19,22 @@ from city_source_db import (
     record_collection, reset_failure, increment_failure
 )
 import db as permitdb  # V12.50: SQLite database layer
+from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication
+
+# V18: Valid US state/territory codes for validation
+VALID_US_STATES = {
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA',
+    'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
+    'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX',
+    'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+    'AS', 'GU', 'MP', 'PR', 'VI'  # territories
+}
+
+
+def is_valid_state(state):
+    """V18: Check if a state code is a valid US state/territory."""
+    return state and state.upper() in VALID_US_STATES
 
 
 # V15: Helper function to get source config from either CITY_REGISTRY or BULK_SOURCES
@@ -651,12 +667,15 @@ def slugify_city_name(city_name, state):
     """
     V12.31: Convert a city name to a URL-safe slug.
     e.g., "Newark City" -> "newark", "East Orange" -> "east-orange"
+    V18: Normalizes city names first to prevent duplicates (Ft -> Fort, etc.)
     """
     if not city_name:
         return None
 
+    # V18: Normalize city name first (Ft -> Fort, St -> Saint, etc.)
+    name = normalize_city_name(city_name)
+
     # Clean up common suffixes
-    name = city_name.strip()
     for suffix in [" City", " Township", " Borough", " Town", " Village"]:
         if name.endswith(suffix):
             name = name[:-len(suffix)]
@@ -719,8 +738,13 @@ def collect_bulk_source(source_key, config, days_back=90):
             unknown_city_count += 1
             continue
 
-        # Normalize city name for grouping
-        city_name_normalized = city_name.title()
+        # V18: Filter out garbage city names (database fields, test data, etc.)
+        if is_garbage_city_name(city_name):
+            unknown_city_count += 1
+            continue
+
+        # V18: Normalize city name for grouping (Ft -> Fort, St -> Saint, etc.)
+        city_name_normalized = normalize_city_name(city_name)
 
         if city_name_normalized not in city_groups:
             city_groups[city_name_normalized] = []
@@ -872,11 +896,16 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
         permit_num = f"PG-{source_key[:3].upper()}-{hashlib.md5(raw_str.encode()).hexdigest()[:8]}"
 
     city_slug = virtual_config.get("slug", source_key)
+    state = virtual_config.get("state", "")
+
+    # V18: Validate state code - reject permits with invalid states
+    if not is_valid_state(state):
+        return None  # Skip permits with invalid state codes
 
     return {
         "id": f"{city_slug}_{permit_num}",
         "city": virtual_config.get("name", ""),
-        "state": virtual_config.get("state", ""),
+        "state": state,
         "permit_number": sanitize_string(permit_num),
         "permit_type": sanitize_string(get_field("permit_type")),
         "work_type": sanitize_string(get_field("work_type")),
@@ -1008,6 +1037,7 @@ def normalize_permit(raw_record, city_key):
         return str(raw_record.get(raw_key, "")).strip()
 
     # Build address — V12.55c: handle Socrata location objects
+    # V18: Handle cities like Chicago with separate street_number, street_direction, street_name
     raw_addr = raw_record.get(fmap.get("address", ""), "")
     parsed_addr = parse_address_value(raw_addr)
     address_parts = []
@@ -1015,6 +1045,11 @@ def normalize_permit(raw_record, city_key):
         address_parts.append(parsed_addr)
     elif get_field("address"):
         address_parts.append(get_field("address"))
+
+    # V18: Add street direction if present (e.g., "N", "S", "E", "W" for Chicago addresses)
+    if get_field("street_direction"):
+        address_parts.append(get_field("street_direction"))
+
     if get_field("street"):
         address_parts.append(get_field("street"))
     if "street_name" in fmap and fmap["street_name"] != fmap.get("street", ""):
@@ -1035,9 +1070,11 @@ def normalize_permit(raw_record, city_key):
             val = parse_address_value(raw_val)
             if not val:
                 val = str(raw_val).strip()
-            if val and val != "None":
-                address = val
-                break
+            if val and val.lower() not in ["none", "n/a", ""]:
+                # V18: Sanity check - skip if value looks like a description (>100 chars or contains work keywords)
+                if len(val) < 100 and not any(kw in val.lower() for kw in ["construction", "alteration", "renovation", "permit", "install"]):
+                    address = val
+                    break
 
     if not address:
         address = "Address not provided"
@@ -2449,6 +2486,162 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     print(f"\n[V12.50] Returning {len(all_permits)} permits for SQLite persistence")
 
     return all_permits, collection_stats
+
+
+# ---------------------------------------------------------------------------
+# V18: Staleness Detection
+# ---------------------------------------------------------------------------
+
+def staleness_check():
+    """
+    V18: Check all active cities for stale data and take appropriate action.
+
+    This should run after every collection cycle. It:
+    1. Queries for cities with stale permit data (>14 days)
+    2. Updates their freshness status
+    3. Auto-pauses cities with very stale data (>30 days)
+    4. Logs warnings for stale cities
+
+    Returns dict with summary stats.
+    """
+    from datetime import datetime
+
+    print("\n" + "="*60)
+    print("[V18] STALENESS CHECK")
+    print("="*60)
+
+    stale_cities = permitdb.get_stale_cities()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    stats = {
+        'total_checked': 0,
+        'fresh': 0,
+        'stale': 0,
+        'very_stale': 0,
+        'paused': 0,
+        'no_data': 0,
+        'stale_list': [],
+        'paused_list': [],
+    }
+
+    # Also check cities that were previously marked stale but now have fresh data
+    conn = permitdb.get_connection()
+    all_active = conn.execute("""
+        SELECT pc.city, pc.state, pc.city_slug, pc.data_freshness, pc.stale_since,
+               MAX(p.filing_date) as newest_permit,
+               CAST(julianday('now') - julianday(MAX(p.filing_date)) AS INTEGER) as days_stale
+        FROM prod_cities pc
+        LEFT JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
+                            AND LOWER(p.state) = LOWER(pc.state)
+        WHERE pc.status = 'active'
+        GROUP BY pc.city, pc.state
+    """).fetchall()
+
+    for row in all_active:
+        stats['total_checked'] += 1
+        city_slug = row['city_slug']
+        newest = row['newest_permit']
+        days = row['days_stale']
+        current_freshness = row['data_freshness']
+
+        if newest is None:
+            # No permit data at all
+            permitdb.update_city_freshness(city_slug, 'no_data', None, today)
+            stats['no_data'] += 1
+            print(f"  [NO DATA] {row['city']}, {row['state']}: no permits found")
+
+        elif days is None or days <= permitdb.FRESHNESS_STALE_DAYS:
+            # Fresh data
+            if current_freshness != 'fresh':
+                # City recovered from stale state
+                print(f"  [RECOVERED] {row['city']}, {row['state']}: now fresh (newest: {newest})")
+            permitdb.update_city_freshness(city_slug, 'fresh', newest)
+            stats['fresh'] += 1
+
+        elif days <= permitdb.FRESHNESS_VERY_STALE_DAYS:
+            # Stale (15-30 days)
+            stale_since = row['stale_since'] or today
+            permitdb.update_city_freshness(city_slug, 'stale', newest, stale_since)
+            stats['stale'] += 1
+            stats['stale_list'].append({
+                'city': row['city'],
+                'state': row['state'],
+                'days_stale': days,
+                'newest_permit': newest,
+            })
+            print(f"  [STALE] {row['city']}, {row['state']}: {days} days old (newest: {newest})")
+
+        else:
+            # Very stale (>30 days) - auto-pause
+            stats['very_stale'] += 1
+            stats['paused'] += 1
+            stats['paused_list'].append({
+                'city': row['city'],
+                'state': row['state'],
+                'days_stale': days,
+                'newest_permit': newest,
+            })
+            permitdb.pause_city_stale(city_slug, 'stale_data')
+            print(f"  [PAUSED] {row['city']}, {row['state']}: {days} days old - auto-paused")
+
+            # V18: Try to find an alternate source
+            search_result = 'pending_search'
+            try:
+                from discovery import find_alternate_source
+                alt_result = find_alternate_source(row['city'], row['state'])
+                if alt_result.get('best_match'):
+                    search_result = f"found: {alt_result['best_match'].get('name', 'unknown')[:50]}"
+                    print(f"  [ALT SOURCE] Found potential alternate: {search_result}")
+                else:
+                    search_result = 'no_alternate'
+                    print(f"  [ALT SOURCE] No alternate source found")
+            except Exception as e:
+                search_result = f'search_error: {str(e)[:50]}'
+                print(f"  [ALT SOURCE] Search error: {e}")
+
+            # Add to review queue with search result
+            permitdb.add_to_review_queue(
+                row['city'], row['state'],
+                f"source_type: {row.get('source_type', 'unknown')}",
+                newest, today, search_result
+            )
+
+    # Summary
+    print(f"\n[V18] Staleness check complete:")
+    print(f"  Total cities checked: {stats['total_checked']}")
+    print(f"  Fresh (<={permitdb.FRESHNESS_STALE_DAYS} days): {stats['fresh']}")
+    print(f"  Stale ({permitdb.FRESHNESS_STALE_DAYS+1}-{permitdb.FRESHNESS_VERY_STALE_DAYS} days): {stats['stale']}")
+    print(f"  Very stale (>{permitdb.FRESHNESS_VERY_STALE_DAYS} days): {stats['very_stale']}")
+    print(f"  Auto-paused this run: {stats['paused']}")
+    print(f"  No permit data: {stats['no_data']}")
+
+    # V18: Send weekly stale cities alert if there are issues
+    # Only send once per week (check system_state)
+    if stats['paused'] > 0 or stats['stale'] > 5:
+        try:
+            last_alert = permitdb.get_system_state('last_stale_alert')
+            should_send = True
+            if last_alert:
+                import json
+                last_data = json.loads(last_alert)
+                last_date = datetime.strptime(last_data.get('date', ''), '%Y-%m-%d').date()
+                days_since = (datetime.now().date() - last_date).days
+                should_send = days_since >= 7  # Weekly alerts
+
+            if should_send:
+                from email_alerts import send_stale_cities_alert
+                if send_stale_cities_alert():
+                    import json
+                    permitdb.set_system_state('last_stale_alert', json.dumps({
+                        'date': datetime.now().strftime('%Y-%m-%d'),
+                        'paused': stats['paused'],
+                        'stale': stats['stale'],
+                    }))
+                    print(f"  [EMAIL] Sent stale cities alert")
+        except Exception as e:
+            print(f"  [EMAIL] Failed to send alert: {e}")
+
+    return stats
 
 
 if __name__ == "__main__":

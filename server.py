@@ -539,6 +539,36 @@ def admin_data_freshness():
     })
 
 
+@app.route('/api/admin/stale-cities', methods=['GET'])
+def admin_stale_cities():
+    """V18: Get stale cities review queue and freshness summary."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        # Get freshness summary
+        summary = permitdb.get_freshness_summary()
+
+        # Get review queue
+        review_queue = permitdb.get_review_queue()
+
+        # Get currently stale cities (active but stale)
+        stale = permitdb.get_stale_cities()
+
+        return jsonify({
+            'summary': summary,
+            'review_queue': review_queue,
+            'currently_stale': stale,
+            'thresholds': {
+                'stale_days': permitdb.FRESHNESS_STALE_DAYS,
+                'very_stale_days': permitdb.FRESHNESS_VERY_STALE_DAYS,
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to get stale cities: {str(e)}'}), 500
+
+
 @app.route('/api/admin/send-welcome', methods=['POST'])
 def admin_send_welcome():
     """V12.53: Send welcome email to a specific user."""
@@ -1369,10 +1399,19 @@ def calculate_lead_score(permit):
     # recency_added stays False, score += 0 implied
 
     # C: Address quality (0-15 pts) — V13.1: Increased weight
+    # V19: Explicitly exclude placeholder addresses from scoring
     address = str(permit.get('address', '')).strip()
-    if address and any(c.isdigit() for c in address):
+    address_lower = address.lower()
+    is_placeholder = (
+        not address or
+        address_lower in ('address not provided', 'not provided', 'n/a', 'na', 'none', 'unknown', 'tbd', '-') or
+        address_lower.startswith('address not')
+    )
+    if is_placeholder:
+        score += 0    # V19: No address = 0 points (keeps out of Best Leads)
+    elif any(c.isdigit() for c in address):
         score += 15   # Has street number = full points
-    elif address and len(address) > 5:
+    elif len(address) > 5:
         score += 7    # Has name but no number
     # else 0
 
@@ -2353,6 +2392,7 @@ def alerts_redirect():
 
 
 @app.route('/health')
+@app.route('/api/health')
 def health_check():
     """
     V12.51: Health check endpoint with SQLite data availability check.
@@ -6089,9 +6129,40 @@ def city_landing_inner(city_slug):
     # V15: Check prod_cities status for this city
     is_prod_city = False
     prod_city_status = None
+    city_freshness = 'fresh'
+    newest_permit_date = None
+
     try:
         if permitdb.prod_cities_table_exists():
             is_prod_city, prod_city_status = permitdb.is_prod_city(city_slug)
+
+            # V18: Check if city is paused due to stale data
+            if prod_city_status == 'paused':
+                conn = permitdb.get_connection()
+                row = conn.execute("""
+                    SELECT pause_reason, newest_permit_date, city, state
+                    FROM prod_cities WHERE city_slug = ?
+                """, (city_slug,)).fetchone()
+                if row and row['pause_reason'] == 'stale_data':
+                    # Show a "data updating" page instead of normal city page
+                    return render_template('city_paused.html',
+                        city_name=row['city'],
+                        state=row['state'],
+                        last_updated=row['newest_permit_date'],
+                        canonical_url=f"{SITE_URL}/permits/{city_slug}",
+                        robots="noindex, follow"
+                    )
+
+            # V18: Get freshness info for stale indicator
+            if is_prod_city:
+                conn = permitdb.get_connection()
+                row = conn.execute("""
+                    SELECT data_freshness, newest_permit_date
+                    FROM prod_cities WHERE city_slug = ?
+                """, (city_slug,)).fetchone()
+                if row:
+                    city_freshness = row['data_freshness'] or 'fresh'
+                    newest_permit_date = row['newest_permit_date']
     except Exception as e:
         print(f"[V15] Error checking prod_cities: {e}")
 
@@ -6102,6 +6173,27 @@ def city_landing_inner(city_slug):
         # V12.32: Try both explicit configs AND auto-discovered bulk source cities
         city_key, city_config = get_city_by_slug_auto(city_slug)
         if not city_config:
+            # V18: Slug fallback - handle city-state format (e.g., san-antonio-tx -> san-antonio)
+            # Check if slug ends with a state abbreviation suffix
+            import re
+            state_suffix_match = re.match(r'^(.+)-([a-z]{2})$', city_slug)
+            if state_suffix_match:
+                bare_slug = state_suffix_match.group(1)
+                state_suffix = state_suffix_match.group(2).upper()
+                # Verify it's a valid US state abbreviation
+                VALID_STATE_ABBREVS = {
+                    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+                    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA',
+                    'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
+                    'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX',
+                    'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+                }
+                if state_suffix in VALID_STATE_ABBREVS:
+                    # Try the bare slug
+                    bare_key, bare_config = get_city_by_slug_auto(bare_slug)
+                    if bare_config:
+                        # Redirect to canonical bare slug URL
+                        return redirect(f'/permits/{bare_slug}', code=301)
             return render_city_not_found(city_slug)
         # Generate basic SEO config with properly formatted city name
         display_name = format_city_name(city_config["name"])
@@ -6326,6 +6418,8 @@ def city_landing_inner(city_slug):
         state_name=state_name,  # V14.0: For display
         city_blog_url=city_blog_url,  # V14.0: City guide link
         top_trades=top_trades,  # V14.0: Trade page links
+        data_freshness=city_freshness,  # V18: stale indicator
+        newest_permit_date=newest_permit_date,  # V18: for "last updated" display
     )
 
 
@@ -6579,6 +6673,8 @@ def sitemap():
         add_url(f"{SITE_URL}/permits/{state_slug}", 'daily', '0.85')
 
     # Get cities with permits for filtering
+    # V18: get_cities_with_data() uses get_prod_cities(status='active') which
+    # automatically excludes paused cities (including stale_data paused ones)
     cities_with_data = get_cities_with_data()
     cities_with_permits = {c['name'] for c in cities_with_data}
 
@@ -7080,6 +7176,15 @@ def scheduled_collection():
             print(f"[{datetime.now()}] V17 discovery pipeline complete: {total_new_sources} new sources")
 
         print(f"[{datetime.now()}] All collection tasks complete.")
+
+        # V18: Run staleness check after collection
+        try:
+            from collector import staleness_check
+            print(f"[{datetime.now()}] V18: Running staleness check...")
+            staleness_stats = staleness_check()
+            print(f"[{datetime.now()}] V18: Staleness check done - {staleness_stats.get('paused', 0)} paused, {staleness_stats.get('stale', 0)} stale")
+        except Exception as e:
+            print(f"[{datetime.now()}] V18: Staleness check error: {e}")
 
         # V16: Track last successful collection run
         global _last_collection_run

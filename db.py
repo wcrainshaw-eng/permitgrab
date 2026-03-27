@@ -6,8 +6,137 @@ Replaces permits.json and permit_history.json with a single SQLite database.
 import sqlite3
 import os
 import json
+import re
 import threading
 from datetime import datetime, timedelta
+
+
+# V18: City name normalization to prevent duplicates like "Ft Lauderdale" vs "Fort Lauderdale"
+CITY_NAME_REPLACEMENTS = {
+    r'\bFt\.?\b': 'Fort',
+    r'\bSt\.?\b': 'Saint',
+    r'\bMt\.?\b': 'Mount',
+    r'\bN\.?\b': 'North',
+    r'\bS\.?\b': 'South',
+    r'\bE\.?\b': 'East',
+    r'\bW\.?\b': 'West',
+}
+
+# V18: Known garbage city names to filter out (database field names, test data, etc.)
+# V19: Added decimal patterns and more bad values
+GARBAGE_CITY_PATTERNS = [
+    r'_',           # Underscores (e.g., "Archived_Buildings")
+    r'^test',       # Test data
+    r'^sample',     # Sample data
+    r'^[\d.]+$',    # Numbers/decimals (e.g., '6', '5.0', '2.0')
+    r'^null$',      # Null values
+    r'^n/a$',       # N/A values
+    r'^na$',        # NA values
+    r'^none$',      # None values
+    r'^unknown$',   # Unknown values
+    r'^tbd$',       # TBD values
+    r'^-$',         # Just a dash
+]
+
+# V19: Neighborhood/subdivision names that should map to their parent city
+# Format: {(neighborhood, state): actual_city}
+NEIGHBORHOOD_TO_CITY = {
+    # Orlando, FL neighborhoods (from Orange County bulk source)
+    ('Lake Nona South', 'FL'): 'Orlando', ('Lake Nona Central', 'FL'): 'Orlando',
+    ('Lake Nona Estates', 'FL'): 'Orlando', ('Vista Park', 'FL'): 'Orlando',
+    ('Vista East', 'FL'): 'Orlando', ('College Park', 'FL'): 'Orlando',
+    ('Meridian Park', 'FL'): 'Orlando', ('Florida Center', 'FL'): 'Orlando',
+    ('Florida Center North', 'FL'): 'Orlando', ('Central Business District', 'FL'): 'Orlando',
+    ('Johnson Village', 'FL'): 'Orlando', ('33Rd St. Industrial', 'FL'): 'Orlando',
+    ('Southeastern Oaks', 'FL'): 'Orlando', ('North Orange', 'FL'): 'Orlando',
+    ('South Orange', 'FL'): 'Orlando', ('East Park', 'FL'): 'Orlando',
+    ('West Colonial', 'FL'): 'Orlando', ('Airport North', 'FL'): 'Orlando',
+    ('Rosemont', 'FL'): 'Orlando', ('Rosemont North', 'FL'): 'Orlando',
+    ('Audubon Park', 'FL'): 'Orlando', ('Holden Heights', 'FL'): 'Orlando',
+    ('Holden/Parramore', 'FL'): 'Orlando', ('Colonialtown South', 'FL'): 'Orlando',
+    ('Colonial Town Center', 'FL'): 'Orlando', ('Lake Eola Heights', 'FL'): 'Orlando',
+    ('Lake Fairview', 'FL'): 'Orlando', ('Lake Davis/Greenwood', 'FL'): 'Orlando',
+    ('Lake Terrace', 'FL'): 'Orlando', ('Lake Underhill', 'FL'): 'Orlando',
+    ('Lake Como', 'FL'): 'Orlando', ('Lake Cherokee', 'FL'): 'Orlando',
+    ('Lake Formosa', 'FL'): 'Orlando', ('Lake Sunset', 'FL'): 'Orlando',
+    ('Lake Copeland', 'FL'): 'Orlando', ('Lake Mann Estates', 'FL'): 'Orlando',
+    ('Lake Weldona', 'FL'): 'Orlando', ('Park Lake/Highland', 'FL'): 'Orlando',
+    ('Spring Lake', 'FL'): 'Orlando', ('Clear Lake', 'FL'): 'Orlando',
+    ('Kirkman North', 'FL'): 'Orlando', ('Kirkman South', 'FL'): 'Orlando',
+    ('Mercy Drive', 'FL'): 'Orlando', ('Boggy Creek', 'FL'): 'Orlando',
+    ('Conway', 'FL'): 'Orlando', ('Storey Park', 'FL'): 'Orlando',
+    ('Randal Park', 'FL'): 'Orlando', ('Northlake Park At Lake Nona', 'FL'): 'Orlando',
+    ('Sunbridge/Icp', 'FL'): 'Orlando', ('Dover Shores West', 'FL'): 'Orlando',
+    ('Dover Shores East', 'FL'): 'Orlando', ('Dover Estates', 'FL'): 'Orlando',
+    ('Dover Manor', 'FL'): 'Orlando', ('Rose Isle', 'FL'): 'Orlando',
+    ('Pineloch', 'FL'): 'Orlando', ('Princeton/Silver Star', 'FL'): 'Orlando',
+    ('Milk District', 'FL'): 'Orlando', ('Thornton Park', 'FL'): 'Orlando',
+    ('South Eola', 'FL'): 'Orlando', ('Delaney Park', 'FL'): 'Orlando',
+    ('Lorna Doone', 'FL'): 'Orlando', ('Signal Hill', 'FL'): 'Orlando',
+    ('Pershing', 'FL'): 'Orlando', ('Catalina', 'FL'): 'Orlando',
+    ('Bryn Mawr', 'FL'): 'Orlando', ('Monterey', 'FL'): 'Orlando',
+    ('Rock Lake', 'FL'): 'Orlando', ('Windhover', 'FL'): 'Orlando',
+    ('Carver Shores', 'FL'): 'Orlando', ('North Quarter', 'FL'): 'Orlando',
+    ('Southern Oaks', 'FL'): 'Orlando', ('South Semoran', 'FL'): 'Orlando',
+    ('Lancaster Park', 'FL'): 'Orlando', ('Rowena Gardens', 'FL'): 'Orlando',
+    ('Lawsona/Fern Creek', 'FL'): 'Orlando', ('Dixie Belle', 'FL'): 'Orlando',
+    ('Malibu Groves', 'FL'): 'Orlando', ('Southport', 'FL'): 'Orlando',
+    ('Bel Air', 'FL'): 'Orlando', ('Richmond Heights', 'FL'): 'Orlando',
+    ('Richmond Estates', 'FL'): 'Orlando', ('Engelwood Park', 'FL'): 'Orlando',
+    ('Wadeview Park', 'FL'): 'Orlando', ('Orwin Manor', 'FL'): 'Orlando',
+    ('Ventura', 'FL'): 'Orlando', ('Bal Bay', 'FL'): 'Orlando',
+    ('Crescent Park', 'FL'): 'Orlando', ('Timberleaf', 'FL'): 'Orlando',
+    ('Countryside', 'FL'): 'Orlando', ('Mariners Village', 'FL'): 'Orlando',
+    ('Orlando Executive Airport', 'FL'): 'Orlando',
+    ('Orlando International Airport', 'FL'): 'Orlando',
+    ('Seaboard Industrial', 'FL'): 'Orlando', ('Beltway Commerce Center', 'FL'): 'Orlando',
+    ('Palomar', 'FL'): 'Orlando', ('Azalea Park', 'FL'): 'Orlando',
+}
+
+
+def is_garbage_city_name(city_name):
+    """V18: Check if a city name is garbage (database field name, test data, etc.)."""
+    if not city_name:
+        return True
+    name_lower = city_name.strip().lower()
+    if len(name_lower) < 2:
+        return True
+    for pattern in GARBAGE_CITY_PATTERNS:
+        if re.search(pattern, name_lower, re.IGNORECASE):
+            return True
+    return False
+
+
+def normalize_city_name(city_name):
+    """V18: Normalize city name to prevent duplicates from different sources.
+    Converts abbreviations: Ft -> Fort, St -> Saint, Mt -> Mount, etc.
+    """
+    if not city_name:
+        return city_name
+
+    normalized = city_name.strip()
+    for pattern, replacement in CITY_NAME_REPLACEMENTS.items():
+        # Case-insensitive replacement, preserving original case style
+        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+
+    # Clean up multiple spaces
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+
+    # Title case for consistency
+    normalized = normalized.title()
+
+    return normalized
+
+
+def normalize_city_slug(city_name, state=None):
+    """V18: Generate normalized slug from city name.
+    Example: 'Ft Lauderdale' -> 'fort-lauderdale'
+    """
+    normalized_name = normalize_city_name(city_name)
+    slug = normalized_name.lower()
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    slug = slug.strip('-')
+    return slug
 
 # Use Render persistent disk if available
 if os.path.isdir('/var/data'):
@@ -243,12 +372,36 @@ def init_db():
             added_by TEXT,
             added_at TEXT DEFAULT (datetime('now')),
             notes TEXT,
+            -- V18: Staleness detection columns
+            data_freshness TEXT DEFAULT 'fresh' CHECK (data_freshness IN ('fresh', 'stale', 'very_stale', 'no_data')),
+            newest_permit_date TEXT,
+            stale_since TEXT,
+            pause_reason TEXT,
             UNIQUE(city, state)
         );
         CREATE INDEX IF NOT EXISTS idx_prod_cities_status ON prod_cities(status);
         CREATE INDEX IF NOT EXISTS idx_prod_cities_state ON prod_cities(state);
         CREATE INDEX IF NOT EXISTS idx_prod_cities_slug ON prod_cities(city_slug);
         CREATE INDEX IF NOT EXISTS idx_prod_cities_last_collection ON prod_cities(last_collection);
+        CREATE INDEX IF NOT EXISTS idx_prod_cities_freshness ON prod_cities(data_freshness);
+
+        -- V18: stale_cities_review: Manual review queue for cities without automated sources
+        CREATE TABLE IF NOT EXISTS stale_cities_review (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            original_source TEXT,
+            last_permit_date TEXT,
+            stale_since TEXT,
+            auto_search_attempted INTEGER DEFAULT 0,
+            auto_search_result TEXT,
+            manual_notes TEXT,
+            alternate_source_url TEXT,
+            status TEXT DEFAULT 'needs_review' CHECK (status IN ('needs_review', 'in_progress', 'resolved', 'no_source')),
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(city, state)
+        );
 
         -- scraper_runs: Per-city collection logging
         CREATE TABLE IF NOT EXISTS scraper_runs (
@@ -317,7 +470,61 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_discovered_sources_status ON discovered_sources(status);
     """)
     conn.commit()
-    print(f"[DB] V15: Database initialized at {DB_PATH}")
+
+    # V18: Migrations for staleness detection columns
+    _run_v18_migrations(conn)
+
+    print(f"[DB] V18: Database initialized at {DB_PATH}")
+
+
+def _run_v18_migrations(conn):
+    """V18: Add staleness detection columns to existing prod_cities tables."""
+    # Check which columns exist
+    cursor = conn.execute("PRAGMA table_info(prod_cities)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+
+    # Add missing V18 columns
+    v18_columns = [
+        ("data_freshness", "TEXT DEFAULT 'fresh'"),
+        ("newest_permit_date", "TEXT"),
+        ("stale_since", "TEXT"),
+        ("pause_reason", "TEXT"),
+    ]
+
+    for col_name, col_def in v18_columns:
+        if col_name not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE prod_cities ADD COLUMN {col_name} {col_def}")
+                print(f"[V18] Added column: prod_cities.{col_name}")
+            except Exception as e:
+                pass  # Column may already exist
+
+    # Create freshness index if not exists
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_prod_cities_freshness ON prod_cities(data_freshness)")
+    except:
+        pass
+
+    # Create stale_cities_review table if not exists
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stale_cities_review (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            original_source TEXT,
+            last_permit_date TEXT,
+            stale_since TEXT,
+            auto_search_attempted INTEGER DEFAULT 0,
+            auto_search_result TEXT,
+            manual_notes TEXT,
+            alternate_source_url TEXT,
+            status TEXT DEFAULT 'needs_review',
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(city, state)
+        )
+    """)
+    conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +537,9 @@ def upsert_permits(permits, source_city_key=None):
     all the JSON file writes. Uses INSERT OR REPLACE so duplicates by
     permit_number are automatically handled (newer data wins).
 
+    V19: Also deduplicates by address+city+state+filing_date to prevent
+    duplicate rows for the same physical permit with different permit numbers.
+
     Args:
         permits: list of permit dicts (same format as the old JSON)
         source_city_key: which city config collected these (for tracking)
@@ -337,6 +547,63 @@ def upsert_permits(permits, source_city_key=None):
     Returns:
         (new_count, updated_count)
     """
+    # V19: Apply neighborhood-to-city mapping (e.g., "Vista Park, FL" -> "Orlando, FL")
+    for p in permits:
+        city = p.get('city', '').strip() if p.get('city') else ''
+        state = p.get('state', '').strip() if p.get('state') else ''
+        if city and state:
+            mapped_city = NEIGHBORHOOD_TO_CITY.get((city, state))
+            if mapped_city:
+                p['city'] = mapped_city
+
+    # V19: Pre-filter to check for existing permits by address+city+state+filing_date
+    # This prevents duplicates even when permit_number differs
+    conn = get_connection()
+    existing_addr_combos = set()
+
+    # Build list of (address, city, state, filing_date) to check
+    addr_combos = []
+    for p in permits:
+        addr = p.get('address', '').strip() if p.get('address') else ''
+        city = p.get('city', '').strip() if p.get('city') else ''
+        state = p.get('state', '').strip() if p.get('state') else ''
+        filing_date = p.get('filing_date', '').strip() if p.get('filing_date') else ''
+        if addr and city and state and filing_date and addr.lower() != 'address not provided':
+            addr_combos.append((addr, city, state, filing_date))
+
+    # Check existing in batches
+    for i in range(0, len(addr_combos), 100):
+        batch = addr_combos[i:i+100]
+        for addr, city, state, filing_date in batch:
+            row = conn.execute("""
+                SELECT 1 FROM permits
+                WHERE address = ? AND city = ? AND state = ? AND filing_date = ?
+                LIMIT 1
+            """, (addr, city, state, filing_date)).fetchone()
+            if row:
+                existing_addr_combos.add((addr.lower(), city.lower(), state.lower(), filing_date))
+
+    # Filter out permits that already exist by address combo
+    filtered_permits = []
+    skipped_dupes = 0
+    for p in permits:
+        addr = (p.get('address', '') or '').strip().lower()
+        city = (p.get('city', '') or '').strip().lower()
+        state = (p.get('state', '') or '').strip().lower()
+        filing_date = (p.get('filing_date', '') or '').strip()
+
+        if addr and city and state and filing_date and addr != 'address not provided':
+            if (addr, city, state, filing_date) in existing_addr_combos:
+                skipped_dupes += 1
+                continue
+
+        filtered_permits.append(p)
+
+    if skipped_dupes > 0:
+        print(f"[DB] Skipped {skipped_dupes} duplicate permits (same address+city+state+date)")
+
+    permits = filtered_permits
+
     # V12.56: Safety net - convert any dict/list values to strings to prevent SQLite binding errors
     for permit in permits:
         for key, val in list(permit.items()):
@@ -682,13 +949,14 @@ def record_collection_run(run_type, cities_processed, permits_collected,
 # V15: Prod Cities — Verified cities with working data sources
 # ---------------------------------------------------------------------------
 
-def get_prod_cities(status='active'):
+def get_prod_cities(status='active', min_permits=1):
     """
     V15: Get all cities from prod_cities table.
     Returns list of dicts compatible with the old get_cities_with_data() format.
 
     Args:
         status: Filter by status ('active', 'paused', 'failed', 'pending', or None for all)
+        min_permits: V18: Minimum permit count to include (default 1 to exclude empty cities)
 
     Returns:
         List of city dicts with keys: name, state, slug, permit_count, active
@@ -700,9 +968,9 @@ def get_prod_cities(status='active'):
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
                    source_type, source_id, consecutive_failures, last_error
             FROM prod_cities
-            WHERE status = ?
+            WHERE status = ? AND total_permits >= ?
             ORDER BY total_permits DESC
-        """, (status,))
+        """, (status, min_permits))
     else:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
@@ -785,7 +1053,13 @@ def get_city_health_status():
 
 def upsert_prod_city(city, state, city_slug, source_type=None, source_id=None,
                      source_scope=None, status='active', added_by='manual', notes=None):
-    """V15: Insert or update a prod city."""
+    """V15: Insert or update a prod city.
+    V18: Normalizes city name and slug to prevent duplicates (Ft -> Fort, etc.)
+    """
+    # V18: Normalize city name and slug to prevent duplicates
+    normalized_city = normalize_city_name(city)
+    normalized_slug = normalize_city_slug(city)
+
     conn = get_connection()
     conn.execute("""
         INSERT INTO prod_cities (
@@ -799,7 +1073,7 @@ def upsert_prod_city(city, state, city_slug, source_type=None, source_id=None,
             status = excluded.status,
             notes = excluded.notes,
             verified_date = datetime('now')
-    """, (city, state, city_slug, source_type, source_id, source_scope,
+    """, (normalized_city, state, normalized_slug, source_type, source_id, source_scope,
           status, added_by, notes))
     conn.commit()
 
@@ -1069,3 +1343,166 @@ def upsert_discovered_source(source_config):
         source_config.get('notes'),
     ))
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# V18: Staleness detection functions
+# ---------------------------------------------------------------------------
+
+# Configurable thresholds (days)
+FRESHNESS_STALE_DAYS = 14
+FRESHNESS_VERY_STALE_DAYS = 30
+
+
+def get_stale_cities():
+    """V18: Get all cities with stale data (>14 days since newest permit).
+
+    Returns list of dicts with city info and staleness details.
+    """
+    conn = get_connection()
+    cursor = conn.execute("""
+        SELECT pc.city, pc.state, pc.city_slug, pc.total_permits,
+               pc.source_type, pc.source_id, pc.data_freshness, pc.stale_since,
+               MAX(p.filing_date) as newest_permit,
+               CAST(julianday('now') - julianday(MAX(p.filing_date)) AS INTEGER) as days_stale
+        FROM prod_cities pc
+        LEFT JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
+                            AND LOWER(p.state) = LOWER(pc.state)
+        WHERE pc.status = 'active'
+        GROUP BY pc.city, pc.state
+        HAVING days_stale > ? OR newest_permit IS NULL
+        ORDER BY days_stale DESC
+    """, (FRESHNESS_STALE_DAYS,))
+
+    results = []
+    for row in cursor:
+        results.append({
+            'city': row['city'],
+            'state': row['state'],
+            'city_slug': row['city_slug'],
+            'total_permits': row['total_permits'] or 0,
+            'source_type': row['source_type'],
+            'source_id': row['source_id'],
+            'current_freshness': row['data_freshness'],
+            'stale_since': row['stale_since'],
+            'newest_permit': row['newest_permit'],
+            'days_stale': row['days_stale'] if row['newest_permit'] else None,
+        })
+    return results
+
+
+def update_city_freshness(city_slug, freshness, newest_permit_date=None, stale_since=None):
+    """V18: Update freshness status for a city."""
+    conn = get_connection()
+    if stale_since:
+        conn.execute("""
+            UPDATE prod_cities
+            SET data_freshness = ?,
+                newest_permit_date = ?,
+                stale_since = ?
+            WHERE city_slug = ?
+        """, (freshness, newest_permit_date, stale_since, city_slug))
+    else:
+        conn.execute("""
+            UPDATE prod_cities
+            SET data_freshness = ?,
+                newest_permit_date = ?
+            WHERE city_slug = ?
+        """, (freshness, newest_permit_date, city_slug))
+    conn.commit()
+
+
+def pause_city_stale(city_slug, reason='stale_data'):
+    """V18: Pause a city due to stale data."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE prod_cities
+        SET status = 'paused',
+            pause_reason = ?,
+            data_freshness = 'very_stale'
+        WHERE city_slug = ?
+    """, (reason, city_slug))
+    conn.commit()
+
+
+def reactivate_city(city_slug):
+    """V18: Reactivate a paused city when fresh data is found."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE prod_cities
+        SET status = 'active',
+            pause_reason = NULL,
+            data_freshness = 'fresh',
+            stale_since = NULL
+        WHERE city_slug = ?
+    """, (city_slug,))
+    conn.commit()
+
+
+def add_to_review_queue(city, state, original_source, last_permit_date, stale_since, search_result=None):
+    """V18: Add a stale city to the manual review queue."""
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO stale_cities_review
+            (city, state, original_source, last_permit_date, stale_since,
+             auto_search_attempted, auto_search_result, status)
+        VALUES (?, ?, ?, ?, ?, 1, ?, 'needs_review')
+        ON CONFLICT(city, state) DO UPDATE SET
+            last_permit_date = excluded.last_permit_date,
+            auto_search_attempted = 1,
+            auto_search_result = excluded.auto_search_result,
+            updated_at = datetime('now')
+    """, (city, state, original_source, last_permit_date, stale_since, search_result))
+    conn.commit()
+
+
+def get_review_queue(status=None):
+    """V18: Get the manual review queue."""
+    conn = get_connection()
+    if status:
+        cursor = conn.execute("""
+            SELECT * FROM stale_cities_review
+            WHERE status = ?
+            ORDER BY stale_since DESC
+        """, (status,))
+    else:
+        cursor = conn.execute("""
+            SELECT * FROM stale_cities_review
+            ORDER BY stale_since DESC
+        """)
+    return [dict(row) for row in cursor]
+
+
+def get_freshness_summary():
+    """V18: Get summary of data freshness across all cities."""
+    conn = get_connection()
+    summary = {}
+
+    # Count by freshness status
+    for row in conn.execute("""
+        SELECT data_freshness, COUNT(*) as cnt
+        FROM prod_cities
+        WHERE status = 'active'
+        GROUP BY data_freshness
+    """):
+        summary[row['data_freshness'] or 'unknown'] = row['cnt']
+
+    # Count paused due to stale data
+    row = conn.execute("""
+        SELECT COUNT(*) as cnt FROM prod_cities
+        WHERE status = 'paused' AND pause_reason = 'stale_data'
+    """).fetchone()
+    summary['paused_stale'] = row['cnt'] if row else 0
+
+    # Get oldest active city's newest permit
+    row = conn.execute("""
+        SELECT city, state, newest_permit_date
+        FROM prod_cities
+        WHERE status = 'active' AND newest_permit_date IS NOT NULL
+        ORDER BY newest_permit_date ASC
+        LIMIT 1
+    """).fetchone()
+    if row:
+        summary['oldest_city'] = f"{row['city']}, {row['state']}: {row['newest_permit_date']}"
+
+    return summary

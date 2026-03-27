@@ -1076,6 +1076,156 @@ def send_new_cities_alert(activated_cities):
 
 
 # =============================================================================
+# V18: STALE CITIES ALERT
+# =============================================================================
+
+def send_stale_cities_alert():
+    """
+    V18: Send weekly email alert for cities with stale data.
+
+    Includes:
+    - Cities auto-paused (>30 days stale)
+    - Cities going stale (14-30 days)
+    - Alternate source search results
+    - Cities needing manual research
+    """
+    owner_email = os.environ.get('OWNER_EMAIL', 'wcrainshaw@gmail.com')
+
+    try:
+        # Get stale cities data
+        summary = permitdb.get_freshness_summary()
+        review_queue = permitdb.get_review_queue()
+        stale_cities = permitdb.get_stale_cities()
+
+        # Filter by staleness level
+        paused = [c for c in stale_cities if c.get('days_stale') and c['days_stale'] > 30]
+        going_stale = [c for c in stale_cities if c.get('days_stale') and 14 < c['days_stale'] <= 30]
+
+        # Group review queue by search result
+        found_alt = [r for r in review_queue if r.get('auto_search_result', '').startswith('found:')]
+        no_alt = [r for r in review_queue if r.get('auto_search_result') == 'no_alternate']
+        needs_review = [r for r in review_queue if r.get('status') == 'needs_review']
+
+        # Don't send if nothing to report
+        if not paused and not going_stale and not needs_review:
+            print("[V18] No stale cities to report")
+            return False
+
+        # Build HTML email
+        html = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .section {{ margin-bottom: 25px; }}
+                h2 {{ color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 8px; }}
+                h3 {{ color: #f59e0b; }}
+                .city-list {{ background: #f9fafb; padding: 15px; border-radius: 8px; }}
+                .city-item {{ margin: 8px 0; padding: 8px; background: white; border-radius: 4px; }}
+                .stale {{ border-left: 4px solid #f59e0b; }}
+                .paused {{ border-left: 4px solid #dc2626; }}
+                .found {{ border-left: 4px solid #10b981; }}
+                .summary {{ background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
+                a {{ color: #2563eb; }}
+            </style>
+        </head>
+        <body>
+            <h1>PermitGrab: Data Staleness Report</h1>
+
+            <div class="summary">
+                <strong>Summary:</strong><br>
+                Fresh cities: {summary.get('fresh', 0)}<br>
+                Stale cities (14-30 days): {summary.get('stale', 0)}<br>
+                Very stale (paused): {summary.get('paused_stale', 0)}<br>
+                No data: {summary.get('no_data', 0)}
+            </div>
+        """
+
+        if paused:
+            html += """
+            <div class="section">
+                <h2>Cities Auto-Paused (30+ days stale)</h2>
+                <p>These cities have been removed from the site due to stale data:</p>
+                <div class="city-list">
+            """
+            for c in paused[:20]:  # Limit to 20
+                html += f"""
+                <div class="city-item paused">
+                    <strong>{c['city']}, {c['state']}</strong><br>
+                    Last permit: {c.get('newest_permit', 'N/A')} ({c.get('days_stale', '?')} days ago)<br>
+                    Source: {c.get('source_type', 'unknown')}
+                </div>
+                """
+            html += "</div></div>"
+
+        if going_stale:
+            html += """
+            <div class="section">
+                <h3>Cities Going Stale (14-30 days)</h3>
+                <p>These cities are showing age and may need attention:</p>
+                <div class="city-list">
+            """
+            for c in going_stale[:20]:
+                html += f"""
+                <div class="city-item stale">
+                    <strong>{c['city']}, {c['state']}</strong> - {c.get('days_stale', '?')} days old
+                </div>
+                """
+            html += "</div></div>"
+
+        if found_alt:
+            html += """
+            <div class="section">
+                <h3>Alternate Sources Found</h3>
+                <p>These cities have potential alternate data sources:</p>
+                <div class="city-list">
+            """
+            for r in found_alt[:10]:
+                html += f"""
+                <div class="city-item found">
+                    <strong>{r['city']}, {r['state']}</strong><br>
+                    {r.get('auto_search_result', '')}
+                </div>
+                """
+            html += "</div></div>"
+
+        if needs_review:
+            html += """
+            <div class="section">
+                <h3>Needing Manual Research</h3>
+                <p>No automated alternate sources found for these cities:</p>
+                <div class="city-list">
+            """
+            for r in needs_review[:15]:
+                html += f"""
+                <div class="city-item">
+                    {r['city']}, {r['state']} - last data: {r.get('last_permit_date', 'N/A')}
+                </div>
+                """
+            html += "</div></div>"
+
+        html += """
+            <p style="margin-top: 30px; color: #666;">
+                <a href="https://permitgrab.com/admin">View Admin Dashboard</a> |
+                <em>This is an automated V18 Staleness Detection alert</em>
+            </p>
+        </body>
+        </html>
+        """
+
+        total_issues = len(paused) + len(going_stale) + len(needs_review)
+        return send_email(
+            owner_email,
+            f"PermitGrab: {total_issues} Cities Have Stale Data",
+            html
+        )
+
+    except Exception as e:
+        print(f"[V18] Failed to send stale cities alert: {e}")
+        return False
+
+
+# =============================================================================
 # MAIN (for testing)
 # =============================================================================
 
@@ -1099,7 +1249,10 @@ if __name__ == '__main__':
         elif cmd == 'nudges':
             check_onboarding_nudges()
 
+        elif cmd == 'stale':
+            send_stale_cities_alert()
+
         else:
-            print("Usage: python email_alerts.py [digest|test|lifecycle|nudges]")
+            print("Usage: python email_alerts.py [digest|test|lifecycle|nudges|stale]")
     else:
-        print("Usage: python email_alerts.py [digest|test|lifecycle|nudges]")
+        print("Usage: python email_alerts.py [digest|test|lifecycle|nudges|stale]")

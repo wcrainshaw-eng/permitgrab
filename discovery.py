@@ -360,6 +360,168 @@ def run_county_discovery(limit=50):
     return all_discoveries
 
 
+# ---------------------------------------------------------------------------
+# V18: City-to-County Mapping for Alternate Source Search
+# ---------------------------------------------------------------------------
+
+CITY_TO_COUNTY = {
+    'Atlanta': ('Fulton County', 'GA'),
+    'Dallas': ('Dallas County', 'TX'),
+    'Denver': ('Denver County', 'CO'),
+    'Detroit': ('Wayne County', 'MI'),
+    'Minneapolis': ('Hennepin County', 'MN'),
+    'San Diego': ('San Diego County', 'CA'),
+    'Phoenix': ('Maricopa County', 'AZ'),
+    'Baltimore': ('Baltimore City', 'MD'),
+    'Las Vegas': ('Clark County', 'NV'),
+    'Salt Lake City': ('Salt Lake County', 'UT'),
+    'Sacramento': ('Sacramento County', 'CA'),
+    'Indianapolis': ('Marion County', 'IN'),
+    'Milwaukee': ('Milwaukee County', 'WI'),
+    'Oklahoma City': ('Oklahoma County', 'OK'),
+    'San Jose': ('Santa Clara County', 'CA'),
+    'San Francisco': ('San Francisco County', 'CA'),
+    'Los Angeles': ('Los Angeles County', 'CA'),
+    'Houston': ('Harris County', 'TX'),
+    'Chicago': ('Cook County', 'IL'),
+    'Philadelphia': ('Philadelphia County', 'PA'),
+    'San Antonio': ('Bexar County', 'TX'),
+    'Fort Worth': ('Tarrant County', 'TX'),
+    'Austin': ('Travis County', 'TX'),
+    'Columbus': ('Franklin County', 'OH'),
+    'Charlotte': ('Mecklenburg County', 'NC'),
+    'Seattle': ('King County', 'WA'),
+    'Portland': ('Multnomah County', 'OR'),
+    'Boston': ('Suffolk County', 'MA'),
+    'Nashville': ('Davidson County', 'TN'),
+    'Memphis': ('Shelby County', 'TN'),
+    'Louisville': ('Jefferson County', 'KY'),
+    'Jacksonville': ('Duval County', 'FL'),
+    'Tampa': ('Hillsborough County', 'FL'),
+    'Miami': ('Miami-Dade County', 'FL'),
+    'Orlando': ('Orange County', 'FL'),
+    'Raleigh': ('Wake County', 'NC'),
+}
+
+
+def find_alternate_source(city, state):
+    """
+    V18: Search for an alternate data source for a stale city.
+
+    Searches:
+    1. Socrata catalogs (city portal, state portal)
+    2. ArcGIS Hub
+    3. County-level sources (using CITY_TO_COUNTY mapping)
+
+    Returns:
+        dict with search results and any found candidates
+    """
+    print(f"\n[V18] Searching for alternate source: {city}, {state}")
+    results = {
+        'city': city,
+        'state': state,
+        'searched': [],
+        'candidates': [],
+        'best_match': None,
+    }
+
+    # Normalize city name for search
+    city_lower = city.lower().replace(' ', '-')
+    city_search = city.replace('-', ' ')
+
+    # 1. Search Socrata for city-specific data
+    search_queries = [
+        f"building permit {city_search}",
+        f"construction permit {city_search}",
+        f"permit {city_search}",
+    ]
+
+    for query in search_queries:
+        try:
+            datasets = search_socrata_catalog(query=query)
+            results['searched'].append(f"Socrata: {query}")
+
+            for ds in datasets:
+                # Check if dataset is from this state
+                ds_state = ds.get('metadata', {}).get('domain_metadata', {}).get('state', '')
+                domain = ds.get('domain', '')
+
+                # Heuristic: check if domain or name contains city/state
+                name_lower = ds.get('name', '').lower()
+                if (city_lower in name_lower or
+                    city_lower in domain or
+                    state.lower() in domain):
+
+                    # Test if this dataset has recent data
+                    candidate = {
+                        'source': 'socrata',
+                        'name': ds.get('name'),
+                        'domain': domain,
+                        'dataset_id': ds.get('id'),
+                        'endpoint': f"https://{domain}/resource/{ds.get('id')}.json",
+                        'record_count': ds.get('resource', {}).get('records_total', 0),
+                    }
+
+                    # Quick test for recent data
+                    test_result = test_socrata_endpoint(domain, ds.get('id'))
+                    if test_result.get('status') == 'success':
+                        candidate['has_recent_data'] = test_result.get('has_recent_data', False)
+                        candidate['newest_date'] = test_result.get('newest_date')
+                        candidate['field_map'] = test_result.get('field_map', {})
+
+                        if test_result.get('has_recent_data'):
+                            results['candidates'].append(candidate)
+                            print(f"  [FOUND] {candidate['name'][:50]} - {candidate['newest_date']}")
+
+        except Exception as e:
+            print(f"  [ERROR] Socrata search failed: {e}")
+
+        time.sleep(0.5)  # Rate limiting
+
+    # 2. Search county-level source if city is in mapping
+    if city in CITY_TO_COUNTY:
+        county_name, county_state = CITY_TO_COUNTY[city]
+        if county_state == state:
+            results['searched'].append(f"County: {county_name}")
+            print(f"  Checking county portal: {county_name}")
+
+            # Search for county data
+            county_query = f"building permit {county_name}"
+            try:
+                datasets = search_socrata_catalog(query=county_query)
+                for ds in datasets:
+                    domain = ds.get('domain', '')
+                    name_lower = ds.get('name', '').lower()
+
+                    if 'permit' in name_lower:
+                        candidate = {
+                            'source': 'socrata_county',
+                            'name': ds.get('name'),
+                            'domain': domain,
+                            'dataset_id': ds.get('id'),
+                            'endpoint': f"https://{domain}/resource/{ds.get('id')}.json",
+                            'county': county_name,
+                        }
+                        results['candidates'].append(candidate)
+                        print(f"  [COUNTY] {candidate['name'][:50]}")
+
+            except Exception as e:
+                print(f"  [ERROR] County search failed: {e}")
+
+    # 3. Select best candidate
+    if results['candidates']:
+        # Prefer candidates with recent data
+        recent_candidates = [c for c in results['candidates'] if c.get('has_recent_data')]
+        if recent_candidates:
+            results['best_match'] = recent_candidates[0]
+        else:
+            results['best_match'] = results['candidates'][0]
+
+        print(f"\n  [BEST MATCH] {results['best_match']['name']}")
+
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description='V16 Source Discovery Engine')
     parser.add_argument('--states', action='store_true', help='Check all 50 states')
@@ -368,10 +530,19 @@ def main():
     parser.add_argument('--county-limit', type=int, default=50, help='Number of counties to check (default: 50)')
     parser.add_argument('--cities', action='store_true', help='Check cities by population (not yet implemented)')
     parser.add_argument('--test', type=str, help='Test specific domain/dataset (domain:id)')
+    parser.add_argument('--find-alt', type=str, help='Find alternate source for city (city:state)')
 
     args = parser.parse_args()
 
-    if args.states:
+    if args.find_alt:
+        if ':' in args.find_alt:
+            city, state = args.find_alt.rsplit(':', 1)
+            print(f"Searching for alternate source for {city}, {state}...")
+            result = find_alternate_source(city, state.upper())
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            print("Usage: --find-alt 'City Name:ST'")
+    elif args.states:
         run_state_discovery()
     elif args.state:
         run_state_discovery([args.state.upper()])
