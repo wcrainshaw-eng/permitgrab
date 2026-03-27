@@ -261,12 +261,112 @@ def run_state_discovery(states=None):
     return all_discoveries
 
 
+def search_county_sources(county_name, state):
+    """
+    V16: Search for permit data sources for a specific county.
+
+    Args:
+        county_name: County name (e.g., "Los Angeles")
+        state: State code (e.g., "CA")
+
+    Returns:
+        List of discovered sources
+    """
+    discoveries = []
+
+    # Search Socrata catalog for county permit data
+    query = f"{county_name} county building permit"
+    datasets = search_socrata_catalog(query=query)
+
+    for ds in datasets[:3]:  # Check top 3 matches
+        name = ds.get('name', '')
+        domain = ds.get('domain', '')
+        ds_id = ds.get('id', '')
+
+        # Filter: must contain county name or state
+        name_lower = name.lower()
+        if county_name.lower() not in name_lower and state.lower() not in domain.lower():
+            continue
+
+        # Test the endpoint
+        result = test_socrata_endpoint(domain, ds_id)
+        if result['reachable'] and result['has_permits']:
+            discoveries.append({
+                'county': county_name,
+                'state': state,
+                'name': name,
+                'domain': domain,
+                'dataset_id': ds_id,
+                'record_count': result['record_count'],
+            })
+
+    return discoveries
+
+
+def run_county_discovery(limit=50):
+    """
+    V16: Discover county-level permit data sources.
+
+    Searches the Socrata catalog for county building permit datasets.
+    """
+    print(f"\n{'#'*60}")
+    print(f"# V16 COUNTY-LEVEL SOURCE DISCOVERY")
+    print(f"# Checking top {limit} counties by population")
+    print(f"{'#'*60}")
+
+    # Top US counties by population (simplified list)
+    top_counties = [
+        ("Los Angeles", "CA"), ("Cook", "IL"), ("Harris", "TX"), ("Maricopa", "AZ"),
+        ("San Diego", "CA"), ("Orange", "CA"), ("Miami-Dade", "FL"), ("Dallas", "TX"),
+        ("Kings", "NY"), ("Riverside", "CA"), ("Clark", "NV"), ("Queens", "NY"),
+        ("San Bernardino", "CA"), ("King", "WA"), ("Tarrant", "TX"), ("Bexar", "TX"),
+        ("Santa Clara", "CA"), ("Broward", "FL"), ("Wayne", "MI"), ("Alameda", "CA"),
+        ("New York", "NY"), ("Middlesex", "MA"), ("Philadelphia", "PA"), ("Suffolk", "NY"),
+        ("Sacramento", "CA"), ("Bronx", "NY"), ("Palm Beach", "FL"), ("Hillsborough", "FL"),
+        ("Cuyahoga", "OH"), ("Franklin", "OH"), ("Hennepin", "MN"), ("Allegheny", "PA"),
+        ("Orange", "FL"), ("Travis", "TX"), ("Pima", "AZ"), ("Oakland", "MI"),
+        ("Contra Costa", "CA"), ("Montgomery", "MD"), ("Wake", "NC"), ("Fairfax", "VA"),
+    ]
+
+    all_discoveries = []
+    checked = 0
+
+    for county_name, state in top_counties[:limit]:
+        checked += 1
+        print(f"\n[{checked}/{min(limit, len(top_counties))}] {county_name} County, {state}...", flush=True)
+
+        discoveries = search_county_sources(county_name, state)
+
+        if discoveries:
+            for d in discoveries:
+                print(f"  ✓ FOUND: {d['name'][:50]} ({d['record_count']:,} records)")
+            all_discoveries.extend(discoveries)
+        else:
+            print(f"  - No sources found")
+
+        time.sleep(2)  # Rate limit
+
+    print(f"\n{'='*60}")
+    print(f"COUNTY DISCOVERY COMPLETE")
+    print(f"{'='*60}")
+    print(f"Counties checked: {checked}")
+    print(f"Sources discovered: {len(all_discoveries)}")
+
+    if all_discoveries:
+        print("\nDiscovered sources:")
+        for d in all_discoveries:
+            print(f"  - {d['county']} County, {d['state']}: {d['name'][:40]} ({d['record_count']:,})")
+
+    return all_discoveries
+
+
 def main():
-    parser = argparse.ArgumentParser(description='V15 Source Discovery Engine')
+    parser = argparse.ArgumentParser(description='V16 Source Discovery Engine')
     parser.add_argument('--states', action='store_true', help='Check all 50 states')
     parser.add_argument('--state', type=str, help='Check specific state (e.g., TX)')
-    parser.add_argument('--counties', action='store_true', help='Check top 200 counties')
-    parser.add_argument('--cities', action='store_true', help='Check cities by population')
+    parser.add_argument('--counties', action='store_true', help='Check top counties by population')
+    parser.add_argument('--county-limit', type=int, default=50, help='Number of counties to check (default: 50)')
+    parser.add_argument('--cities', action='store_true', help='Check cities by population (not yet implemented)')
     parser.add_argument('--test', type=str, help='Test specific domain/dataset (domain:id)')
 
     args = parser.parse_args()
@@ -275,6 +375,10 @@ def main():
         run_state_discovery()
     elif args.state:
         run_state_discovery([args.state.upper()])
+    elif args.counties:
+        run_county_discovery(limit=args.county_limit)
+    elif args.cities:
+        print("City-level discovery not yet implemented. Use --counties instead.")
     elif args.test:
         if ':' in args.test:
             domain, ds_id = args.test.split(':', 1)

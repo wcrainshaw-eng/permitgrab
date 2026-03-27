@@ -210,6 +210,49 @@ It only makes direct HTTP requests to Socrata/ArcGIS/CKAN APIs.
 
 
 ===================================================================
+STEP 7: VERIFY COLLECTION SCHEDULE & FRESHNESS (10 min)
+===================================================================
+
+The scheduled_collection() thread in server.py runs every 6 HOURS
+and calls collect_refresh(days_back=7). This is good — it means
+every active source gets hit 4x/day with a 7-day lookback window.
+
+BUT now that we're going from 18 to 500+ cities in prod_cities,
+we need to make sure the collection loop can handle the volume:
+
+  A) Verify _collect_all_inner() processes ALL prod_cities entries
+     when there are 500+ of them. Check for any LIMIT clauses or
+     early exits that might truncate the list.
+
+  B) Check collection timing: if 500 sources × ~5 seconds each =
+     ~40 minutes per run. That fits comfortably in the 6-hour window.
+     But if it's slower, we may need to optimize.
+
+  C) For BULK sources (county/state level), make sure the collector
+     only hits each bulk endpoint ONCE and distributes permits to
+     all cities covered by that source. Don't hit the same county
+     endpoint 30 times for 30 cities — hit it once, split by city_field.
+
+  D) Verify the 6-hour schedule is actually running:
+     - Check Render logs for "REFRESH Collection" messages
+     - There should be at least 3-4 per day
+     - If not, the daemon thread may be dying silently
+
+  E) Add a simple health check: create a last_collection_run timestamp
+     that gets updated after each successful collection. Add an
+     /api/health endpoint that reports when collection last ran.
+     If it's been >12 hours, something is wrong.
+
+  F) Make sure collect_refresh is called with days_back=7 (confirmed
+     it already is). This ensures we catch any permits that were
+     added to source portals with a lag.
+
+IMPORTANT: Do NOT change the 6-hour interval — it's already
+better than the 12hr minimum we need. Just make sure it actually
+works at scale with 500+ cities.
+
+
+===================================================================
 VERIFICATION CHECKLIST
 ===================================================================
 
@@ -224,6 +267,10 @@ After all steps, verify:
 [ ] discovery.py --counties works (even if slow)
 [ ] discovery.py --cities works for top 200 by population
 [ ] No broken existing sources (run V15 verification again)
+[ ] Collection schedule confirmed: runs every 6hrs with days_back=7
+[ ] Render logs show recent collection runs
+[ ] /api/health endpoint reports last collection time
+[ ] Bulk sources only hit once per collection (not once per city)
 [ ] All changes committed with descriptive messages
 [ ] Git pushed to main
 
@@ -231,7 +278,8 @@ EXPECTED TIMELINE:
   Steps 1-4: ~1 hour (get to 200-500 cities FAST)
   Step 5: ~15 min (status tracking)
   Step 6: ~45 min (discovery engine expansion)
-  Total: ~2 hours
+  Step 7: ~10 min (verify collection schedule handles scale)
+  Total: ~2.5 hours
 
 The #1 priority is Steps 1-4. If credits run low, STOP after Step 4.
 Getting the existing bulk source cities into prod_cities is the
