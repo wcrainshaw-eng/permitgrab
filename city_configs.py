@@ -14162,8 +14162,8 @@ BULK_SOURCES = {
         },
         "date_field": "issue_date",
         "limit": 50000,
-        "active": False,  # Need to verify endpoint
-        "notes": "V12.31: Needs endpoint verification",
+        "active": False,  # Portal migrated to ArcGIS
+        "notes": "V15: Endpoint broken - portal migrated to ArcGIS at gis-mdc.opendata.arcgis.com. Need to find new ArcGIS REST endpoint.",
     },
 
     # V12.35: New bulk sources from county discovery
@@ -14459,8 +14459,8 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Dallas TX building permits. Covers all zip codes.",
+        "active": True,
+        "notes": "V15: Reactivated - endpoint verified working Mar 27 2026.",
     },
 
     "orlando_fl_bulk": {
@@ -14483,8 +14483,8 @@ BULK_SOURCES = {
         },
         "date_field": "processed_date",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Orlando FL permit applications. Covers all neighborhoods/districts.",
+        "active": True,
+        "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. Covers all neighborhoods/districts.",
     },
 
     "norfolk_va_bulk": {
@@ -14507,8 +14507,8 @@ BULK_SOURCES = {
         },
         "date_field": "permit_application_date",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Norfolk VA permits. All wards covered.",
+        "active": True,
+        "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. All wards covered.",
     },
 
     "cincinnati_oh_bulk": {
@@ -14555,8 +14555,8 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Mesa AZ building permits. 34 fields, includes sq ft and fees.",
+        "active": True,
+        "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. 34 fields, includes sq ft and fees.",
     },
 
     "corona_ca_bulk": {
@@ -14579,8 +14579,8 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Corona CA building permits. Includes applied, approved, issued dates.",
+        "active": True,
+        "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. Includes applied, approved, issued dates.",
     },
 
     "fort_worth_tx_bulk": {
@@ -14604,7 +14604,7 @@ BULK_SOURCES = {
         "date_field": "issued_date",
         "limit": 50000,
         "active": False,
-        "notes": "V12.60: Fort Worth TX development permits. Pop ~978K.",
+        "notes": "V15: Endpoint broken - portal migrated to ArcGIS. Need to find new ArcGIS REST endpoint. Pop ~978K.",
     },
 
     "austin_tx_datahub_bulk": {
