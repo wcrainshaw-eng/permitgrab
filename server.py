@@ -7038,27 +7038,26 @@ def scheduled_collection():
         # 2. Auto-test and activate pending cities
         # 3. Send SEO notification email for new activations
         if permitdb.should_run_daily('discovery'):
-            print(f"[{datetime.now()}] V17: Starting daily discovery pipeline...")
+            print(f"[{datetime.now()}] V17b: Starting accelerated discovery pipeline...")
 
             total_new_sources = 0
 
-            # Run Socrata discovery
+            # V17b: Use accelerated parallel discovery (Socrata + ArcGIS combined)
             try:
-                from auto_discover import run_full_discovery
-                socrata_sources = run_full_discovery(max_results=100)
-                total_new_sources += socrata_sources
-                print(f"[{datetime.now()}] Socrata discovery: {socrata_sources} new sources")
+                from auto_discover import run_accelerated_discovery
+                total_new_sources = run_accelerated_discovery(max_results=300, max_workers=5)
+                print(f"[{datetime.now()}] V17b accelerated discovery: {total_new_sources} new sources")
+            except ImportError:
+                # Fallback to sequential if accelerated not available
+                print(f"[{datetime.now()}] V17b not available, using sequential discovery...")
+                try:
+                    from auto_discover import run_full_discovery, run_arcgis_bulk_discovery
+                    total_new_sources += run_full_discovery(max_results=100)
+                    total_new_sources += run_arcgis_bulk_discovery(max_results=100)
+                except Exception as e:
+                    print(f"[{datetime.now()}] Sequential discovery error: {e}")
             except Exception as e:
-                print(f"[{datetime.now()}] Socrata discovery error: {e}")
-
-            # Run ArcGIS bulk discovery
-            try:
-                from auto_discover import run_arcgis_bulk_discovery
-                arcgis_sources = run_arcgis_bulk_discovery(max_results=100)
-                total_new_sources += arcgis_sources
-                print(f"[{datetime.now()}] ArcGIS discovery: {arcgis_sources} new sources")
-            except Exception as e:
-                print(f"[{datetime.now()}] ArcGIS discovery error: {e}")
+                print(f"[{datetime.now()}] V17b discovery error: {e}")
 
             # Auto-test pending cities and activate the good ones
             try:
