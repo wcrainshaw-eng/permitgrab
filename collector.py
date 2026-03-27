@@ -555,6 +555,10 @@ def fetch_arcgis_bulk(config, days_back=90):
     if date_format == "epoch":
         since_epoch = int(since_dt.timestamp() * 1000)
         where_clause = f"{date_field} >= {since_epoch}" if date_field else "1=1"
+    elif date_format == "epoch_ms" or date_format == "timestamp":
+        # V15: epoch_ms/timestamp use timestamp format for ArcGIS esriFieldTypeDate fields
+        since_ts = since_dt.strftime("%Y-%m-%d %H:%M:%S")
+        where_clause = f"{date_field} >= timestamp '{since_ts}'" if date_field else "1=1"
     elif date_format == "none" or not date_field:
         where_clause = "1=1"
     else:
