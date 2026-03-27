@@ -982,6 +982,100 @@ def send_subscription_cancelled(user):
 
 
 # =============================================================================
+# V17: SEO NOTIFICATION EMAIL
+# =============================================================================
+
+def send_new_cities_alert(activated_cities):
+    """
+    V17: Send email to site owner when new cities are auto-activated.
+    This triggers SEO content creation (blog posts, landing page optimization).
+
+    Args:
+        activated_cities: List of dicts with 'city', 'state', 'slug', 'permits'
+    """
+    if not activated_cities:
+        return False
+
+    owner_email = os.environ.get('OWNER_EMAIL', 'wcrainshaw@gmail.com')
+
+    # Build city list HTML
+    city_rows = []
+    for city in activated_cities:
+        city_rows.append(f'''
+        <tr>
+          <td style="padding:12px 16px;border-bottom:1px solid #e5e7eb;">
+            <a href="{SITE_URL}/permits/{city['slug']}" style="color:#2563eb;font-weight:600;text-decoration:none;">{city['city']}, {city['state']}</a>
+          </td>
+          <td style="padding:12px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">
+            {city['permits']:,} permits
+          </td>
+        </tr>''')
+
+    content = f'''
+    <div style="padding:32px;">
+      <h1 style="margin:0 0 8px 0;font-size:24px;color:#111827;">🎉 New Cities Activated</h1>
+      <p style="margin:0 0 24px 0;color:#6b7280;font-size:16px;">
+        {len(activated_cities)} new cities were auto-activated on PermitGrab
+      </p>
+
+      <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <thead>
+          <tr style="background:#f9fafb;">
+            <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">City</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Permits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {"".join(city_rows)}
+        </tbody>
+      </table>
+
+      <div style="margin-top:24px;padding:20px;background:#fef3c7;border-radius:8px;">
+        <h3 style="margin:0 0 12px 0;color:#92400e;font-size:16px;">SEO Action Items</h3>
+        <ul style="margin:0;padding-left:20px;color:#78350f;font-size:14px;line-height:1.8;">
+          <li>Review each city page for accuracy</li>
+          <li>Write city-specific blog posts for high-population cities</li>
+          <li>Add internal links from related state/trade pages</li>
+          <li>Check that permits are displaying correctly</li>
+          <li>Consider adding to Google Search Console for monitoring</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:24px;padding:16px;background:#ecfdf5;border-radius:8px;">
+        <p style="margin:0;color:#065f46;font-size:14px;">
+          <strong>✓ These cities are now:</strong><br>
+          • Live on the site with auto-generated pages<br>
+          • Included in sitemap.xml<br>
+          • Set to index,follow (if permits > 0)<br>
+          • Collecting permits every 6 hours<br>
+          • Available for user subscriptions
+        </p>
+      </div>
+    </div>'''
+
+    html = base_template(content, preheader=f"{len(activated_cities)} new cities activated on PermitGrab")
+
+    # Also log to system_state
+    try:
+        permitdb.set_system_state(
+            'last_cities_activated',
+            json.dumps({
+                'date': datetime.now().isoformat(),
+                'count': len(activated_cities),
+                'cities': [c['slug'] for c in activated_cities]
+            })
+        )
+    except Exception as e:
+        print(f"[V17] Failed to log activation to system_state: {e}")
+
+    return send_email(
+        owner_email,
+        f"PermitGrab: {len(activated_cities)} New Cities Activated",
+        html
+    )
+
+
+# =============================================================================
 # MAIN (for testing)
 # =============================================================================
 

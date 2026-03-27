@@ -53,19 +53,57 @@ def get_city_config(source_key):
         if 'active' not in d and d.get('status') == 'active':
             d['active'] = True
         return d
-    # Fallback
+
+    # V17: Check discovered_sources table
+    try:
+        row = conn.execute(
+            "SELECT * FROM discovered_sources WHERE source_key = ?", (source_key,)
+        ).fetchone()
+        if row:
+            d = dict(row)
+            if d.get('field_map'):
+                try:
+                    d['field_map'] = json.loads(d['field_map'])
+                except (json.JSONDecodeError, TypeError):
+                    d['field_map'] = {}
+            if 'active' not in d and d.get('status') == 'active':
+                d['active'] = True
+            return d
+    except:
+        pass  # Table may not exist yet
+
+    # Fallback to legacy dict
     from city_configs import get_city_config as _legacy_get
     return _legacy_get(source_key)
 
 
 def get_active_bulk_sources():
-    """Return list of active bulk source keys."""
+    """Return list of active bulk source keys.
+    V17: Also includes sources from discovered_sources table."""
     conn = permitdb.get_connection()
+    source_keys = set()
+
+    # Check city_sources table
     rows = conn.execute(
         "SELECT source_key FROM city_sources WHERE status='active' AND mode='bulk'"
     ).fetchall()
-    if rows:
-        return [r['source_key'] for r in rows]
+    for r in rows:
+        source_keys.add(r['source_key'])
+
+    # V17: Also check discovered_sources table
+    try:
+        rows = conn.execute(
+            "SELECT source_key FROM discovered_sources WHERE status='active' AND mode='bulk'"
+        ).fetchall()
+        for r in rows:
+            source_keys.add(r['source_key'])
+    except:
+        pass  # Table may not exist yet
+
+    if source_keys:
+        return list(source_keys)
+
+    # Fallback to legacy BULK_SOURCES dict
     from city_configs import get_active_bulk_sources as _legacy_get
     return _legacy_get()
 

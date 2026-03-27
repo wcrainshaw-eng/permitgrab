@@ -730,6 +730,50 @@ def admin_discovery_log():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/new-cities')
+def admin_new_cities():
+    """V17: Get recently activated cities for SEO tracking."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+
+    days = int(request.args.get('days', 7))
+
+    try:
+        # Get recent activations
+        activations = permitdb.get_recent_activations(days=days)
+
+        # Get totals
+        conn = permitdb.get_connection()
+        total_active = conn.execute(
+            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active'"
+        ).fetchone()['cnt']
+
+        # Enrich with permit counts and page URLs
+        enriched = []
+        for a in activations:
+            enriched.append({
+                'city': a.get('city_name'),
+                'state': a.get('state'),
+                'slug': a.get('city_slug'),
+                'activated_at': a.get('activated_at'),
+                'permits': a.get('initial_permits', 0),
+                'seo_status': a.get('seo_status', 'needs_content'),
+                'source': a.get('source'),
+                'page_url': f"https://permitgrab.com/permits/{a.get('city_slug')}"
+            })
+
+        return jsonify({
+            'new_cities': enriched,
+            'total_active': total_active,
+            'activated_this_week': len([a for a in activations
+                if a.get('activated_at', '') >= (datetime.now() - timedelta(days=7)).isoformat()])
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
@@ -1205,6 +1249,8 @@ USERS_FILE = os.path.join(DATA_DIR, 'users.json')  # DEPRECATED - use PostgreSQL
 # Track whether initial data has been loaded from disk
 _initial_data_loaded = False
 _collection_in_progress = False
+# V16: Track last successful collection run for health monitoring
+_last_collection_run = None
 
 # V12.51: Removed V12.49 cache code (_permits_cache, _permits_cache_mtime, _permits_cache_lock)
 # SQLite handles all permit storage now - no JSON file caching needed
@@ -2325,11 +2371,24 @@ def health_check():
             'permit_count': 0
         }), 503
 
+    # V16: Collection health tracking
+    collection_status = 'never'
+    hours_since_collection = None
+    if _last_collection_run:
+        hours_since_collection = (datetime.now() - _last_collection_run).total_seconds() / 3600
+        if hours_since_collection > 12:
+            collection_status = 'stale'  # Warning: collection hasn't run recently
+        else:
+            collection_status = 'healthy'
+
     return jsonify({
         'status': 'ok',
         'timestamp': datetime.now().isoformat(),
         'permit_count': permit_count,
-        'data_loaded': _initial_data_loaded
+        'data_loaded': _initial_data_loaded,
+        'collection_status': collection_status,
+        'last_collection_run': _last_collection_run.isoformat() if _last_collection_run else None,
+        'hours_since_collection': round(hours_since_collection, 1) if hours_since_collection else None
     }), 200
 
 
@@ -6974,20 +7033,58 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] City health check error: {e}")
 
-        # V13.2: Auto-discovery (daily) — find new permit data sources
-        now = datetime.now()
-        if last_discovery_run is None or (now - last_discovery_run).days >= 1:
+        # V17: Auto-discovery pipeline (daily)
+        # 1. Discover new sources (Socrata + ArcGIS)
+        # 2. Auto-test and activate pending cities
+        # 3. Send SEO notification email for new activations
+        if permitdb.should_run_daily('discovery'):
+            print(f"[{datetime.now()}] V17: Starting daily discovery pipeline...")
+
+            total_new_sources = 0
+
+            # Run Socrata discovery
             try:
                 from auto_discover import run_full_discovery
-                new_sources = run_full_discovery()
-                last_discovery_run = now
-                print(f"[{datetime.now()}] Auto-discovery complete: {new_sources} new sources found.")
-            except ImportError:
-                print(f"[{datetime.now()}] Auto-discovery skipped: run_full_discovery not implemented yet.")
+                socrata_sources = run_full_discovery(max_results=100)
+                total_new_sources += socrata_sources
+                print(f"[{datetime.now()}] Socrata discovery: {socrata_sources} new sources")
             except Exception as e:
-                print(f"[{datetime.now()}] Auto-discovery error: {e}")
+                print(f"[{datetime.now()}] Socrata discovery error: {e}")
+
+            # Run ArcGIS bulk discovery
+            try:
+                from auto_discover import run_arcgis_bulk_discovery
+                arcgis_sources = run_arcgis_bulk_discovery(max_results=100)
+                total_new_sources += arcgis_sources
+                print(f"[{datetime.now()}] ArcGIS discovery: {arcgis_sources} new sources")
+            except Exception as e:
+                print(f"[{datetime.now()}] ArcGIS discovery error: {e}")
+
+            # Auto-test pending cities and activate the good ones
+            try:
+                from collector import activate_pending_cities
+                activated, failed = activate_pending_cities()
+                print(f"[{datetime.now()}] Pending cities: {len(activated)} activated, {len(failed)} failed")
+
+                # Send SEO notification if new cities activated
+                if activated:
+                    try:
+                        from email_alerts import send_new_cities_alert
+                        send_new_cities_alert(activated)
+                        print(f"[{datetime.now()}] SEO notification sent for {len(activated)} cities")
+                    except Exception as e:
+                        print(f"[{datetime.now()}] SEO notification error: {e}")
+            except Exception as e:
+                print(f"[{datetime.now()}] Pending activation error: {e}")
+
+            permitdb.mark_daily_complete('discovery')
+            print(f"[{datetime.now()}] V17 discovery pipeline complete: {total_new_sources} new sources")
 
         print(f"[{datetime.now()}] All collection tasks complete.")
+
+        # V16: Track last successful collection run
+        global _last_collection_run
+        _last_collection_run = datetime.now()
 
         # V12.50: Sleep 6 hours (reduced from 24 — deltas are lightweight)
         time.sleep(21600)

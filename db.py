@@ -273,6 +273,48 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_city_slug ON scraper_runs(city_slug);
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_started ON scraper_runs(run_started_at);
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_status ON scraper_runs(status);
+
+        -- V17: system_state for tracking daily tasks (discovery, etc.)
+        CREATE TABLE IF NOT EXISTS system_state (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- V17: city_activation_log for tracking newly activated cities
+        CREATE TABLE IF NOT EXISTS city_activation_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city_slug TEXT NOT NULL,
+            city_name TEXT NOT NULL,
+            state TEXT NOT NULL,
+            activated_at TEXT DEFAULT (datetime('now')),
+            source TEXT,
+            initial_permits INTEGER DEFAULT 0,
+            seo_status TEXT DEFAULT 'needs_content',
+            notes TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_city_activation_log_activated ON city_activation_log(activated_at);
+
+        -- V17: discovered_sources for dynamically discovered data sources
+        CREATE TABLE IF NOT EXISTS discovered_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_key TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            state TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            mode TEXT DEFAULT 'bulk',
+            endpoint TEXT NOT NULL,
+            dataset_id TEXT,
+            city_field TEXT,
+            date_field TEXT,
+            field_map TEXT,
+            scope TEXT,
+            discovered_at TEXT DEFAULT (datetime('now')),
+            last_tested TEXT,
+            status TEXT DEFAULT 'active',
+            notes TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovered_sources_status ON discovered_sources(status);
     """)
     conn.commit()
     print(f"[DB] V15: Database initialized at {DB_PATH}")
@@ -807,6 +849,19 @@ def update_prod_city_collection(city_slug, permits_found=0, last_permit_date=Non
     conn.commit()
 
 
+def update_prod_city_status(city_slug, status, notes=None):
+    """V17: Update prod city status (pending, active, failed, paused)."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE prod_cities SET
+            status = ?,
+            notes = COALESCE(?, notes),
+            verified_date = datetime('now')
+        WHERE city_slug = ?
+    """, (status, notes, city_slug))
+    conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # V15: Scraper Runs — Per-city collection logging
 # ---------------------------------------------------------------------------
@@ -885,3 +940,132 @@ def prod_cities_table_exists():
         return row['cnt'] > 0
     except sqlite3.OperationalError:
         return False
+
+
+# ---------------------------------------------------------------------------
+# V17: System state helpers for tracking daily tasks
+# ---------------------------------------------------------------------------
+
+def get_system_state(key):
+    """V17: Get a system state value by key."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT value, updated_at FROM system_state WHERE key = ?",
+        (key,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def set_system_state(key, value):
+    """V17: Set a system state value."""
+    conn = get_connection()
+    conn.execute("""
+        INSERT OR REPLACE INTO system_state (key, value, updated_at)
+        VALUES (?, ?, datetime('now'))
+    """, (key, value))
+    conn.commit()
+
+
+def should_run_daily(task_name):
+    """V17: Check if a daily task should run (last run was >24 hours ago)."""
+    state = get_system_state(f'last_{task_name}_run')
+    if not state:
+        return True
+
+    last_run = state.get('updated_at')
+    if not last_run:
+        return True
+
+    try:
+        last_dt = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+        hours_since = (datetime.now() - last_dt).total_seconds() / 3600
+        return hours_since >= 24
+    except (ValueError, TypeError):
+        return True
+
+
+def mark_daily_complete(task_name):
+    """V17: Mark a daily task as complete (sets last run time to now)."""
+    set_system_state(f'last_{task_name}_run', datetime.now().isoformat())
+
+
+# ---------------------------------------------------------------------------
+# V17: City activation log helpers
+# ---------------------------------------------------------------------------
+
+def log_city_activation(city_slug, city_name, state, source='discovery_engine',
+                        initial_permits=0, notes=None):
+    """V17: Log a city activation to the activation log."""
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO city_activation_log
+            (city_slug, city_name, state, source, initial_permits, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (city_slug, city_name, state, source, initial_permits, notes))
+    conn.commit()
+
+
+def get_recent_activations(days=7):
+    """V17: Get recently activated cities."""
+    conn = get_connection()
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    cursor = conn.execute("""
+        SELECT * FROM city_activation_log
+        WHERE activated_at >= ?
+        ORDER BY activated_at DESC
+    """, (cutoff,))
+    return [dict(row) for row in cursor]
+
+
+def update_activation_seo_status(city_slug, seo_status):
+    """V17: Update SEO status for an activated city."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE city_activation_log
+        SET seo_status = ?
+        WHERE city_slug = ?
+    """, (seo_status, city_slug))
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# V17: Discovered sources helpers
+# ---------------------------------------------------------------------------
+
+def get_discovered_sources(status='active'):
+    """V17: Get all discovered sources with given status."""
+    conn = get_connection()
+    cursor = conn.execute("""
+        SELECT * FROM discovered_sources
+        WHERE status = ?
+        ORDER BY discovered_at DESC
+    """, (status,))
+    return [dict(row) for row in cursor]
+
+
+def upsert_discovered_source(source_config):
+    """V17: Insert or update a discovered source."""
+    conn = get_connection()
+    field_map_json = json.dumps(source_config.get('field_map', {})) if source_config.get('field_map') else None
+
+    conn.execute("""
+        INSERT OR REPLACE INTO discovered_sources
+            (source_key, name, state, platform, mode, endpoint, dataset_id,
+             city_field, date_field, field_map, scope, status, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        source_config.get('source_key'),
+        source_config.get('name'),
+        source_config.get('state', ''),
+        source_config.get('platform', 'socrata'),
+        source_config.get('mode', 'city'),
+        source_config.get('endpoint'),
+        source_config.get('dataset_id'),
+        source_config.get('city_field'),
+        source_config.get('date_field'),
+        field_map_json,
+        source_config.get('scope'),
+        source_config.get('status', 'active'),
+        source_config.get('notes'),
+    ))
+    conn.commit()
