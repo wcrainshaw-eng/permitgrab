@@ -908,7 +908,7 @@ body {
 
   <div class="permits-preview">
     <div class="permits-header">
-      <h3>Recent High-Value Permits</h3>
+      <h3>{% if high_value_count > 0 %}Recent High-Value Permits{% else %}Recent Permits{% endif %}</h3>
       {% if permit_count > 0 %}
       <a href="/?city={{ city_name }}">View All {{ permit_count }}+ Permits &rarr;</a>
       {% else %}
@@ -968,7 +968,8 @@ body {
   </div>
 </section>
 
-<!-- TRADES WE COVER -->
+<!-- TRADES WE COVER — V13.7: Hide when only 1 trade (M3 fix) -->
+{% if trade_breakdown and trade_breakdown | length > 1 %}
 <section class="section">
   <div class="section-header">
     <h2>Trades We Cover in {{ city_name }}</h2>
@@ -989,6 +990,7 @@ body {
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
 <!-- CROSS LINKS -->
 <section class="cross-links-section">

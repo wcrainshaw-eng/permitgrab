@@ -1818,6 +1818,11 @@ def get_cities_with_data():
         }
         cities_with_counts.append(city_info)
 
+    # V13.7: Filter out cities with very few permits (reduces TX from 1,170 to ~100)
+    # Cities with <10 permits aren't useful leads and inflate the city count
+    MIN_PERMIT_THRESHOLD = 10
+    cities_with_counts = [c for c in cities_with_counts if c.get('permit_count', 0) >= MIN_PERMIT_THRESHOLD]
+
     # Sort by permit count descending (top cities first)
     cities_with_counts.sort(key=lambda x: x.get('permit_count', 0), reverse=True)
     return cities_with_counts
@@ -2223,15 +2228,26 @@ def index():
     # This ensures dropdown shows all 555+ cities, not just those in the paginated API response
     all_dropdown_cities = get_cities_with_data()  # Now returns all cities from permits table
 
+    # V13.7: Pass stats for server-side rendering (fixes H5: stat counters showing dashes)
+    stats = permitdb.get_permit_stats()
+    initial_stats = {
+        'total_permits': stats.get('total_permits', 0),
+        'total_value': stats.get('total_value', 0),
+        'high_value_count': stats.get('high_value_count', 0),
+    }
+
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
-                          city_count=city_count, all_dropdown_cities=all_dropdown_cities)
+                          city_count=city_count, all_dropdown_cities=all_dropdown_cities,
+                          initial_stats=initial_stats)
 
 
-# V9 Fix 9: /dashboard redirects to homepage
+# V9 Fix 9: /dashboard redirects to homepage (V13.7: redirect to login if not authenticated)
 @app.route('/dashboard')
 def dashboard_redirect():
-    """Redirect /dashboard to / for user convenience."""
+    """Redirect /dashboard to / for authenticated users, /login for unauthenticated."""
+    if 'user_email' not in session:
+        return redirect('/login?redirect=dashboard&message=login_required')
     return redirect('/')
 
 
@@ -3278,7 +3294,12 @@ def login_page():
     if get_current_user():
         return redirect('/')
     footer_cities = get_cities_with_data()
-    return render_template('login.html', footer_cities=footer_cities)
+    # V13.7: Handle redirect messages (e.g., from /dashboard redirect)
+    message = request.args.get('message', '')
+    login_message = None
+    if message == 'login_required':
+        login_message = 'Please log in to access your dashboard.'
+    return render_template('login.html', footer_cities=footer_cities, login_message=login_message)
 
 
 # ===========================
@@ -3496,9 +3517,10 @@ def terms_page():
 
 @app.route('/about')
 def about_page():
-    """Render the About page."""
+    """Render the About page. V13.6: Pass city_count for consistency."""
     footer_cities = get_cities_with_data()
-    return render_template('about.html', footer_cities=footer_cities)
+    city_count = get_total_city_count_auto()
+    return render_template('about.html', footer_cities=footer_cities, city_count=city_count)
 
 
 @app.route('/stats')
@@ -5573,7 +5595,7 @@ STATE_CONFIG = {
     'colorado': {'name': 'Colorado', 'abbrev': 'CO'},
     'florida': {'name': 'Florida', 'abbrev': 'FL'},
     'louisiana': {'name': 'Louisiana', 'abbrev': 'LA'},
-    'new-york': {'name': 'New York', 'abbrev': 'NY'},
+    'new-york-state': {'name': 'New York', 'abbrev': 'NY'},
     'illinois': {'name': 'Illinois', 'abbrev': 'IL'},
     'ohio': {'name': 'Ohio', 'abbrev': 'OH'},
     'washington': {'name': 'Washington', 'abbrev': 'WA'},
@@ -5624,13 +5646,35 @@ def get_state_data(state_slug):
     state_cities = get_cities_by_state_auto(state_abbrev)
 
     # V12.51: Use SQL aggregation for city stats
+    # V13.7: Include cities that were misassigned to other states using same heuristics
     conn = permitdb.get_connection()
-    cursor = conn.execute("""
-        SELECT city, COUNT(*) as permit_count, COALESCE(SUM(estimated_cost), 0) as total_value
-        FROM permits
-        WHERE state = ?
-        GROUP BY city
-    """, (state_abbrev,))
+
+    # Known cities for state correction heuristics (same as get_cities_with_data)
+    KNOWN_OK_CITIES = {
+        'oklahoma city', 'tulsa', 'norman', 'broken arrow', 'edmond',
+        'lawton', 'moore', 'midwest city', 'enid', 'stillwater',
+        'muskogee', 'bartlesville', 'owasso', 'shawnee', 'ponca city'
+    }
+    KNOWN_NV_CITIES = {
+        'las vegas', 'henderson', 'reno', 'north las vegas', 'sparks',
+        'carson city', 'elko', 'mesquite', 'boulder city', 'fernley'
+    }
+
+    if state_abbrev == 'TX':
+        # TX gets its own permits PLUS misassigned OK/NV permits
+        cursor = conn.execute("""
+            SELECT city, state, COUNT(*) as permit_count, COALESCE(SUM(estimated_cost), 0) as total_value
+            FROM permits
+            WHERE state IN ('TX', 'OK', 'NV')
+            GROUP BY city, state
+        """)
+    else:
+        cursor = conn.execute("""
+            SELECT city, state, COUNT(*) as permit_count, COALESCE(SUM(estimated_cost), 0) as total_value
+            FROM permits
+            WHERE state = ?
+            GROUP BY city, state
+        """, (state_abbrev,))
 
     # Build city stats from SQL
     city_permit_counts = {}
@@ -5639,13 +5683,41 @@ def get_state_data(state_slug):
 
     for row in cursor:
         city_name = row['city'] or ''
-        if city_name:
-            norm_name = ' '.join(city_name.lower().split())
+        row_state = row['state'] if 'state' in row.keys() else state_abbrev
+        if not city_name:
+            continue
+
+        norm_name = ' '.join(city_name.lower().split())
+
+        # V13.7: Apply state correction heuristics for TX state hub
+        if state_abbrev == 'TX':
+            # Include TX cities directly
+            if row_state == 'TX':
+                pass  # Include
+            # Include OK cities that are NOT in KNOWN_OK_CITIES (they're actually TX)
+            elif row_state == 'OK' and norm_name not in KNOWN_OK_CITIES:
+                pass  # Include
+            # Include NV cities that are NOT in KNOWN_NV_CITIES (they're actually TX)
+            elif row_state == 'NV' and norm_name not in KNOWN_NV_CITIES:
+                pass  # Include
+            else:
+                continue  # Skip actual OK/NV cities
+        else:
+            # For other states, only include cities with matching state
+            if row_state != state_abbrev:
+                continue
+
+        # Aggregate permit counts (in case same city appears with different states)
+        if norm_name in city_permit_counts:
+            city_permit_counts[norm_name] += row['permit_count']
+            city_values[norm_name] += row['total_value']
+        else:
             city_permit_counts[norm_name] = row['permit_count']
             city_values[norm_name] = row['total_value']
-            # Keep track of display name (prefer title case)
-            if norm_name not in city_display_names or city_name.istitle():
-                city_display_names[norm_name] = city_name
+
+        # Keep track of display name (prefer title case)
+        if norm_name not in city_display_names or city_name.istitle():
+            city_display_names[norm_name] = city_name
 
     # Add counts to city info, matching by normalized name
     cities_with_data = []
@@ -5669,6 +5741,23 @@ def get_state_data(state_slug):
 
         if city_data['permit_count'] > 0:
             cities_with_data.append(city_data)
+            seen_norm_names.add(norm_name)
+
+    # V13.6: Add cities from DB that have permits but aren't in registry (e.g., Houston)
+    # V13.7: Minimum threshold to avoid showing tiny cities on state hub
+    MIN_STATE_HUB_PERMITS = 50
+    for norm_name, permit_count in city_permit_counts.items():
+        if norm_name not in seen_norm_names and permit_count >= MIN_STATE_HUB_PERMITS:
+            display_name = city_display_names.get(norm_name, norm_name.title())
+            slug = display_name.lower().replace(' ', '-').replace(',', '').replace('.', '')
+            cities_with_data.append({
+                'name': display_name,
+                'state': state_abbrev,
+                'slug': slug,
+                'permit_count': permit_count,
+                'total_value': city_values.get(norm_name, 0),
+                'active': True,
+            })
             seen_norm_names.add(norm_name)
 
     # Sort by permit count
@@ -5823,21 +5912,20 @@ def city_landing_inner(city_slug):
     current_state = config.get('state', '')
 
     # V17d: Related blog articles for cross-linking SEO
+    # V13.7: Fixed H6 - only show city-specific articles, not state-level
     related_articles = []
     try:
         all_posts = get_all_blog_posts()
         city_lower = config['name'].lower()
-        state_lower = current_state.lower() if current_state else ''
+        # Only match posts that specifically mention this city (not just the state)
         for post in all_posts:
             title_lower = post.get('title', '').lower()
             keywords_lower = post.get('keywords', '').lower()
             slug_lower = post.get('slug', '').lower()
-            # Match city name, state, or general permit/contractor topics
+            # Match city name in title, keywords, or slug
             if city_lower in title_lower or city_lower in keywords_lower or city_lower in slug_lower:
                 related_articles.append(post)
-            elif state_lower and (state_lower in title_lower or state_lower in keywords_lower):
-                related_articles.append(post)
-        # If no city/state matches, add general articles
+        # If no city-specific matches, add general articles (not state-level)
         if not related_articles:
             general_slugs = ['what-is-a-building-permit', 'how-to-find-construction-leads', 'construction-leads-from-building-permits']
             for post in all_posts:

@@ -290,6 +290,10 @@ const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('redirect') === 'my-leads') {
   showAlert('Log in to access your saved leads', 'error');
 }
+// V13.7: Handle dashboard redirect message
+if (urlParams.get('message') === 'login_required') {
+  showAlert('Please log in to access your dashboard.', 'info');
+}
 
 async function handleLogin(event) {
   event.preventDefault();

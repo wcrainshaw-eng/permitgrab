@@ -292,7 +292,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Full 35-field map — owner name, applicant, construction value, total/unpaid fees, bond amount, beds/baths, building area, second floor/basement, land use, zoning, council district, subdivision, parcel PIN, inspections, days open/issued, open comments. Same-day data Mar 24, 2026. GOLD.",
     },
 
@@ -4576,7 +4576,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.8: Deactivated - duplicate of new_orleans using same endpoint",
     },
 

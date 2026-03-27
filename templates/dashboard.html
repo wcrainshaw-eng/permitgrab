@@ -1394,7 +1394,7 @@ footer a:hover { color: white; }
   </div>
   <div class="stats-bar">
     <div class="stat-item">
-      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-value" id="stat-total">{{ "{:,}".format(initial_stats.total_permits | default(0)) }}</div>
       <div class="stat-label">Active Permits</div>
     </div>
     <div class="stat-item">
@@ -1402,11 +1402,11 @@ footer a:hover { color: white; }
       <div class="stat-label">Trade Categories</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-value">—</div>
+      <div class="stat-value" id="stat-value">{% if initial_stats.total_value | default(0) >= 1000000000 %}${{ "%.1f" | format((initial_stats.total_value | default(0)) / 1000000000) }}B{% else %}${{ "%.0f" | format((initial_stats.total_value | default(0)) / 1000000) }}M{% endif %}</div>
       <div class="stat-label">Total Project Value</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-high">—</div>
+      <div class="stat-value" id="stat-high">{{ "{:,}".format(initial_stats.high_value_count | default(0)) }}</div>
       <div class="stat-label" id="stat-high-label">High-Value Leads</div>
     </div>
   </div>
@@ -1533,7 +1533,7 @@ footer a:hover { color: white; }
     <!-- V8: Upgrade banner for free users -->
     <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; justify-content: space-between; align-items: center;">
       <div>
-        <strong>You're viewing <span id="banner-total">—</span>+ leads</strong>
+        <strong>You're viewing <span id="banner-total">{{ "{:,}".format(initial_stats.total_permits | default(0)) }}</span>+ leads</strong>
         <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Early Intel, Analytics, and unlimited exports.</span>
       </div>
       <a href="/pricing" style="background: #f97316; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap;">See Plans →</a>
@@ -1666,7 +1666,7 @@ footer a:hover { color: white; }
         <div class="pricing-price">$499<span>/mo</span></div>
         <div class="pricing-desc">For teams & multi-location ops</div>
         <ul class="pricing-features">
-          <li>All 85+ metro areas</li>
+          <li>All {{ city_count }}+ cities</li>
           <li>All trades + custom filters</li>
           <li>Real-time SMS + email alerts</li>
           <li>Full historical data</li>
@@ -2543,9 +2543,13 @@ function renderSidebar() {
   `).join('');
 
   // City breakdown - V13.6: Filter garbage city names
+  // V13.7: Added 'building and safety', 'pierce county', exact 'building' match
   const GARBAGE_CITY_PATTERNS = ['dob now', 'epic-la', 'permit', 'application', 'build –',
     'certificate', 'inspection', 'development', 'table', 'data', 'report', 'view',
-    'commercial', 'residential', 'issued', 'case', 'bp_', 'ebr', 'dsc', 'land use'];
+    'commercial', 'residential', 'issued', 'case', 'bp_', 'ebr', 'dsc', 'land use',
+    'building and safety', 'county'];
+  // V13.7: Exact matches for single-word garbage entries
+  const GARBAGE_EXACT = ['building', 'michigan', 'maine'];
   const STATE_NAMES = ['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
     'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana',
     'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan',
@@ -2557,6 +2561,7 @@ function renderSidebar() {
     if (!city || city.length < 3 || city.length > 35) return true;
     const lower = city.toLowerCase();
     if (STATE_NAMES.includes(lower)) return true;
+    if (GARBAGE_EXACT.includes(lower)) return true;
     if (GARBAGE_CITY_PATTERNS.some(p => lower.includes(p))) return true;
     return false;
   };
