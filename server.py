@@ -25,6 +25,27 @@ from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_s
 import analytics
 import db as permitdb  # V12.50: SQLite database layer (renamed to avoid Flask-SQLAlchemy collision)
 
+# V14.1: TRADE_MAPPING - SQL LIKE patterns for matching permits to trades
+# Used by city_trade_landing() to filter permits at database level
+TRADE_MAPPING = {
+    'plumbing': ['%plumbing%', '%plumb%', '%pipe%', '%sewer%', '%water heater%', '%drain%', '%backflow%'],
+    'electrical': ['%electrical%', '%electric%', '%wiring%', '%panel%', '%circuit%', '%generator%', '%outlet%'],
+    'hvac': ['%hvac%', '%heating%', '%air conditioning%', '%a/c%', '%furnace%', '%ductwork%', '%ventilation%', '%heat pump%', '%boiler%', '%mechanical%'],
+    'roofing': ['%roofing%', '%roof%', '%reroof%', '%re-roof%', '%shingle%', '%gutter%'],
+    'general-construction': ['%general%', '%addition%', '%alteration%', '%remodel%', '%renovation%', '%new construction%', '%new building%', '%build%', '%tenant improvement%'],
+    'demolition': ['%demolition%', '%demo%', '%tear down%', '%abatement%'],
+    'fire-protection': ['%fire%', '%sprinkler%', '%fire alarm%', '%fire suppression%'],
+    'painting': ['%painting%', '%paint%', '%coating%'],
+    'concrete': ['%concrete%', '%foundation%', '%slab%', '%footing%', '%masonry%', '%brick%', '%paving%'],
+    'landscaping': ['%landscape%', '%landscaping%', '%irrigation%', '%fence%', '%deck%', '%patio%', '%pool%'],
+    'solar': ['%solar%', '%photovoltaic%', '%pv %', '% pv%'],
+    'new-construction': ['%new build%', '%new construction%', '%ground up%', '%new building%', '%new dwelling%', '%new home%'],
+    'interior-renovation': ['%interior%', '%interior renovation%', '%interior remodel%', '%fit out%', '%fitout%', '%tenant finish%'],
+    'windows-doors': ['%window%', '%door%', '%storefront%', '%glazing%'],
+    'structural': ['%structural%', '%steel%', '%framing%', '%load bearing%', '%beam%', '%column%'],
+    'addition': ['%addition%', '%add on%', '%extension%', '%expand%', '%enlarge%'],
+}
+
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -6066,58 +6087,77 @@ def city_trade_landing(city_slug, trade_slug):
     # V12.9: Format city name for display
     display_name = format_city_name(city_config['name'])
 
-    # V14.0: Filter permits for this city from SQLite using case-insensitive match
-    # Try multiple matching strategies for robustness
+    # V14.1: Filter permits using SQL LIKE patterns for both city AND trade
+    # This is more efficient than loading all city permits then filtering in Python
     city_name = city_config['name']
-    city_permits = []
+    matching_permits = []
 
-    # Strategy 1: Exact match (fastest)
-    cursor = conn.execute(
-        "SELECT * FROM permits WHERE city = ? ORDER BY filing_date DESC LIMIT 2000",
-        (city_name,)
-    )
-    city_permits = [dict(row) for row in cursor]
+    # V14.1: Get LIKE patterns for this trade from TRADE_MAPPING
+    trade_patterns = TRADE_MAPPING.get(trade_slug, [f'%{trade_slug}%'])
 
-    # Strategy 2: Case-insensitive match if exact match fails
-    if not city_permits:
-        cursor = conn.execute(
-            "SELECT * FROM permits WHERE LOWER(city) = LOWER(?) ORDER BY filing_date DESC LIMIT 2000",
-            (city_name,)
-        )
-        city_permits = [dict(row) for row in cursor]
+    # V14.1: Build SQL query with trade patterns
+    # Check description, permit_type, work_type, trade_category for trade keywords
+    def query_trade_permits(city_filter, city_param):
+        """Helper to query permits matching city filter AND trade patterns."""
+        # Build OR conditions for trade patterns across multiple fields
+        trade_conditions = []
+        trade_params = []
+        for pattern in trade_patterns:
+            trade_conditions.append("""
+                (LOWER(COALESCE(description, '')) LIKE ?
+                 OR LOWER(COALESCE(permit_type, '')) LIKE ?
+                 OR LOWER(COALESCE(work_type, '')) LIKE ?
+                 OR LOWER(COALESCE(trade_category, '')) LIKE ?)
+            """)
+            trade_params.extend([pattern.lower(), pattern.lower(), pattern.lower(), pattern.lower()])
 
-    # Strategy 3: Partial match (city name without state) if still no results
-    if not city_permits and ',' in city_name:
+        trade_clause = " OR ".join(trade_conditions)
+        sql = f"""
+            SELECT * FROM permits
+            WHERE {city_filter}
+              AND ({trade_clause})
+            ORDER BY filing_date DESC
+            LIMIT 500
+        """
+        params = [city_param] + trade_params
+        cursor = conn.execute(sql, params)
+        return [dict(row) for row in cursor]
+
+    # Strategy 1: Exact city match
+    matching_permits = query_trade_permits("city = ?", city_name)
+
+    # Strategy 2: Case-insensitive city match if no results
+    if not matching_permits:
+        matching_permits = query_trade_permits("LOWER(city) = LOWER(?)", city_name)
+
+    # Strategy 3: Partial city match (without state suffix) if still no results
+    if not matching_permits and ',' in city_name:
         base_name = city_name.split(',')[0].strip()
+        matching_permits = query_trade_permits("LOWER(city) LIKE ?", f"%{base_name.lower()}%")
+
+    # V14.1: Fallback to Python-side matching if SQL patterns didn't match
+    # This handles edge cases where data format differs from expected patterns
+    if not matching_permits:
+        # Load city permits and filter with trade_configs keywords
+        city_permits = []
         cursor = conn.execute(
             "SELECT * FROM permits WHERE LOWER(city) LIKE ? ORDER BY filing_date DESC LIMIT 2000",
-            (f"%{base_name.lower()}%",)
+            (f"%{city_name.split(',')[0].strip().lower()}%",)
         )
         city_permits = [dict(row) for row in cursor]
 
-    # V14.0: Match permits to this trade based on keywords
-    # Enhanced matching: check description, permit_type, work_type, trade_category, AND project_name
-    trade_keywords = [kw.lower() for kw in trade['keywords']]
-    matching_permits = []
-    for p in city_permits:
-        text = ""
-        if p.get("description"):
-            text += p["description"].lower() + " "
-        if p.get("permit_type"):
-            text += p["permit_type"].lower() + " "
-        if p.get("work_type"):
-            text += p["work_type"].lower() + " "
-        if p.get("trade_category"):
-            text += p["trade_category"].lower() + " "
-        if p.get("project_name"):
-            text += p["project_name"].lower() + " "
-        if p.get("scope_of_work"):
-            text += p["scope_of_work"].lower()
+        trade_keywords = [kw.lower() for kw in trade['keywords']]
+        for p in city_permits:
+            text = ""
+            for field in ['description', 'permit_type', 'work_type', 'trade_category']:
+                if p.get(field):
+                    text += p[field].lower() + " "
+            if any(kw in text for kw in trade_keywords):
+                matching_permits.append(p)
+                if len(matching_permits) >= 500:
+                    break
 
-        if any(kw in text for kw in trade_keywords):
-            matching_permits.append(p)
-
-    # Already sorted by date from SQL
+    # Results are already sorted by date from SQL
 
     # Calculate stats
     # V12.23: Use module-level datetime/timedelta imports
