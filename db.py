@@ -383,7 +383,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_prod_cities_state ON prod_cities(state);
         CREATE INDEX IF NOT EXISTS idx_prod_cities_slug ON prod_cities(city_slug);
         CREATE INDEX IF NOT EXISTS idx_prod_cities_last_collection ON prod_cities(last_collection);
-        CREATE INDEX IF NOT EXISTS idx_prod_cities_freshness ON prod_cities(data_freshness);
+        -- NOTE: freshness index created in _run_v18_migrations() after column is added
 
         -- V18: stale_cities_review: Manual review queue for cities without automated sources
         CREATE TABLE IF NOT EXISTS stale_cities_review (
