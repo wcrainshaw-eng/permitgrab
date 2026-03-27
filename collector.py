@@ -676,9 +676,11 @@ def collect_bulk_source(source_key, config, days_back=90):
     city_field = config.get("city_field")
     state = config.get("state", "")
 
+    # V15: If no city_field, treat entire source as one city
+    single_city_mode = False
     if not city_field:
-        print(f"    [ERROR] No city_field defined for bulk source {source_key}")
-        return {}, {"status": "error_no_city_field"}
+        single_city_mode = True
+        print(f"    [INFO] No city_field - treating as single city source")
 
     # Fetch all records
     if platform == "socrata":
@@ -699,7 +701,16 @@ def collect_bulk_source(source_key, config, days_back=90):
     unknown_city_count = 0
 
     for record in raw_records:
-        city_name = record.get(city_field, "").strip()
+        # V15: Handle single_city_mode and type safety
+        if single_city_mode:
+            city_name = config.get('name', source_key)
+        else:
+            raw_city = record.get(city_field, "")
+            # Handle None and non-string types
+            if raw_city is None:
+                raw_city = ""
+            city_name = str(raw_city).strip()
+
         if not city_name:
             unknown_city_count += 1
             continue

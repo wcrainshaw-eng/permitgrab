@@ -14145,12 +14145,11 @@ BULK_SOURCES = {
     "miami_dade_county": {
         "name": "Miami-Dade County",
         "state": "FL",
+        "slug": "miami-dade-fl",
         "platform": "arcgis",
-        "mode": "bulk",
         "endpoint": "https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/ArcGIS/rest/services/BuildingPermit_gdb/FeatureServer/0/query",
         "dataset_id": "BuildingPermit_gdb",
-        "description": "Miami-Dade County Building Permits - 34 cities",
-        "city_field": "STNDADDR",  # Standard address includes city
+        "description": "Miami-Dade County Building Permits",
         "field_map": {
             "permit_number": "ID",
             "filing_date": "ISSUDATE",
@@ -14160,13 +14159,12 @@ BULK_SOURCES = {
             "address": "ADDRESS",
             "status": "BPSTATUS",
             "contractor_name": "CONTRNAME",
-            "folio": "FOLIO",
         },
         "date_field": "ISSUDATE",
         "date_format": "epoch_ms",
         "limit": 2000,
         "active": True,
-        "notes": "V15: Reactivated with new ArcGIS REST endpoint. Weekly updates. Fields: ID, ADDRESS, TYPE, DESC1-10, ISSUDATE, BPSTATUS, ESTVALUE, CONTRNAME.",
+        "notes": "V15: County-wide permits (no city breakdown). ArcGIS endpoint. ID is numeric.",
     },
 
     # V12.35: New bulk sources from county discovery
@@ -14587,26 +14585,27 @@ BULK_SOURCES = {
     },
 
     "fort_worth_tx_bulk": {
-        "name": "Fort Worth TX",
+        "name": "Fort Worth",
         "state": "TX",
+        "slug": "fort-worth-tx",
         "platform": "arcgis",
-        "mode": "bulk",
         "endpoint": "https://services5.arcgis.com/3ddLCBXe1bRt7mzj/ArcGIS/rest/services/CFW_Open_Data_Development_Permits_View/FeatureServer/0/query",
         "dataset_id": "CFW_Open_Data_Development_Permits_View",
         "description": "Fort Worth TX Development Permits",
-        "city_field": "Zip_Code",
         "field_map": {
             "permit_number": "Permit_No",
             "permit_type": "Permit_Type",
             "description": "B1_WORK_DESC",
-            "status": "Permit_SubType",
-            "filing_date": "Permit_Category",  # Note: may need date field discovery
-            "address": "Full_Street_Address",
+            "status": "Current_Status",
+            "filing_date": "File_Date",
+            "address": "Street_Name",
+            "zip": "Zip_Code",
         },
-        "date_field": "Permit_Category",  # Placeholder - may need specific date field
+        "date_field": "File_Date",
+        "date_format": "epoch_ms",
         "limit": 1000,
         "active": True,
-        "notes": "V15: Reactivated with new ArcGIS REST endpoint. Fields: Permit_No, Permit_Type, Full_Street_Address, B1_WORK_DESC. Pop ~978K.",
+        "notes": "V15: ArcGIS endpoint. File_Date is epoch_ms. Address needs assembly from parts. Pop ~978K.",
     },
 
     "austin_tx_datahub_bulk": {

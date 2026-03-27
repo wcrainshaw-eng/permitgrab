@@ -1,0 +1,686 @@
+PERMITGRAB V14.1 — CORRECTIONS & CONTENT HANDOFF
+===================================================
+Date: March 27, 2026
+Base: V14 (commits 8e9f438, 80ca471, 0a79ef9)
+
+This document contains:
+  PART 0: DATA PIPELINE BUG — Atlanta & Chicago scrapers stale
+  PART 1: Code fixes (trade page data, neighborhoods, blog links)
+  PART 2: Blog post rewrites (4 replacement .md files)
+
+⚠️  GUARDRAILS:
+  - Do NOT create any additional blog posts beyond what's in this doc
+  - Do NOT modify any existing city guide blog posts (except adding
+    trade links to the 33 that are missing them)
+  - Do NOT change any working features from V14
+  - Replace blog .md files EXACTLY as written below
+
+
+===================================================================
+PART 0: DATA PIPELINE BUG — ATLANTA & CHICAGO SCRAPERS STALE
+===================================================================
+
+PROBLEM: Daily digest emails for Atlanta and Chicago have been
+reporting "no new permits were filed yesterday" for 3 consecutive
+days (Mar 25, 26, 27). The digest on Mar 24 was the last one with
+actual Chicago data (50 permits). Atlanta hasn't appeared in any
+digest with data.
+
+EVIDENCE FROM LIVE SITE:
+
+  ATLANTA (/permits/atlanta):
+    - 1,186 total permits in DB
+    - Most recent permit filed: Jan 28, 2026
+    - All 8 visible permits are from Dec 30, 2025 – Jan 28, 2026
+    - NO permits from February or March 2026
+    - The Atlanta scraper has been DEAD for ~2 MONTHS
+
+  CHICAGO (/permits/chicago):
+    - 2,084 total permits in DB
+    - Most recent permit filed: Mar 18, 2026
+    - Other recent permits: Mar 11, Mar 6, Mar 4, Mar 3, Mar 2
+    - NO permits after Mar 18 (9 days stale)
+    - Chicago scraper stopped working around Mar 18-19
+
+DIAGNOSIS:
+  This is a scraper/data ingestion issue, not a display issue. The
+  site correctly shows what's in the DB — but the scrapers that pull
+  new permits from the city data portals have stopped running or are
+  failing silently.
+
+  Likely causes:
+  1. The city changed their data portal URL or API format
+  2. The scraper is hitting rate limits or getting blocked
+  3. The scraper cron job stopped running or errored out
+  4. Authentication/API key expired
+
+ACTION NEEDED:
+  1. Check the scraper logs for Atlanta and Chicago:
+     - Is the scraper cron job running?
+     - Are there error messages in the logs?
+     - When was the last successful scrape for each city?
+
+  2. Check the city data sources directly:
+     - Atlanta: Likely uses Atlanta's open data portal
+       (may be on data.atlantaga.gov or similar)
+     - Chicago: Likely uses Chicago Data Portal
+       (data.cityofchicago.org — they have a permits dataset)
+
+  3. Test the scraper manually:
+     Run the Atlanta and Chicago scraper functions manually and
+     check if they return new data or throw errors.
+
+  4. After fixing, verify:
+     - New permits appear on /permits/atlanta with dates after Jan 28
+     - New permits appear on /permits/chicago with dates after Mar 18
+     - Next day's digest email shows actual permit counts
+
+  NOTE: The welcome email (Mar 23) said "556+ cities" but the site
+  now shows 840+. The digest should reflect the same city count.
+
+PRIORITY: HIGH — This directly affects paying users. If someone
+subscribes to Atlanta alerts and gets "no permits" for 2 months,
+they'll cancel. This is a retention issue.
+
+
+===================================================================
+PART 1: CODE FIXES
+===================================================================
+
+
+-----------------------------------------------------------
+FIX 1 — CRITICAL: TRADE PAGE DATA PIPELINE (0 PERMITS BUG)
+-----------------------------------------------------------
+
+PROBLEM: All 1,836 trade pages show "0 This Month", "0 This Week",
+"$N/A Avg Value". No permit data is reaching the template.
+
+DEBUGGING STEPS:
+  1. Find the route handler for /permits/<city_slug>/<trade_slug>
+  2. Add temporary debug logging to see what the DB query returns:
+
+       @app.route('/permits/<city_slug>/<trade_slug>')
+       def city_trade_page(city_slug, trade_slug):
+           # ... existing code ...
+           print(f"DEBUG TRADE: city={city_slug}, trade={trade_slug}")
+           print(f"DEBUG TRADE: query returned {len(permits)} results")
+           # ... rest of handler ...
+
+  3. Check what column stores trade/work type info:
+       SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'permits';
+
+  4. Check what values exist in that column for Houston:
+       SELECT DISTINCT LOWER(description) as desc, COUNT(*) as cnt
+       FROM permits
+       WHERE LOWER(city) = 'houston'
+       GROUP BY LOWER(description)
+       ORDER BY cnt DESC
+       LIMIT 30;
+
+     Also try with "work_type", "permit_type", "trade", "category"
+     — whatever columns exist.
+
+  5. The most likely cause: the DB stores values like
+     "Plumbing - New Installation" or "PLUMBING" but the query
+     filters on exact match "plumbing". Fix with ILIKE:
+
+       WHERE LOWER(description) ILIKE ANY(ARRAY['%plumbing%', '%plumb%'])
+
+  6. Create a TRADE_MAPPING dict if one doesn't exist:
+
+       TRADE_MAPPING = {
+           'plumbing': ['%plumbing%', '%plumb%'],
+           'electrical': ['%electrical%', '%electric%', '%elec%'],
+           'hvac': ['%hvac%', '%heating%', '%air conditioning%',
+                    '%mechanical%', '%a/c%'],
+           'roofing': ['%roofing%', '%roof%', '%reroof%', '%re-roof%'],
+           'general-construction': ['%general%', '%addition%',
+               '%alteration%', '%remodel%', '%renovation%',
+               '%new construction%', '%new building%'],
+           'solar': ['%solar%', '%photovoltaic%', '%pv %'],
+           'demolition': ['%demolition%', '%demo%'],
+           'painting': ['%painting%', '%paint%']
+       }
+
+  7. Use it in the query:
+       keywords = TRADE_MAPPING.get(trade_slug, [f'%{trade_slug}%'])
+       # Build: WHERE (LOWER(description) LIKE kw1
+       #           OR LOWER(description) LIKE kw2 ...)
+
+FALLBACK: If the data fix is proving complex, add a noindex tag
+to the trade page template IMMEDIATELY so Google doesn't index
+1,836 empty pages while you debug:
+
+  In city_trade.html <head> section:
+    {% if trade_permit_count == 0 %}
+    <meta name="robots" content="noindex, follow">
+    {% endif %}
+
+  Remove this once data populates.
+
+VERIFY: /permits/houston/plumbing shows real permit count > 0
+
+
+-----------------------------------------------------------
+FIX 2 — CITY PAGE: ADD TOP NEIGHBORHOODS SECTION
+-----------------------------------------------------------
+
+PROBLEM: City pages have "Related Content" (good) but no "Top
+Neighborhoods" section showing most active zip codes.
+
+NEW DB FUNCTION (server.py):
+
+  def get_top_neighborhoods(city_slug, limit=5):
+      """Return top zip codes by permit count for a city."""
+      conn = get_db_connection()
+      cur = conn.cursor()
+      cur.execute("""
+          SELECT zip_code, COUNT(*) as permit_count
+          FROM permits
+          WHERE LOWER(REPLACE(city, ' ', '-')) = %s
+            AND zip_code IS NOT NULL
+            AND zip_code != ''
+            AND LENGTH(zip_code) >= 5
+          GROUP BY zip_code
+          ORDER BY permit_count DESC
+          LIMIT %s
+      """, (city_slug, limit))
+      results = cur.fetchall()
+      cur.close()
+      conn.close()
+      return [{'zip_code': r[0], 'count': r[1]} for r in results]
+
+ROUTE HANDLER UPDATE:
+  In the city page route, add:
+    neighborhoods = get_top_neighborhoods(city_slug)
+  Pass to template.
+
+TEMPLATE UPDATE (city.html):
+  Add inside "Houston Construction Insights" section, after
+  existing content:
+
+    {% if neighborhoods %}
+    <h3>Top Neighborhoods by Permit Activity</h3>
+    <ul>
+    {% for n in neighborhoods %}
+      <li>{{ n.zip_code }} — {{ n.count }} active permits</li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+
+VERIFY: /permits/houston shows zip codes with permit counts.
+
+
+-----------------------------------------------------------
+FIX 3 — ADD TRADE LINKS TO REMAINING 33 BLOG POSTS
+-----------------------------------------------------------
+
+PROBLEM: Push C added "Browse by Trade" links to 51 of 84 blog
+posts. 33 are still missing them (Tampa was confirmed missing).
+
+FIX: Run the same script from Push C on the remaining 33 posts.
+For each .md file in the blog directory that does NOT already
+contain "## Browse" or "Browse.*Permits by Trade":
+
+  1. Extract city_slug from filename pattern:
+     building-permits-{city_slug}-{state}-contractor-guide.md
+
+  2. Append this section at the end (before any final CTA if present):
+
+     ## Browse {City} Permits by Trade
+
+     - [Plumbing Permits in {City}](/permits/{city_slug}/plumbing)
+     - [Electrical Permits in {City}](/permits/{city_slug}/electrical)
+     - [HVAC Permits in {City}](/permits/{city_slug}/hvac)
+     - [Roofing Permits in {City}](/permits/{city_slug}/roofing)
+     - [General Construction Permits in {City}](/permits/{city_slug}/general-construction)
+
+  DO NOT modify any other content in the .md files.
+
+VERIFY: /blog/building-permits-tampa-fl-contractor-guide has
+"Browse Tampa Permits by Trade" section with 5 links.
+
+
+===================================================================
+PART 2: BLOG POST REWRITES
+===================================================================
+
+Code created 4 unauthorized blog posts. Below are replacement
+versions. Replace the existing .md files with these EXACTLY.
+
+
+-----------------------------------------------------------
+POST 1: REPLACE what-is-a-building-permit.md
+-----------------------------------------------------------
+
+Filename: what-is-a-building-permit.md
+
+---
+title: "What Is a Building Permit? A Contractor's Guide to Using Permit Data"
+description: "Building permits aren't just paperwork — they're public records that reveal where construction work is happening. Learn what permits are, how the process works, and how contractors use permit filings to find new business."
+date: 2026-03-10
+author: PermitGrab Team
+---
+
+# What Is a Building Permit? A Contractor's Guide to Using Permit Data
+
+If you work in construction, you know building permits are part of the job. But most contractors think of permits as a box to check before starting work. What many don't realize is that permits create a public record of every construction project in a city — and that record is a tool you can use to find new customers.
+
+This guide covers how the permit system works, what information permits contain, and how contractors are using permit data to stay ahead of their competition.
+
+## How Building Permits Work
+
+A building permit is an authorization from a local government that allows construction, renovation, or demolition work to proceed on a property. The permit confirms that the planned work complies with local building codes, zoning ordinances, fire safety standards, and other regulations.
+
+The permit process exists to protect public safety. Without it, there's no way to verify that electrical work won't cause a fire, that a structural modification won't compromise a building, or that a new construction project meets setback and height requirements.
+
+### When Is a Permit Required?
+
+Requirements vary by jurisdiction, but most cities require permits for:
+
+**Structural work** — adding rooms, removing load-bearing walls, building decks or porches, constructing garages or accessory dwelling units
+
+**Mechanical systems** — installing or replacing HVAC systems, ductwork modifications, commercial kitchen ventilation
+
+**Electrical** — new circuits, panel upgrades, rewiring, adding outlets in certain locations, generator installations
+
+**Plumbing** — new fixtures, repiping, water heater installations, sewer line work, gas line modifications
+
+**Roofing** — full roof replacements (most cities), structural roof repairs, adding skylights
+
+**New construction** — any new building, from single-family homes to commercial developments
+
+Work that typically does NOT require a permit includes cosmetic changes like painting, flooring installation, cabinet replacement, and minor landscaping. However, this varies — some cities require permits for fences, driveways, or even water heaters.
+
+When in doubt, check with the local building department before starting work. Unpermitted work can result in fines, stop-work orders, and problems when the property owner tries to sell.
+
+### The Permit Lifecycle
+
+Every permit follows roughly the same path through the system:
+
+**1. Application** — The property owner or their contractor submits plans, a scope of work description, and the application to the city's building department. Many cities now accept applications online.
+
+**2. Plan review** — City inspectors and plan reviewers check the submitted plans against building codes. This is where projects get approved, denied, or sent back for revisions. Timeline varies dramatically: a simple residential permit might take a few days, while a complex commercial project can take months.
+
+**3. Permit issuance** — Once approved, the permit is issued and becomes a public record. This is the critical moment for lead generation — it signals that a funded, approved project is about to begin.
+
+**4. Construction and inspections** — Work proceeds with inspections at key stages (foundation, framing, rough-in for mechanical/electrical/plumbing, insulation, final). Failed inspections require corrections before work continues.
+
+**5. Final sign-off** — After a successful final inspection, the permit is closed. For new construction, this typically includes a certificate of occupancy.
+
+## What Information Does a Permit Contain?
+
+This is where permits become valuable for contractors. When a permit is filed, the public record typically includes:
+
+- **Property address** — exactly where the work is happening
+- **Type of work** — new construction, renovation, addition, repair, demolition
+- **Description** — often specific: "kitchen remodel," "reroof," "new HVAC system," "bathroom addition"
+- **Estimated project value** — what the applicant declared the project will cost
+- **Filing and approval dates** — when the project was approved and work can begin
+- **Permit status** — active, expired, finaled, revoked
+- **Owner name** — the property owner who applied for or is associated with the permit
+- **Contractor of record** — if a contractor pulled the permit, their name and license number may appear
+
+The level of detail varies by city. Some municipalities publish comprehensive data with contractor names, fees paid, and inspection results. Others provide only basic information. But even a property address plus a project description is enough to identify an opportunity.
+
+## Why Permit Data Matters for Contractors
+
+### Every Permit Represents a Real Project
+
+Unlike marketing leads from home improvement directories where someone might be "just browsing," a permit filing means the project is funded, approved, and about to start. The homeowner or developer has already committed to the work.
+
+### Adjacent Opportunities
+
+A single permit often signals multiple needs. When a homeowner pulls a permit for a kitchen remodel, they may also need:
+
+- Electrical upgrades to support new appliances
+- Plumbing modifications for sink or dishwasher relocation
+- HVAC adjustments if the layout changes
+- Painting and finishing work after construction
+- Flooring installation
+
+The general contractor handling the remodel may need subcontractors for specialized trades. The homeowner may be planning additional projects that haven't been permitted yet.
+
+### Timing Advantage
+
+Permit data tells you when a project is starting — not after it's already underway. A contractor who reaches out within a few days of a permit filing has a significant advantage over one who finds out about the project weeks later through word of mouth.
+
+### Market Intelligence
+
+Beyond individual leads, permit data reveals market-level patterns. You can identify which neighborhoods have the most construction activity, which trades are in highest demand, whether your market is trending up or down, and which of your competitors is most active.
+
+## How PermitGrab Makes This Practical
+
+Building permits are public record, but accessing them historically required visiting each city's website, navigating different database formats, and manually searching. Monitoring multiple cities across different states was effectively impossible for an individual contractor.
+
+PermitGrab aggregates permit data from cities across the country, normalizes it into a consistent format, and delivers it through a single dashboard. You can filter by city, by trade (plumbing, electrical, roofing, HVAC, general construction, solar, demolition), and by project value to surface the opportunities that match your business.
+
+New permits are added daily, so you're seeing projects as they're approved — not weeks or months later.
+
+## Getting Started With Permit-Based Lead Generation
+
+If you want to start using permit data to find work, here's a practical approach:
+
+**Start with your home market.** Pick the city or metro area where you do most of your work. Get familiar with the volume and types of permits being filed there before expanding.
+
+**Filter by your trade.** A plumber doesn't need to see roofing permits. Narrowing by trade keeps your lead list manageable and relevant.
+
+**Focus on timing.** The highest-value outreach happens in the first few days after a permit is filed. The homeowner is actively making decisions about contractors and hasn't committed yet.
+
+**Track your results.** Not every permit lead will convert. Track which types of projects, neighborhoods, and outreach methods produce actual paying jobs so you can refine your approach.
+
+Building permits have always been public. The contractors who are winning in 2026 are the ones who've figured out how to use that public data systematically rather than relying on chance, referrals, or expensive advertising to find their next job.
+
+[Browse building permits in your city on PermitGrab →](/cities)
+
+
+-----------------------------------------------------------
+POST 2: REPLACE how-much-does-a-building-permit-cost-chicago.md
+-----------------------------------------------------------
+
+Filename: how-much-does-a-building-permit-cost-chicago.md
+
+---
+title: "How Much Does a Building Permit Cost in Chicago? (2026 Fee Guide)"
+description: "Chicago building permit fees start at a $302 minimum and scale based on project scope, construction type, and occupancy. Here's what contractors and homeowners need to know about permit costs, timelines, and the application process."
+date: 2026-03-19
+author: PermitGrab Team
+---
+
+# How Much Does a Building Permit Cost in Chicago? (2026 Fee Guide)
+
+Chicago's building permit fees are calculated using a formula based on construction type, occupancy classification, and project scope — not a flat rate. That means your permit cost can vary significantly depending on what you're building and where. This guide breaks down what to expect so you can budget accurately before starting a project.
+
+## Chicago's Permit Fee Structure
+
+Unlike cities that charge a simple flat fee or a percentage of construction cost, Chicago uses a formula defined in the Chicago Building Code. The calculation factors in four variables:
+
+- **Construction type** (wood frame, steel, concrete, etc.)
+- **Occupancy type** (residential, commercial, assembly, etc.)
+- **Area** in square feet
+- **Project scope** (new construction, alteration, repair)
+
+The City of Chicago provides an online fee calculator at the Department of Buildings website (chicago.gov) where you can plug in your project details and get an estimate. The calculator was built on fee tables that are updated periodically — the most recent tables took effect January 1, 2025.
+
+**The minimum permit fee in Chicago is $302** for any permit that requires plan review and drawings. Even a small residential alteration won't cost less than this. This minimum applies to the building permit itself — electrical, plumbing, and mechanical permits are separate and have their own fees.
+
+## What Drives the Cost Up
+
+**Square footage is the primary driver.** Chicago's fee tables are structured around the area of work. A 200-square-foot bathroom remodel generates a lower fee than a 2,000-square-foot addition, even if both are residential alterations.
+
+**Occupancy type changes the multiplier.** Commercial and mixed-use buildings face higher per-square-foot rates than single-family residential because they require more intensive plan review. A restaurant build-out is more expensive to permit than a residential renovation of equivalent size due to additional fire safety, accessibility, and occupancy load requirements.
+
+**Multiple trades stack up.** A kitchen remodel typically requires separate permits for building, electrical, plumbing, and sometimes mechanical work. Each permit has its own fee. When budgeting for a client, account for all the permits the project will need, not just the building permit.
+
+**Zoning reviews add cost.** If your project doesn't comply with current zoning — for example, you're building closer to the property line than the setback allows, or changing the use of a space — you may need a zoning variance or special use permit. These involve hearings and additional fees that can add significantly to the total cost and timeline.
+
+**Pre-1985 buildings require asbestos surveys.** For any demolition or renovation work in buildings constructed before 1985, Chicago requires an asbestos survey before issuing the permit. This isn't a city fee — it's a separate cost paid to an environmental testing firm — but the permit won't be issued without it. Budget accordingly.
+
+## Permit Processing Timelines
+
+How long it takes to get your permit depends on the review track your project falls into:
+
+**Easy Permit (formerly Express Permit):** For straightforward work that meets specific criteria. These can be issued quickly, sometimes same-day or within a few business days. Examples include basic electrical or plumbing work, re-roofing, and simple residential repairs.
+
+**Standard Plan Review:** For projects that require full plan review by the Department of Buildings. Expect several weeks for residential projects, longer for commercial. The timeline depends on current workload and the complexity of your submittal.
+
+**Developer Services:** For larger projects. Timeline varies based on scope.
+
+The clock starts when you submit a **complete** application. Incomplete submittals get returned without review, which can waste weeks. Double-check that all required documents, drawings, and supporting materials are included before submitting.
+
+## Tips for Chicago Contractors
+
+**Use the online fee calculator before quoting jobs.** Permit costs should be part of your estimate, not an unpleasant surprise for the client. Run the numbers through the city's calculator before you bid.
+
+**Keep your E-Plan account current.** Chicago's building permit applications go through their online permitting system. Having your account set up, your documents formatted to their specifications, and your application complete before submitting will avoid back-and-forth that delays the process.
+
+**Factor in all permits, not just the building permit.** A residential renovation might require building, electrical, plumbing, and mechanical permits. Total permit cost is the sum of all of them, and they may need to be filed separately.
+
+**Consider hiring a permit expediter for complex projects.** Many Chicago contractors use professional expediters who know the Department of Buildings' processes and can help navigate the system more efficiently, particularly for projects that involve zoning review or multiple departments.
+
+**Check for fee exemptions.** Some types of work may qualify for reduced fees or exemptions. Check the current fee tables and consult with the Department of Buildings if you think your project might qualify.
+
+## Track Chicago Building Permits on PermitGrab
+
+Chicago is one of the most active construction markets in the country, with thousands of permits filed regularly across residential, commercial, and institutional projects. PermitGrab tracks Chicago permits daily — you can filter by trade to see plumbing, electrical, roofing, HVAC, and general construction permits as they're filed.
+
+If you're a contractor working in Chicago, monitoring new permit filings can help you find opportunities before your competition does.
+
+[Browse Chicago building permits on PermitGrab →](/permits/chicago)
+
+*Fee information in this article is based on publicly available data from the City of Chicago Department of Buildings. Permit fees are subject to change. Use the City of Chicago's official fee calculator at chicago.gov for the most current rates.*
+
+## Browse Chicago Permits by Trade
+
+- [Plumbing Permits in Chicago](/permits/chicago/plumbing)
+- [Electrical Permits in Chicago](/permits/chicago/electrical)
+- [HVAC Permits in Chicago](/permits/chicago/hvac)
+- [Roofing Permits in Chicago](/permits/chicago/roofing)
+- [General Construction Permits in Chicago](/permits/chicago/general-construction)
+
+
+-----------------------------------------------------------
+POST 3: REPLACE how-to-find-construction-leads.md
+-----------------------------------------------------------
+
+Filename: how-to-find-construction-leads.md
+
+---
+title: "How to Find Construction Leads in 2026: A Data-Driven Approach"
+description: "The contractors growing fastest in 2026 aren't relying on cold calls and yard signs. Here's how building permit data, targeted outreach, and smart filtering create a repeatable system for finding high-value construction leads."
+date: 2026-03-15
+author: PermitGrab Team
+---
+
+# How to Find Construction Leads in 2026: A Data-Driven Approach
+
+Every contractor needs a pipeline of new work. The question isn't whether you need leads — it's how you find them efficiently enough to grow without spending all your non-billable time chasing prospects who aren't ready to hire.
+
+This guide covers the lead generation methods that are actually working for contractors in 2026, from tried-and-true referral systems to data-driven approaches using building permit filings.
+
+## The Lead Generation Problem for Contractors
+
+Most contractors find work through some combination of referrals, repeat customers, and being visible in their market. These are solid foundations, but they share a common limitation: you can't control the volume or timing.
+
+Referrals come when they come. A client might recommend you to their neighbor six months from now or never. Your yard signs work when someone happens to drive past an active job site and happens to need work done. Your Google Business profile generates calls when someone searches — but you're competing with every other contractor in the area for those same searches.
+
+The contractors who grow consistently are the ones who've built a system for finding opportunities proactively rather than waiting for the phone to ring.
+
+## Traditional Methods and Where They Still Work
+
+### Referrals and Repeat Clients
+
+Referrals remain the highest-converting lead source for most contractors. A warm introduction from a satisfied customer carries more trust than any advertisement. The key is making referrals systematic rather than leaving them to chance:
+
+- Ask for referrals explicitly after completing a job, while the client is most satisfied
+- Stay in touch with past clients through seasonal check-ins (HVAC tune-ups, roof inspections, winterization reminders)
+- Make it easy — a simple text or email the client can forward is more effective than a business card they'll lose
+
+The limitation is scale. You can't referral your way to 10x growth.
+
+### Home Shows and Networking Events
+
+Trade shows and home expos put you in front of homeowners who are actively thinking about projects. The challenge is that booth costs, materials, and staff time add up quickly, and many of the leads you collect are from people who are months or years away from starting work. If you do shows, have a system for following up and qualifying leads afterward — the value is rarely in same-day sales.
+
+### Online Directories and Lead Services
+
+Services that sell contractor leads can provide volume, but the economics are tough. You're typically paying for shared leads (3-5 contractors receive the same lead), the lead quality varies widely, and the cost per acquired customer can be high once you account for the leads that don't convert. These services work best as a supplement, not a primary strategy.
+
+## The Permit Data Approach
+
+Building permits are filed with local government when a property owner is approved to begin construction, renovation, or demolition work. These filings are public record in virtually every US city. What makes them valuable for lead generation is what they represent: a funded, approved project that's about to start.
+
+### Why Permit Leads Are Different
+
+**The project is real.** A permit filing isn't someone browsing Houzz for kitchen ideas. It's a property owner who has submitted plans, paid fees, and received approval to proceed. The commitment is already made.
+
+**The timing is specific.** You know a project is starting now — not "sometime this year" or "when we get around to it." This lets you reach out when decisions about contractors and subcontractors are actively being made.
+
+**The details are specific.** Permits typically include the property address, type of work, project scope, and estimated value. You can target exactly the types of projects that match your business rather than casting a wide net.
+
+**There's no bidding war (yet).** Unlike leads from directories where 5 contractors all call the same homeowner within an hour, most contractors don't monitor permit data. You're reaching out to people who haven't been contacted by your competitors through this channel.
+
+### How Contractors Use Permit Data
+
+**Subcontractors finding prime contractors.** When a general contractor pulls a permit for a large renovation, they'll need plumbers, electricians, HVAC techs, and other trades. The permit tells you who the GC is and what the project involves.
+
+**Specialty contractors finding direct opportunities.** A roofing contractor can filter for roof replacement permits to find homeowners who've been approved for a new roof. An HVAC contractor can find mechanical permits in their service area.
+
+**Identifying adjacent opportunities.** A kitchen remodel permit often signals need for electrical, plumbing, countertop, flooring, and painting work. Even if you weren't involved in the original scope, the homeowner may need your trade.
+
+**Market analysis.** Tracking permit volume by neighborhood, trade, and project value over time reveals which areas are growing, which trades are in demand, and where your competitors are most active. This informs where you focus your marketing and whether to expand into adjacent markets.
+
+### Making Permit Data Practical
+
+The challenge with permit data has always been access. Each city has its own database, format, and update schedule. Manually checking multiple cities is time-consuming and easy to fall behind on.
+
+PermitGrab solves this by aggregating permit data from cities across the country into a single dashboard. You can filter by city, trade, and project value to see the permits that are relevant to your business, updated daily.
+
+## Building a Lead Generation System
+
+The most effective approach combines multiple sources into a repeatable system:
+
+**1. Foundation: Referrals + Repeat Clients**
+These are your highest-quality leads. Systematize them so they happen consistently, not randomly.
+
+**2. Visibility: Online Presence**
+A solid Google Business profile, a functional website, and a few strong reviews ensure you're findable when someone searches for your trade in your area.
+
+**3. Proactive Outreach: Permit Data**
+This is your growth engine. Monitoring new permit filings gives you a daily feed of real opportunities you can act on before your competition.
+
+**4. Track Everything**
+Know your numbers. Which lead sources produce actual revenue? What's your cost per acquired customer from each channel? Where should you invest more time and budget?
+
+The contractors who are growing fastest in 2026 aren't doing anything revolutionary. They've just built a system that finds opportunities consistently, reaches out at the right time, and tracks what works. Permit data is the piece most contractors are missing.
+
+[Start finding construction leads with PermitGrab →](/get-alerts)
+
+
+-----------------------------------------------------------
+POST 4: DELETE OR REPLACE permit-trends-march-2026.md
+-----------------------------------------------------------
+
+⚠️  THIS POST CONTAINS FABRICATED STATISTICS. The "12% YoY increase",
+"25% HVAC spike", "2,000+" city counts, and all the MoM percentages
+are made-up numbers. This is the most dangerous of the 4 posts.
+
+OPTION A (RECOMMENDED): DELETE the .md file entirely.
+  Remove: permit-trends-march-2026.md
+  This removes it from the blog listing and sitemap.
+
+OPTION B: Make it a DYNAMIC template that pulls real data.
+  If you want to keep this as a recurring monthly feature, the
+  content MUST come from actual DB queries, not static text.
+
+  If going with Option B, replace the .md file with this version
+  that uses template variables Code should populate from the DB:
+
+---
+title: "Building Permit Trends: What We're Seeing Across US Cities"
+description: "A look at building permit activity across PermitGrab's network of tracked cities — which trades are busiest, which markets are growing, and what it means for contractors."
+date: 2026-03-16
+author: PermitGrab Team
+---
+
+# Building Permit Trends: What We're Seeing Across US Cities
+
+PermitGrab tracks building permit filings across a growing network of cities nationwide. Here's a snapshot of what the data shows about construction activity and what it means for contractors looking for work.
+
+## Where Permits Are Being Filed
+
+Construction activity varies significantly by region and city size. Among the cities PermitGrab tracks, the highest permit volumes consistently come from major metros with large populations and active development markets.
+
+{{CODE: Replace this section with REAL data. Query the DB:
+  SELECT city, state, COUNT(*) as permit_count
+  FROM permits
+  WHERE created_at >= NOW() - INTERVAL '30 days'
+  GROUP BY city, state
+  ORDER BY permit_count DESC
+  LIMIT 10;
+
+  Format as a table showing "City | State | Permits (Last 30 Days)"
+  Use ACTUAL numbers from the query. Do NOT make up numbers.}}
+
+These numbers reflect permits that have entered PermitGrab's system in the last 30 days. Actual totals may be higher as some permit types are reported with a delay.
+
+## Which Trades Are Busiest
+
+Permit filings break down across trades differently depending on the season, region, and local market conditions.
+
+{{CODE: Replace this section with REAL data. Query the DB:
+  SELECT description_category, COUNT(*) as cnt
+  FROM permits
+  WHERE created_at >= NOW() - INTERVAL '30 days'
+  GROUP BY description_category
+  ORDER BY cnt DESC
+  LIMIT 8;
+
+  (Adjust column name to whatever stores trade/category info)
+  Format as a ranked list with actual counts.
+  Do NOT fabricate percentages or growth rates.}}
+
+## What This Means for Contractors
+
+The practical takeaway from permit data isn't about national trends — it's about your specific market. A plumber in Nashville cares about Nashville plumbing permits, not national averages.
+
+Here's how to use market-level data:
+
+**If your trade is busy in your city**, competition for those jobs is also increasing. Speed matters — the first contractor to reach out after a permit is filed has an advantage.
+
+**If your trade is slower**, it may be worth expanding your service area or looking at adjacent trades. A general contractor seeing fewer new construction permits might shift focus to renovation and remodel permits.
+
+**Seasonal patterns are real.** HVAC permits tend to spike in spring as homeowners prepare for cooling season. Roofing picks up after winter weather. Knowing when your busy season starts helps you prepare.
+
+## Track Permits in Your Market
+
+National trends are interesting, but what matters is what's happening in the cities where you work. PermitGrab lets you filter permits by city and trade so you see exactly the opportunities relevant to your business.
+
+[See what's being permitted in your city →](/cities)
+
+*Data reflects permits tracked by PermitGrab and may not represent the complete permit volume for any given city. Not all cities report all permit types.*
+
+
+===================================================================
+PART 2 SUMMARY: BLOG FILE CHANGES
+===================================================================
+
+FILE: what-is-a-building-permit.md
+  ACTION: REPLACE with content above (~1,600 words)
+
+FILE: how-much-does-a-building-permit-cost-chicago.md
+  ACTION: REPLACE with content above (~1,400 words)
+
+FILE: how-to-find-construction-leads.md
+  ACTION: REPLACE with content above (~1,500 words)
+
+FILE: permit-trends-march-2026.md
+  ACTION: DELETE (Option A, recommended)
+  OR: REPLACE with dynamic template above (Option B)
+
+Total blog post count after changes:
+  Option A (delete trends): 83 posts (was 84 original + 4 new - 1 delete)
+  Option B (keep trends): 84 posts
+
+
+===================================================================
+VERIFICATION CHECKLIST (after V14.1 deploy)
+===================================================================
+
+[ ] /permits/houston/plumbing shows real permit data (not 0)
+    OR has <meta name="robots" content="noindex"> if data still broken
+[ ] /permits/houston has "Top Neighborhoods" section with zip codes
+[ ] /blog/building-permits-tampa-fl-contractor-guide has "Browse by Trade" links
+[ ] /blog/what-is-a-building-permit loads and shows ~1,600 words
+[ ] /blog/how-much-does-a-building-permit-cost-chicago loads and shows ~1,400 words
+[ ] /blog/how-to-find-construction-leads loads and shows ~1,500 words
+[ ] /blog/permit-trends-march-2026 returns 404 (if Option A)
+    OR shows real data from DB (if Option B)
+[ ] Blog still shows correct total post count on /blog
+[ ] No other blog posts were modified beyond trade link additions
+
+DATA PIPELINE (Part 0):
+[ ] Atlanta scraper is running — new permits with dates after Jan 28 appearing
+[ ] Chicago scraper is running — new permits with dates after Mar 18 appearing
+[ ] Next day's digest email shows actual permit counts for both cities

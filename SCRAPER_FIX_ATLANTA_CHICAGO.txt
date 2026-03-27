@@ -1,0 +1,104 @@
+PERMITGRAB — SCRAPER FIX: ATLANTA & CHICAGO DATA PIPELINES
+=============================================================
+Priority: HIGH — Directly impacts paying subscribers
+Date: March 27, 2026
+
+
+PROBLEM
+-------
+Daily digest emails for Atlanta and Chicago have been reporting
+"no new permits were filed yesterday" for 3+ consecutive days.
+This is NOT a display or email bug — the scrapers that pull new
+permit data from city portals have gone stale.
+
+
+EVIDENCE FROM LIVE SITE (verified March 27, 2026)
+--------------------------------------------------
+
+ATLANTA (/permits/atlanta):
+  - 1,186 total permits in DB
+  - Most recent permit filed: January 28, 2026
+  - All 8 visible permits date from Dec 30, 2025 – Jan 28, 2026
+  - ZERO permits from February or March 2026
+  - The Atlanta scraper has been DEAD for approximately 2 MONTHS
+
+CHICAGO (/permits/chicago):
+  - 2,084 total permits in DB
+  - Most recent permit filed: March 18, 2026
+  - Other recent permits: Mar 11, Mar 6, Mar 4, Mar 3, Mar 2
+  - ZERO permits after March 18 (9 days stale)
+  - The Chicago scraper stopped working around March 18-19
+  - Last working digest: Mar 24 (reported 50 new Chicago permits,
+    but those were filed on/before Mar 18)
+
+
+DIAGNOSIS
+---------
+The site correctly displays what's in the database. The digest
+correctly reports "no new permits" because there are none in the
+DB after those dates. The issue is upstream — the scraper/ingestion
+jobs that pull new permits from the city data portals have stopped
+running or are failing silently.
+
+Likely causes (check in this order):
+  1. Scraper cron job stopped running or errored out
+  2. City changed their data portal URL, API format, or schema
+  3. Scraper hitting rate limits or getting IP-blocked
+  4. API key or authentication token expired
+  5. Data format changed (new columns, renamed fields, different
+     date format) causing the parser to silently return 0 results
+
+
+ACTION NEEDED
+-------------
+
+Step 1: Check scraper logs
+  - Find the scraper/cron job for Atlanta and Chicago
+  - Check logs for errors, exceptions, or empty result sets
+  - Determine when the last SUCCESSFUL scrape ran for each city
+  - If there are no recent log entries at all, the cron job itself
+    may have stopped
+
+Step 2: Check the city data sources directly
+  Atlanta:
+    - Likely source: Atlanta's open data portal
+      (data.atlantaga.gov or similar Socrata/CKAN portal)
+    - Visit the source URL in a browser and confirm the dataset
+      is still accessible and has recent data
+    - Check if the API endpoint or dataset ID changed
+
+  Chicago:
+    - Likely source: Chicago Data Portal (data.cityofchicago.org)
+    - They have a well-known building permits dataset
+    - Visit the source URL and confirm recent permits are present
+    - Check if the API format or authentication requirements changed
+
+Step 3: Test the scraper manually
+  - Run the Atlanta scraper function manually (not via cron) and
+    check what it returns
+  - If it returns 0 results or throws an error, you've found the
+    problem
+  - Do the same for Chicago
+  - Compare the data format the scraper expects vs. what the API
+    currently returns
+
+Step 4: Fix and backfill
+  - Once the scraper is working again, backfill the missing data:
+    - Atlanta: ~2 months of missing permits (Feb 1 – Mar 27)
+    - Chicago: ~9 days of missing permits (Mar 19 – Mar 27)
+  - Most city data portals allow date-range queries, so you should
+    be able to pull the historical data in one batch
+
+Step 5: Verify
+  - After fix, check /permits/atlanta — should show permits with
+    dates in Feb/Mar 2026
+  - Check /permits/chicago — should show permits after Mar 18
+  - Wait for the next daily digest and confirm it reports actual
+    permit counts for both cities
+
+
+ADDITIONAL NOTE
+---------------
+The welcome email (sent Mar 23) says "556+ cities" but the site
+currently shows "840+ cities." The digest and welcome emails should
+use the same dynamic city count as the site to avoid confusion.

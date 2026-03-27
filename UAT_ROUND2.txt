@@ -1,0 +1,150 @@
+UAT ROUND 2 — POST c0b714e FIX VERIFICATION
+=============================================
+Date: March 26, 2026
+
+WHAT'S FIXED (verified working):
+- Nav dropdown: No more duplicate cities, no states showing as cities (California, New Jersey gone) ✓
+- /cities page: Zero duplicate cities within any state section ✓
+- /cities page: 20 top cards now (was 12) ✓
+- /cities search: filterCities() now correctly hides/shows top cards ✓
+
+REMAINING ISSUES (4 bugs, ordered by severity):
+=================================================
+
+ISSUE 1 — CRITICAL: Entire sitemap is duplicated (every URL appears 2x)
+------------------------------------------------------------------------
+Severity: HIGH (SEO impact — Google may penalize for 2,869 duplicate URLs)
+
+What's happening:
+  Every single URL in sitemap.xml appears exactly twice.
+  Total URL occurrences: 5,738
+  Unique URLs: 2,869
+  Zero URLs appear only once — it's 100% duplicated.
+
+Root cause:
+  The sitemap() function in server.py is generating the full URL list twice,
+  or appending URLs to a list that doesn't get cleared between two generation passes.
+  This is likely a regression from the c0b714e fix.
+
+Where to look:
+  server.py — sitemap() function (around line 5880)
+  Check if URLs are being appended in two separate loops, or if the
+  function is called twice, or if a list variable isn't being reset.
+
+Fix:
+  Use a set or dedup the final URL list before rendering the XML.
+  Better yet: find the root cause of why every URL gets added twice.
+
+
+ISSUE 2 — CRITICAL: Oklahoma has 1,156 cities (state field data corruption)
+----------------------------------------------------------------------------
+Severity: HIGH (data quality — makes the entire /cities page unreliable)
+
+What's happening:
+  The "OK" state section contains 1,156 cities, which is absurd for Oklahoma.
+  Houston (9,044 permits) appears under OK instead of TX.
+  Meanwhile Texas only shows 42 cities.
+
+  The actual state distribution looks wrong:
+    OK: 1,156 (should be ~5-10)
+    NV: 97 (probably inflated too)
+    Other Locations: 150 (all garbage)
+
+Root cause:
+  The permits DB has "OK" stored in the state field for records that aren't
+  from Oklahoma. This is likely a data collection artifact where bulk sources
+  store "OK" as an acknowledgment/status code rather than a US state abbreviation.
+
+  The V13.2 cross-state dedup was supposed to merge Houston OK + Houston TX,
+  keeping TX (the one with the CITY_REGISTRY config). But if the DB has
+  Houston with state="OK" and 9,044 permits vs Houston with state="TX" and
+  fewer permits, the dedup may be picking OK because it has more data.
+
+Where to look:
+  server.py — get_cities_with_data() V13.2 cross-state dedup logic
+  db.py — get_cities_with_permits() at line 408
+
+Fix approach:
+  In get_cities_with_data(), when doing cross-state dedup for cities that
+  appear in multiple states:
+  1. If one of the states matches a CITY_REGISTRY config, always pick that state
+     (regardless of permit count)
+  2. If neither matches a config, pick the state with more permits
+  3. Consider adding a KNOWN_STATE_OVERRIDES dict for obvious cases:
+     {"houston": "TX", "dallas": "TX", "austin": "TX", "san antonio": "TX", etc.}
+
+  OR: Fix at the DB level — the root cause is that bulk sources are writing
+  bad state values. Check the collector to see why "OK" is being stored for
+  non-Oklahoma cities.
+
+
+ISSUE 3 — MEDIUM: "Other Locations" section has 150 garbage entries
+--------------------------------------------------------------------
+Severity: MEDIUM (data quality — looks unprofessional)
+
+What's happening:
+  There's an "Other Locations" section with 150 entries that are NOT cities.
+  They are Socrata dataset names, permit types, and other junk:
+    - "Dob Now: Build – Approved" (2,766 permits)  ← NYC DOB permit type
+    - "Building And Safety" (2,299)
+    - "Kitsap County Sewer Data_Wfl1" (1,990)
+    - "Cfw Development Permits Table" (1,841)
+    - "La County Permitting (Epic-La Case History)" (1,061)
+    - "Bureau Of Engineering Permit Information" (655)
+    - "Dob Now: Build – Limited Alteration Applications" (482)
+    - etc.
+
+  "Dob Now: Build – Approved" even appears in the nav dropdown (top 20).
+
+Root cause:
+  Bulk sources or collectors are storing dataset names / permit type names
+  in the city field of the permits table. The get_cities_with_data()
+  function has no filter for these non-city values.
+
+Where to look:
+  server.py — get_cities_with_data()
+  db.py — get_cities_with_permits()
+  collector.py — wherever city values are written to the DB
+
+Fix approach (pick one or both):
+  A) Filter in get_cities_with_data():
+     - Skip entries where city name contains common junk patterns:
+       "dob now", "build –", "applications", "certificate",
+       "permit", "data_wfl", "epic-la", "bureau of", "_wgs84",
+       "table", "inspections", "cases", etc.
+     - Skip entries where city name is longer than ~35 chars
+       (real city names are rarely that long)
+     - Skip entries where state is NULL or empty or not a valid
+       2-letter US state abbreviation
+
+  B) Fix at the collector level:
+     - Validate city_field values before writing to DB
+     - Reject values that match known dataset name patterns
+
+
+ISSUE 4 — LOW: Sitemap still has new-york, new-jersey, nevada as both state hub and city
+------------------------------------------------------------------------------------------
+Severity: LOW (3 duplicate URLs, partially masked by Issue 1's bigger problem)
+
+What's happening:
+  /permits/new-york, /permits/new-jersey, /permits/nevada still appear
+  as both state hub URLs and city page URLs in the sitemap.
+
+  Note: This is now masked by Issue 1 (everything is duplicated), but
+  these 3 would still be duped even after Issue 1 is fixed, since they
+  appear as both a state hub entry AND a city entry.
+
+Where to look:
+  server.py — sitemap() function, the section that adds city pages
+
+Fix:
+  When adding city page URLs, skip any slug that exists as a key in
+  STATE_CONFIG. (This was the original Issue 8 fix — may not have
+  been applied correctly.)
+
+
+SUGGESTED FIX ORDER:
+1. Issue 1 (sitemap duplication) — quick fix, high SEO impact
+2. Issue 3 (garbage city names) — filter in get_cities_with_data()
+3. Issue 2 (OK state corruption) — needs investigation of DB data
+4. Issue 4 (3 sitemap slug conflicts) — small, do with Issue 1

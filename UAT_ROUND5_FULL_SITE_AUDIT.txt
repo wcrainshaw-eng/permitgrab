@@ -1,0 +1,358 @@
+UAT ROUND 5 — COMPREHENSIVE FULL-SITE AUDIT
+=============================================
+Date: March 26, 2026
+Auditor: Cowork (manual browser testing)
+Deploy: Post 861ccfa (KNOWN_OK_CITIES heuristic)
+Scope: Every page, every flow, every element. Super picky.
+
+=============================================
+EXECUTIVE SUMMARY
+=============================================
+Total bugs found: 19
+  CRITICAL (site broken):    3
+  HIGH (data quality/trust):  8
+  MEDIUM (UX/cosmetic):       5
+  LOW (minor/nitpick):        3
+
+The 8 original UAT issues are FIXED. The sitemap is clean (2,888 unique URLs,
+zero duplicates), OK state section is gone, garbage "Other Locations" is gone,
+nav dropdown is clean. Good progress.
+
+However, this audit uncovered a NEW class of issues: widespread state
+corruption beyond just "OK", a completely broken /contractors page,
+and major number inconsistencies across pages that undermine trust.
+
+
+=============================================
+CRITICAL BUGS (3)
+=============================================
+
+BUG C1 — /contractors page completely broken (HTTP 500)
+-------------------------------------------------------
+Page: https://permitgrab.com/contractors
+What: The /api/contractors endpoint returns HTTP 500.
+      The page shows "Loading contractors..." forever with "0 contractors".
+      Console error: "Failed to load contractors: SyntaxError: Unexpected
+      token '<', "<!doctype "... is not valid JSON"
+Impact: The entire Contractors Intelligence feature is non-functional.
+        This is a nav-level page linked from every page on the site.
+Fix: Debug the /api/contractors endpoint. The 500 error suggests a Python
+     exception in the route handler. Check Render logs for the traceback.
+
+
+BUG C2 — State corruption beyond OK: NV has 98 Texas towns
+-----------------------------------------------------------
+Page: https://permitgrab.com/cities (NV section)
+What: The NV (Nevada) section has 100 cities, but ~98 are Texas towns:
+      Fredericksbrg (misspelled Fredericksburg TX), Alleyton, Ranger,
+      Windthorst, Mountain Home, Colorado City, College Sta (College
+      Station TX), Bigfoot, Turkey, Quitaque, etc.
+      Only Henderson and Reno are actual Nevada cities.
+Impact: Nevada state directory is completely wrong. Same root cause as
+        the OK→TX issue but unfixed.
+Fix: Apply same KNOWN_OK_CITIES pattern for NV:
+     KNOWN_NV_CITIES = {"Las Vegas", "Henderson", "Reno", "North Las Vegas",
+       "Sparks", "Carson City", "Elko", "Mesquite", "Boulder City", "Fernley"}
+     If state='NV' and city not in KNOWN_NV_CITIES → reassign to 'TX'
+     OR: Fix at DB level with UPDATE permits SET state='TX' WHERE state='NV'
+         AND city NOT IN ('Las Vegas','Henderson','Reno',...);
+
+
+BUG C3 — State corruption: IN has 25 Florida cities, LA has 70 CA cities
+-------------------------------------------------------------------------
+Page: https://permitgrab.com/cities (IN and LA sections)
+
+IN (Indiana) — 28 cities, ~25 are Florida:
+  Miami (677), North Miami Beach, Doral, Boca Raton, Cutler Bay,
+  Miami Lakes, Coral Gables, Miami Shores, Homestead, Tamarac, Apopka
+  Also "Uninc" (48) — not a city name ("unincorporated")
+  Only Bloomington could plausibly be Indiana.
+
+LA (Louisiana) — 72 cities, ~70 are Los Angeles CA neighborhoods:
+  Tarzana, Northridge, Sherman Oaks, Encino, Woodland Hills, Simi Valley,
+  Sylmar, Studio City, Valencia, West Hills, North Hollywood, Ontario,
+  Panorama City, etc.
+  Only New Orleans and Baton Rouge are actual Louisiana cities.
+  Root cause: "LA" state code confused with "LA" as Los Angeles.
+
+Impact: State directories for IN and LA are completely wrong.
+Fix: Same heuristic pattern as KNOWN_OK_CITIES:
+     KNOWN_IN_CITIES = {"Indianapolis", "Fort Wayne", "Evansville",
+       "South Bend", "Carmel", "Fishers", "Bloomington", "Hammond",
+       "Gary", "Lafayette", "Muncie", "Terre Haute"}
+     If state='IN' and city not in KNOWN_IN_CITIES → reassign to 'FL'
+
+     KNOWN_LA_CITIES = {"New Orleans", "Baton Rouge", "Shreveport",
+       "Lafayette", "Lake Charles", "Kenner", "Bossier City", "Monroe",
+       "Alexandria", "Houma", "Slidell", "Metairie"}
+     If state='LA' and city not in KNOWN_LA_CITIES → reassign to 'CA'
+
+     OR: DB-level fix (better long-term).
+
+
+=============================================
+HIGH BUGS (8)
+=============================================
+
+BUG H1 — Homepage "Leads by City" sidebar shows garbage entries
+---------------------------------------------------------------
+Page: https://permitgrab.com/ (right sidebar)
+What: The sidebar shows non-city entries mixed with real cities:
+      - "DOB NOW: Build – Approved" (539 leads) — NYC dataset name
+      - "Michigan" (607 leads) — state name, not city
+      - "EPIC-LA Fire Recovery Cases" (41)
+      - "Building Permit Applications" (38)
+      - "EBR" (28)
+      - "Maine" (4) — state name
+      - "Land Use" (4)
+      - "BP_Comm_Dev_Report_Data view" (4)
+      - "Commercial" (4), "DSC" (4)
+      - "Issued" (17), "Residential Permit" (17), "Permitting Table" (16)
+Impact: Makes the homepage look unprofessional and untrustworthy.
+Root cause: The "Leads by City" sidebar uses a DIFFERENT code path than
+            get_cities_with_data(). It does NOT have the VALID_STATES
+            filter or garbage pattern matching.
+Fix: Apply the same VALID_STATES filter and garbage-name filter to
+     whatever function feeds the homepage sidebar. Or better: make the
+     sidebar use get_cities_with_data() directly.
+
+
+BUG H2 — City count inconsistency across entire site
+-----------------------------------------------------
+The same "cities covered" number is different on every page:
+  Homepage yellow bar:    "4290+ cities covered"
+  Pricing "By Numbers":   "4290+"
+  Pricing FAQ text:       "4298+ metro areas"
+  About page:             "85+ metro areas"
+  /cities page title:     "Browse 1601+ Cities"
+  TX state hub:           "26 cities" (for Texas alone)
+
+These wildly different numbers destroy credibility. A visitor checking
+two pages will immediately notice the discrepancy.
+
+Fix: Pick ONE authoritative number and use it everywhere:
+     - If counting DB rows: ~1,601 (from get_cities_with_data)
+     - If counting configured cities: ~311 active configs
+     - If counting metro areas: ~85 (About page number)
+     - The "4290" number appears fabricated or from a stale source
+     Make all pages pull from the same source of truth.
+
+
+BUG H3 — TX has 1,170 cities (massively inflated)
+--------------------------------------------------
+Page: https://permitgrab.com/cities (TX section)
+What: Texas shows 1,170 cities. These are all the formerly-OK cities
+      reassigned by the KNOWN_OK_CITIES heuristic. While the state
+      assignment is now correct (they ARE Texas cities), having 1,170
+      entries makes the page unusable and the count misleading.
+      Many are tiny towns with 1-6 permits: Bigfoot (6), Turkey (6),
+      Quitaque (5), Runge (5), Anton (4), Bagwell (4), etc.
+Impact: TX section is 73% of all cities. The page is dominated by it.
+        The "1601+ cities" headline is inflated by ~1,100 tiny TX towns.
+Fix: Add a minimum permit threshold (e.g., >= 10 or >= 25 permits)
+     to hide tiny entries. Or add pagination/truncation per state
+     (show top 20, "View all 1,170 →" link).
+
+
+BUG H4 — Houston missing from Texas state hub
+----------------------------------------------
+Page: https://permitgrab.com/permits/texas
+What: The Texas state hub shows "26 Cities Covered" and lists them.
+      Houston (the largest TX city with 9,043 permits) is NOT listed.
+      The hub only shows cities from active CITY_REGISTRY configs.
+      Houston's config is INACTIVE, so it's excluded.
+Impact: Visitors looking for Houston permits via the state hub won't find it.
+Fix: Either activate Houston's CITY_REGISTRY config, or make the state
+     hub include cities from get_cities_with_data() (which includes all
+     cities with permits, not just configured ones).
+
+
+BUG H5 — Homepage stat counters show dashes on initial load
+------------------------------------------------------------
+Page: https://permitgrab.com/
+What: "ACTIVE PERMITS", "TOTAL PROJECT VALUE", and "HIGH-VALUE LEADS"
+      show em-dashes (—) instead of numbers. On some loads they
+      eventually populate (436,044 / 15 / 30,721), on others they stay
+      as dashes. "TOTAL PROJECT VALUE" appears to never populate.
+Impact: Above-the-fold credibility — visitors see broken counters.
+Fix: Check the JS that populates these counters. Likely a race condition
+     or API call that sometimes fails. Ensure fallback values or
+     server-side rendering for these stats.
+
+
+BUG H6 — "Houston Construction Insights" shows non-Houston articles
+--------------------------------------------------------------------
+Page: https://permitgrab.com/permits/houston (bottom section)
+What: The "Houston Construction Insights" section shows 3 blog posts:
+      1. "Arlington Building Permits..." — NOT about Houston
+      2. "Building Permits in Dallas, TX..." — NOT about Houston
+      3. "Houston Building Permits..." — correct
+Impact: Misleading section title. Users expect Houston-specific content.
+Fix: Filter blog posts to only show the city's own articles, or rename
+     the section to "Texas Construction Insights" or "Related Guides".
+
+
+BUG H7 — Footer "New York City" links to state hub /permits/new-york
+---------------------------------------------------------------------
+Page: All pages (footer)
+What: The footer "Top Cities" section has "New York City" linking to
+      /permits/new-york. This URL is the NEW YORK STATE hub, not the
+      NYC city page. Clicking it shows state-level data, not city data.
+Impact: Users expecting NYC city data get state-level data instead.
+Fix: Link to the correct NYC city page URL (likely /permits/new-york-city
+     or whatever the city slug is). Or if NYC and NY state share a slug,
+     add a disambiguation.
+
+
+BUG H8 — Footer "New Orleans" links to /permits/new-orleans-verified
+---------------------------------------------------------------------
+Page: All pages (footer)
+What: New Orleans links to /permits/new-orleans-verified with an
+      unusual "-verified" suffix. No other city has this pattern.
+Impact: Minor UX oddity, but the "-verified" suffix looks like a
+        debug/internal designation that leaked into production.
+Fix: Create a cleaner URL (/permits/new-orleans) that redirects or
+     serves the same content, and update footer links.
+
+
+=============================================
+MEDIUM BUGS (5)
+=============================================
+
+BUG M1 — "Madison County" appears in top 20 cards and nav dropdown
+-------------------------------------------------------------------
+Page: /cities (top cards), nav dropdown, footer "Other Cities"
+What: "Madison County" (ID, 3,990 permits) is a COUNTY, not a city.
+      It appears in the top 20 city cards, the nav dropdown, and the
+      "Explore Permits in Other Cities" section on city pages.
+Impact: Looks odd to have a county mixed in with cities.
+Fix: Filter entries containing "County" from the city listings.
+     Or move to a separate "Counties" section.
+
+
+BUG M2 — All Houston permits show "Not listed on permit" for value
+------------------------------------------------------------------
+Page: https://permitgrab.com/permits/houston (permit listings)
+What: Every permit in the "Recent High-Value Permits" section shows
+      "Not listed on permit" in the value column. The section is called
+      "High-Value" but none have values.
+Impact: "High-Value" label is misleading when no values are shown.
+Fix: Either show permits that DO have values in this section, or rename
+     it to "Recent Permits" when no values are available.
+
+
+BUG M3 — Houston shows only 1 trade category: "General Construction"
+---------------------------------------------------------------------
+Page: https://permitgrab.com/permits/houston ("Trades We Cover")
+What: The "Trades We Cover in Houston" section shows a single card:
+      "General Construction 4357". Houston should have variety.
+Impact: Looks like data is poorly categorized.
+Fix: This is a data quality issue — the Houston source may not provide
+     granular trade categories. Consider hiding the "Trades We Cover"
+     section when there's only 1 trade, or enriching the data.
+
+
+BUG M4 — "Uninc" appears as a city name under IN state
+-------------------------------------------------------
+Page: https://permitgrab.com/cities (IN section)
+What: "Uninc" (48 permits) is listed as a city. This is short for
+      "unincorporated" — not a city name.
+Impact: Garbage data in the city listings.
+Fix: Add "uninc" to garbage patterns, or filter cities with names
+     shorter than 3 characters.
+
+
+BUG M5 — Blog index loads all 84 posts on one page
+---------------------------------------------------
+Page: https://permitgrab.com/blog
+What: All 84 blog posts load on a single page with no pagination.
+Impact: Slow page load, poor UX for browsing. As more posts are added,
+        this will get worse.
+Fix: Add pagination (20-30 posts per page) or infinite scroll.
+
+
+=============================================
+LOW BUGS (3)
+=============================================
+
+BUG L1 — "Fredericksbrg" misspelled in NV section
+---------------------------------------------------
+Page: /cities (NV section)
+What: City name "Fredericksbrg" is missing the 'u' — should be
+      "Fredericksburg" (a Texas city, misassigned to NV).
+Impact: Typo in city name.
+Fix: This will be resolved when BUG C2 (NV state corruption) is fixed.
+
+
+BUG L2 — "College Sta" abbreviated in NV section
+-------------------------------------------------
+Page: /cities (NV section)
+What: "College Sta" (6 permits) is an abbreviation of "College Station".
+      Should be the full city name.
+Impact: Looks sloppy.
+Fix: This will be resolved when BUG C2 is fixed. The DB has the
+     abbreviated form — data quality issue from the original collection.
+
+
+BUG L3 — /dashboard redirects to homepage when not logged in
+-------------------------------------------------------------
+Page: https://permitgrab.com/dashboard
+What: Clicking "Dashboard" in the nav when not logged in redirects
+      silently to the homepage. No login prompt or message.
+Impact: Minor UX confusion — user clicks Dashboard, ends up on homepage
+        with no indication they need to log in.
+Fix: Redirect to /login with a message like "Please log in to access
+     your dashboard" or show the login page.
+
+
+=============================================
+WHAT'S WORKING WELL (fixed from previous rounds)
+=============================================
+
+✓ Sitemap: 2,888 unique URLs, zero duplicates (was 5,738 / 2,869 dupes)
+✓ OK state section: Completely gone (was 1,156 cities)
+✓ "Other Locations" garbage section: Gone (was 150 entries)
+✓ Nav dropdown: Clean — no duplicates, no state names, no garbage
+✓ Houston shows TX (not OK) in top cards, city page, breadcrumbs
+✓ /cities search: Correctly filters top cards
+✓ City page stats populate: 4357+ permits, 1420+ this month, 50+ contractors
+✓ 404 page: Clean design with helpful CTAs
+✓ robots.txt: Properly configured, blocks admin/API/user pages
+✓ Meta tags: Title, description, OG tags, canonical all present
+✓ Blog: 84 posts, all functional, clean layout
+✓ Pricing: Clear tiers, good FAQ section
+
+
+=============================================
+SUGGESTED FIX ORDER
+=============================================
+
+Priority 1 — Quick wins (1 hour):
+  C1: Fix /api/contractors 500 error (check Render logs for traceback)
+  H5: Fix homepage stat counters (check JS/API race condition)
+  H2: Standardize city count across all pages (pick one number)
+
+Priority 2 — State corruption (2-3 hours):
+  C2: NV → TX heuristic (same pattern as KNOWN_OK_CITIES)
+  C3: IN → FL and LA → CA heuristics
+  H1: Apply VALID_STATES filter to homepage sidebar data source
+  OR: Single DB migration fixing all bad state assignments at once
+
+Priority 3 — Data quality (1-2 hours):
+  H3: Add min permit threshold or pagination for TX's 1,170 cities
+  H4: Include Houston in Texas state hub (activate config or change query)
+  M1: Filter "County" entries from city listings
+  M4: Filter "Uninc" from city names
+
+Priority 4 — UX polish (1 hour):
+  H6: Filter blog posts to match city on city pages
+  H7: Fix NYC footer link
+  H8: Clean up New Orleans URL
+  M2: Rename "High-Value Permits" when no values available
+  M3: Hide "Trades We Cover" when only 1 trade
+  L3: Redirect /dashboard to /login for unauthenticated users
+
+Priority 5 — Future improvements:
+  M5: Add blog pagination
+  Consider DB-level migration for ALL state corruption (definitive fix)
+  Add minimum permit count threshold site-wide

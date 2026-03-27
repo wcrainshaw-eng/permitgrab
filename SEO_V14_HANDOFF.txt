@@ -1,0 +1,539 @@
+PERMITGRAB SEO V14 — DETAILED INSTRUCTIONS FOR CODE
+=====================================================
+Date: March 26, 2026
+Base version: V13.9.2
+
+⚠️  IMPORTANT GUARDRAILS — READ BEFORE STARTING
+=====================================================
+
+DO NOT:
+  - Rewrite or expand blog post .md files (we'll handle content separately)
+  - Create new blog posts
+  - Generate large blocks of AI-written marketing copy
+  - Change any existing routes or URL structures
+  - Remove or modify existing schema markup that's already working
+  - Touch get_cities_with_data() or the city filtering logic
+  - Change the sidebar, nav dropdown, or footer city lists
+
+THIS PUSH IS: Technical SEO fixes — schemas, templates, data queries,
+internal linking, and pagination. Code changes only, no content creation.
+
+
+=====================================================
+ITEM 1 — CRITICAL: FIX TRADE PAGE DATA (0 PERMITS BUG)
+=====================================================
+Priority: HIGHEST — Do this first. Everything else depends on it.
+
+PROBLEM:
+  All 1,836 trade-specific landing pages show zero data.
+  Example: /permits/houston/plumbing displays:
+    - "0 This Month"
+    - "0 This Week"
+    - "$N/A Avg Value"
+    - No recent permits listed in the table
+
+  Houston has 9,000+ total permits. Plumbing should have hundreds.
+
+DIAGNOSIS STEPS:
+  1. Run this query to see what trade values exist in the DB:
+       SELECT DISTINCT description, COUNT(*) as cnt
+       FROM permits
+       WHERE LOWER(city) = 'houston'
+       GROUP BY description
+       ORDER BY cnt DESC
+       LIMIT 30;
+
+     Also try:
+       SELECT DISTINCT work_type, COUNT(*) as cnt
+       FROM permits
+       WHERE LOWER(city) = 'houston'
+       GROUP BY work_type
+       ORDER BY cnt DESC
+       LIMIT 30;
+
+     (The column might be called "description", "work_type", "trade",
+     "permit_type", or "category" — check the schema.)
+
+  2. Compare what the DB returns to what the URL slug expects.
+     The route is: /permits/<city_slug>/<trade_slug>
+     Trade slugs in the sitemap are: plumbing, electrical, hvac,
+     roofing, general-construction, solar, demolition, painting
+
+  3. The mismatch is likely one of:
+     a) The DB column stores full descriptions like "Plumbing -
+        New Installation" and the query filters on exact match
+        "plumbing" — fix with ILIKE '%plumbing%' or a mapping dict
+     b) The route handler doesn't query the DB at all — it renders
+        the template with empty data
+     c) The trade filter function exists but isn't called in the route
+
+FIX:
+  In server.py, find the route for /permits/<city_slug>/<trade_slug>.
+  Ensure it:
+    1. Maps the URL trade_slug to a DB query filter
+    2. Queries permits filtered by city AND trade
+    3. Passes the filtered permit list to the template
+    4. Calculates this_month_count, this_week_count, avg_value
+       from the filtered results
+
+  Recommended: Create a TRADE_MAPPING dict:
+    TRADE_MAPPING = {
+        'plumbing': ['plumbing', 'plumb'],
+        'electrical': ['electrical', 'electric', 'elec'],
+        'hvac': ['hvac', 'heating', 'air conditioning', 'mechanical'],
+        'roofing': ['roofing', 'roof', 'reroof', 're-roof'],
+        'general-construction': ['general', 'addition', 'alteration',
+            'remodel', 'renovation', 'new construction'],
+        'solar': ['solar', 'photovoltaic', 'pv'],
+        'demolition': ['demolition', 'demo'],
+        'painting': ['painting', 'paint']
+    }
+
+  Then filter with:
+    keywords = TRADE_MAPPING.get(trade_slug, [trade_slug])
+    # Build WHERE clause: description ILIKE ANY of the keywords
+
+  SAFETY: If the data fix is complex and you can't get real data
+  flowing quickly, add this to the trade page template as a stopgap:
+    <meta name="robots" content="noindex, follow">
+  This prevents Google from indexing 1,836 empty pages. Remove
+  the noindex once data populates.
+
+VERIFY: After fix, load /permits/houston/plumbing and confirm it
+shows actual permit counts and recent permits in the table.
+
+
+=====================================================
+ITEM 2 — HIGH: TRADE PAGE SCHEMAS
+=====================================================
+Priority: HIGH — Do after Item 1
+
+PROBLEM:
+  Trade pages only have FAQPage + BreadcrumbList schemas.
+  Missing Dataset and WebPage schemas.
+
+FIX:
+  In the city_trade.html template, add two JSON-LD blocks:
+
+  Block 1 — Dataset:
+    {
+      "@context": "https://schema.org",
+      "@type": "Dataset",
+      "name": "{{ trade_name }} Building Permits in {{ city_name }}, {{ state_abbr }}",
+      "description": "Active {{ trade_name|lower }} building permit filings in {{ city_name }}, {{ state_abbr }}. Updated daily.",
+      "url": "https://permitgrab.com/permits/{{ city_slug }}/{{ trade_slug }}",
+      "temporalCoverage": "2024/..",
+      "spatialCoverage": {
+        "@type": "Place",
+        "name": "{{ city_name }}, {{ state_abbr }}"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "PermitGrab",
+        "url": "https://permitgrab.com"
+      }
+    }
+
+  Block 2 — WebPage:
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "{{ trade_name }} Permits in {{ city_name }}, {{ state_abbr }}",
+      "description": "Browse {{ trade_name|lower }} building permits in {{ city_name }}. Find contractor leads from recent {{ trade_name|lower }} permit filings.",
+      "url": "https://permitgrab.com/permits/{{ city_slug }}/{{ trade_slug }}",
+      "isPartOf": {
+        "@type": "WebSite",
+        "name": "PermitGrab",
+        "url": "https://permitgrab.com"
+      }
+    }
+
+  Keep the existing FAQPage and BreadcrumbList blocks.
+
+
+=====================================================
+ITEM 3 — HIGH: TRADE PAGE INTERNAL LINKS
+=====================================================
+Priority: HIGH — Do with Item 2
+
+PROBLEM:
+  Trade pages have 0 links to blog posts and 0 links to state hubs.
+  They link to the parent city page (good) but nothing else.
+
+FIX:
+  In city_trade.html template, add a "Related Guides" section
+  BELOW the FAQ section and ABOVE "Explore More Permits":
+
+    <h3>Related Guides</h3>
+    <ul>
+      {% if city_blog_url %}
+      <li><a href="{{ city_blog_url }}">{{ city_name }} Building Permits: Complete Contractor Guide</a></li>
+      {% endif %}
+      <li><a href="/permits/{{ state_slug }}">Browse All {{ state_name }} Permits</a></li>
+      <li><a href="/permits/{{ city_slug }}">All {{ city_name }} Permits</a></li>
+    </ul>
+
+  To populate city_blog_url, in the route handler check if a blog
+  post exists for that city:
+    blog_slug = f"building-permits-{city_slug}-{state_abbr.lower()}-contractor-guide"
+    blog_path = os.path.join(BLOG_DIR, f"{blog_slug}.md")
+    city_blog_url = f"/blog/{blog_slug}" if os.path.exists(blog_path) else None
+
+  DO NOT generate any blog post content. Just link to what exists.
+
+
+=====================================================
+ITEM 4 — HIGH: STATE HUB FAQ + FAQPage SCHEMA
+=====================================================
+Priority: HIGH
+
+PROBLEM:
+  State hub pages (e.g., /permits/texas) have CollectionPage +
+  BreadcrumbList schemas but NO FAQ section and NO FAQPage schema.
+  Also 0 links to blog posts.
+
+FIX — Part A: Add FAQ section to state_hub.html template:
+
+  <h2>Frequently Asked Questions About {{ state_name }} Building Permits</h2>
+
+  Add 3 data-driven FAQ items:
+
+  Q1: "How many cities have active building permits in {{ state_name }}?"
+  A1: "PermitGrab tracks building permits in {{ city_count }} {{ state_name }}
+       cities, updated daily."
+      (city_count = count of cities in get_cities_with_data() for that state)
+
+  Q2: "Which {{ state_name }} city has the most building permits?"
+  A2: "{{ top_city }} currently leads {{ state_name }} with {{ top_city_count }}+
+       active building permits."
+      (Query: SELECT city, COUNT(*) FROM permits WHERE state='TX'
+       GROUP BY city ORDER BY COUNT(*) DESC LIMIT 1)
+
+  Q3: "How often is {{ state_name }} permit data updated?"
+  A3: "PermitGrab updates {{ state_name }} building permit data daily,
+       pulling directly from municipal permit offices."
+
+FIX — Part B: Add FAQPage schema:
+
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How many cities have active building permits in {{ state_name }}?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "PermitGrab tracks building permits in {{ city_count }} {{ state_name }} cities, updated daily."
+        }
+      },
+      ... (repeat for Q2, Q3)
+    ]
+  }
+
+FIX — Part C: Add "City Guides" section linking to blog posts:
+
+  In the route handler, find which cities in this state have blog posts:
+    state_blog_posts = []
+    for city in state_cities:
+        slug = f"building-permits-{city['slug']}-{state_abbr.lower()}-contractor-guide"
+        if os.path.exists(os.path.join(BLOG_DIR, f"{slug}.md")):
+            state_blog_posts.append({'name': city['name'], 'url': f'/blog/{slug}'})
+
+  In the template, if state_blog_posts is not empty:
+    <h3>{{ state_name }} City Guides</h3>
+    <ul>
+    {% for post in state_blog_posts[:10] %}
+      <li><a href="{{ post.url }}">{{ post.name }} Building Permits Guide</a></li>
+    {% endfor %}
+    </ul>
+
+
+=====================================================
+ITEM 5 — HIGH: HOMEPAGE SoftwareApplication SCHEMA
+=====================================================
+Priority: HIGH — Quick win, ~5 minutes
+
+PROBLEM:
+  Homepage only has Organization schema. Missing SoftwareApplication.
+
+FIX:
+  Add this JSON-LD block to the homepage template (dashboard_production.html
+  or whatever renders /):
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "PermitGrab",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "Real-time building permit leads for contractors. Track new construction permits, find contractor leads, and grow your business with permit data from 840+ US cities.",
+    "url": "https://permitgrab.com",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Free tier available"
+    }
+  }
+  </script>
+
+  Keep the existing Organization schema.
+
+
+=====================================================
+ITEM 6 — MEDIUM: BLOG PAGINATION
+=====================================================
+Priority: MEDIUM
+
+PROBLEM:
+  /blog loads all 84 posts on one page. No pagination, no rel="next",
+  no category filters.
+
+FIX:
+  1. In the /blog route handler, add pagination:
+       page = request.args.get('page', 1, type=int)
+       per_page = 20
+       total_posts = len(all_posts)
+       total_pages = math.ceil(total_posts / per_page)
+       posts = all_posts[(page-1)*per_page : page*per_page]
+
+  2. Pass to template: posts, page, total_pages, per_page
+
+  3. In blog.html template, add pagination nav at bottom:
+       {% if total_pages > 1 %}
+       <nav aria-label="Blog pagination">
+         {% if page > 1 %}
+           <a href="/blog?page={{ page - 1 }}">← Previous</a>
+         {% endif %}
+         Page {{ page }} of {{ total_pages }}
+         {% if page < total_pages %}
+           <a href="/blog?page={{ page + 1 }}">Next →</a>
+         {% endif %}
+       </nav>
+       {% endif %}
+
+  4. Add rel="next"/rel="prev" to <head>:
+       {% if page < total_pages %}
+       <link rel="next" href="https://permitgrab.com/blog?page={{ page + 1 }}">
+       {% endif %}
+       {% if page > 1 %}
+       <link rel="prev" href="https://permitgrab.com/blog?page={{ page - 1 }}">
+       {% endif %}
+
+  5. Update sitemap to include paginated blog URLs:
+       /blog (page 1)
+       /blog?page=2
+       /blog?page=3
+       etc.
+
+
+=====================================================
+ITEM 7 — MEDIUM: CITY PAGE ENRICHMENT
+=====================================================
+Priority: MEDIUM
+
+PROBLEM:
+  City pages have "Construction Insights" section with permit trends
+  and top contractors (good!), but missing:
+  - Top Neighborhoods/Zip Codes
+  - Average project value displayed prominently
+  - "Related Content" section at bottom
+
+FIX — Part A: Top Neighborhoods
+  New DB function in server.py:
+    def get_top_neighborhoods(city_slug, limit=5):
+        """Return top zip codes by permit count for this city."""
+        query = """
+            SELECT zip_code, COUNT(*) as permit_count
+            FROM permits
+            WHERE LOWER(REPLACE(city, ' ', '-')) = %s
+            AND zip_code IS NOT NULL AND zip_code != ''
+            GROUP BY zip_code
+            ORDER BY permit_count DESC
+            LIMIT %s
+        """
+        # Execute and return results
+
+  Add to "Construction Insights" section in city.html:
+    {% if top_neighborhoods %}
+    <h3>Top Neighborhoods by Permit Activity</h3>
+    <ul>
+    {% for n in top_neighborhoods %}
+      <li>{{ n.zip_code }} — {{ n.permit_count }} permits</li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+
+FIX — Part B: Related Content section
+  Add at bottom of city.html, before footer:
+    <h3>Related Content</h3>
+    <ul>
+      {% if city_blog_url %}
+      <li><a href="{{ city_blog_url }}">{{ city_name }} Building Permits: Complete Guide</a></li>
+      {% endif %}
+      <li><a href="/permits/{{ state_slug }}">All {{ state_name }} Permits</a></li>
+      {% for trade in top_trades[:3] %}
+      <li><a href="/permits/{{ city_slug }}/{{ trade.slug }}">{{ city_name }} {{ trade.name }} Permits</a></li>
+      {% endfor %}
+    </ul>
+
+  top_trades can be derived from the TRADE_MAPPING keys or from a
+  DB query of most common trades in that city.
+
+
+=====================================================
+ITEM 8 — MEDIUM: PRECONNECT HINTS
+=====================================================
+Priority: MEDIUM — Quick win, ~2 minutes
+
+PROBLEM:
+  No <link rel="preconnect"> in any page's <head>.
+
+FIX:
+  In base.html (or whatever the base template is), add to <head>:
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  Check what other external domains are used (CDNs for JS/CSS)
+  and add preconnect for those too.
+
+
+=====================================================
+ITEM 9 — MEDIUM: INTERNAL LINKING (BLOG → TRADE PAGES)
+=====================================================
+Priority: MEDIUM
+
+PROBLEM:
+  Blog posts link to city pages but NOT to trade pages. Houston
+  blog post has 0 links to /permits/houston/plumbing etc.
+
+FIX:
+  This one requires editing the .md blog files, but it's a
+  STRUCTURAL change, not a content rewrite.
+
+  For each of the 84 city blog posts, add a "Browse by Trade"
+  section near the bottom (before the final CTA) with links:
+
+  ## Browse Houston Permits by Trade
+  - [Plumbing Permits in Houston](/permits/houston/plumbing)
+  - [Electrical Permits in Houston](/permits/houston/electrical)
+  - [HVAC Permits in Houston](/permits/houston/hvac)
+  - [Roofing Permits in Houston](/permits/houston/roofing)
+  - [General Construction Permits in Houston](/permits/houston/general-construction)
+
+  This can be scripted: for each blog file, extract the city slug
+  from the filename, then append the trade links section.
+
+  ⚠️  DO NOT rewrite the rest of the blog post content. ONLY add
+  the "Browse by Trade" links section. Leave all existing content
+  untouched.
+
+
+=====================================================
+ITEM 10 — LOW: CITY COUNT MICRO-INCONSISTENCY
+=====================================================
+Priority: LOW — cosmetic
+
+PROBLEM:
+  Homepage shows "840+" but some pages show "848+". Minor but
+  looks inconsistent.
+
+FIX:
+  Ensure all templates use the same {{ city_count }} variable
+  from get_total_city_count_auto(). If any template has a hardcoded
+  number, replace it with the variable.
+
+
+=====================================================
+ITEM 11 — LOW: LocalBusiness SCHEMA ON CITY PAGES
+=====================================================
+Priority: LOW — Nice to have for local SEO
+
+NOTE: City pages already have Dataset + BreadcrumbList + WebPage +
+FAQPage. LocalBusiness is NOT standard for a permit data aggregator
+since PermitGrab is not a local business in each city.
+
+SKIP THIS ITEM — the existing schemas are correct and sufficient.
+Adding LocalBusiness would be misleading (Google might think
+PermitGrab has a physical location in Houston).
+
+
+=====================================================
+ITEMS EXPLICITLY DEFERRED (DO NOT DO IN THIS PUSH)
+=====================================================
+
+❌ Blog content expansion (rewriting 84 posts to 1,500+ words)
+   — Will be a separate content project with editorial review
+
+❌ New blog post creation (trade guides, market reports)
+   — Will be a separate content project
+
+❌ Exit intent popups
+   — Conversion optimization, not SEO priority
+
+❌ Sitemap split into index + sub-sitemaps
+   — 2,078 URLs is well within the 50,000 limit
+
+❌ AI search optimization / GEO
+   — Schemas and structured data (done above) cover most of this
+
+
+=====================================================
+IMPLEMENTATION ORDER FOR THIS PUSH
+=====================================================
+
+Step 1: Fix trade page data pipeline (Item 1)
+         → Deploy, verify Houston/plumbing shows real data
+
+Step 2: Trade page schemas + internal links (Items 2 & 3)
+         → Deploy, verify schemas in page source
+
+Step 3: State hub FAQ + schema + blog links (Item 4)
+         → Deploy, verify Texas hub
+
+Step 4: Homepage SoftwareApplication schema (Item 5)
+         → Deploy, verify in page source
+
+Step 5: Blog pagination (Item 6)
+         → Deploy, verify /blog shows 20 posts with Next link
+
+Step 6: City page enrichment (Item 7)
+         → Deploy, verify Houston has neighborhoods + related
+
+Step 7: Preconnect hints (Item 8)
+         → Deploy, verify in page source
+
+Step 8: Blog trade links (Item 9)
+         → Deploy, verify Houston blog has trade links
+
+Step 9: City count consistency (Item 10)
+         → Deploy, verify
+
+Can be done as one push or broken into 2-3 pushes. Recommended:
+  Push A: Items 1-3 (trade pages — the critical stuff)
+  Push B: Items 4-8 (everything else)
+  Push C: Item 9 (blog file edits)
+
+
+=====================================================
+VERIFICATION CHECKLIST (after all items deployed)
+=====================================================
+
+[ ] /permits/houston/plumbing shows real permit count (not 0)
+[ ] /permits/houston/plumbing has Dataset + WebPage schemas
+[ ] /permits/houston/plumbing links to Houston blog post
+[ ] /permits/texas has FAQ section with 3 questions
+[ ] /permits/texas has FAQPage schema in page source
+[ ] /permits/texas has "City Guides" section with blog links
+[ ] Homepage has SoftwareApplication schema
+[ ] /blog shows 20 posts with pagination controls
+[ ] /blog?page=2 works and shows next batch
+[ ] /blog has <link rel="next"> in <head>
+[ ] /permits/houston has "Top Neighborhoods" section
+[ ] /permits/houston has "Related Content" section at bottom
+[ ] Base template has <link rel="preconnect"> tags
+[ ] Houston blog post has "Browse by Trade" links section
+[ ] All pages show consistent city count number

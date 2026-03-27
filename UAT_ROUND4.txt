@@ -1,0 +1,114 @@
+UAT ROUND 4 — POST f09f7c3 (CONFIRMED DEPLOYED 6:33 PM)
+========================================================
+Date: March 26, 2026
+Deploy verified: f09f7c3 is LIVE on Render (checked deploy events)
+
+WHAT'S FIXED:
+  - Houston now shows TX (not OK) in top cards and state sections ✓
+  - "Other Locations" section is GONE ✓
+  - No states showing as cities (California, New Jersey gone) ✓
+  - Nav dropdown clean — no duplicates, no garbage ✓
+  - /cities search filters top cards ✓
+  - 20 top cards ✓
+
+WHAT'S STILL BROKEN (3 issues):
+=================================
+
+ISSUE 1 — CRITICAL: Sitemap still fully doubled (CONFIRMED NOT A CACHE ISSUE)
+-------------------------------------------------------------------------------
+Tested with ?nocache=1 query param AND confirmed f09f7c3 is deployed.
+Every URL still appears exactly 2x:
+  Total URL occurrences: 5,738
+  Unique URLs: 2,869
+  Duplicate URLs: 2,869 (100%)
+
+The dict-based rewrite did NOT fix this. The duplication is happening
+BEFORE the dict, or the dict is being populated twice.
+
+DEBUGGING STEPS for Code:
+  1. Add a print/log statement at the END of the sitemap() function:
+       print(f"SITEMAP DEBUG: {len(url_map)} unique URLs in dict")
+     Then check Render logs after hitting /sitemap.xml
+  2. Search for ALL places in sitemap() that add to the dict/list.
+     Count how many add-loops exist. There should be exactly:
+       - 1 loop for static pages
+       - 1 loop for state hubs
+       - 1 loop for city pages
+       - 1 loop for blog posts
+     If any category has TWO loops, that's the bug.
+  3. Check if sitemap() calls another function that ALSO adds URLs.
+  4. Check if the route is registered twice (two @app.route('/sitemap.xml'))
+  5. Check if the XML template itself has two <urlset> blocks or
+     iterates the URL list twice.
+
+The fix MUST actually deduplicate. If using a dict, verify:
+  - The dict is created INSIDE the function (not module-level)
+  - Each URL is added with url_map[url] = ... (dict key = URL string)
+  - The template iterates url_map.values() or url_map.items(), NOT
+    a separate list that was built alongside the dict
+
+
+ISSUE 2 — HIGH: Oklahoma still has 1,112 cities (all Texas)
+-------------------------------------------------------------
+The registry lookup fixed ~44 cities that had CITY_REGISTRY entries
+(Houston, Dallas, Austin, etc.), but 1,112 "OK" cities remain.
+These are real Texas cities with NO config: Katy, Spring, El Paso,
+Corpus Christi, Brownsville, Laredo, Cypress, Midland, etc.
+
+The root cause: some past bulk collection run wrote "OK" as the
+state for ~1,156 Texas cities. Only ~44 of those have CITY_REGISTRY
+entries to override.
+
+FIX OPTIONS (pick one):
+
+  Option A — DB migration (BEST, one-time fix):
+    Run a SQL UPDATE on the Render Postgres DB to correct the state:
+      UPDATE permits SET state = 'TX' WHERE state = 'OK'
+        AND city NOT IN ('Oklahoma City', 'Tulsa', 'Norman',
+            'Broken Arrow', 'Edmond', 'Lawton', 'Moore',
+            'Midwest City', 'Enid', 'Stillwater');
+    This is aggressive but OK isn't actually used for real Oklahoma
+    cities (only Oklahoma City has an active config).
+
+    SAFER version — only fix cities that are KNOWN Texas cities:
+      UPDATE permits SET state = 'TX' WHERE state = 'OK'
+        AND city IN (select the top 50 TX cities by name);
+
+  Option B — Heuristic in get_cities_with_data():
+    If a city appears under "OK" with > 100 permits and does NOT
+    match any known Oklahoma city name, reassign it to "TX".
+    Known OK cities: Oklahoma City, Tulsa, Norman, Broken Arrow,
+    Edmond, Lawton, Moore, Midwest City, Enid, Stillwater.
+    Everything else under "OK" is almost certainly TX.
+
+  Option C — Accept it for now:
+    The 1,112 "OK" entries are real cities with real permits.
+    They just have the wrong state. This is a data quality issue
+    that doesn't break functionality — just makes the state
+    directory inaccurate. Can be fixed later with a proper
+    data cleanup.
+
+  RECOMMENDATION: Option A (DB migration). It's a one-time fix
+  that solves the problem at the source. The data in the DB is
+  simply wrong — "OK" should be "TX" for these rows.
+
+
+ISSUE 3 — LOW: City count still inflated (1,600 vs ~400-500 real)
+-------------------------------------------------------------------
+Even after all fixes, "Browse 1600+ Cities" is misleading because:
+  - 1,112 of those are the "OK" entries (Issue 2)
+  - Some county names showing as cities (Madison County ID, etc.)
+
+If Issue 2 is fixed via DB migration, the count drops to ~488.
+That's actually a realistic number for the data we have.
+
+County names could be filtered with:
+  if "county" in city_name.lower():
+      continue  # or move to a "Counties" section
+But this is low priority — some users DO search by county.
+
+
+SUGGESTED FIX ORDER:
+1. Issue 1 (sitemap) — debug with logging, find the double-add
+2. Issue 2 (OK state) — DB migration is cleanest
+3. Issue 3 (city count) — resolves automatically when Issue 2 is fixed

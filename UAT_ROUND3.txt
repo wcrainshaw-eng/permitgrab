@@ -1,0 +1,178 @@
+UAT ROUND 3 — POST 1233709 FIX VERIFICATION
+=============================================
+Date: March 26, 2026
+
+VERDICT: 3 of 4 issues from UAT_ROUND2.txt are NOT fixed.
+The commit may not have deployed, or the fixes have bugs.
+
+STATUS OF EACH ISSUE:
+  Issue 1 (sitemap duplication):  NOT FIXED — still 5,738 URLs, 2,869 unique, every URL 2x
+  Issue 2 (OK state corruption):  NOT FIXED — Houston still shows OK, OK still has 1,156 cities
+  Issue 3 (garbage city names):   PARTIALLY FIXED — "Other Locations" down from 150 to 124
+  Issue 4 (sitemap slug conflicts): NOT FIXED — new-york/new-jersey/nevada still appear 2x
+
+======================================================================
+DEEP ROOT CAUSE ANALYSIS (from code review)
+======================================================================
+
+THE "OK" PROBLEM — THIS IS THE BIG ONE:
+-----------------------------------------
+I traced the data flow end-to-end:
+
+1. The "OK" state section has 1,156 cities. They are ALL Texas cities:
+   Houston (9,044), El Paso (1,849), Katy (1,424), Spring (1,100),
+   Lubbock (837), Corpus Christi (829), Brownsville (787), Laredo (758), etc.
+
+2. There are only 3 Oklahoma CITY_REGISTRY configs: oklahoma_city (active),
+   tulsa (inactive), norman (inactive). There are NO active OK bulk sources.
+
+3. The collector writes state from config["state"] (line 1020 of collector.py).
+   Bulk sources write state from config.get("state", "") (line 598/652).
+
+4. Active TX bulk sources: collin_county_tx (Collin County only) and
+   williamson_county_tx (Williamson County only). Neither covers Houston,
+   El Paso, Lubbock, etc.
+
+5. CONCLUSION: The 1,156 "OK" entries are ALREADY IN THE DB from a past
+   collection run. Some previous bulk source (now deleted or renamed)
+   wrote "OK" as the state for Texas cities. The data is baked in.
+
+WHY THE V13.2 REGISTRY LOOKUP DIDN'T FIX IT:
+----------------------------------------------
+Code said: "Added registry_by_city_state lookup that prioritizes (city, state)
+registry matches over permit count."
+
+The problem: Houston's CITY_REGISTRY config is INACTIVE (active: False).
+If the registry lookup only checks active configs, it won't find Houston=TX.
+The lookup for (Houston, OK) returns nothing, and (Houston, TX) is inactive,
+so the dedup falls back to permit count — and OK has 9,044 permits.
+
+======================================================================
+REQUIRED FIXES (3 issues, precise instructions)
+======================================================================
+
+FIX 1 — SITEMAP: FIND THE DOUBLE-GENERATION BUG
+--------------------------------------------------
+File: server.py — sitemap() function (~line 5880)
+
+The entire sitemap is generated twice. Every URL appears exactly 2x.
+This is NOT a dedup issue — the generation itself runs twice.
+
+Check for:
+  - Is the URL list a module-level variable that persists between requests?
+    If `urls = []` is defined OUTSIDE the function, it grows on each request.
+  - Is the function generating URLs in two separate loops that overlap?
+  - Is there a pattern like: urls += static_urls; urls += city_urls; urls += static_urls?
+
+The fix: Ensure the URL list is created fresh inside the function (local var),
+and that each category of URLs is only added once. Also add the STATE_CONFIG
+slug skip for city pages (fixes Issue 4 too).
+
+Quick verification after fix:
+  curl -s https://permitgrab.com/sitemap.xml | grep -c '<loc>'
+  Should roughly equal the number of unique URLs (~2,869), not double.
+
+
+FIX 2 — OK STATE: USE ALL CONFIGS (NOT JUST ACTIVE) FOR STATE LOOKUP
+----------------------------------------------------------------------
+File: server.py — get_cities_with_data()
+
+The registry_by_city_state lookup must include ALL CITY_REGISTRY entries,
+not just active ones. Many cities (Houston, Dallas original, etc.) have
+correct state info in inactive configs.
+
+Change the registry lookup to:
+  registry_by_city = {}
+  for key, cfg in CITY_REGISTRY.items():    # ← ALL configs, not just active
+      city_lower = cfg["name"].lower()
+      state = cfg["state"]
+      if city_lower not in registry_by_city:
+          registry_by_city[city_lower] = state
+      # If city appears multiple times, prefer the active config's state
+      elif cfg.get("active"):
+          registry_by_city[city_lower] = state
+
+Then when processing DB rows:
+  for each (city, state, count) from DB:
+      correct_state = registry_by_city.get(city.lower())
+      if correct_state and correct_state != state:
+          state = correct_state  # Override DB state with registry state
+
+This fixes:
+  - Houston OK → Houston TX (inactive config has state="TX")
+  - All 1,156 "OK" entries that have matching TX configs get corrected
+  - Any other cross-state issues from bad DB data
+
+For cities NOT in any config (the majority of the 1,156 OK entries),
+add a secondary heuristic: if a city appears under BOTH "OK" and another
+state, AND the other state has a valid CITY_REGISTRY config for that city,
+keep the config state. If neither state has a config, keep the one with
+more permits.
+
+IMPORTANT: Many of the 1,156 "OK" cities are real TX cities with NO
+config at all (Katy, Spring, Cypress, Midland, etc). For these, the
+state will remain "OK" unless you either:
+  a) Add a hardcoded KNOWN_STATE_OVERRIDES dict, OR
+  b) Cross-reference with a US city→state lookup table, OR
+  c) Accept "OK" for now and fix the DB data separately
+
+Option (c) is fine for now — the immediate win is fixing the cities that
+DO have registry configs.
+
+
+FIX 3 — GARBAGE FILTER: STRENGTHEN THE PATTERN MATCHING
+---------------------------------------------------------
+File: server.py — get_cities_with_data()
+
+The current GARBAGE_PATTERNS filter caught 26 entries (150→124) but missed 124.
+The remaining 124 entries in "Other Locations" include:
+
+  "Building And Safety" (2,299) — matches "building" but probably not filtered
+  "Kitsap County Sewer Data_Wfl1" (1,990) — matches "_wfl1"
+  "Cfw Development Permits Table" (1,841) — matches "permits table"
+  "Permits" (1,370)
+  "Gas And Inspections" (512)
+  "Development" (367)
+  "Trades" (316)
+  "General" (268)
+  "Issued" (169)
+  etc.
+
+Add these patterns:
+  - Any city name where state is NULL/empty/not a valid 2-letter US abbrev
+    → This alone would eliminate the entire "Other Locations" section
+  - Names containing: "and safety", "sewer", "_wfl", "development",
+    "permits", "inspections", "trades", "general", "issued", "cases",
+    "plan review", "data model", "relationships"
+  - Single-word generic names: "building", "permits", "development",
+    "issued", "general", "trades", "electrical", "plumbing", "mechanical"
+  - Names with underscores (e.g., "new_const2016_wgs84")
+
+BEST FIX: Instead of pattern matching, validate the state field:
+  VALID_STATES = {"AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA",
+                  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA",
+                  "MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY",
+                  "NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX",
+                  "UT","VT","VA","WA","WV","WI","WY"}
+
+  # Skip any entry whose state is not in VALID_STATES
+  if state not in VALID_STATES:
+      continue
+
+This would eliminate ALL "Other Locations" entries (they have NULL/empty
+state) without needing pattern matching for city names.
+
+
+SUGGESTED FIX ORDER:
+1. Fix 3 (garbage filter) — quickest, just add VALID_STATES check
+2. Fix 2 (OK state) — use all configs for registry lookup
+3. Fix 1 (sitemap) — find the double-generation bug
+
+After all 3, expected result:
+  - /cities page shows ~300-400 real cities (not 1,716)
+  - No "Other Locations" section
+  - OK has ~1-3 cities (Oklahoma City + maybe Tulsa/Norman)
+  - TX has 42+ cities
+  - Houston shows TX
+  - Sitemap has ~2,869 unique URLs (no duplicates)
+  - Nav dropdown shows only real cities with valid states

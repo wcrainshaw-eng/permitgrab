@@ -1,0 +1,253 @@
+PERMITGRAB — FULL DATA PIPELINE AUDIT (ALL 850 CITIES)
+========================================================
+Date: March 27, 2026
+Method: Queried /api/permits?city={slug}&limit=1 for ALL 850 cities
+        listed on permitgrab.com/cities
+
+
+⚠️  THE DATA PIPELINE IS FUNDAMENTALLY BROKEN.
+========================================================
+
+  850 cities listed on the site.
+  704 (83%) have ZERO permits in the database.
+   13 (1.5%) are 60+ days stale (scraper dead for months).
+   69 (8%) are 8-60 days stale.
+   47 (5.5%) are 3-7 days stale.
+   17 (2%) have fresh data (0-2 days old).
+
+  Only 146 cities (17%) have ANY data at all.
+  Only 17 cities (2%) are actually delivering fresh daily data.
+
+  The site says "850+ cities." The honest number is 17.
+
+
+========================================================
+THE 17 CITIES THAT ACTUALLY WORK (0-2 days stale)
+========================================================
+
+  City                 | Newest Permit | Days
+  ---------------------+---------------+------
+  San Marcos, TX       | Mar 27        | 0
+  Houston, TX          | Mar 26        | 1
+  Nashville, TN        | Mar 26        | 1
+  Orlando, FL          | Mar 26        | 1
+  Buffalo, NY          | Mar 26        | 1
+  Tyler, TX            | Mar 26        | 1
+  Utica, NY            | Mar 26        | 1
+  New York, NY         | Mar 25        | 2
+  San Antonio, TX      | Mar 25        | 2
+  San Francisco, CA    | Mar 25        | 2
+  Seattle, WA          | Mar 25        | 2
+  Lubbock, TX          | Mar 25        | 2
+  Corpus Christi, TX   | Mar 25        | 2
+  Fairfax, VA          | Mar 25        | 2
+  Rockwall, TX         | Mar 25        | 2
+  Bellevue, WA         | Mar 25        | 2
+  Rolling Meadows, IL  | Mar 25        | 2
+
+
+========================================================
+SLIGHTLY STALE: 3-7 DAYS (47 cities)
+========================================================
+
+These might be normal weekend lag or early signs of problems.
+
+  Austin, TX (3d), Raleigh, NC (3d), Jacksonville, FL (3d),
+  El Paso, TX (3d), Abilene, TX (3d), Irving, TX (3d),
+  Dayton, OH (3d), Clifton, NJ (3d),
+  Fort Worth, TX (4d), Plano, TX (4d), New Orleans, LA (4d),
+  Cincinnati, OH (4d), Durham, NC (4d), Princeton, NJ (4d),
+  Gainesville, TX (4d), Marshall, TX (4d), Granger, TX (4d),
+  Odessa, TX (5d),
+  Arlington, TX (6d), Cleveland, OH (6d), Montgomery, AL (6d),
+  Hutto, TX (6d), Liberty Hill, TX (6d), Round Rock, TX (6d),
+  Los Angeles, CA (7d), Portland, OR (7d), Huntsville, AL (7d),
+  Anna, TX (7d), Aurora, CO (7d), Beaumont, TX (7d),
+  Cedar Park, TX (7d), Garland, TX (7d), Georgetown, TX (7d),
+  Grand Prairie, TX (7d), Jarrell, TX (7d), Laredo, TX (7d),
+  Leander, TX (7d), Longview, TX (7d), Madison, WI (7d),
+  Midland, TX (7d), Mill Valley, CA (7d), Pearland, TX (7d),
+  Pflugerville, TX (7d), Sachse, TX (7d), Taylor, TX (7d),
+  Van Alstyne, TX (7d), Waco, TX (7d)
+
+
+========================================================
+STALE: 8-60 DAYS (69 cities)
+========================================================
+
+These scrapers are broken and need fixing.
+
+  8-10 days stale:
+    Chicago (8d), Little Rock (8d), Fresno (8d), College Station (8d),
+    Bridgeport (8d), Pasadena, CA (8d), Boulder (9d), Chandler (9d),
+    Downey (9d), Henderson (9d), Florence TX (9d), Clarksville MD (9d),
+    Cambridge MA (10d), Lavon (10d)
+
+  11-20 days stale:
+    Bartlett IL (15d), Baton Rouge (16d), Bethesda (15d),
+    Blue Ridge (14d), Boyds (11d), Charlotte (18d), Clarksburg (14d),
+    Columbus (15d), Danbury (18d), Dickerson (17d), Bolinas (18d),
+    Gaithersburg (21d), Louisville (15d), Lexington (15d),
+    Memphis (25d), Tampa (24d), Norfolk (24d)
+
+  21-40 days stale:
+    McKinney (36d), Roseville CA (36d), Kensington (31d),
+    Chevy Chase (36d), Burtonsville (38d), Josephine (22d),
+    Cary (23d), Carthage (25d)
+
+  41-60 days stale:
+    Dallas (59d!), Camden NJ (57d), Germantown (57d),
+    Richmond (44d), Detroit (53d), Damascus (52d),
+    Brookeville (43d), Celina (43d), Lucas (43d),
+    Kentfield (46d)
+
+  DALLAS being 59 days stale is critical — it's one of the
+  biggest construction markets in the country.
+
+
+========================================================
+DEAD: 60+ DAYS STALE (13 cities)
+========================================================
+
+  City              | Newest Permit | Days Stale
+  ------------------+---------------+-----------
+  Sandy Spring, MD  | Dec 30, 2025  | 87 days
+  Sayreville, NJ    | Jan 05, 2026  | 81 days
+  Urbana, MD        | Jan 05, 2026  | 81 days
+  Farmersville, TX  | Jan 07, 2026  | 79 days
+  Rockville, MD     | Jan 08, 2026  | 78 days
+  Olney, MD         | Jan 12, 2026  | 74 days
+  Linden, NJ        | Jan 13, 2026  | 73 days
+  Frisco, TX        | Jan 16, 2026  | 70 days
+  Leonard, TX       | Jan 20, 2026  | 66 days
+  Allen, TX         | Jan 21, 2026  | 65 days
+  Atlanta, GA       | Jan 22, 2026  | 64 days
+  Corona, CA        | Jan 22, 2026  | 64 days
+  Fairview, TX      | Jan 23, 2026  | 63 days
+
+
+========================================================
+NO DATA: 704 CITIES (83% OF ALL LISTED)
+========================================================
+
+These cities have pages on the site but ZERO permits in the
+database. They have never received a single permit.
+
+This includes major US metros:
+  Phoenix, AZ         Miami, FL          San Diego, CA
+  Indianapolis, IN    Minneapolis, MN    Sacramento, CA
+  San Jose, CA        Pittsburgh, PA     Milwaukee, WI
+  Kansas City, MO     St. Louis, MO      Baltimore, MD
+  Oklahoma City, OK   Las Vegas, NV      Tucson, AZ
+  Denver, CO          Spokane, WA        Virginia Beach, VA
+  Colorado Springs, CO  Long Beach, CA   Mesa, AZ
+  Omaha, NE           Tampa suburbs      ... and 680+ more
+
+(Full list of all 704 cities available on request.)
+
+
+========================================================
+WHAT THIS MEANS
+========================================================
+
+The "850+ cities" claim on the site is not accurate. The actual
+breakdown is:
+
+  17 cities with working, fresh data (2%)
+  47 cities with slightly stale data that might recover (5.5%)
+  69 cities with broken scrapers (8%)
+  13 cities with dead scrapers (1.5%)
+  704 cities with no data and likely no scraper (83%)
+
+A subscriber who picks Atlanta, Dallas, Chicago, Phoenix, Miami,
+Denver, San Diego, or any of the 700+ empty cities will get
+nothing. They'll either cancel immediately or never convert to
+paid.
+
+
+========================================================
+ROOT CAUSE ANALYSIS
+========================================================
+
+This isn't a "fix two scrapers" problem. Based on the data:
+
+1. IT APPEARS ONLY ~17-64 SCRAPERS WERE EVER BUILT.
+   704 cities have zero data — these likely never had scrapers.
+   They were probably added to get_cities_with_data() or the
+   cities list through heuristics (VALID_STATES, KNOWN_OK_CITIES)
+   without actual data sources being connected.
+
+2. OF THE ~146 THAT HAVE DATA, MANY ARE FAILING.
+   82 of 146 cities with data are stale (8+ days). That's a 56%
+   failure rate among the scrapers that DO exist.
+
+3. THERE'S NO MONITORING.
+   Scrapers fail silently. Nobody knows until a user complains.
+   Atlanta was dead for 2 months before anyone noticed.
+
+4. STRONG TEXAS BIAS.
+   Most of the fresh/working cities are in Texas. This suggests
+   the scraper may pull from a single Texas-wide data source
+   rather than individual city scrapers.
+
+
+========================================================
+RECOMMENDED PATH FORWARD
+========================================================
+
+OPTION A: FIX AND SCALE (harder, more honest)
+  1. Audit: Which data sources are actually connected? Is there
+     one source per city, or are there bulk sources (state-level,
+     regional) that cover multiple cities?
+  2. Fix the broken scrapers for the ~82 stale cities
+  3. Build new scrapers for top-50 empty markets (Phoenix, Miami,
+     San Diego, etc.)
+  4. Add monitoring so failures are caught within 48 hours
+  5. Update the city count to reflect reality
+
+OPTION B: CLEAN UP THE LISTING (easier, more honest)
+  1. Remove the 704 zero-data cities from the /cities page,
+     nav dropdown, and sitemap
+  2. Only list cities that have received permits in the last 30 days
+  3. Fix the broken scrapers for the remaining cities
+  4. Change "850+ cities" to the actual count (~60-80)
+  5. Add new cities back only when a working scraper is confirmed
+
+OPTION C: HYBRID (recommended)
+  1. Immediately: Add a "last updated" indicator on each city page
+     so users can see data freshness before subscribing
+  2. Short term: Fix the broken scrapers for the ~82 stale cities
+  3. Short term: Remove zero-data cities from the /cities listing
+     (keep the URL/page alive but don't promote them)
+  4. Medium term: Build scrapers for the top 20 empty major markets
+  5. Medium term: Add scraper health monitoring + alerts
+  6. Update marketing to show "X cities with active data" instead
+     of total cities listed
+
+
+========================================================
+IMMEDIATE ACTION FOR CODE
+========================================================
+
+1. Run this query to get the real picture from the DB side:
+
+   SELECT city, state, MAX(filing_date) as newest_permit,
+          COUNT(*) as total_permits,
+          EXTRACT(DAY FROM NOW() - MAX(filing_date)) as days_stale
+   FROM permits
+   GROUP BY city, state
+   ORDER BY newest_permit DESC;
+
+   This will show you every city that has ever had data and how
+   stale it is — directly from the DB, no API needed.
+
+2. Check what data sources exist. Are there:
+   - Individual city scraper functions?
+   - A bulk state-level data source (e.g., TX open data)?
+   - A third-party data provider?
+
+   Understanding the architecture determines the fix approach.
+
+3. Add a /admin/scraper-health route (even if temporary) that
+   displays the query from step 1 so you can monitor freshness
+   without running queries manually.

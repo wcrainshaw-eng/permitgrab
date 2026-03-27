@@ -59,13 +59,13 @@ VALUES ('Rolling Meadows', 'IL', 'rolling-meadows-il', 'socrata', 'rolling_meado
 -- BULK SOURCES - Cover multiple cities each
 -- ============================================================================
 
--- Miami-Dade County, FL - ArcGIS endpoint verified working (covers 34 cities)
+-- Miami-Dade County, FL - ArcGIS endpoint (county-wide, no city breakdown)
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Miami-Dade County', 'FL', 'miami-dade-fl', 'arcgis', 'miami_dade_county', 'county', 'active', 'migration', 'Bulk source covering 34 cities. ArcGIS verified Mar 27, 2026');
+VALUES ('Miami-Dade County', 'FL', 'miami-dade-fl', 'arcgis', 'miami_dade_county', 'county', 'active', 'migration', 'County-wide permits. ArcGIS endpoint. ID field is numeric.');
 
--- Fort Worth, TX - ArcGIS endpoint verified working
+-- Fort Worth, TX - ArcGIS endpoint (city-wide)
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)
-VALUES ('Fort Worth', 'TX', 'fort-worth-tx', 'arcgis', 'fort_worth_tx_bulk', 'city', 'active', 'migration', 'ArcGIS endpoint verified Mar 27, 2026. Pop ~978K');
+VALUES ('Fort Worth', 'TX', 'fort-worth-tx', 'arcgis', 'fort_worth_tx_bulk', 'city', 'active', 'migration', 'City-wide permits. File_Date is epoch_ms. Pop ~978K');
 
 -- Dallas, TX - Socrata bulk endpoint verified working
 INSERT INTO prod_cities (city, state, city_slug, source_type, source_id, source_scope, status, added_by, notes)

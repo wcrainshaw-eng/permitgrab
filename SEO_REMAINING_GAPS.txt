@@ -1,0 +1,342 @@
+PERMITGRAB — SEO REMAINING GAPS (POST V13.9.2)
+================================================
+Date: March 26, 2026
+Audited by: Cowork (live site inspection)
+Current deploy: V13.9.2
+
+This document lists everything that STILL NEEDS TO BE DONE from
+the SEO_FULL_IMPLEMENTATION.txt plan, organized by priority.
+Items Code already implemented are noted as ✅ DONE.
+
+================================================
+STATUS SUMMARY: WHAT CODE ALREADY DID
+================================================
+
+✅ Trade-specific landing pages — 1,836 pages built (far more than 240 planned)
+✅ Sitemap enhancements — lastmod, changefreq, priority all present on all 2,078 URLs
+✅ Trade pages in sitemap — all 1,836 included
+✅ City page "Browse by Trade" links — links to /permits/[city]/[trade] working
+✅ Blog article:published_time + article:modified_time meta tags — present
+✅ Blog Article schema with datePublished + dateModified — present
+✅ State hub BreadcrumbList schema — present
+✅ State hub "Texas Construction Market" section — present
+✅ City page schemas — Dataset + BreadcrumbList + WebPage + FAQPage (all 4)
+✅ Blog posts link to city pages — Houston post has 3 links to /permits/houston
+✅ Mid-article CTA box in blog posts — detected on Houston post
+✅ Homepage Organization schema — present
+✅ Contractors page WebPage + Dataset schemas — present (V13.9.2)
+✅ Get-alerts page WebPage + SubscribeAction schemas — present (V13.9.1)
+
+
+================================================
+CRITICAL: TRADE PAGES BROKEN (0 PERMITS)
+================================================
+
+PRIORITY: HIGHEST — This is the single biggest SEO issue right now.
+
+Code built 1,836 trade landing pages, but NONE of them have data.
+Example: /permits/houston/plumbing shows:
+  - "0 This Month"
+  - "0 This Week"
+  - "$N/A Avg Value"
+  - No recent permits listed
+
+Houston has 9,000+ total permits. The plumbing subset should show
+hundreds of permits. The DB query for trade-filtered permits is
+either not implemented, returning empty results, or the trade
+names in the DB don't match the trade slugs in the URL.
+
+FIX NEEDED:
+  1. Debug get_trade_data(city, trade) or equivalent function
+  2. Check what trade values exist in the permits DB
+     (run: SELECT DISTINCT trade FROM permits WHERE city='Houston' LIMIT 50)
+  3. Map DB trade values to URL slugs (e.g., "Plumbing" → "plumbing")
+  4. Ensure the route handler passes real permit data to the template
+  5. Verify at least Houston/plumbing shows real permits after fix
+
+Until this is fixed, Google will see 1,836 pages with zero content
+value — that's a NEGATIVE SEO signal (thin/doorway pages penalty).
+If the data fix is complex, consider temporarily noindexing trade
+pages until data populates:
+  <meta name="robots" content="noindex, follow">
+
+
+================================================
+HIGH PRIORITY GAPS
+================================================
+
+--- 1. TRADE PAGES: THIN CONTENT (370 words) ---
+
+Even after data populates, trade pages are only 370 words with:
+  - H1: "Plumbing Permits in Houston, TX" ✅
+  - H2: "Recent Plumbing Permits in Houston" ✅
+  - H2: "Frequently Asked Questions" ✅
+  - H2: "Explore More Permits" ✅
+  - FAQ section present ✅
+  - BreadcrumbList + FAQPage schemas ✅
+
+MISSING from the plan (Section 1):
+  - "About [Trade] Permits in [City]" section (3-4 paragraphs)
+  - Local licensing requirements for that trade in that state
+  - Average project values for that trade in that city
+  - Dataset schema (trade pages only have FAQPage + BreadcrumbList)
+  - WebPage schema
+  - Internal link to relevant blog post (e.g., "Read our guide:
+    Plumbing Leads for Contractors")
+  - Internal link to state hub page
+  - CTA: "Get [Trade] Leads in [City] — Set Up Free Alerts"
+
+FIX: Enrich the city_trade.html template with:
+  a) Add "About [Trade] Permits in [City]" section with 3-4 paragraphs
+     covering: what [trade] permits are required for, typical project
+     scope, licensing requirements in [state], average values
+  b) Add Dataset schema with spatialCoverage and trade info
+  c) Add WebPage schema
+  d) Add link to matching blog post if one exists
+  e) Add link to state hub
+  f) Target: 800+ words per page minimum
+
+
+--- 2. TRADE PAGES: NO LINKS TO BLOG POSTS ---
+
+Trade pages have 0 links to blog posts. Each trade page should link
+to the relevant city guide blog post AND any trade-specific blog post.
+
+Example for /permits/houston/plumbing:
+  - Link to: /blog/building-permits-houston-tx-contractor-guide
+    Text: "Read our complete Houston Building Permits guide →"
+  - Link to: /blog/plumbing-leads-guide (once created)
+    Text: "Read: Plumbing Leads for Contractors →"
+
+FIX: In city_trade.html template, add a "Related Guides" section
+at the bottom with contextual links to matching blog posts.
+
+
+--- 3. STATE HUB PAGES: MISSING FAQPage SCHEMA ---
+
+State hubs (e.g., /permits/texas) have:
+  ✅ CollectionPage schema
+  ✅ BreadcrumbList schema
+  ✅ "Texas Construction Market" section (market overview)
+  ❌ FAQPage schema — MISSING
+  ❌ FAQ content section — MISSING
+  ❌ "Fastest Growing Cities" section — MISSING
+  ❌ "Top Contractors in [State]" section — MISSING
+  ❌ Links to blog posts — 0 blog links detected
+
+FIX (from plan Section 2A + 3B):
+  a) Add FAQ section to state hub template with 3-5 state-specific
+     questions + FAQPage schema:
+     - "How many cities have active permits in [State]?"
+     - "What's the average construction project value in [State]?"
+     - "Which [State] city has the most building permits?"
+  b) Add "Fastest Growing Cities" section showing cities with highest
+     month-over-month permit increase. Needs new DB function:
+     get_fastest_growing_cities(state)
+  c) Add "Top Contractors in [State]" section — top 5 by permit volume.
+     Needs: get_top_contractors_by_state(state)
+  d) Add links to relevant city blog posts. If Houston blog post exists,
+     link from TX state hub.
+
+
+--- 4. CITY PAGES: MISSING ENRICHMENT ---
+
+City pages (e.g., /permits/houston) have some enrichment but are
+missing key items from the plan:
+
+  ✅ "Houston Construction Insights" section (has permit trends, top contractors, common types)
+  ❌ "Top Neighborhoods" section — MISSING
+      Need: get_top_neighborhoods(city) — top 5 zip codes by permit count
+  ❌ Average project value — NOT VISIBLE on page
+      Plan says: "Average Project Value: Calculate from DB for that city"
+  ❌ "Related Content" section at bottom — MISSING
+      Should show 3-4 contextual links to blog posts, trade pages, etc.
+
+FIX:
+  a) Add "Top Neighborhoods" section to city.html template
+     Query DB for top 5 zip codes/neighborhoods by permit count
+  b) Display average project value prominently
+  c) Add "Related Content" section with links to:
+     - City's blog post
+     - Top 3 trade pages for that city
+     - State hub page
+
+
+--- 5. BLOG: NO PAGINATION ---
+
+The /blog page loads all 84 articles on a single page.
+No pagination, no rel="next"/rel="prev", no category filters.
+
+FIX (from plan Section 4C):
+  a) Paginate at 20 posts per page
+  b) Add <link rel="next"> and <link rel="prev"> for pagination SEO
+  c) Add category filter links: City Guides, Trade Guides, Market
+     Reports, How-To Guides, Business Growth
+  d) Route: /blog?page=2 or /blog/page/2
+
+
+--- 6. BLOG: THIN CONTENT (970 words) ---
+
+Houston blog post is 970 words. Plan calls for 1,500+ minimum,
+2,500+ for top 20 cities. It has 6 H2 sections but needs more depth.
+
+MISSING from plan (Section 4A):
+  - Specific permit fee schedule for Houston
+  - Processing timeline section
+  - Link to Houston building department website
+  - "Best neighborhoods for contractors" section
+  - Trade-specific subsections (plumbing, electrical, roofing in Houston)
+  - Embedded data: "In Q1 2026, Houston issued X permits worth $Y"
+  - Links to trade pages (currently 0 links to /permits/houston/[trade])
+
+FIX: Expand all 84 blog posts to 1,500+ words with the above sections.
+Top 20 cities (Houston, NYC, LA, Dallas, Austin, etc.) should target
+2,500+ words.
+
+
+--- 7. HOMEPAGE: NO SoftwareApplication SCHEMA ---
+
+Homepage has Organization schema only. Missing SoftwareApplication
+schema from plan Section 2D.
+
+FIX: Add to dashboard_production.html (or homepage template):
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "PermitGrab",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "Real-time building permit leads for contractors.
+      Track new construction permits, find contractor leads, and
+      grow your business with permit data from 840+ US cities.",
+    "url": "https://permitgrab.com",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Free tier includes one metro area"
+    }
+  }
+
+
+================================================
+MEDIUM PRIORITY GAPS
+================================================
+
+--- 8. INTERNAL LINKING: BLOG → TRADE PAGES ---
+
+Blog posts link to city pages (✅) but NOT to trade pages (❌).
+Houston blog post has 0 links to /permits/houston/plumbing,
+/permits/houston/roofing, etc.
+
+FIX (from plan Section 5E):
+  Within blog post body text, add natural contextual links:
+  "In Houston, there are currently [count]+ active plumbing permits
+  filed this month. [View Houston plumbing permits →]"
+
+  Each city blog post should link to at least 3 trade pages for
+  that city.
+
+
+--- 9. STATE HUBS → BLOG POSTS LINKING ---
+
+State hub pages have 0 links to blog posts. TX state hub should
+link to Houston, Dallas, Austin, San Antonio blog posts.
+
+FIX: Add a "City Guides" section to state_hub.html that links to
+relevant blog posts for cities in that state.
+
+
+--- 10. "RELATED CONTENT" SECTION ON ALL PAGES ---
+
+No page currently has a "Related Content" footer section.
+
+FIX (from plan Section 5F):
+  Add to bottom of city pages, trade pages, and blog posts:
+  "Related" section with 3-4 contextual links.
+  Template logic:
+  - City page → links to trade pages + blog post + state hub
+  - Trade page → links to city page + blog post + other trades
+  - Blog post → links to city page + trade pages + related posts
+
+
+--- 11. NEW BLOG CONTENT ---
+
+Plan Section 4B calls for 10-15 new high-priority blog posts.
+Currently only 84 city guides exist. No trade-specific guides,
+no market reports, no how-to guides.
+
+HIGH-PRIORITY new posts to create:
+  - "Building Permit Lookup: How to Search Permits in Any City (2026)"
+  - "Construction Lead Generation: The Definitive Guide for 2026"
+  - "How to Use Building Permit Data to Find Contractor Leads"
+  - "Best Construction Markets in America: 2026 Rankings"
+
+TRADE-SPECIFIC posts:
+  - "Roofing Leads: How to Find $50K+ Roof Replacement Jobs"
+  - "HVAC Contractor Leads: Using Permit Data to Fill Your Pipeline"
+  - "Electrical Contractor Marketing: Beyond Word of Mouth"
+  - "Plumbing Leads for Contractors: The Permit Data Advantage"
+  - "Solar Installation Leads: Where New Permits Are Filed"
+
+These would target Segments 1, 3, and 5 from the audience research.
+
+
+--- 12. PRECONNECT/PRELOAD HINTS ---
+
+No <link rel="preconnect"> or <link rel="preload"> found in any
+page's <head>.
+
+FIX: Add to base template <head>:
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  (add any other external CDN domains used)
+  <link rel="preload" as="style" href="/static/css/main.css">
+  <link rel="preload" as="script" href="/static/js/main.js">
+
+
+================================================
+LOWER PRIORITY / FUTURE
+================================================
+
+13. BLOG SITEMAP SPLIT — Consider creating sitemap-blog.xml and
+    a sitemap index. Currently all 2,078 URLs in one sitemap. Not
+    critical but improves crawl organization.
+
+14. EXIT INTENT on city/trade pages — "Before you go — get [City]
+    permits delivered to your inbox." (conversion optimization)
+
+15. AI SEARCH OPTIMIZATION (GEO) — Make sure all data points are
+    in schema markup, not just visible text. Write content that AI
+    can quote with clear factual statements.
+
+16. CONTRACTOR LICENSE GUIDE blog posts — "Texas Contractor License
+    Requirements: Complete Guide" for top 10 states. These target
+    Segment 5 (info seekers) and build topical authority.
+
+
+================================================
+IMPLEMENTATION ORDER (RECOMMENDED)
+================================================
+
+IMMEDIATE (blocks everything else):
+  → Fix trade page data pipeline (0 permits bug)
+
+THEN (biggest SEO impact):
+  1. Trade page content enrichment + schemas
+  2. State hub FAQ schema + FAQ content + blog links
+  3. Blog pagination
+  4. Homepage SoftwareApplication schema
+  5. City page "Top Neighborhoods" + "Related Content"
+
+THEN (content expansion):
+  6. Expand 84 blog posts to 1,500+ words
+  7. Internal linking: blog → trade pages, state → blog
+  8. Related Content sections on all page types
+  9. Create 5-10 new blog posts (trade guides + market reports)
+
+THEN (polish):
+  10. Preconnect/preload hints
+  11. Sitemap split
+  12. Exit intent popups
+  13. AI search optimization

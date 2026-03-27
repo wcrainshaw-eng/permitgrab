@@ -1,0 +1,190 @@
+UAT ROUND 6 — VERIFICATION OF V13.6 FIXES (3a2cce6)
+=====================================================
+Date: March 26, 2026
+Auditor: Cowork (manual browser testing)
+Deploy: 3a2cce6 (V13.6: UAT Round 5 fixes)
+Scope: Verification of all 10 claimed fixes from Round 5
+
+=====================================================
+SCORECARD: 3 FIXED / 3 PARTIAL / 4 NOT FIXED
+=====================================================
+
+  FIXED:
+    ✅ H5  — Homepage stat counters (server-side rendering)
+    ✅ C2  — NV state corruption (100 → 2 cities)
+    ✅ C3  — IN + LA state corruption (28→1, 72→3)
+
+  PARTIALLY FIXED:
+    ⚠️  C1  — /contractors API (500→200, but 0 results)
+    ⚠️  H4  — Houston in TX state hub (some DB cities added, Houston still missing)
+    ⚠️  H1  — Homepage sidebar garbage (DOB NOW gone, but "Building" + "Building and Safety" remain)
+
+  NOT FIXED:
+    ❌ H7  — NYC slug REGRESSION (/permits/new-york-city → 404)
+    ❌ H6  — Blog filtering (Arlington + Dallas still show on Houston page)
+    ❌ M2  — "Recent High-Value Permits" label not changed
+    ❌ M3  — "Trades We Cover" still shows with only 1 trade
+    ❌ L3  — /dashboard still redirects silently to homepage
+    ❌ M2/M3 — Both not taking effect on Houston page
+
+  ALSO NOT ADDRESSED (from Round 5 audit):
+    ❌ H2  — "4290+ cities covered" still hardcoded on homepage yellow bar
+             (About says "85+ metro areas", /cities says "1587+")
+    ❌ H8  — New Orleans still links to /permits/new-orleans-verified
+
+
+=====================================================
+DETAILED RESULTS
+=====================================================
+
+✅ H5 — HOMEPAGE STAT COUNTERS — FIXED
+  Before: ACTIVE PERMITS, TOTAL PROJECT VALUE, HIGH-VALUE LEADS showed dashes (—)
+  After:  434,208 ACTIVE PERMITS | 15 TRADE CATEGORIES | $32.9B TOTAL PROJECT VALUE | 30,577 HIGH-VALUE LEADS
+  All four counters now populate immediately via server-side rendering. No JS race condition.
+
+✅ C2 — NV STATE CORRUPTION — FIXED
+  Before: NV had 100 cities, ~98 were Texas towns (Fredericksbrg, Alleyton, etc.)
+  After:  NV has 2 cities (Henderson, Reno — actual Nevada cities)
+  The KNOWN_NV_CITIES heuristic correctly reassigned Texas towns to TX.
+
+✅ C3 — IN + LA STATE CORRUPTION — FIXED
+  Before: IN had 28 cities (25 were Florida), LA had 72 (70 were Los Angeles CA)
+  After:  IN has 1 city, LA has 3 cities
+  Florida cities reassigned from IN, LA-area cities reassigned from LA. Clean.
+
+⚠️ C1 — /CONTRACTORS API — PARTIALLY FIXED
+  Before: /api/contractors returned HTTP 500, page showed infinite spinner
+  After:  API returns 200, page shows "No contractors found" (0 results)
+  The crash is fixed but the feature returns no data. Either the contractor
+  aggregation hasn't run yet, or the query has a bug. Need to verify the
+  contractors table has data.
+
+⚠️ H4 — HOUSTON IN TX STATE HUB — PARTIALLY FIXED
+  Before: TX state hub showed 26 cities, Houston absent
+  After:  TX state hub still says "26 Cities Covered" in header.
+          Some small DB cities were added (Dallas 7, Fairview 6, Nevada 5, etc.)
+          but Houston (9,043 permits) is STILL NOT in the Texas Cities grid.
+  The get_state_data() change added some DB cities but missed Houston.
+  Possible cause: Houston's config slug or city name in DB doesn't match
+  what get_state_data() expects. Houston's DB city name may be "Houston"
+  but the registry config may use a different key. Debug needed.
+
+⚠️ H1 — HOMEPAGE SIDEBAR GARBAGE — PARTIALLY FIXED
+  Before: "DOB NOW: Build – Approved" (539), "Michigan" (607), "EPIC-LA Fire
+          Recovery Cases" (41), "Building Permit Applications" (38), etc.
+  After:  The worst offenders are gone. BUT still present:
+          - "Building" (181 leads) — not a city name
+          - "Building and Safety" (168 leads) — department name
+          - "Pierce County" (77) — county, not city
+  The filter catches some patterns but misses generic words like "Building".
+  Fix: Add these to the garbage filter patterns.
+
+❌ H7 — NYC SLUG — REGRESSION (NEW BUG)
+  Before: Footer "New York City" → /permits/new-york (showed state hub)
+  After:  Config slug changed to "new-york-city" but:
+          - /permits/new-york-city → 404 "City Not Found"
+          - /permits/new-york → Now correctly shows NY STATE hub
+          - NYC city card on state hub links to /permits/new-york (circular)
+          - Footer still links to /permits/new-york
+  The slug was renamed in city_configs.py but the route handler doesn't
+  resolve "new-york-city" to the NYC page. The city_configs slug change
+  alone isn't enough — the route/view that generates the city page from
+  DB data needs to know about this slug too.
+  URGENT: This broke the NYC city page (40,404 permits — the biggest city).
+  Fix: Either revert the slug to "new-york" and handle the state hub
+  conflict differently (e.g., /states/new-york for the state hub), or
+  ensure the route handler maps "new-york-city" to the correct DB data.
+
+❌ H6 — BLOG POST FILTERING — NOT FIXED
+  Page: /permits/houston → "Houston Construction Insights" section
+  Still shows:
+    1. "Arlington Building Permits..." — NOT about Houston
+    2. "Building Permits in Dallas, TX..." — NOT about Houston
+    3. "Houston Building Permits..." — correct
+  The state-level matching removal didn't work, or these articles match
+  on some other criteria (e.g., Texas state tag).
+
+❌ M2 — HIGH-VALUE PERMITS LABEL — NOT FIXED
+  Page: /permits/houston → "Recent High-Value Permits"
+  Still says "Recent High-Value Permits" even though every permit shows
+  "Not listed on permit" for value. Should say "Recent Permits".
+  The high_value_count check may not be in the right template, or the
+  variable isn't being passed correctly.
+
+❌ M3 — TRADES SECTION WITH 1 TRADE — NOT FIXED
+  Page: /permits/houston → "Trades We Cover in Houston"
+  Still shows with only 1 trade card (General Construction 4357).
+  The template condition to hide when trade_count <= 1 isn't working.
+
+❌ L3 — DASHBOARD REDIRECT — NOT FIXED
+  /dashboard still redirects silently to homepage (https://permitgrab.com/).
+  URL changes to / with no login message, no redirect to /login page.
+  The redirect logic may have been added but isn't reaching the deployed
+  code, or the condition isn't triggering.
+
+
+=====================================================
+ALSO STILL OPEN FROM ROUND 5
+=====================================================
+
+❌ H2 — CITY COUNT INCONSISTENCY
+  Homepage yellow bar: "4290+ cities covered" (HARDCODED)
+  /cities page: "1587+" (dynamic from get_cities_with_data)
+  About page: "85+ metro areas" (different framing)
+  Pricing FAQ: "4298+" (yet another number)
+  The yellow bar "4290+" is hardcoded in the template. The about page
+  was updated to pass city_count but the homepage template still uses
+  the hardcoded value. EVERY page needs to use the same dynamic count.
+
+❌ H8 — NEW ORLEANS URL
+  Footer still links to /permits/new-orleans-verified (with -verified suffix).
+  The fix note said "Fixed nola_verified config" but didn't change the URL.
+
+
+=====================================================
+NEW ISSUES DISCOVERED IN THIS ROUND
+=====================================================
+
+NEW BUG 1 — NYC city page is 404 (regression from H7 fix)
+  /permits/new-york-city → 404
+  This is the biggest city (40,404 permits). CRITICAL regression.
+
+NEW BUG 2 — TX state hub shows tiny cities from DB
+  Dallas (7 permits), Fairview (6), Nevada TX (5), Blue Ridge (2),
+  Josephine (2), Rockwall (2) now appear in TX state hub.
+  These are too small to feature. The min threshold for state hub
+  inclusion should be higher (e.g., 50+ permits) or match the
+  CITY_REGISTRY-only approach.
+
+
+=====================================================
+SUGGESTED FIX ORDER FOR ROUND 7
+=====================================================
+
+URGENT (do first):
+  1. H7 regression: Revert NYC slug to "new-york" and handle the
+     state/city disambiguation differently. The simplest approach:
+     keep /permits/new-york as the city page (it was working before)
+     and use /permits/new-york-state or /states/new-york for the hub.
+     Or add a redirect: /permits/new-york-city → /permits/new-york
+
+  2. H2: Replace ALL hardcoded "4290+" with dynamic {{ city_count }}
+     in templates: dashboard_production.html (yellow bar), pricing.html
+     (FAQ), and any other template that mentions a city count number.
+
+QUICK FIXES:
+  3. H1: Add "Building", "Building and Safety" to garbage filter patterns
+  4. H4: Debug why Houston doesn't appear in get_state_data() results
+     despite having 9,043 permits. Check if the city name in DB
+     matches what the function expects.
+  5. M2: Verify the high_value_count variable is passed to the city
+     template and the conditional is in the correct template file.
+  6. M3: Verify the trade_count conditional is in the correct template.
+  7. L3: Verify the /dashboard route change is in the deployed code.
+     Check if there's a separate authenticated redirect that runs first.
+
+LOWER PRIORITY:
+  8. H6: Debug blog matching — check what criteria picks articles for
+     the city page. Might need to match on exact city slug, not state.
+  9. H8: Change New Orleans slug to /permits/new-orleans
+  10. TX state hub: Add min threshold for DB-sourced cities (50+ permits)
