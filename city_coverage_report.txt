@@ -1,0 +1,89 @@
+======================================================================
+PERMITGRAB V16 - CITY COVERAGE REPORT
+Generated: 2026-03-27 11:21:49
+======================================================================
+
+PROD_CITIES TABLE:
+  Active cities:  678
+  Paused cities:  1
+  Total permits (prod_cities.total_permits): 42,485
+  Actual permits in permits table: 48,840
+
+CITIES BY STATE:
+  FL: 115 cities, 17,119 permits
+  NJ: 407 cities, 10,754 permits
+  TX: 24 cities, 2,608 permits
+  NY: 2 cities, 2,369 permits
+  OH: 1 cities, 2,240 permits
+  LA: 12 cities, 2,046 permits
+  AR: 3 cities, 1,869 permits
+  CA: 25 cities, 1,797 permits
+  MD: 48 cities, 1,191 permits
+  IL: 36 cities, 492 permits
+  WA: 2 cities, 0 permits
+  VA: 1 cities, 0 permits
+  TN: 1 cities, 0 permits
+  AZ: 1 cities, 0 permits
+
+TOP 20 CITIES BY PERMIT VOLUME:
+   1. Miami-Dade County, FL: 12,201
+   2. Buffalo, NY: 2,369
+   3. Cincinnati, OH: 2,240
+   4. Baton Rouge, LA: 1,927
+   5. Little Rock, AR: 1,822
+   6. Corona, CA: 823
+   7. Fort Worth, TX: 691
+   8. College Park, FL: 591
+   9. Mckinney, TX: 433
+  10. Newark, NJ: 315
+  11. City Of Chicago, IL: 294
+  12. Edison, NJ: 284
+  13. Melissa, TX: 262
+  14. Princeton, TX: 248
+  15. Silver Spring, MD: 243
+  16. Mill Valley, CA: 231
+  17. Washington Twp, NJ: 227
+  18. Lakewood, NJ: 225
+  19. Jackson, NJ: 221
+  20. Franklin Twp Somerset, NJ: 207
+
+BULK SOURCE COVERAGE:
+  bulk_harvest: 661 cities, 26,387 permits
+  miami_dade_county: 1 cities, 12,201 permits
+  buffalo: 1 cities, 2,369 permits
+  corona_ca_bulk: 1 cities, 823 permits
+  fort_worth_tx_bulk: 1 cities, 691 permits
+  fairfax: 1 cities, 13 permits
+  rockwall: 1 cities, 1 permits
+  seattle: 1 cities, 0 permits
+  san_marcos: 1 cities, 0 permits
+  san_francisco: 1 cities, 0 permits
+  rolling_meadows_il: 1 cities, 0 permits
+  orlando_fl_bulk: 1 cities, 0 permits
+  orlando: 1 cities, 0 permits
+  norfolk_va_bulk: 1 cities, 0 permits
+  new_york: 1 cities, 0 permits
+  nashville: 1 cities, 0 permits
+  mesa_az_bulk: 1 cities, 0 permits
+  bellevue: 1 cities, 0 permits
+
+CITIES WITH 0 PERMITS (11):
+  San Marcos, TX (source: san_marcos)
+  Nashville, TN (source: nashville)
+  Orlando, FL (source: orlando)
+  New York City, NY (source: new_york)
+  San Francisco, CA (source: san_francisco)
+  Seattle, WA (source: seattle)
+  Bellevue, WA (source: bellevue)
+  Rolling Meadows, IL (source: rolling_meadows_il)
+  Mesa, AZ (source: mesa_az_bulk)
+  Norfolk, VA (source: norfolk_va_bulk)
+  Orlando Metro, FL (source: orlando_fl_bulk)
+
+======================================================================
+SUMMARY
+======================================================================
+Total active cities: 678
+Total permits: 48,840
+Cities with permits: 667
+Cities needing data: 11
