@@ -1720,7 +1720,8 @@ def get_cities_with_data():
             continue
 
         # V13.6: Filter county names and abbreviations
-        if 'county' in name_lower or name_lower in ('uninc', 'unincorporated'):
+        # V13.8: Added 'general', 'electrical', 'roof' per UAT Round 7 (trade names)
+        if 'county' in name_lower or name_lower in ('uninc', 'unincorporated', 'general', 'electrical', 'roof'):
             continue
 
         # V13.6: Skip very short names (likely abbreviations or garbage)
