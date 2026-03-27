@@ -21,6 +21,60 @@ from city_source_db import (
 import db as permitdb  # V12.50: SQLite database layer
 
 
+# V15: Helper function for logging collection runs to scraper_runs table
+def _log_v15_collection(city_key, city_name, state, permits_found, permits_inserted,
+                        status, error_message=None, duration_ms=None):
+    """V15: Log collection run to scraper_runs and update prod_cities if exists."""
+    try:
+        # Generate city slug
+        city_slug = city_name.lower().replace(' ', '-').replace(',', '') if city_name else city_key
+
+        # Log to scraper_runs
+        permitdb.log_scraper_run(
+            source_name=city_key,
+            city=city_name,
+            state=state,
+            city_slug=city_slug,
+            permits_found=permits_found,
+            permits_inserted=permits_inserted,
+            status=status,
+            error_message=error_message,
+            duration_ms=duration_ms,
+            collection_type='scheduled',
+            triggered_by='collector'
+        )
+
+        # Update prod_cities if this city exists there
+        is_prod, _ = permitdb.is_prod_city(city_slug)
+        if is_prod:
+            if status in ('success', 'no_new'):
+                # Get newest permit date
+                newest_date = None
+                if permits_found > 0:
+                    conn = permitdb.get_connection()
+                    row = conn.execute(
+                        "SELECT MAX(filing_date) as newest FROM permits WHERE city = ?",
+                        (city_name,)
+                    ).fetchone()
+                    if row and row['newest']:
+                        newest_date = row['newest']
+
+                permitdb.update_prod_city_collection(
+                    city_slug,
+                    permits_found=permits_inserted,
+                    last_permit_date=newest_date,
+                    error=None
+                )
+            else:
+                permitdb.update_prod_city_collection(
+                    city_slug,
+                    error=error_message or status
+                )
+    except Exception as e:
+        # Don't let V15 logging errors break collection
+        print(f"  [V15] Logging error: {str(e)[:50]}")
+
+
 def parse_address_value(val):
     """V12.55c/V12.57: Parse Socrata location fields and GeoJSON points.
     Handles:
@@ -1686,6 +1740,7 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             if not config:
                 continue
 
+            start_time = time.time()  # V15: Track timing for scraper_runs
             try:
                 city_permits, source_stats = collect_bulk_source(source_key, config, days_back=90)
 
@@ -1695,11 +1750,36 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                     cities_from_bulk.add(city_slug)
 
                 bulk_stats[source_key] = source_stats
-                print(f"  ✓ {config['name']}: {source_stats.get('total_normalized', 0)} permits from {source_stats.get('cities_with_permits', 0)} cities")
+                total_permits = source_stats.get('total_normalized', 0)
+                print(f"  ✓ {config['name']}: {total_permits} permits from {source_stats.get('cities_with_permits', 0)} cities")
+
+                # V15: Log bulk source success to scraper_runs
+                duration_ms = int((time.time() - start_time) * 1000)
+                _log_v15_collection(
+                    city_key=source_key,
+                    city_name=config.get('name', source_key),
+                    state=config.get('state', ''),
+                    permits_found=total_permits,
+                    permits_inserted=total_permits,
+                    status='success' if total_permits > 0 else 'no_new',
+                    duration_ms=duration_ms
+                )
 
             except Exception as e:
                 print(f"  ✗ {config['name']}: ERROR - {str(e)[:100]}")
                 bulk_stats[source_key] = {"status": f"error: {str(e)[:100]}"}
+                # V15: Log bulk source error to scraper_runs
+                duration_ms = int((time.time() - start_time) * 1000)
+                _log_v15_collection(
+                    city_key=source_key,
+                    city_name=config.get('name', source_key),
+                    state=config.get('state', ''),
+                    permits_found=0,
+                    permits_inserted=0,
+                    status='error',
+                    error_message=str(e)[:200],
+                    duration_ms=duration_ms
+                )
 
             # Pause between bulk sources
             time.sleep(5)
@@ -1766,6 +1846,7 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             continue
 
         sources_attempted += 1
+        start_time = time.time()  # V15: Track timing for scraper_runs
 
         try:
             raw, fetch_status = fetch_permits(city_key, days_back)
@@ -1801,6 +1882,17 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                         reset_failure(city_key)
                     except Exception:
                         pass  # Don't let tracking errors break collection
+                # V15: Log to scraper_runs table
+                duration_ms = int((time.time() - start_time) * 1000)
+                _log_v15_collection(
+                    city_key=city_key,
+                    city_name=display_name,
+                    state=config.get('state', ''),
+                    permits_found=len(city_permits),
+                    permits_inserted=len(city_permits),  # Actual insert count not tracked here
+                    status='success' if len(city_permits) > 0 else 'no_new',
+                    duration_ms=duration_ms
+                )
             elif fetch_status == "skip":
                 stats[city_key] = {
                     "raw": 0,
@@ -1822,6 +1914,18 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                     increment_failure(city_key, fetch_status)
                 except Exception:
                     pass
+                # V15: Log failure to scraper_runs table
+                duration_ms = int((time.time() - start_time) * 1000)
+                _log_v15_collection(
+                    city_key=city_key,
+                    city_name=display_name,
+                    state=config.get('state', ''),
+                    permits_found=0,
+                    permits_inserted=0,
+                    status='error',
+                    error_message=fetch_status,
+                    duration_ms=duration_ms
+                )
 
         except Exception as e:
             display_name = config.get("name", city_key) if config else city_key
@@ -1833,6 +1937,18 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             }
             print(f"  ✗ {city_key}: {str(e)[:100]}")
             sources_failed += 1
+            # V15: Log exception to scraper_runs table
+            duration_ms = int((time.time() - start_time) * 1000)
+            _log_v15_collection(
+                city_key=city_key,
+                city_name=display_name,
+                state=config.get('state', '') if config else '',
+                permits_found=0,
+                permits_inserted=0,
+                status='error',
+                error_message=str(e)[:200],
+                duration_ms=duration_ms
+            )
 
         # Rate limiting
         time.sleep(RATE_LIMIT_DELAY)
