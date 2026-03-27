@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Blog | PermitGrab - Construction Permit Leads & Insights</title>
 <meta name="description" content="Expert insights on finding construction leads, understanding building permits, and growing your contracting business. Updated weekly.">
-<link rel="canonical" href="https://permitgrab.com/blog">
+<!-- V14.0: Pagination-aware canonical -->
+<link rel="canonical" href="https://permitgrab.com/blog{% if page and page > 1 %}?page={{ page }}{% endif %}">
+{% if page and page < total_pages %}
+<link rel="next" href="https://permitgrab.com/blog?page={{ page + 1 }}">
+{% endif %}
+{% if page and page > 1 %}
+<link rel="prev" href="https://permitgrab.com/blog{% if page > 2 %}?page={{ page - 1 }}{% endif %}">
+{% endif %}
 <meta property="og:title" content="PermitGrab Blog - Construction Lead Generation Insights">
 <meta property="og:description" content="Expert tips on finding construction leads using permit data.">
 <meta property="og:url" content="https://permitgrab.com/blog">
@@ -86,6 +93,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
   {% if not posts %}
   <p style="text-align: center; color: var(--gray-500);">No blog posts yet. Check back soon!</p>
+  {% endif %}
+
+  <!-- V14.0: Pagination controls -->
+  {% if total_pages and total_pages > 1 %}
+  <nav aria-label="Blog pagination" style="display: flex; justify-content: center; align-items: center; gap: 24px; margin-top: 40px; padding: 20px 0;">
+    {% if page > 1 %}
+    <a href="/blog{% if page > 2 %}?page={{ page - 1 }}{% endif %}" style="color: var(--primary); font-weight: 600; text-decoration: none;">&larr; Previous</a>
+    {% else %}
+    <span style="color: var(--gray-400);">&larr; Previous</span>
+    {% endif %}
+
+    <span style="color: var(--gray-600);">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+    <a href="/blog?page={{ page + 1 }}" style="color: var(--primary); font-weight: 600; text-decoration: none;">Next &rarr;</a>
+    {% else %}
+    <span style="color: var(--gray-400);">Next &rarr;</span>
+    {% endif %}
+  </nav>
   {% endif %}
 </div>
 

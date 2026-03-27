@@ -1043,6 +1043,37 @@ body {
 </section>
 {% endif %}
 
+<!-- V14.0: Top Neighborhoods by Permit Activity -->
+{% if top_neighborhoods %}
+<section style="max-width: 1200px; margin: 0 auto; padding: 24px 32px;">
+  <h2 style="font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 20px;">Top Neighborhoods by Permit Activity</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+    {% for n in top_neighborhoods %}
+    <div style="background: white; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid var(--gray-200);">
+      <div style="font-size: 24px; font-weight: 700; color: var(--gray-900);">{{ n.zip_code }}</div>
+      <div style="font-size: 14px; color: var(--gray-500);">{{ n.permit_count }} permits</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- V14.0: Related Content section for internal linking -->
+<section style="max-width: 1200px; margin: 0 auto; padding: 24px 32px 48px;">
+  <h2 style="font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 20px;">Related Content</h2>
+  <ul style="list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+    {% if city_blog_url %}
+    <li><a href="{{ city_blog_url }}" style="display: block; padding: 16px 20px; background: white; border-radius: 8px; border: 1px solid var(--gray-200); color: var(--primary); font-weight: 500; text-decoration: none;">{{ city_name }} Building Permits: Complete Guide</a></li>
+    {% endif %}
+    {% if state_slug %}
+    <li><a href="/permits/{{ state_slug }}" style="display: block; padding: 16px 20px; background: white; border-radius: 8px; border: 1px solid var(--gray-200); color: var(--primary); font-weight: 500; text-decoration: none;">All {{ state_name }} Permits</a></li>
+    {% endif %}
+    {% for trade in top_trades[:3] %}
+    <li><a href="/permits/{{ city_slug }}/{{ trade.slug }}" style="display: block; padding: 16px 20px; background: white; border-radius: 8px; border: 1px solid var(--gray-200); color: var(--primary); font-weight: 500; text-decoration: none;">{{ city_name }} {{ trade.name }} Permits</a></li>
+    {% endfor %}
+  </ul>
+</section>
+
 <!-- EXPLORE OTHER CITIES -->
 <section class="explore-cities">
   <div class="explore-inner">

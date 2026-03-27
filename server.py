@@ -7,6 +7,7 @@ Deploy to any VPS (DigitalOcean, Railway, Render, etc.)
 from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response, redirect, abort, g
 from difflib import SequenceMatcher
 import json
+import math
 import os
 import sqlite3
 import threading
@@ -5790,8 +5791,24 @@ def state_or_city_landing(state_slug):
         state_data = get_state_data(state_slug)
         if state_data and state_data['cities']:
             footer_cities = get_cities_with_data()
+
+            # V14.0: Find blog posts for cities in this state
+            state_blog_posts = []
+            state_abbrev = STATE_CONFIG[state_slug]['abbrev'].lower()
+            blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
+            for city in state_data['cities'][:20]:  # Check top 20 cities
+                city_slug = city.get('slug', city['name'].lower().replace(' ', '-').replace(',', ''))
+                blog_slug = f"building-permits-{city_slug}-{state_abbrev}-contractor-guide"
+                blog_path = os.path.join(blog_dir, f"{blog_slug}.md")
+                if os.path.exists(blog_path):
+                    state_blog_posts.append({
+                        'name': city['name'],
+                        'url': f"/blog/{blog_slug}"
+                    })
+
             return render_template('state_landing.html',
                                    footer_cities=footer_cities,
+                                   state_blog_posts=state_blog_posts,
                                    **state_data)
 
     # Otherwise, fall through to city landing page logic
@@ -5952,6 +5969,51 @@ def city_landing_inner(city_slug):
         other_state_cities = [c for c in cities_by_volume if c.get('state') != current_state][:6 - len(nearby_cities)]
         nearby_cities = nearby_cities + other_state_cities
 
+    # V14.0: Top neighborhoods by zip code for city enrichment
+    top_neighborhoods = []
+    try:
+        zip_cursor = conn.execute("""
+            SELECT zip_code, COUNT(*) as permit_count
+            FROM permits
+            WHERE city = ? AND zip_code IS NOT NULL AND zip_code != ''
+            GROUP BY zip_code
+            ORDER BY permit_count DESC
+            LIMIT 5
+        """, (filter_name,))
+        for row in zip_cursor:
+            top_neighborhoods.append({
+                'zip_code': row['zip_code'],
+                'permit_count': row['permit_count']
+            })
+    except Exception:
+        pass
+
+    # V14.0: State info for internal linking
+    state_slug = None
+    state_name = current_state
+    for slug, info in STATE_CONFIG.items():
+        if info['abbrev'] == current_state:
+            state_slug = slug
+            state_name = info['name']
+            break
+
+    # V14.0: City blog URL if exists
+    city_blog_url = None
+    if current_state:
+        blog_slug = f"building-permits-{city_slug}-{current_state.lower()}-contractor-guide"
+        blog_path = os.path.join(os.path.dirname(__file__), 'blog', f"{blog_slug}.md")
+        if os.path.exists(blog_path):
+            city_blog_url = f"/blog/{blog_slug}"
+
+    # V14.0: Top trades for Related Content links
+    top_trades = [
+        {'name': 'Plumbing', 'slug': 'plumbing'},
+        {'name': 'Electrical', 'slug': 'electrical'},
+        {'name': 'HVAC', 'slug': 'hvac'},
+        {'name': 'Roofing', 'slug': 'roofing'},
+        {'name': 'General Construction', 'slug': 'general-construction'},
+    ]
+
     return render_template(
         'city_landing.html',
         city_name=config['name'],
@@ -5976,6 +6038,11 @@ def city_landing_inner(city_slug):
         last_collected=last_collected,  # V17c: Freshness badge
         related_articles=related_articles,  # V17d: Cross-linked blog articles
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
+        top_neighborhoods=top_neighborhoods,  # V14.0: Top zip codes
+        state_slug=state_slug,  # V14.0: For state hub link
+        state_name=state_name,  # V14.0: For display
+        city_blog_url=city_blog_url,  # V14.0: City guide link
+        top_trades=top_trades,  # V14.0: Trade page links
     )
 
 
@@ -6555,9 +6622,32 @@ def get_all_blog_posts():
 
 @app.route('/blog')
 def blog_index():
-    """Blog index page."""
-    posts = get_all_blog_posts()
-    return render_template('blog_index.html', posts=posts)
+    """Blog index page. V14.0: Added pagination."""
+    all_posts = get_all_blog_posts()
+
+    # V14.0: Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    total_posts = len(all_posts)
+    total_pages = math.ceil(total_posts / per_page) if total_posts > 0 else 1
+
+    # Ensure page is valid
+    if page < 1:
+        page = 1
+    elif page > total_pages:
+        page = total_pages
+
+    # Slice posts for current page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    posts = all_posts[start_idx:end_idx]
+
+    return render_template('blog_index.html',
+                           posts=posts,
+                           page=page,
+                           total_pages=total_pages,
+                           total_posts=total_posts,
+                           per_page=per_page)
 
 
 @app.route('/blog/<slug>')

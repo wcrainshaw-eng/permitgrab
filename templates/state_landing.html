@@ -55,6 +55,39 @@
   ]
 }
 </script>
+<!-- V14.0 SEO: FAQPage schema for state hub pages -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How many cities have active building permits in {{ state_name }}?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "PermitGrab tracks building permits in {{ cities | length }} {{ state_name }} cities, updated daily."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which {{ state_name }} city has the most building permits?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{% if cities %}{{ cities[0].name }} currently leads {{ state_name }} with {{ cities[0].permit_count | default(0) }}+ active building permits.{% else %}Check our {{ state_name }} cities page for the latest permit data.{% endif %}"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How often is {{ state_name }} permit data updated?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "PermitGrab updates {{ state_name }} building permit data daily, pulling directly from municipal permit offices."
+      }
+    }
+  ]
+}
+</script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -295,6 +328,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <p>Browse the cities above to explore specific markets, or <a href="/signup" style="color: var(--primary);">sign up for Pro</a> to get daily email alerts and full contact information for permit holders.</p>
   </div>
 </section>
+
+<!-- V14.0: FAQ Section for state hubs -->
+<section class="overview-section" style="background: var(--gray-50);">
+  <div class="overview-inner">
+    <h2>Frequently Asked Questions About {{ state_name }} Building Permits</h2>
+    <div style="margin-top: 24px;">
+      <div style="margin-bottom: 24px;">
+        <h3 style="font-size: 18px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">How many cities have active building permits in {{ state_name }}?</h3>
+        <p>PermitGrab tracks building permits in {{ cities | length }} {{ state_name }} cities, updated daily.</p>
+      </div>
+      <div style="margin-bottom: 24px;">
+        <h3 style="font-size: 18px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">Which {{ state_name }} city has the most building permits?</h3>
+        <p>{% if cities %}{{ cities[0].name }} currently leads {{ state_name }} with {{ cities[0].permit_count | default(0) }}+ active building permits.{% else %}Check our {{ state_name }} cities page for the latest permit data.{% endif %}</p>
+      </div>
+      <div style="margin-bottom: 24px;">
+        <h3 style="font-size: 18px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;">How often is {{ state_name }} permit data updated?</h3>
+        <p>PermitGrab updates {{ state_name }} building permit data daily, pulling directly from municipal permit offices.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if state_blog_posts %}
+<!-- V14.0: City Guides linking to blog posts -->
+<section class="overview-section">
+  <div class="overview-inner">
+    <h2>{{ state_name }} City Guides</h2>
+    <ul style="list-style: none; padding: 0; margin-top: 16px;">
+      {% for post in state_blog_posts[:10] %}
+      <li style="margin-bottom: 12px;"><a href="{{ post.url }}" style="color: var(--primary); font-weight: 500;">{{ post.name }} Building Permits Guide</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
 
 <section class="cta-section">
   <h2>Get {{ state_name }} Permit Alerts</h2>
