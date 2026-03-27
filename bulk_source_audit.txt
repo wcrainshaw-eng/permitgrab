@@ -1,0 +1,37 @@
+V16 BULK SOURCE AUDIT
+======================================================================
+Date: March 27, 2026
+Total BULK_SOURCES entries: 25
+
+OK SOURCES (21):
+  baton_rouge_la                      city_field=city1                East Baton Rouge Parish
+  buffalo_ny_bulk                     city_field=city                 Buffalo NY
+  cincinnati_oh_bulk                  city_field=originalcity         Cincinnati OH Metro
+  collin_county_tx                    city_field=situscity            Collin County TX
+  contra_costa_county_ca              city_field=site_city            Contra Costa County CA
+  cook_county_il                      city_field=municipality         Cook County IL
+  corona_ca_bulk                      city_field=site_city            Corona CA
+  dallas_tx_bulk                      city_field=zip_code             Dallas TX
+  fort_worth_tx_bulk                  city_field=(none)               Fort Worth
+  howard_county_md                    city_field=city                 Howard County MD
+  little_rock_ar_bulk                 city_field=propertycity         Little Rock AR Metro
+  marin_county_ca                     city_field=city_town            Marin County CA
+  mesa_az_bulk                        city_field=council_district     Mesa AZ
+  miami_dade_county                   city_field=(none)               Miami-Dade County
+  montgomery_county_md                city_field=city                 Montgomery County MD
+  nj_statewide                        city_field=muniname             New Jersey Statewide
+  norfolk_va_bulk                     city_field=ward                 Norfolk VA
+  orlando_fl_bulk                     city_field=neighborhood         Orlando FL Metro
+  prince_georges_county_md            city_field=city                 Prince George's County MD
+  sonoma_county                       city_field=jurisdiction         Sonoma County
+  williamson_county_tx                city_field=situscity            Williamson County TX
+
+ERROR SOURCES (1):
+  san_diego_county                    San Diego County
+
+INACTIVE SOURCES (3):
+  austin_tx_datahub_bulk              Austin TX (Datahub)
+  pierce_county_wa_socrata_bulk       Pierce County WA
+  san_diego_county_v2                 San Diego County (Public)
+
+SUMMARY: 21 OK, 1 ERROR, 3 INACTIVE

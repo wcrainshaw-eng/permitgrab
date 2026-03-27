@@ -1,0 +1,238 @@
+PERMITGRAB V16 — CITY EXPLOSION PLAN
+=====================================
+Date: March 27, 2026
+Goal: Go from 18 cities to 500+ cities on the site as fast as possible.
+
+THE KEY INSIGHT:
+  We already have 104 BULK_SOURCES in city_configs.py covering 1,000+ cities.
+  The legacy collector already fetches permits from ALL of them.
+  But only 18 cities are in prod_cities, and the site counts off prod_cities.
+
+  The fastest path is NOT building more discovery. It's:
+  1) Run the existing collector in legacy mode to populate the permits table
+  2) Query the permits table to see which cities ACTUALLY have data
+  3) Bulk-insert those cities into prod_cities as active
+  4) Now the site shows 500+ cities instantly
+  5) THEN expand discovery for even more
+
+⚠️  GUARDRAILS:
+  - Do NOT create blog posts or modify blog content
+  - Do NOT change SEO, schemas, or templates
+  - Do NOT spawn Claude agents to search for data sources
+  - Do NOT use web search or AI to discover endpoints
+  - Stay focused on the collector pipeline and prod_cities table
+  - Commit after each step so progress isn't lost
+  - Do NOT break existing working sources
+
+PRIORITY ORDER: 1 → 2 → 3 → 4 → 5 → 6
+Do NOT start a later step until the previous one is verified.
+
+
+===================================================================
+STEP 1: AUDIT EXISTING BULK SOURCES (10 min)
+===================================================================
+
+Run a quick test to see how many of the 104 BULK_SOURCES in city_configs.py
+are actually reachable and returning data right now.
+
+Write a small Python script (or inline test) that:
+  A) Iterates every entry in BULK_SOURCES where active=True
+  B) Makes a simple query: fetch 1 record, timeout 10s
+  C) Logs: source_key, status (ok/error), record_count, city_field value
+  D) Prints a summary table at the end
+
+This tells us which bulk sources are alive RIGHT NOW before we try
+to collect from all of them.
+
+Expected: 60-80 of the 104 should be reachable.
+
+Save results to: bulk_source_audit.txt
+
+
+===================================================================
+STEP 2: RUN FULL COLLECTION FROM ALL WORKING BULK SOURCES (30 min)
+===================================================================
+
+For every bulk source that passed the audit in Step 1:
+  A) Run collect_bulk_source() with days_back=90
+  B) For each, extract the DISTINCT city names from the city_field
+  C) Normalize city names (title case, strip whitespace)
+  D) Match against us_cities table using (city_name, state)
+  E) Insert all permits into the permits table as normal
+  F) Log which cities got permits and how many
+
+The goal here is to populate the permits table with as much real data
+as possible from sources we ALREADY have configured.
+
+Do NOT skip sources just because they aren't in prod_cities yet.
+Run in legacy mode if needed to process all bulk sources.
+
+
+===================================================================
+STEP 3: HARVEST CITIES FROM PERMITS TABLE → prod_cities (20 min)
+===================================================================
+
+This is the money step. Query the permits table to find every unique
+(city, state) pair that has actual permit data, then bulk-insert
+into prod_cities.
+
+SQL approach:
+
+  -- Find all cities with recent permits (last 90 days)
+  SELECT
+    p.city,
+    p.state,
+    COUNT(*) as total_permits,
+    COUNT(CASE WHEN p.date >= date('now', '-30 days') THEN 1 END) as permits_30d,
+    MAX(p.date) as last_permit_date,
+    MIN(p.date) as first_permit_date
+  FROM permits p
+  WHERE p.city IS NOT NULL
+    AND p.city != ''
+    AND p.state IS NOT NULL
+    AND LENGTH(p.city) > 1
+  GROUP BY p.city, p.state
+  HAVING total_permits >= 1
+  ORDER BY total_permits DESC;
+
+For each result:
+  A) Skip if already in prod_cities
+  B) Generate city_slug as: lower(city)-lower(state) with spaces→hyphens
+  C) Try to match against us_cities table to get county, population
+  D) Determine source_type and source_scope:
+     - If city came from a bulk source → source_scope = 'county' or 'state'
+     - If city came from a city-level source → source_scope = 'city'
+  E) INSERT into prod_cities with:
+     - status = 'active'
+     - added_by = 'bulk_harvest'
+     - verified_date = datetime('now')
+     - total_permits = count from query
+     - permits_last_30d = count from query
+     - notes = 'Harvested from existing bulk source collection'
+
+Also update us_cities table:
+  - Set status = 'covered_by_source' for matched cities
+  - Set covered_by_source = the bulk source key
+
+IMPORTANT: Filter out garbage entries before inserting:
+  - Skip entries where city looks like a county name (e.g., "Miami-Dade County")
+  - Skip entries that are clearly not city names (numbers, single chars, etc.)
+  - Skip state-level entries (city = state name)
+  - Use the CITY_REGISTRY and us_cities table as validation sources
+
+Print summary: "Added X cities to prod_cities. Total now: Y"
+
+
+===================================================================
+STEP 4: UPDATE SITE CITY COUNT DISPLAY (10 min)
+===================================================================
+
+Verify the site now reflects the new city count:
+
+  A) Check that get_cities_with_data() in server.py returns the
+     full list from prod_cities
+  B) The /api/cities endpoint should return all active prod_cities
+  C) The cities page should list all of them
+  D) The homepage city count should update
+  E) Run: SELECT COUNT(*) FROM prod_cities WHERE status='active'
+     This should now be 200+ (ideally 500+)
+
+If the site code has any limits or pagination issues with large
+city lists, fix them now.
+
+ALSO: Check that individual city pages work. Pick 5 random NEW cities
+from prod_cities and verify /permits/<slug> loads with actual permits.
+
+
+===================================================================
+STEP 5: UPDATE us_cities STATUS TRACKING (15 min)
+===================================================================
+
+Now that we know which cities have data, update the 30K us_cities
+table so we know what's left to find:
+
+  A) For every city in prod_cities → mark us_cities as 'has_source'
+
+  B) For every city covered by a county bulk source that we haven't
+     seen permits for yet → mark as 'covered_by_county' with a note
+     like "County source exists but no permits seen in last 90 days"
+
+  C) Generate a summary report:
+     - Total us_cities: ~19,500
+     - Cities with active data (in prod_cities): ???
+     - Cities covered by county (but no recent permits): ???
+     - Cities not started: ???
+     - Top 50 largest cities by population that are still 'not_started'
+
+  Save this to: city_coverage_report.txt
+
+  This report is our roadmap for Phase 2 expansion.
+
+
+===================================================================
+STEP 6: DISCOVERY ENGINE — COUNTY + CITY TIERS (45 min)
+===================================================================
+
+NOW we build out the discovery engine for counties and cities.
+The --states tier already works. Implement --counties and --cities.
+
+COUNTY TIER (--counties):
+  The us_counties table has ~3,143 US counties.
+  For each county (sorted by population DESC):
+    A) Check Socrata catalog: search "{county_name} building permits"
+       on the county's data portal domain (if known) or generic search
+    B) Check ArcGIS Hub: search for building permit FeatureServers
+       on services.arcgis.com with county name
+    C) If found: test the endpoint (reachable, has permits, has dates)
+    D) If passes: add to BULK_SOURCES config and run collection
+    E) Mark all cities in that county as 'covered_by_county'
+    F) Log everything to discovery_counties.log
+
+  Rate limit: 2 second delay between API calls
+  Resume: skip counties already in BULK_SOURCES
+
+CITY TIER (--cities):
+  From us_cities table, get cities with status='not_started',
+  sorted by population DESC:
+    A) Search Socrata catalog for "{city_name} building permits"
+    B) Search ArcGIS Hub for the city
+    C) If found: test endpoint
+    D) If passes: add to CITY_REGISTRY and prod_cities
+    E) Update us_cities status accordingly
+    F) Log to discovery_cities.log
+
+  Rate limit: 2 second delay between calls
+  Start with top 200 cities by population
+  Resume: skip cities already searched (status != 'not_started')
+
+CRITICAL: discovery.py must NOT use Claude credits or AI.
+It only makes direct HTTP requests to Socrata/ArcGIS/CKAN APIs.
+
+
+===================================================================
+VERIFICATION CHECKLIST
+===================================================================
+
+After all steps, verify:
+
+[ ] prod_cities has 200+ active entries (ideally 500+)
+[ ] Site shows updated city count on homepage
+[ ] /api/cities returns full list
+[ ] 5 random new city pages load with real permits
+[ ] us_cities table has updated statuses
+[ ] city_coverage_report.txt exists with clear metrics
+[ ] discovery.py --counties works (even if slow)
+[ ] discovery.py --cities works for top 200 by population
+[ ] No broken existing sources (run V15 verification again)
+[ ] All changes committed with descriptive messages
+[ ] Git pushed to main
+
+EXPECTED TIMELINE:
+  Steps 1-4: ~1 hour (get to 200-500 cities FAST)
+  Step 5: ~15 min (status tracking)
+  Step 6: ~45 min (discovery engine expansion)
+  Total: ~2 hours
+
+The #1 priority is Steps 1-4. If credits run low, STOP after Step 4.
+Getting the existing bulk source cities into prod_cities is the
+single biggest lever we can pull.
