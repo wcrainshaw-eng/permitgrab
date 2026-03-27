@@ -1608,12 +1608,14 @@ def get_cities_with_data():
     }
 
     # V13.3: Garbage patterns - dataset names, permit types, and other junk
+    # V13.9: Added 'building:' for "Building: Addition/Alteration" entries
     GARBAGE_PATTERNS = [
         'dob now', 'build –', 'build-', 'applications', 'certificate',
         'permits table', 'data_wfl', 'epic-la', 'bureau of', '_wgs84',
         'inspections', 'case history', 'building and safety',
         'development permits', 'sewer data', 'engineering permit',
-        'permit information', 'county permit', 'limited alteration'
+        'permit information', 'county permit', 'limited alteration',
+        'building:'
     ]
 
     # Get city counts from SQLite - this has ALL cities with permits
@@ -3584,10 +3586,12 @@ def map_page():
     is_pro = user and user.plan == 'pro'
     cities = get_all_cities_info()
     footer_cities = get_cities_with_data()
+    city_count = get_total_city_count_auto()  # V13.9: Pass for dynamic meta desc
     return render_template('map.html',
                            is_pro=is_pro,
                            cities=cities,
-                           footer_cities=footer_cities)
+                           footer_cities=footer_cities,
+                           city_count=city_count)
 
 
 @app.route('/contact')

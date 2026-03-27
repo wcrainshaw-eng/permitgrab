@@ -2544,10 +2544,11 @@ function renderSidebar() {
 
   // City breakdown - V13.6: Filter garbage city names
   // V13.7: Added 'building and safety', 'pierce county', exact 'building' match
+  // V13.9: Added 'building:' for "Building: Addition/Alteration" garbage entries
   const GARBAGE_CITY_PATTERNS = ['dob now', 'epic-la', 'permit', 'application', 'build –',
     'certificate', 'inspection', 'development', 'table', 'data', 'report', 'view',
     'commercial', 'residential', 'issued', 'case', 'bp_', 'ebr', 'dsc', 'land use',
-    'building and safety', 'county'];
+    'building and safety', 'county', 'building:'];
   // V13.7: Exact matches for single-word garbage entries
   // V13.8: Added 'general', 'uninc', 'electrical', 'roof' per UAT Round 7
   const GARBAGE_EXACT = ['building', 'michigan', 'maine', 'general', 'uninc', 'electrical', 'roof'];
