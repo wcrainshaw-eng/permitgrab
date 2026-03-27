@@ -1664,8 +1664,10 @@ def get_cities_with_data():
         if registry_state:
             state = registry_state
 
-        # V13.5: Fix OK state corruption - reassign non-Oklahoma cities to TX
-        # The DB has ~1100 Texas cities incorrectly tagged as "OK" from a past bulk run
+        # V13.5: Fix state corruption - reassign misassigned cities
+        # The DB has cities incorrectly tagged from past bulk runs
+        state_upper = state.upper() if state else ''
+
         KNOWN_OK_CITIES = {
             'oklahoma city', 'tulsa', 'norman', 'broken arrow', 'edmond',
             'lawton', 'moore', 'midwest city', 'enid', 'stillwater',
@@ -1673,8 +1675,37 @@ def get_cities_with_data():
             'ardmore', 'duncan', 'del city', 'bixby', 'sapulpa', 'altus',
             'bethany', 'sand springs', 'yukon', 'mustang', 'claremore'
         }
-        if state and state.upper() == 'OK' and name_lower not in KNOWN_OK_CITIES:
-            state = 'TX'  # These are Texas cities incorrectly tagged as OK
+        if state_upper == 'OK' and name_lower not in KNOWN_OK_CITIES:
+            state = 'TX'
+
+        # V13.6: Fix NV state corruption - ~98 Texas towns tagged as NV
+        KNOWN_NV_CITIES = {
+            'las vegas', 'henderson', 'reno', 'north las vegas', 'sparks',
+            'carson city', 'elko', 'mesquite', 'boulder city', 'fernley',
+            'fallon', 'winnemucca', 'west wendover', 'ely', 'yerington'
+        }
+        if state_upper == 'NV' and name_lower not in KNOWN_NV_CITIES:
+            state = 'TX'
+
+        # V13.6: Fix IN state corruption - ~25 Florida cities tagged as IN
+        KNOWN_IN_CITIES = {
+            'indianapolis', 'fort wayne', 'evansville', 'south bend', 'carmel',
+            'fishers', 'bloomington', 'hammond', 'gary', 'lafayette', 'muncie',
+            'terre haute', 'kokomo', 'anderson', 'noblesville', 'greenwood',
+            'elkhart', 'mishawaka', 'lawrence', 'jeffersonville', 'columbus'
+        }
+        if state_upper == 'IN' and name_lower not in KNOWN_IN_CITIES:
+            state = 'FL'
+
+        # V13.6: Fix LA state corruption - ~70 LA (Los Angeles) cities tagged as LA (Louisiana)
+        KNOWN_LA_CITIES = {
+            'new orleans', 'baton rouge', 'shreveport', 'lafayette', 'lake charles',
+            'kenner', 'bossier city', 'monroe', 'alexandria', 'houma', 'slidell',
+            'metairie', 'new iberia', 'laplace', 'central', 'ruston', 'sulphur',
+            'hammond', 'natchitoches', 'gretna', 'opelousas', 'zachary', 'thibodaux'
+        }
+        if state_upper == 'LA' and name_lower not in KNOWN_LA_CITIES:
+            state = 'CA'
 
         # V13.4: Require valid US state (eliminates "Other Locations" garbage)
         if not state or state.upper() not in VALID_US_STATES:
@@ -1686,6 +1717,14 @@ def get_cities_with_data():
 
         # V13.3: Filter garbage city names (dataset names, permit types, etc.)
         if any(p in name_lower for p in GARBAGE_PATTERNS):
+            continue
+
+        # V13.6: Filter county names and abbreviations
+        if 'county' in name_lower or name_lower in ('uninc', 'unincorporated'):
+            continue
+
+        # V13.6: Skip very short names (likely abbreviations or garbage)
+        if len(name) < 3:
             continue
 
         # V13.3: Skip names that are too long (real city names are rarely >35 chars)
@@ -3023,90 +3062,96 @@ def api_contractors():
     GET /api/contractors
     Query params: city, search, sort_by, sort_order, page, per_page
     Returns aggregated contractor data from permits.
-    V12.51: SQL-backed
+    V12.51: SQL-backed, V13.5: Added error handling
     """
-    city = request.args.get('city', '')
-    permits, _ = permitdb.query_permits(city=city or None, page=1, per_page=100000)
+    try:
+        city = request.args.get('city', '')
+        permits, _ = permitdb.query_permits(city=city or None, page=1, per_page=100000)
 
-    # Aggregate by contractor name
-    contractors = {}
-    for p in permits:
-        name = p.get('contact_name', '').strip()
-        if not name or name.lower() in ('n/a', 'unknown', 'none', ''):
-            continue
+        # Aggregate by contractor name
+        contractors = {}
+        for p in permits:
+            name = p.get('contact_name', '').strip()
+            if not name or name.lower() in ('n/a', 'unknown', 'none', ''):
+                continue
 
-        if name not in contractors:
-            contractors[name] = {
-                'name': name,
-                'total_permits': 0,
-                'total_value': 0,
-                'cities': set(),
-                'trades': {},
-                'most_recent_date': '',
-                'permits': [],
-            }
+            if name not in contractors:
+                contractors[name] = {
+                    'name': name,
+                    'total_permits': 0,
+                    'total_value': 0,
+                    'cities': set(),
+                    'trades': {},
+                    'most_recent_date': '',
+                    'permits': [],
+                }
 
-        contractors[name]['total_permits'] += 1
-        contractors[name]['total_value'] += p.get('estimated_cost', 0) or 0
-        contractors[name]['cities'].add(p.get('city', ''))
+            contractors[name]['total_permits'] += 1
+            contractors[name]['total_value'] += p.get('estimated_cost', 0) or 0
+            contractors[name]['cities'].add(p.get('city', ''))
 
-        trade = p.get('trade_category', 'Other')
-        contractors[name]['trades'][trade] = contractors[name]['trades'].get(trade, 0) + 1
+            trade = p.get('trade_category', 'Other')
+            contractors[name]['trades'][trade] = contractors[name]['trades'].get(trade, 0) + 1
 
-        filing_date = p.get('filing_date', '')
-        if filing_date > contractors[name]['most_recent_date']:
-            contractors[name]['most_recent_date'] = filing_date
+            filing_date = p.get('filing_date', '')
+            if filing_date > contractors[name]['most_recent_date']:
+                contractors[name]['most_recent_date'] = filing_date
 
-        contractors[name]['permits'].append(p.get('permit_number'))
+            contractors[name]['permits'].append(p.get('permit_number'))
 
-    # Convert to list and determine primary trade
-    contractor_list = []
-    for name, data in contractors.items():
-        primary_trade = max(data['trades'].items(), key=lambda x: x[1])[0] if data['trades'] else 'Unknown'
-        contractor_list.append({
-            'name': data['name'],
-            'total_permits': data['total_permits'],
-            'total_value': data['total_value'],
-            'cities': sorted(list(data['cities'])),
-            'city_count': len(data['cities']),
-            'primary_trade': primary_trade,
-            'most_recent_date': data['most_recent_date'],
-            'permit_ids': data['permits'][:50],  # Limit stored permits
+        # Convert to list and determine primary trade
+        contractor_list = []
+        for name, data in contractors.items():
+            primary_trade = max(data['trades'].items(), key=lambda x: x[1])[0] if data['trades'] else 'Unknown'
+            contractor_list.append({
+                'name': data['name'],
+                'total_permits': data['total_permits'],
+                'total_value': data['total_value'],
+                'cities': sorted(list(data['cities'])),
+                'city_count': len(data['cities']),
+                'primary_trade': primary_trade,
+                'most_recent_date': data['most_recent_date'],
+                'permit_ids': data['permits'][:50],
+            })
+
+        # Search filter
+        search = request.args.get('search', '').lower()
+        if search:
+            contractor_list = [c for c in contractor_list if search in c['name'].lower()]
+
+        # Sorting
+        sort_by = request.args.get('sort_by', 'total_permits')
+        sort_order = request.args.get('sort_order', 'desc')
+        reverse = sort_order == 'desc'
+
+        if sort_by == 'name':
+            contractor_list.sort(key=lambda x: x['name'].lower(), reverse=reverse)
+        elif sort_by == 'total_value':
+            contractor_list.sort(key=lambda x: x['total_value'], reverse=reverse)
+        elif sort_by == 'most_recent_date':
+            contractor_list.sort(key=lambda x: x['most_recent_date'] or '', reverse=reverse)
+        else:
+            contractor_list.sort(key=lambda x: x['total_permits'], reverse=reverse)
+
+        # Pagination
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 50))
+        total = len(contractor_list)
+        start = (page - 1) * per_page
+        page_contractors = contractor_list[start:start + per_page]
+
+        return jsonify({
+            'contractors': page_contractors,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page,
         })
-
-    # Search filter
-    search = request.args.get('search', '').lower()
-    if search:
-        contractor_list = [c for c in contractor_list if search in c['name'].lower()]
-
-    # Sorting
-    sort_by = request.args.get('sort_by', 'total_permits')
-    sort_order = request.args.get('sort_order', 'desc')
-    reverse = sort_order == 'desc'
-
-    if sort_by == 'name':
-        contractor_list.sort(key=lambda x: x['name'].lower(), reverse=reverse)
-    elif sort_by == 'total_value':
-        contractor_list.sort(key=lambda x: x['total_value'], reverse=reverse)
-    elif sort_by == 'most_recent_date':
-        contractor_list.sort(key=lambda x: x['most_recent_date'] or '', reverse=reverse)
-    else:
-        contractor_list.sort(key=lambda x: x['total_permits'], reverse=reverse)
-
-    # Pagination
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 50))
-    total = len(contractor_list)
-    start = (page - 1) * per_page
-    page_contractors = contractor_list[start:start + per_page]
-
-    return jsonify({
-        'contractors': page_contractors,
-        'total': total,
-        'page': page,
-        'per_page': per_page,
-        'total_pages': (total + per_page - 1) // per_page,
-    })
+    except Exception as e:
+        print(f"[ERROR] /api/contractors failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'contractors': [], 'total': 0}), 500
 
 
 @app.route('/api/contractors/<path:name>')

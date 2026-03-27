@@ -2542,10 +2542,29 @@ function renderSidebar() {
     </div>
   `).join('');
 
-  // City breakdown
+  // City breakdown - V13.6: Filter garbage city names
+  const GARBAGE_CITY_PATTERNS = ['dob now', 'epic-la', 'permit', 'application', 'build –',
+    'certificate', 'inspection', 'development', 'table', 'data', 'report', 'view',
+    'commercial', 'residential', 'issued', 'case', 'bp_', 'ebr', 'dsc', 'land use'];
+  const STATE_NAMES = ['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+    'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana',
+    'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan',
+    'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire',
+    'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma',
+    'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee',
+    'texas', 'utah', 'vermont', 'virginia', 'washington', 'west virginia', 'wisconsin', 'wyoming'];
+  const isGarbageCity = (city) => {
+    if (!city || city.length < 3 || city.length > 35) return true;
+    const lower = city.toLowerCase();
+    if (STATE_NAMES.includes(lower)) return true;
+    if (GARBAGE_CITY_PATTERNS.some(p => lower.includes(p))) return true;
+    return false;
+  };
   const cityCounts = {};
   filteredPermits.forEach(p => {
-    cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
+    if (!isGarbageCity(p.city)) {
+      cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
+    }
   });
   const cityEntries = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
   const maxCity = cityEntries.length > 0 ? cityEntries[0][1] : 1;
