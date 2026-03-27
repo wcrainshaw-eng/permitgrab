@@ -5999,14 +5999,37 @@ def city_trade_landing(city_slug, trade_slug):
     # V12.9: Format city name for display
     display_name = format_city_name(city_config['name'])
 
-    # Filter permits for this city from SQLite
+    # V14.0: Filter permits for this city from SQLite using case-insensitive match
+    # Try multiple matching strategies for robustness
+    city_name = city_config['name']
+    city_permits = []
+
+    # Strategy 1: Exact match (fastest)
     cursor = conn.execute(
-        "SELECT * FROM permits WHERE city = ? ORDER BY filing_date DESC",
-        (city_config['name'],)
+        "SELECT * FROM permits WHERE city = ? ORDER BY filing_date DESC LIMIT 2000",
+        (city_name,)
     )
     city_permits = [dict(row) for row in cursor]
 
-    # Match permits to this trade based on keywords (Python-based for flexibility)
+    # Strategy 2: Case-insensitive match if exact match fails
+    if not city_permits:
+        cursor = conn.execute(
+            "SELECT * FROM permits WHERE LOWER(city) = LOWER(?) ORDER BY filing_date DESC LIMIT 2000",
+            (city_name,)
+        )
+        city_permits = [dict(row) for row in cursor]
+
+    # Strategy 3: Partial match (city name without state) if still no results
+    if not city_permits and ',' in city_name:
+        base_name = city_name.split(',')[0].strip()
+        cursor = conn.execute(
+            "SELECT * FROM permits WHERE LOWER(city) LIKE ? ORDER BY filing_date DESC LIMIT 2000",
+            (f"%{base_name.lower()}%",)
+        )
+        city_permits = [dict(row) for row in cursor]
+
+    # V14.0: Match permits to this trade based on keywords
+    # Enhanced matching: check description, permit_type, work_type, trade_category, AND project_name
     trade_keywords = [kw.lower() for kw in trade['keywords']]
     matching_permits = []
     for p in city_permits:
@@ -6018,7 +6041,11 @@ def city_trade_landing(city_slug, trade_slug):
         if p.get("work_type"):
             text += p["work_type"].lower() + " "
         if p.get("trade_category"):
-            text += p["trade_category"].lower()
+            text += p["trade_category"].lower() + " "
+        if p.get("project_name"):
+            text += p["project_name"].lower() + " "
+        if p.get("scope_of_work"):
+            text += p["scope_of_work"].lower()
 
         if any(kw in text for kw in trade_keywords):
             matching_permits.append(p)
@@ -6059,6 +6086,24 @@ def city_trade_landing(city_slug, trade_slug):
     # V12.5: noindex for empty city×trade pages
     robots_directive = "noindex, follow" if len(matching_permits) == 0 else "index, follow"
 
+    # V14.0: Get state info for internal linking
+    state_abbrev = city_config.get('state', '')
+    state_slug = None
+    state_name = state_abbrev  # Fallback to abbrev
+    for slug, info in STATE_CONFIG.items():
+        if info['abbrev'] == state_abbrev:
+            state_slug = slug
+            state_name = info['name']
+            break
+
+    # V14.0: Check if city blog post exists
+    city_blog_url = None
+    if state_abbrev:
+        blog_slug = f"building-permits-{city_slug}-{state_abbrev.lower()}-contractor-guide"
+        blog_path = os.path.join(os.path.dirname(__file__), 'blog', f"{blog_slug}.md")
+        if os.path.exists(blog_path):
+            city_blog_url = f"/blog/{blog_slug}"
+
     return render_template(
         'city_trade_landing.html',
         city=city_dict,
@@ -6068,6 +6113,9 @@ def city_trade_landing(city_slug, trade_slug):
         other_trades=other_trades,
         other_cities=other_cities,
         robots_directive=robots_directive,
+        state_slug=state_slug,
+        state_name=state_name,
+        city_blog_url=city_blog_url,
     )
 
 
