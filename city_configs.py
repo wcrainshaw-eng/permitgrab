@@ -602,7 +602,7 @@ CITY_REGISTRY = {
     "nashville": {
         "name": "Nashville",
         "state": "TN",
-        "slug": "nashville",
+        "slug": "nashville-tn",
         "platform": "arcgis",
         "endpoint": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Building_Permits_Issued_2/FeatureServer/0/query",
         "dataset_id": "Building_Permits_Issued_2",
@@ -631,10 +631,10 @@ CITY_REGISTRY = {
             "longitude": "Lon",
         },
         "date_field": "Date_Issued",
-        "date_format": "epoch",
+        "date_format": "none",  # V15: Server rejects date comparisons, filter in Python
         "limit": 2000,
         "active": True,
-        "notes": "V19: Switched from Applications to Issued endpoint (Building_Permits_Issued_2). Added Date_Issued, parcel, subdivision, council district, census tract, lat/lon, IVR tracking. Epoch date format. Data through Mar 2026. Verified.",
+        "notes": "V15: Server doesn't support WHERE date filters. Using date_format=none to fetch all and filter in Python.",
     },
 
     "miami_dade": {
@@ -10898,7 +10898,7 @@ CITY_REGISTRY = {
     "san_marcos": {
         "name": "San Marcos",
         "state": "TX",
-        "slug": "san-marcos",
+        "slug": "san-marcos-tx",
         "platform": "arcgis",
         "endpoint": "https://smgis.sanmarcostx.gov/arcgis/rest/services/Planning/CoSM_BuildingPermits/FeatureServer/0/query",
         "dataset_id": "CoSM_BuildingPermits",
@@ -10906,15 +10906,15 @@ CITY_REGISTRY = {
         "field_map": {
             "permit_number": "PERMITID",
             "address": "ADDRESS",
-            "filing_date": "created_date",
+            "filing_date": "APPLIED",
             "description": "DESCRIPTION",
             "status": "STATUS",
         },
-        "date_field": "ISSUED",
-        "date_format": "epoch",
+        "date_field": "APPLIED",
+        "date_format": "none",  # V15: Server rejects date comparisons, filter in Python
         "limit": 2000,
         "active": True,
-        "notes": "V12.8: Deactivated - ArcGIS endpoint error",
+        "notes": "V15: Server doesn't support WHERE date filters. Using date_format=none to fetch all and filter in Python.",
     },
 
     "leon_county": {
