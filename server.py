@@ -1176,14 +1176,23 @@ def get_cities_by_state_auto(state_abbrev):
 
 
 def get_total_city_count_auto():
-    """V13.8: Get total count of filtered cities (same as /cities page).
-    Previously used raw DB count which included garbage entries (4290+).
-    Now uses get_cities_with_data() which applies proper filtering (847+)."""
+    """V15: Get total count of active cities.
+
+    V15: Uses prod_cities table if available (collector redesign).
+    Falls back to get_cities_with_data() heuristics if prod_cities is empty.
+    """
     try:
+        # V15: Try prod_cities first (collector redesign)
+        if permitdb.prod_cities_table_exists():
+            count = permitdb.get_prod_city_count()
+            if count > 0:
+                return count
+
+        # Fall back to heuristics (pre-V15 behavior)
         filtered_cities = get_cities_with_data()
         return len(filtered_cities)
     except Exception as e:
-        print(f"[V13.8] Error getting city count: {e}")
+        print(f"[V15] Error getting city count: {e}")
         return 160  # Fallback
 
 
@@ -1599,12 +1608,25 @@ def load_stats():
         return {}
 
 def get_cities_with_data():
-    """V13.3: Get ALL cities from permits table sorted by permit volume.
+    """V15: Get cities with data, sorted by permit volume.
+
+    V15: Uses prod_cities table if available (collector redesign).
+    Falls back to heuristics-based filtering if prod_cities is empty.
 
     V13.1: Normalize and deduplicate city names (handles inconsistent casing)
     V13.2: Filter state names as cities, filter non-US entries, cross-state dedup
     V13.3: Filter garbage city names, fix OK state corruption by prioritizing registry
     """
+    # V15: Try prod_cities first (collector redesign)
+    try:
+        if permitdb.prod_cities_table_exists():
+            prod_cities = permitdb.get_prod_cities(status='active')
+            if prod_cities:
+                return prod_cities
+    except Exception as e:
+        print(f"[V15] Error getting prod_cities: {e}")
+
+    # Fall back to heuristics (pre-V15 behavior)
     # V13.2: Valid US state/territory codes - filter out Canadian provinces etc.
     VALID_US_STATES = {
         'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
@@ -4940,6 +4962,173 @@ def admin_trigger_collection():
     })
 
 
+@app.route('/admin/collector-health')
+def admin_collector_health():
+    """V15: Collector health dashboard - shows status of all prod cities."""
+    if not session.get('admin_authenticated'):
+        return redirect('/admin?error=Please+log+in')
+
+    # Get health data
+    try:
+        health_data = permitdb.get_city_health_status()
+        summary = permitdb.get_daily_collection_summary()
+        recent_runs = permitdb.get_recent_scraper_runs(limit=20)
+    except Exception as e:
+        health_data = []
+        summary = None
+        recent_runs = []
+        print(f"[V15] Error loading collector health: {e}")
+
+    # Count by status
+    green_count = sum(1 for c in health_data if c.get('health_color') == 'GREEN')
+    yellow_count = sum(1 for c in health_data if c.get('health_color') == 'YELLOW')
+    red_count = sum(1 for c in health_data if c.get('health_color') == 'RED')
+
+    html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Collector Health - PermitGrab Admin</title>
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
+            h1 {{ color: #00d4ff; }}
+            h2 {{ color: #888; margin-top: 30px; }}
+            table {{ border-collapse: collapse; width: 100%; margin-bottom: 30px; }}
+            th, td {{ border: 1px solid #333; padding: 8px 12px; text-align: left; }}
+            th {{ background: #252540; color: #00d4ff; }}
+            tr:nth-child(even) {{ background: #1e1e35; }}
+            .green {{ color: #00ff88; font-weight: bold; }}
+            .yellow {{ color: #ffcc00; font-weight: bold; }}
+            .red {{ color: #ff4444; font-weight: bold; }}
+            .summary {{ display: flex; gap: 20px; margin-bottom: 30px; }}
+            .summary-card {{ background: #252540; padding: 20px; border-radius: 8px; text-align: center; min-width: 120px; }}
+            .summary-card .value {{ font-size: 32px; font-weight: bold; }}
+            .summary-card .label {{ font-size: 14px; color: #888; }}
+            a {{ color: #00d4ff; }}
+            .back-link {{ margin-bottom: 20px; display: block; }}
+        </style>
+    </head>
+    <body>
+        <a href="/admin" class="back-link">&larr; Back to Admin</a>
+        <h1>Collector Health Dashboard</h1>
+
+        <div class="summary">
+            <div class="summary-card">
+                <div class="value green">{green_count}</div>
+                <div class="label">Healthy (0-2 days)</div>
+            </div>
+            <div class="summary-card">
+                <div class="value yellow">{yellow_count}</div>
+                <div class="label">Warning (3-7 days)</div>
+            </div>
+            <div class="summary-card">
+                <div class="value red">{red_count}</div>
+                <div class="label">Critical (7+ days)</div>
+            </div>
+            <div class="summary-card">
+                <div class="value">{len(health_data)}</div>
+                <div class="label">Total Cities</div>
+            </div>
+        </div>
+    '''
+
+    if summary:
+        html += f'''
+        <h2>Today's Collection Summary</h2>
+        <table>
+            <tr>
+                <th>Total Runs</th>
+                <th>Successful</th>
+                <th>Errors</th>
+                <th>No New Data</th>
+                <th>Permits Inserted</th>
+                <th>Avg Duration</th>
+            </tr>
+            <tr>
+                <td>{summary.get('total_runs', 0)}</td>
+                <td class="green">{summary.get('successful', 0)}</td>
+                <td class="red">{summary.get('errors', 0)}</td>
+                <td>{summary.get('no_new_data', 0)}</td>
+                <td>{summary.get('total_permits_inserted', 0)}</td>
+                <td>{int(summary.get('avg_duration_ms', 0) or 0)}ms</td>
+            </tr>
+        </table>
+        '''
+
+    html += '''
+        <h2>City Health Status</h2>
+        <table>
+            <tr>
+                <th>City</th>
+                <th>State</th>
+                <th>Status</th>
+                <th>Days Since Data</th>
+                <th>Total Permits</th>
+                <th>Failures</th>
+                <th>Last Error</th>
+            </tr>
+    '''
+
+    for city in health_data:
+        color_class = city.get('health_color', 'RED').lower()
+        days = city.get('days_since_data', 'N/A')
+        if days is None:
+            days = 'Never'
+        html += f'''
+            <tr>
+                <td>{city.get('city', '')}</td>
+                <td>{city.get('state', '')}</td>
+                <td class="{color_class}">{city.get('status', '').upper()}</td>
+                <td class="{color_class}">{days}</td>
+                <td>{city.get('total_permits', 0)}</td>
+                <td>{city.get('consecutive_failures', 0)}</td>
+                <td>{(city.get('last_error') or '')[:50]}</td>
+            </tr>
+        '''
+
+    html += '''
+        </table>
+
+        <h2>Recent Collection Runs</h2>
+        <table>
+            <tr>
+                <th>Time</th>
+                <th>City</th>
+                <th>Status</th>
+                <th>Permits Found</th>
+                <th>Inserted</th>
+                <th>Duration</th>
+                <th>Error</th>
+            </tr>
+    '''
+
+    for run in recent_runs:
+        status_class = 'green' if run.get('status') == 'success' else ('yellow' if run.get('status') == 'no_new' else 'red')
+        html += f'''
+            <tr>
+                <td>{run.get('run_started_at', '')}</td>
+                <td>{run.get('city', '')} {run.get('state', '')}</td>
+                <td class="{status_class}">{run.get('status', '')}</td>
+                <td>{run.get('permits_found', 0)}</td>
+                <td>{run.get('permits_inserted', 0)}</td>
+                <td>{run.get('duration_ms', '')}ms</td>
+                <td>{(run.get('error_message') or '')[:30]}</td>
+            </tr>
+        '''
+
+    html += '''
+        </table>
+
+        <p style="color: #666; margin-top: 40px;">
+            V15 Collector Redesign - prod_cities table
+        </p>
+    </body>
+    </html>
+    '''
+
+    return html
+
+
 @app.route('/admin/upgrade-user', methods=['POST'])
 def admin_upgrade_user():
     """POST /admin/upgrade-user - Upgrade a user's subscription plan."""
@@ -5838,6 +6027,15 @@ def state_or_city_landing(state_slug):
 
 def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
+    # V15: Check prod_cities status for this city
+    is_prod_city = False
+    prod_city_status = None
+    try:
+        if permitdb.prod_cities_table_exists():
+            is_prod_city, prod_city_status = permitdb.is_prod_city(city_slug)
+    except Exception as e:
+        print(f"[V15] Error checking prod_cities: {e}")
+
     # Check for SEO config, or create fallback from city_configs
     if city_slug in CITY_SEO_CONFIG:
         config = CITY_SEO_CONFIG[city_slug]
@@ -5883,11 +6081,16 @@ def city_landing_inner(city_slug):
     """, (filter_name,))
     city_permits = [dict(row) for row in cursor]
 
-    # V12.5: noindex for empty city pages to avoid thin content in Google
-    robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
-
-    # V12.11: Coming Soon flag for empty cities
-    is_coming_soon = permit_count == 0
+    # V15: noindex for non-prod cities or empty cities
+    # If prod_cities table is active and this city isn't in it, treat as coming soon
+    if permitdb.prod_cities_table_exists() and not is_prod_city:
+        robots_directive = "noindex, follow"
+        is_coming_soon = True
+    else:
+        # V12.5: noindex for empty city pages to avoid thin content in Google
+        robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
+        # V12.11: Coming Soon flag for empty cities
+        is_coming_soon = permit_count == 0
 
     # V12.51: Trade breakdown via SQL for full accuracy
     trade_cursor = conn.execute("""

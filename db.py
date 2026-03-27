@@ -217,9 +217,65 @@ def init_db():
             cities_activated INTEGER DEFAULT 0,
             errors TEXT
         );
+
+        -- V15: Collector Redesign Tables --
+
+        -- prod_cities: Verified cities with working data sources
+        -- Replaces heuristic-based city listing (KNOWN_OK_CITIES, VALID_STATES)
+        CREATE TABLE IF NOT EXISTS prod_cities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            city_slug TEXT UNIQUE NOT NULL,
+            source_type TEXT,
+            source_id TEXT,
+            source_scope TEXT,
+            source_endpoint TEXT,
+            verified_date TEXT,
+            last_collection TEXT,
+            last_permit_date TEXT,
+            total_permits INTEGER DEFAULT 0,
+            permits_last_30d INTEGER DEFAULT 0,
+            avg_daily_permits REAL DEFAULT 0,
+            status TEXT DEFAULT 'active' CHECK (status IN ('active', 'paused', 'failed', 'pending')),
+            consecutive_failures INTEGER DEFAULT 0,
+            last_error TEXT,
+            added_by TEXT,
+            added_at TEXT DEFAULT (datetime('now')),
+            notes TEXT,
+            UNIQUE(city, state)
+        );
+        CREATE INDEX IF NOT EXISTS idx_prod_cities_status ON prod_cities(status);
+        CREATE INDEX IF NOT EXISTS idx_prod_cities_state ON prod_cities(state);
+        CREATE INDEX IF NOT EXISTS idx_prod_cities_slug ON prod_cities(city_slug);
+        CREATE INDEX IF NOT EXISTS idx_prod_cities_last_collection ON prod_cities(last_collection);
+
+        -- scraper_runs: Per-city collection logging
+        CREATE TABLE IF NOT EXISTS scraper_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_name TEXT,
+            city TEXT,
+            state TEXT,
+            city_slug TEXT,
+            run_started_at TEXT DEFAULT (datetime('now')),
+            run_completed_at TEXT,
+            duration_ms INTEGER,
+            permits_found INTEGER DEFAULT 0,
+            permits_inserted INTEGER DEFAULT 0,
+            status TEXT CHECK (status IN ('success', 'error', 'no_new', 'timeout', 'skipped')),
+            error_message TEXT,
+            error_type TEXT,
+            http_status INTEGER,
+            response_size_bytes INTEGER,
+            collection_type TEXT DEFAULT 'scheduled',
+            triggered_by TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_scraper_runs_city_slug ON scraper_runs(city_slug);
+        CREATE INDEX IF NOT EXISTS idx_scraper_runs_started ON scraper_runs(run_started_at);
+        CREATE INDEX IF NOT EXISTS idx_scraper_runs_status ON scraper_runs(status);
     """)
     conn.commit()
-    print(f"[DB] V12.54: Database initialized at {DB_PATH}")
+    print(f"[DB] V15: Database initialized at {DB_PATH}")
 
 
 # ---------------------------------------------------------------------------
@@ -578,3 +634,254 @@ def record_collection_run(run_type, cities_processed, permits_collected,
         json.dumps(details) if details else None
     ))
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# V15: Prod Cities — Verified cities with working data sources
+# ---------------------------------------------------------------------------
+
+def get_prod_cities(status='active'):
+    """
+    V15: Get all cities from prod_cities table.
+    Returns list of dicts compatible with the old get_cities_with_data() format.
+
+    Args:
+        status: Filter by status ('active', 'paused', 'failed', 'pending', or None for all)
+
+    Returns:
+        List of city dicts with keys: name, state, slug, permit_count, active
+    """
+    conn = get_connection()
+
+    if status:
+        cursor = conn.execute("""
+            SELECT city, state, city_slug, total_permits, status, last_permit_date,
+                   source_type, source_id, consecutive_failures, last_error
+            FROM prod_cities
+            WHERE status = ?
+            ORDER BY total_permits DESC
+        """, (status,))
+    else:
+        cursor = conn.execute("""
+            SELECT city, state, city_slug, total_permits, status, last_permit_date,
+                   source_type, source_id, consecutive_failures, last_error
+            FROM prod_cities
+            ORDER BY total_permits DESC
+        """)
+
+    cities = []
+    for row in cursor:
+        cities.append({
+            'name': row['city'],
+            'state': row['state'],
+            'slug': row['city_slug'],
+            'permit_count': row['total_permits'] or 0,
+            'active': row['status'] == 'active',
+            'last_permit_date': row['last_permit_date'],
+            'source_type': row['source_type'],
+            'source_id': row['source_id'],
+            'consecutive_failures': row['consecutive_failures'],
+            'last_error': row['last_error'],
+        })
+
+    return cities
+
+
+def get_prod_city_count():
+    """V15: Get count of active prod cities."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active'"
+    ).fetchone()
+    return row['cnt'] if row else 0
+
+
+def is_prod_city(city_slug):
+    """V15: Check if a city slug is in the prod_cities table."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, status FROM prod_cities WHERE city_slug = ?",
+        (city_slug,)
+    ).fetchone()
+    return row is not None, row['status'] if row else None
+
+
+def get_city_health_status():
+    """
+    V15: Get health status for all prod cities.
+    Returns list sorted by health (worst first).
+    """
+    conn = get_connection()
+    cursor = conn.execute("""
+        SELECT
+            city, state, city_slug, status, last_collection, last_permit_date,
+            total_permits, avg_daily_permits, consecutive_failures, last_error,
+            CAST(julianday('now') - julianday(last_permit_date) AS INTEGER) AS days_since_data,
+            CASE
+                WHEN status = 'failed' THEN 'RED'
+                WHEN status = 'paused' THEN 'YELLOW'
+                WHEN last_permit_date IS NULL THEN 'RED'
+                WHEN julianday('now') - julianday(last_permit_date) <= 2 THEN 'GREEN'
+                WHEN julianday('now') - julianday(last_permit_date) <= 7 THEN 'YELLOW'
+                ELSE 'RED'
+            END AS health_color
+        FROM prod_cities
+        WHERE status IN ('active', 'paused', 'failed')
+        ORDER BY
+            CASE
+                WHEN status = 'failed' THEN 1
+                WHEN status = 'paused' THEN 2
+                ELSE 3
+            END,
+            CASE
+                WHEN last_permit_date IS NULL THEN 9999
+                ELSE julianday('now') - julianday(last_permit_date)
+            END DESC
+    """)
+    return [dict(row) for row in cursor]
+
+
+def upsert_prod_city(city, state, city_slug, source_type=None, source_id=None,
+                     source_scope=None, status='active', added_by='manual', notes=None):
+    """V15: Insert or update a prod city."""
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO prod_cities (
+            city, state, city_slug, source_type, source_id, source_scope,
+            status, added_by, notes, verified_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(city_slug) DO UPDATE SET
+            source_type = excluded.source_type,
+            source_id = excluded.source_id,
+            source_scope = excluded.source_scope,
+            status = excluded.status,
+            notes = excluded.notes,
+            verified_date = datetime('now')
+    """, (city, state, city_slug, source_type, source_id, source_scope,
+          status, added_by, notes))
+    conn.commit()
+
+
+def update_prod_city_collection(city_slug, permits_found=0, last_permit_date=None, error=None):
+    """V15: Update prod city after a collection run."""
+    conn = get_connection()
+
+    if error:
+        # Increment failure count
+        conn.execute("""
+            UPDATE prod_cities SET
+                consecutive_failures = consecutive_failures + 1,
+                last_error = ?,
+                last_collection = datetime('now')
+            WHERE city_slug = ?
+        """, (error, city_slug))
+
+        # Check if should pause (3+ failures)
+        row = conn.execute(
+            "SELECT consecutive_failures FROM prod_cities WHERE city_slug = ?",
+            (city_slug,)
+        ).fetchone()
+        if row and row['consecutive_failures'] >= 3:
+            conn.execute(
+                "UPDATE prod_cities SET status = 'paused' WHERE city_slug = ?",
+                (city_slug,)
+            )
+    else:
+        # Success - reset failures, update stats
+        conn.execute("""
+            UPDATE prod_cities SET
+                consecutive_failures = 0,
+                last_error = NULL,
+                last_collection = datetime('now'),
+                last_permit_date = COALESCE(?, last_permit_date),
+                total_permits = total_permits + ?
+            WHERE city_slug = ?
+        """, (last_permit_date, permits_found, city_slug))
+
+        # Reactivate if was paused
+        conn.execute("""
+            UPDATE prod_cities SET status = 'active'
+            WHERE city_slug = ? AND status = 'paused'
+        """, (city_slug,))
+
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# V15: Scraper Runs — Per-city collection logging
+# ---------------------------------------------------------------------------
+
+def log_scraper_run(source_name=None, city=None, state=None, city_slug=None,
+                    permits_found=0, permits_inserted=0, status='success',
+                    error_message=None, error_type=None, duration_ms=None,
+                    http_status=None, collection_type='scheduled', triggered_by=None):
+    """V15: Log a scraper run."""
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO scraper_runs (
+            source_name, city, state, city_slug, run_completed_at,
+            permits_found, permits_inserted, status, error_message, error_type,
+            duration_ms, http_status, collection_type, triggered_by
+        ) VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        source_name, city, state, city_slug,
+        permits_found, permits_inserted, status, error_message, error_type,
+        duration_ms, http_status, collection_type, triggered_by
+    ))
+    conn.commit()
+
+
+def get_daily_collection_summary(date=None):
+    """V15: Get collection summary for a day."""
+    conn = get_connection()
+    if date is None:
+        date = datetime.now().strftime('%Y-%m-%d')
+
+    row = conn.execute("""
+        SELECT
+            DATE(run_started_at) AS run_date,
+            COUNT(*) AS total_runs,
+            SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS successful,
+            SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors,
+            SUM(CASE WHEN status = 'no_new' THEN 1 ELSE 0 END) AS no_new_data,
+            SUM(CASE WHEN status = 'timeout' THEN 1 ELSE 0 END) AS timeouts,
+            SUM(permits_inserted) AS total_permits_inserted,
+            AVG(duration_ms) AS avg_duration_ms
+        FROM scraper_runs
+        WHERE DATE(run_started_at) = ?
+    """, (date,)).fetchone()
+
+    return dict(row) if row else None
+
+
+def get_recent_scraper_runs(city_slug=None, limit=50):
+    """V15: Get recent scraper runs, optionally filtered by city."""
+    conn = get_connection()
+
+    if city_slug:
+        cursor = conn.execute("""
+            SELECT * FROM scraper_runs
+            WHERE city_slug = ?
+            ORDER BY run_started_at DESC
+            LIMIT ?
+        """, (city_slug, limit))
+    else:
+        cursor = conn.execute("""
+            SELECT * FROM scraper_runs
+            ORDER BY run_started_at DESC
+            LIMIT ?
+        """, (limit,))
+
+    return [dict(row) for row in cursor]
+
+
+def prod_cities_table_exists():
+    """V15: Check if prod_cities table exists and has data."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM prod_cities"
+        ).fetchone()
+        return row['cnt'] > 0
+    except sqlite3.OperationalError:
+        return False
