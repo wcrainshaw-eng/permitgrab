@@ -1154,13 +1154,14 @@ def get_cities_by_state_auto(state_abbrev):
 
 
 def get_total_city_count_auto():
-    """V13: Get total count of all unique cities in permit data from SQLite.
-    Previous version read from deprecated JSON file. Now queries DB directly."""
+    """V13.8: Get total count of filtered cities (same as /cities page).
+    Previously used raw DB count which included garbage entries (4290+).
+    Now uses get_cities_with_data() which applies proper filtering (847+)."""
     try:
-        city_rows = permitdb.get_cities_with_permits()
-        return len(city_rows)
+        filtered_cities = get_cities_with_data()
+        return len(filtered_cities)
     except Exception as e:
-        print(f"[V13] Error getting city count: {e}")
+        print(f"[V13.8] Error getting city count: {e}")
         return 160  # Fallback
 
 
@@ -1720,7 +1721,8 @@ def get_cities_with_data():
             continue
 
         # V13.6: Filter county names and abbreviations
-        if 'county' in name_lower or name_lower in ('uninc', 'unincorporated'):
+        # V13.8: Added 'general', 'electrical', 'roof' per UAT Round 7 (trade names)
+        if 'county' in name_lower or name_lower in ('uninc', 'unincorporated', 'general', 'electrical', 'roof'):
             continue
 
         # V13.6: Skip very short names (likely abbreviations or garbage)
