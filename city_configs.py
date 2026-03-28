@@ -591,6 +591,7 @@ CITY_REGISTRY = {
     # ARCGIS PLATFORM CITIES
     # =========================================================================
 
+    # V23 AUDIT: 2026-03-28 - STALE - ArcGIS endpoint requires verification
     "atlanta": {
         "name": "Atlanta",
         "state": "GA",
@@ -1935,6 +1936,7 @@ CITY_REGISTRY = {
         "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - Endpoint needs verification
     "dallas": {
         "name": "Dallas",
         "state": "TX",
@@ -2329,6 +2331,7 @@ CITY_REGISTRY = {
         "notes": "V12.7: New — Hackensack permits via NJ State Socrata. Filtered from statewide dataset. Pop ~46K.",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - NJ State filtered data
     "sayreville_nj": {
         "name": "Sayreville",
         "state": "NJ",
@@ -2354,6 +2357,7 @@ CITY_REGISTRY = {
         "notes": "V12.7: New — Sayreville permits via NJ State Socrata. Filtered from statewide dataset. Pop ~45K.",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - NJ State filtered data
     "linden_nj": {
         "name": "Linden",
         "state": "NJ",
@@ -2429,6 +2433,7 @@ CITY_REGISTRY = {
         "notes": "V12.7: New — Fort Lee permits via NJ State Socrata. Filtered from statewide dataset. Pop ~40K.",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - NJ State filtered data
     "atlantic_city_nj": {
         "name": "Atlantic City",
         "state": "NJ",
@@ -2479,6 +2484,7 @@ CITY_REGISTRY = {
         "notes": "V12.7: New — Fair Lawn permits via NJ State Socrata. Filtered from statewide dataset. Pop ~34K.",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - NJ State filtered data
     "garfield_nj": {
         "name": "Garfield",
         "state": "NJ",
@@ -4978,6 +4984,7 @@ CITY_REGISTRY = {
         "notes": "V19: Full 22-field map — contractor name + trade, building use code/desc, work class, milestone, sqft, declared valuation, fee amount + desc, issue/expire/modified dates. Data through Mar 20, 2026. Verified.",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE/BLOCKED - Fabricated domain needs replacement
     "urbana": {
         "name": "Urbana",
         "state": "IL",
@@ -5000,7 +5007,7 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": False,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "notes": "# BLOCKED: V12.6 - Fabricated Socrata domain, replacement source needed",
     },
 
     "salt_lake_city": {
@@ -5992,6 +5999,7 @@ CITY_REGISTRY = {
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE/BLOCKED - Fabricated Socrata domain needs replacement
     "reno": {
         "name": "Reno",
         "state": "NV",
@@ -6014,7 +6022,7 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": False,  # V12.31 Deactivated: Error parsing response,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "notes": "# BLOCKED: V12.6 - Fabricated Socrata domain, replacement source needed",
     },
 
     "colorado_springs": {
@@ -10356,6 +10364,7 @@ CITY_REGISTRY = {
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE/INACTIVE - Using NJ statewide data
     "camden": {
         "name": "Camden",
         "state": "NJ",
@@ -10378,7 +10387,7 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": False,  # V12.32: Covered by nj_statewide bulk source
-        "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
+        "notes": "# BLOCKED: V12.32 - Covered by nj_statewide bulk source, using state-level data instead",
     },
 
     "elizabeth": {
@@ -11652,6 +11661,7 @@ CITY_REGISTRY = {
         "notes": "V12.8: City-filtered from Collin County TX",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - City-filtered from Collin County TX source
     "royse_city": {
         "name": "Royse City",
         "state": "TX",
@@ -11802,6 +11812,7 @@ CITY_REGISTRY = {
         "notes": "V12.8: City-filtered from Collin County TX",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - City-filtered from Collin County TX source
     "rockwall": {
         "name": "Rockwall",
         "state": "TX",
@@ -13585,6 +13596,7 @@ CITY_REGISTRY = {
         "notes": "V12.14: City-filtered from Howard County MD",
     },
 
+    # V23 AUDIT: 2026-03-28 - STALE - County-filtered data
     "laurel_md": {
         "name": "Laurel",
         "state": "MD",
