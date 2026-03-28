@@ -416,6 +416,7 @@ CITY_REGISTRY = {
         "notes": "V19: Replaced wrong DDOT_TOPS/MapServer with correct DCRA FeatureServer. Using 'Last 30 Days' rolling feed (layer 4) for daily scraping. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, NEIGHBORHOODCLUSTER, lat/lon. Also available: yearly layers (2015-2025) at FeatureServer/15-17,24-25. Verified Mar 2026 with same-day permit data.",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - CKAN endpoint needs verification
     "san_antonio": {
         "name": "San Antonio",
         "state": "TX",
@@ -532,6 +533,7 @@ CITY_REGISTRY = {
         "notes": "V12.39: Fixed CKAN endpoint - PLI Permits",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - ArcGIS endpoint needs verification
     "denver": {
         "name": "Denver",
         "state": "CO",
@@ -752,6 +754,7 @@ CITY_REGISTRY = {
         "notes": "V19: Replaced broken Building_Permits endpoint with working 180-day rolling feed. GOLD: contractor company, DBA, address, city, state, zip, email, phone, license number. Also: fees, est cost, CO/COC dates, housing units, land use, jurisdiction. Verified Mar 2026.",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - ArcGIS endpoint needs verification
     "phoenix": {
         "name": "Phoenix",
         "state": "AZ",
@@ -806,6 +809,7 @@ CITY_REGISTRY = {
         "notes": "V12.5: Switched to CKAN — 17K+ permits, daily updates",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - Socrata endpoint needs verification
     "san_diego": {
         "name": "San Diego County",
         "state": "CA",
@@ -928,6 +932,7 @@ CITY_REGISTRY = {
     # CARTO PLATFORM CITIES
     # =========================================================================
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - CARTO endpoint needs verification
     "philadelphia": {
         "name": "Philadelphia",
         "state": "PA",
@@ -990,6 +995,7 @@ CITY_REGISTRY = {
         "notes": "V17g: Switched to verified ArcGIS FeatureServer (old Socrata was fabricated)",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - ArcGIS endpoint needs verification
     "charlotte": {
         "name": "Charlotte",
         "state": "NC",
@@ -1049,6 +1055,7 @@ CITY_REGISTRY = {
         "notes": "V19: Full 38-field map — project name/desc/phase, permit desc, subdivision, zone code, building type, num units, construction type, occupancy, heated/unheated/total sqft, owner name/city/state/zip, fee type, x/y coords. Data through Mar 2026. Verified.",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - ArcGIS endpoint needs verification
     "columbus": {
         "name": "Columbus",
         "state": "OH",
@@ -1072,6 +1079,7 @@ CITY_REGISTRY = {
         "notes": "V17h: Switched to ArcGIS Building_and_Zoning_Cases Layer 1 — CASE_NO, FULL_ADDRESS. Limited fields but real data.",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - ArcGIS endpoint needs verification
     "fort_worth": {
         "name": "Fort Worth",
         "state": "TX",
