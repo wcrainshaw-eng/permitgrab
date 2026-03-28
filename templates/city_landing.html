@@ -13,11 +13,13 @@
 <meta property="og:url" content="{{ canonical_url }}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="{{ og_image or '/static/img/og-default.png' }}">
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ meta_title }}">
 <meta name="twitter:description" content="{{ meta_description }}">
+<meta name="twitter:image" content="{{ og_image or '/static/img/og-default.png' }}">
 <meta name="robots" content="{{ robots_directive | default('index, follow') }}">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 
@@ -54,14 +56,14 @@
   "license": "https://permitgrab.com/terms"
 }
 </script>
-<!-- V12.12: Breadcrumb structured data -->
+<!-- V12.12/V21: Breadcrumb structured data -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
     {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://permitgrab.com/"},
-    {"@type": "ListItem", "position": 2, "name": "{{ city_state }}", "item": "https://permitgrab.com/?state={{ city_state }}"},
+    {"@type": "ListItem", "position": 2, "name": "{{ state_name or city_state }}", "item": "https://permitgrab.com/states/{{ city_state|lower }}"},
     {"@type": "ListItem", "position": 3, "name": "{{ city_name }}", "item": "{{ canonical_url }}"}
   ]
 }
@@ -927,7 +929,7 @@ body {
         <p>{{ permit.description[:100] }}{% if permit.description|length > 100 %}...{% endif %} &bull; {{ permit.date_label | default('Filed') }}: {{ permit.filing_date | format_date }}</p>
       </div>
       <div class="permit-value {{ permit.value_tier }}">
-        {% if permit.estimated_cost and permit.estimated_cost != 50000000 and permit.estimated_cost != 100000000 %}{% if permit.estimated_cost >= 1000000 %}${{ "%.1f" | format(permit.estimated_cost / 1000000) }}M{% else %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 13px;">Not listed on permit</span>{% endif %}
+        {% if permit.estimated_cost and permit.estimated_cost > 0 and permit.estimated_cost != 50000000 and permit.estimated_cost != 100000000 %}{% if permit.estimated_cost >= 1000000 %}${{ "%.1f" | format(permit.estimated_cost / 1000000) }}M{% else %}${{ "{:,.0f}".format(permit.estimated_cost) }}{% endif %}{% else %}<span style="color: #9ca3af; font-style: italic; font-size: 13px;">Cost not reported</span>{% endif %}
       </div>
     </div>
     {% endfor %}

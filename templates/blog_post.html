@@ -10,11 +10,16 @@
 <meta property="og:description" content="{{ post.excerpt }}">
 <meta property="og:url" content="https://permitgrab.com/blog/{{ post.slug }}">
 <meta property="og:type" content="article">
+<meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="{{ post.og_image or '/static/img/og-default.png' }}">
 <!-- V13.9: Article publish/modified times for freshness signals -->
 <meta property="article:published_time" content="{{ post.date }}T00:00:00Z">
 <meta property="article:modified_time" content="{{ post.date }}T00:00:00Z">
 <meta property="article:author" content="PermitGrab Team">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ post.title }}">
+<meta name="twitter:description" content="{{ post.excerpt }}">
+<meta name="twitter:image" content="{{ post.og_image or '/static/img/og-default.png' }}">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 {% include 'partials/analytics.html' %}

@@ -73,17 +73,21 @@ def format_date_filter(date_str):
 
 @app.template_filter('clean_address')
 def clean_address_filter(val):
-    """V12.60: Clean raw GeoJSON/Socrata JSON from address fields at display time."""
+    """V12.60/V21: Clean raw GeoJSON/Socrata JSON from address fields at display time.
+    V21 FIX #13: Return 'Address pending' instead of empty/N/A for missing addresses."""
     if not val:
-        return ''
+        return 'Address pending'
     s = str(val).strip()
+    # V21: Check for placeholder values
+    if s.lower() in ('', 'n/a', 'address not provided', 'none', 'null'):
+        return 'Address pending'
     # Quick check — if no curly brace, it's already clean
     if '{' not in s:
         return s
     # Contains JSON — run through parse_address_value
     from collector import parse_address_value
     cleaned = parse_address_value(s)
-    return cleaned if cleaned else ''
+    return cleaned if cleaned else 'Address pending'
 
 
 # V12.17: Google Search Console verification - MUST be registered first before any catch-alls
