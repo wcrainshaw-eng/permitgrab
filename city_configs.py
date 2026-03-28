@@ -782,6 +782,7 @@ CITY_REGISTRY = {
         "notes": "V18: Replaced fabricated endpoint with real maps.phoenix.gov MapServer — company name, scope of work, permit descriptions",
     },
 
+    # V23 AUDIT: 2026-03-28 - NO_DATA - CKAN endpoint needs verification
     "san_jose": {
         "name": "San Jose",
         "state": "CA",
