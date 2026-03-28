@@ -428,20 +428,19 @@ CITY_REGISTRY = {
         "resource_id": "c21106f9-3ef5-4f3a-8604-f992b4db7512",
         "description": "Building Permits (CKAN - Open Data SA)",
         "field_map": {
-            "permit_number": "PERMIT NUMBER",
+            "permit_number": "PERMIT #",
             "permit_type": "PERMIT TYPE",
-            "work_type": "PERMIT CLASS",
-            "address": "SITE ADDRESS",
-            "zip": "ZIP CODE",
+            "work_type": "WORK TYPE",
+            "address": "ADDRESS",
             "filing_date": "DATE ISSUED",
-            "status": "PERMIT STATUS",
-            "estimated_cost": "VALUATION",
-            "description": "PROJECT DESCRIPTION",
+            "estimated_cost": "DECLARED VALUATION",
+            "description": "PROJECT NAME",
+            "contact_name": "PRIMARY CONTACT",
         },
         "date_field": "DATE ISSUED",
         "limit": 2000,
         "active": True,
-        "notes": "V20: Migrated from dead Socrata (v23u-v49r, 404) to CKAN. Resource c21106f9 has 101K+ records. Sort requires URL-encoded quotes for spaced field names. Verified Mar 2026, latest permit 3/20/2026.",
+        "notes": "V23: Fixed field_map to match actual CKAN fields. 100K+ records through Mar 2026.",
     },
 
     "kansas_city": {
@@ -933,7 +932,6 @@ CITY_REGISTRY = {
     # CARTO PLATFORM CITIES
     # =========================================================================
 
-    # V23 AUDIT: 2026-03-28 - NO_DATA - CARTO endpoint needs verification
     "philadelphia": {
         "name": "Philadelphia",
         "state": "PA",
@@ -942,8 +940,8 @@ CITY_REGISTRY = {
         "lon": -75.164,
         "platform": "carto",
         "endpoint": "https://phl.carto.com/api/v2/sql",
-        "table_name": "li_permits",
-        "dataset_id": "li_permits",
+        "table_name": "permits",
+        "dataset_id": "permits",
         "description": "L&I Building and Zoning Permits",
         "field_map": {
             "permit_number": "permitnumber",
@@ -956,12 +954,12 @@ CITY_REGISTRY = {
             "filing_date": "permitissuedate",
             "status": "status",
             "estimated_cost": "",
-            "description": "typeofwork",
+            "description": "permitdescription",
         },
         "date_field": "permitissuedate",
         "limit": 2000,
         "active": True,
-        "notes": "V17g: Re-enabled — phl.carto.com/api/v2/sql is a known working CARTO endpoint",
+        "notes": "V23: Fixed table name li_permits->permits. 912K records through Mar 2026.",
     },
 
     # =========================================================================
@@ -1598,8 +1596,8 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V17h: Verified ArcGIS endpoint via discovery script — CaseNumber, Address, IssuedDate, Cost",
+        "active": False,
+        "notes": "# V23 STALE: ArcGIS endpoint returns Jun 2023 data. Socrata at opendata.lasvegasnevada.gov not responding. Needs fresh source.",
     },
 
     "orlando": {
@@ -1945,7 +1943,6 @@ CITY_REGISTRY = {
         "active": False,  # V12.25: Disabled - individual cities use city_filter
     },
 
-    # V23 AUDIT: 2026-03-28 - STALE - Endpoint needs verification
     "dallas": {
         "name": "Dallas",
         "state": "TX",
@@ -1966,8 +1963,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.3: Verified working — formerly dallas_verified",
+        "active": False,
+        "notes": "# V23 LOGIN_REQUIRED: Socrata stale (last 8/2020). Dallas launched DallasNow Accela May 2025 at aca-prod.accela.com/DALLASTX - requires registration.",
     },
 
     "framingham": {
@@ -6008,30 +6005,20 @@ CITY_REGISTRY = {
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
-    # V23 AUDIT: 2026-03-28 - STALE/BLOCKED - Fabricated Socrata domain needs replacement
     "reno": {
         "name": "Reno",
         "state": "NV",
         "slug": "reno",
-        "platform": "socrata",
-        "endpoint": "https://data.reno.gov/resource/57xk-84gm.json",
-        "dataset_id": "57xk-84gm",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
+        "lat": 39.530,
+        "lon": -119.814,
+        "platform": "",
+        "endpoint": "",
+        "dataset_id": "",
+        "field_map": {},
+        "date_field": "",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Error parsing response,
-        "notes": "# BLOCKED: V12.6 - Fabricated Socrata domain, replacement source needed",
+        "active": False,
+        "notes": "# V23 LOGIN_REQUIRED: Uses ONE Regional Accela at aca-prod.accela.com/ONE - requires registration. No public API.",
     },
 
     "colorado_springs": {
