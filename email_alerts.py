@@ -11,9 +11,53 @@ import secrets
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
+from pathlib import Path
 
 # Import permitdb for SQLite access
 import db as permitdb
+
+# =============================================================================
+# V22: SUBSCRIBER LOADING (replaces User model queries)
+# =============================================================================
+
+SUBSCRIBERS_FILE = Path("/var/data/subscribers.json")
+# Local fallback for development
+if not SUBSCRIBERS_FILE.exists():
+    SUBSCRIBERS_FILE = Path(os.path.dirname(__file__)) / "data" / "subscribers.json"
+
+
+def load_subscribers():
+    """Load active subscribers from subscribers.json."""
+    if not SUBSCRIBERS_FILE.exists():
+        print(f"  [WARN] Subscribers file not found: {SUBSCRIBERS_FILE}")
+        return []
+    try:
+        with open(SUBSCRIBERS_FILE) as f:
+            subscribers = json.load(f)
+        return [s for s in subscribers if s.get("active", False)]
+    except Exception as e:
+        print(f"  [ERROR] Failed to load subscribers: {e}")
+        return []
+
+
+class SubscriberProxy:
+    """V22: Adapter that makes a subscribers.json dict look like a User model."""
+    def __init__(self, data):
+        self.email = data.get("email", "")
+        self.name = data.get("name", "")
+        self.plan = data.get("plan", "free")
+        self.unsubscribe_token = data.get("unsubscribe_token", "")
+        self.digest_active = data.get("active", True)
+        self.last_digest_sent_at = data.get("last_digest_sent_at")
+        # Convert single city string to JSON array format
+        city = data.get("city", "")
+        cities = data.get("cities", [])  # Support future multi-city
+        if cities:
+            self.digest_cities = json.dumps(cities)
+        elif city:
+            self.digest_cities = json.dumps([city])
+        else:
+            self.digest_cities = "[]"
 
 # SendGrid SMTP configuration
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.sendgrid.net')
@@ -274,6 +318,8 @@ def get_permits_for_digest(cities, since_date, limit=25):
     old permits that were merely re-collected by the REFRESH collector.
     Sort by filing_date DESC so newest permits appear first, then by
     estimated_cost DESC as a tiebreaker.
+
+    V22: FALLBACK — if no new permits, show most recent regardless of date.
     """
     if not cities:
         return []
@@ -298,27 +344,157 @@ def get_permits_for_digest(cities, since_date, limit=25):
     params = cities_normalized + [since_date, limit]
 
     cursor = conn.execute(query, params)
-    return [dict(row) for row in cursor]
+    permits = [dict(row) for row in cursor]
+
+    # V22: FALLBACK — if no new permits, show most recent regardless of date
+    if not permits and cities_normalized:
+        fallback_query = f"""
+            SELECT * FROM permits
+            WHERE city IN ({placeholders})
+            ORDER BY filing_date DESC, estimated_cost DESC
+            LIMIT 5
+        """
+        cursor = conn.execute(fallback_query, cities_normalized)
+        permits = [dict(row) for row in cursor]
+        # Tag these as fallback so the template knows
+        for p in permits:
+            p['_is_fallback'] = True
+
+    return permits
 
 
-def build_digest_html(user, permits, is_pro=False, active_cities=None):
-    """Build the daily digest email HTML."""
+def get_nearby_permits(subscriber_city, since_date, limit=3):
+    """Get a few permits from a nearby city for the digest.
+    V22: Uses METRO_NEARBY map from city_configs."""
+    from city_configs import METRO_NEARBY, get_city_config
+
+    # Normalize the subscriber's city to a key
+    city_key = subscriber_city.lower().replace(" ", "_").replace(",", "")
+
+    nearby_keys = METRO_NEARBY.get(city_key, [])
+    if not nearby_keys:
+        # Fallback: try same-state cities from the permits table
+        return _get_same_state_permits(subscriber_city, since_date, limit)
+
+    # Try each nearby city until we find one with recent permits
+    conn = permitdb.get_connection()
+    for nearby_key in nearby_keys:
+        config = get_city_config(nearby_key)
+        if not config or not config.get("active"):
+            continue
+        nearby_city_name = config["name"]
+        nearby_state = config.get("state", "")
+
+        query = """
+            SELECT * FROM permits
+            WHERE city = ? AND state = ?
+            AND filing_date >= ?
+            ORDER BY filing_date DESC, estimated_cost DESC
+            LIMIT ?
+        """
+        cursor = conn.execute(query, [nearby_city_name, nearby_state, since_date, limit])
+        permits = [dict(row) for row in cursor]
+        if permits:
+            return permits, nearby_city_name, nearby_state
+
+    return [], None, None
+
+
+def _get_same_state_permits(subscriber_city, since_date, limit=3):
+    """Fallback: find permits from any other city in the same state."""
+    conn = permitdb.get_connection()
+
+    # First, figure out which state the subscriber's city is in
+    state_query = "SELECT state FROM permits WHERE city = ? LIMIT 1"
+    row = conn.execute(state_query, [subscriber_city.title()]).fetchone()
+    if not row:
+        return [], None, None
+
+    state = row[0]
+
+    query = """
+        SELECT * FROM permits
+        WHERE state = ? AND city != ?
+        AND filing_date >= ?
+        ORDER BY filing_date DESC, estimated_cost DESC
+        LIMIT ?
+    """
+    cursor = conn.execute(query, [state, subscriber_city.title(), since_date, limit])
+    permits = [dict(row) for row in cursor]
+    if permits:
+        nearby_city = permits[0].get("city", "Nearby")
+        return permits, nearby_city, state
+    return [], None, None
+
+
+def get_market_snapshot(days=7):
+    """Get aggregate stats for the market snapshot section.
+    V22: Simple stats across all cities for the past week."""
+    conn = permitdb.get_connection()
+    since = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+
+    stats = {}
+
+    # Total permits this week
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM permits WHERE filing_date >= ?",
+        [since]
+    ).fetchone()
+    stats["total_permits"] = row[0] if row else 0
+
+    # Total value
+    row = conn.execute(
+        "SELECT SUM(estimated_cost) as total FROM permits WHERE filing_date >= ? AND estimated_cost > 0",
+        [since]
+    ).fetchone()
+    stats["total_value"] = row[0] if row else 0
+
+    # Top trade category
+    row = conn.execute("""
+        SELECT trade_category, COUNT(*) as cnt
+        FROM permits WHERE filing_date >= ? AND trade_category IS NOT NULL AND trade_category != ''
+        GROUP BY trade_category ORDER BY cnt DESC LIMIT 1
+    """, [since]).fetchone()
+    stats["top_trade"] = row[0] if row else "General"
+    stats["top_trade_count"] = row[1] if row else 0
+
+    # Busiest city
+    row = conn.execute("""
+        SELECT city, state, COUNT(*) as cnt
+        FROM permits WHERE filing_date >= ?
+        GROUP BY city, state ORDER BY cnt DESC LIMIT 1
+    """, [since]).fetchone()
+    stats["busiest_city"] = row[0] if row else ""
+    stats["busiest_state"] = row[1] if row else ""
+    stats["busiest_count"] = row[2] if row else 0
+
+    return stats
+
+
+def build_digest_html(user, permits, nearby_permits=None, nearby_city=None,
+                      nearby_state=None, snapshot=None, is_pro=False,
+                      active_cities=None):
+    """Build the daily digest email HTML.
+    V22: Three-section layout — Your City, Nearby, Market Snapshot."""
     name = user.name or 'there'
     # V12.59: Use active_cities (cities with actual permits) if provided
     display_cities = active_cities or json.loads(user.digest_cities or '[]')
     city_display = ', '.join(display_cities[:3]) + ('...' if len(display_cities) > 3 else '') if display_cities else 'your cities'
 
+    # Check if permits are fallback (no new permits, showing recent)
+    is_fallback = any(p.get('_is_fallback') for p in permits) if permits else False
+    new_permit_count = len([p for p in permits if not p.get('_is_fallback')]) if permits else 0
+
     # Calculate stats
     total_value = sum(p.get('estimated_cost', 0) or 0 for p in permits)
     high_value = len([p for p in permits if (p.get('estimated_cost') or 0) >= 100000])
 
-    # Build permit rows
-    permit_limit = 25 if is_pro else 10
-    permit_rows = ''
-
-    for p in permits[:permit_limit]:
-        cost = f"${p.get('estimated_cost', 0):,.0f}" if p.get('estimated_cost') else 'N/A'
+    # Build permit rows helper
+    def build_permit_card(p, muted=False):
+        cost = f"${p.get('estimated_cost', 0):,.0f}" if p.get('estimated_cost') else 'Cost not reported'
         value_color = '#dc2626' if (p.get('estimated_cost') or 0) >= 100000 else '#f97316' if (p.get('estimated_cost') or 0) >= 25000 else '#6b7280'
+        if muted:
+            value_color = '#9ca3af'
 
         # Contact info - visible for Pro, blurred for Free
         if is_pro:
@@ -335,37 +511,84 @@ def build_digest_html(user, permits, is_pro=False, active_cities=None):
               🔒 Contact info hidden — <a href="''' + SITE_URL + '''/pricing" style="color:#f97316;">Upgrade to Pro</a>
             </div>'''
 
-        permit_rows += f'''
-        <div style="padding:16px;border-bottom:1px solid #e5e7eb;">
+        return f'''
+        <div style="padding:16px;border-bottom:1px solid #e5e7eb;{'opacity:0.85;' if muted else ''}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px;background:#dbeafe;color:#1e40af;">{p.get('trade_category', 'Other')}</span>
             <span style="font-weight:700;font-size:16px;color:{value_color};">{cost}</span>
           </div>
-          <div style="font-weight:600;font-size:15px;color:#111827;margin-bottom:4px;">{p.get('address', 'N/A')}</div>
+          <div style="font-weight:600;font-size:15px;color:#111827;margin-bottom:4px;">{p.get('address', 'Address pending')}</div>
           <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">{p.get('city', '')}, {p.get('state', '')} {p.get('zip', '')}</div>
           <div style="font-size:14px;color:#4b5563;margin-bottom:8px;">{(p.get('description') or '')[:150]}</div>
           <div style="font-size:12px;color:#9ca3af;">Filed: {p.get('filing_date', 'N/A')} · #{p.get('permit_number', '')}</div>
           {contact_section}
         </div>'''
 
-    # Summary section
-    if permits:
-        summary = f'''
+    # Build permit rows for Section 1
+    permit_limit = 25 if is_pro else 10
+    permit_rows = ''.join(build_permit_card(p) for p in permits[:permit_limit])
+
+    # SECTION 1: Your City summary
+    if permits and not is_fallback:
+        section1_header = f'''
         <div style="padding:24px 32px;background:#f9fafb;">
           <p style="margin:0;font-size:16px;color:#374151;">
             Hey {name}, we found <strong style="color:#111827;">{len(permits)} new permits</strong> in {city_display}.
           </p>
           {f'<p style="margin:8px 0 0 0;font-size:14px;color:#6b7280;">Including <strong style="color:#dc2626;">{high_value} high-value leads</strong> (${total_value:,.0f} total).</p>' if high_value > 0 else ''}
         </div>'''
-    else:
-        summary = f'''
+    elif permits and is_fallback:
+        section1_header = f'''
         <div style="padding:24px 32px;background:#f9fafb;">
           <p style="margin:0;font-size:16px;color:#374151;">
-            Hey {name}, no new permits were filed yesterday in {city_display}.
+            Hey {name}, no new permits today in {city_display}.
           </p>
           <p style="margin:8px 0 0 0;font-size:14px;color:#6b7280;">
-            We'll keep watching and notify you when new permits come in.
+            Here are the most recent active permits in your area:
           </p>
+        </div>'''
+    else:
+        section1_header = f'''
+        <div style="padding:24px 32px;background:#f9fafb;">
+          <p style="margin:0;font-size:16px;color:#374151;">
+            Hey {name}, no permits found for {city_display} yet.
+          </p>
+          <p style="margin:8px 0 0 0;font-size:14px;color:#6b7280;">
+            We're actively collecting data — check back soon!
+          </p>
+        </div>'''
+
+    # SECTION 2: Nearby City (only if we have nearby permits)
+    section2_html = ''
+    if nearby_permits and nearby_city:
+        nearby_rows = ''.join(build_permit_card(p, muted=True) for p in nearby_permits[:3])
+        section2_html = f'''
+        <div style="margin-top:24px;border-top:2px solid #e5e7eb;">
+          <div style="padding:16px 32px;background:#fefce8;">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#854d0e;">
+              📍 Also trending near you — {nearby_city}, {nearby_state}
+            </p>
+          </div>
+          <div>{nearby_rows}</div>
+        </div>'''
+
+    # SECTION 3: Market Snapshot (always shown if we have stats)
+    section3_html = ''
+    if snapshot and snapshot.get('total_permits', 0) > 0:
+        total_val_display = f"${snapshot.get('total_value', 0):,.0f}" if snapshot.get('total_value') else "N/A"
+        section3_html = f'''
+        <div style="margin-top:24px;border-top:2px solid #e5e7eb;">
+          <div style="padding:20px 32px;background:#f0f9ff;">
+            <p style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0369a1;">
+              📊 This Week Across PermitGrab
+            </p>
+            <div style="font-size:14px;color:#374151;line-height:1.8;">
+              • <strong>{snapshot.get('total_permits', 0):,}</strong> new permits filed<br>
+              • <strong>{total_val_display}</strong> in total project value<br>
+              • Top trade: <strong>{snapshot.get('top_trade', 'General')}</strong> ({snapshot.get('top_trade_count', 0):,} permits)<br>
+              • Busiest city: <strong>{snapshot.get('busiest_city', '')}</strong> ({snapshot.get('busiest_count', 0):,} permits)
+            </div>
+          </div>
         </div>'''
 
     content = f'''
@@ -375,7 +598,7 @@ def build_digest_html(user, permits, is_pro=False, active_cities=None):
       </div>
     </div>
 
-    {summary}
+    {section1_header}
 
     <div>
       {permit_rows if permits else ''}
@@ -383,38 +606,58 @@ def build_digest_html(user, permits, is_pro=False, active_cities=None):
 
     {f'<div style="padding:12px 32px;text-align:center;font-size:13px;color:#9ca3af;background:#f9fafb;">Showing top {min(len(permits), permit_limit)} of {len(permits)} matching permits</div>' if len(permits) > permit_limit else ''}
 
+    {section2_html}
+
+    {section3_html}
+
     <div style="padding:24px 32px;text-align:center;">
       <a href="{SITE_URL}/dashboard" style="display:inline-block;padding:14px 32px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
         View All Permits
       </a>
     </div>'''
 
+    preheader = f"{new_permit_count} new permits in {city_display}" if new_permit_count > 0 else f"Daily update for {city_display}"
+
     return base_template(
         content,
-        preheader=f"{len(permits)} new permits in {city_display}" if permits else f"Daily update for {city_display}",
+        preheader=preheader,
         show_upgrade_cta=not is_pro,
         unsubscribe_token=user.unsubscribe_token
     )
 
 
 def send_daily_digest_to_user(user):
-    """Send daily digest to a single user."""
+    """Send daily digest to a single user.
+    V22: Now includes nearby city + market snapshot sections."""
     cities = json.loads(user.digest_cities or '[]')
 
     if not cities:
         return False, "no_cities"
 
-    # V12.64: Use last_digest_sent_at to avoid sending duplicate permits.
-    # Only show permits filed AFTER the last digest was sent.
-    # Fall back to 7-day window for new users who haven't received a digest yet.
-    if user.last_digest_sent_at:
-        since = user.last_digest_sent_at.strftime('%Y-%m-%d')
+    # V12.64/V22: Use last_digest_sent_at to avoid sending duplicate permits.
+    # Handle both string and datetime formats from SubscriberProxy.
+    if hasattr(user, 'last_digest_sent_at') and user.last_digest_sent_at:
+        if isinstance(user.last_digest_sent_at, str):
+            since = user.last_digest_sent_at[:10]
+        else:
+            since = user.last_digest_sent_at.strftime('%Y-%m-%d')
     else:
         since = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    is_pro = user.plan in ('professional', 'pro', 'enterprise')
-    limit = 50 if is_pro else 20  # Fetch more, display limited
 
+    is_pro = user.plan in ('professional', 'pro', 'enterprise')
+    limit = 50 if is_pro else 20
+
+    # Section 1: Subscriber's city permits
     permits = get_permits_for_digest(cities, since, limit)
+
+    # Section 2: Nearby city permits
+    primary_city = cities[0] if cities else ""
+    nearby_permits, nearby_city, nearby_state = get_nearby_permits(
+        primary_city, since, limit=3
+    )
+
+    # Section 3: Market snapshot (always available)
+    snapshot = get_market_snapshot(days=7)
 
     # V12.59: Only reference cities that actually have permits
     cities_with_permits = list(dict.fromkeys(
@@ -422,104 +665,95 @@ def send_daily_digest_to_user(user):
     ))
     active_cities = cities_with_permits if cities_with_permits else cities
 
-    # Build and send
-    html = build_digest_html(user, permits, is_pro, active_cities)
+    # Build HTML with all three sections
+    html = build_digest_html(
+        user, permits,
+        nearby_permits=nearby_permits,
+        nearby_city=nearby_city,
+        nearby_state=nearby_state,
+        snapshot=snapshot,
+        is_pro=is_pro,
+        active_cities=active_cities
+    )
 
-    # Build subject — V12.59: Use only cities with actual permits
-    if len(active_cities) == 1:
-        subject = f"PermitGrab Daily Digest — {active_cities[0]} — {datetime.now().strftime('%b %d')}"
+    # Subject line — V22: dynamic based on permit count
+    permit_count = len([p for p in permits if not p.get('_is_fallback')])
+    if permit_count > 0:
+        subject = f"{permit_count} new permits in {active_cities[0]} — {datetime.now().strftime('%b %d')}"
     else:
-        subject = f"PermitGrab Daily Digest — {len(active_cities)} Cities — {datetime.now().strftime('%b %d')}"
+        subject = f"PermitGrab Daily Digest — {datetime.now().strftime('%b %d')}"
 
     success = send_email(user.email, subject, html)
 
-    return success, len(permits)
+    return success, permit_count
 
 
 def send_daily_digest():
-    """
-    Send daily digest to all eligible users.
-    Called by scheduler at 7 AM ET.
-
-    Eligible users:
-    - digest_active = True
-    - Has at least 1 city in digest_cities
-    - (For now, skip email_verified check until verification is fully implemented)
-    """
-    # Import here to avoid circular imports
-    from server import app, User, db as flask_db
-
+    """Send daily digest to all eligible subscribers.
+    V22: Reads from subscribers.json instead of users table."""
     print(f"\n{'='*60}")
     print(f"PermitGrab Daily Digest - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*60}")
 
-    with app.app_context():
-        # Query eligible users
-        users = User.query.filter(
-            User.digest_active == True,
-            User.digest_cities != '[]',
-            User.digest_cities != None,
-            User.digest_cities != ''
-        ).all()
+    subscribers = load_subscribers()
+    print(f"Found {len(subscribers)} active subscribers")
 
-        print(f"Found {len(users)} eligible users")
+    if not subscribers:
+        print("No subscribers found. Exiting.")
+        return 0, 0
 
-        sent = 0
-        failed = 0
-        skipped = 0
+    sent = 0
+    failed = 0
+    skipped = 0
 
-        for user in users:
-            try:
-                success, result = send_daily_digest_to_user(user)
-                if success:
-                    sent += 1
-                    # Update last sent timestamp
-                    user.last_digest_sent_at = datetime.utcnow()
-                elif result == "no_cities":
-                    skipped += 1
-                else:
-                    failed += 1
-            except Exception as e:
-                print(f"  ✗ Error sending to {user.email}: {e}")
+    for sub_data in subscribers:
+        user = SubscriberProxy(sub_data)
+        if not user.email or user.digest_cities == "[]":
+            skipped += 1
+            continue
+        try:
+            success, result = send_daily_digest_to_user(user)
+            if success:
+                sent += 1
+                # Update last_sent in the JSON file
+                sub_data["last_digest_sent_at"] = datetime.utcnow().isoformat()
+            elif result == "no_cities":
+                skipped += 1
+            else:
                 failed += 1
+        except Exception as e:
+            print(f"  ✗ Error sending to {user.email}: {e}")
+            failed += 1
 
-        # Commit timestamp updates
-        flask_db.session.commit()
+    # Persist updated timestamps back to file
+    try:
+        all_subs = json.loads(SUBSCRIBERS_FILE.read_text())
+        for sub in all_subs:
+            match = next((s for s in subscribers
+                         if s.get("email") == sub.get("email")), None)
+            if match and "last_digest_sent_at" in match:
+                sub["last_digest_sent_at"] = match["last_digest_sent_at"]
+        SUBSCRIBERS_FILE.write_text(json.dumps(all_subs, indent=2))
+    except Exception as e:
+        print(f"  [WARN] Could not update timestamps in subscribers.json: {e}")
 
-        print(f"\nDigest complete: {sent} sent, {failed} failed, {skipped} skipped")
-        return sent, failed
+    print(f"\nDigest complete: {sent} sent, {failed} failed, {skipped} skipped")
+    return sent, failed
 
 
 def send_test_digest(email):
-    """
-    Send a test digest to a specific email address (for admin testing).
-    Creates a mock user object if needed.
-    """
-    from server import app, User
-
-    with app.app_context():
-        # Try to find the user
-        user = User.query.filter_by(email=email).first()
-
-        if user:
-            success, result = send_daily_digest_to_user(user)
-            return {'success': success, 'result': result}
-        else:
-            # Create a mock user for testing
-            class MockUser:
-                def __init__(self):
-                    self.email = email
-                    self.name = "Test User"
-                    self.plan = "pro"
-                    self.digest_cities = json.dumps(["Atlanta", "New York"])
-                    self.unsubscribe_token = "test-token"
-
-                def is_pro(self):
-                    return True
-
-            mock_user = MockUser()
-            success, result = send_daily_digest_to_user(mock_user)
-            return {'success': success, 'result': result, 'note': 'Used mock user (email not found)'}
+    """Send a test digest to a specific email (admin testing).
+    V22: Uses SubscriberProxy instead of User model."""
+    user = SubscriberProxy({
+        "email": email,
+        "name": "Test User",
+        "city": "Chicago",  # Use Chicago since it has fresh data
+        "plan": "pro",
+        "active": True,
+        "unsubscribe_token": "test-token"
+    })
+    success, result = send_daily_digest_to_user(user)
+    return {'success': success, 'result': result}
 
 
 # =============================================================================

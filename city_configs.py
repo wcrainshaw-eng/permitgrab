@@ -566,27 +566,23 @@ CITY_REGISTRY = {
         "platform": "arcgis",
         "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/Building_Permit_latest/FeatureServer/0/query",
         "dataset_id": "Building_Permit_latest",
-        "description": "Building Permits (2019-2024) - DATA STALE",
+        "description": "Building Permits (current) via Building Permit Tracker",
         "field_map": {
             "permit_number": "RecordID",
             "permit_type": "TypeCombo",
             "work_type": "Subtype",
             "address": "Address",
             "zip": "",
-            "filing_date": "Opend",
+            "filing_date": "OrigOpened",
             "status": "Status_1",
             "estimated_cost": "JobValue",
             "description": "Name",
         },
-        "date_field": "Opend",
-        "date_format": "none",
+        "date_field": "OrigOpened",
+        "date_format": "epoch",
         "limit": 2000,
         "active": True,
-        # V18: Atlanta Open Data only publishes 2019-2024 data. Source last updated Dec 28, 2024.
-        # The dataset "All Building Permits 2019-2024" at dpcd-coaplangis.opendata.arcgis.com
-        # does not include 2025+ permits. Need to find alternative source or contact Atlanta DCP.
-        "data_stale_since": "2024-12-28",
-        "stale_reason": "Atlanta Open Data portal only publishes 2019-2024 permits",
+        # V22: Fixed endpoint - now pulling from Building_Permit_latest which has 2026 data
     },
 
     "nashville": {
@@ -14909,6 +14905,54 @@ PERMIT_VALUE_TIERS = {
         "label": "Standard",
         "color": "#27ae60",
     },
+}
+
+
+# ============================================================================
+# V22: METRO NEARBY MAP (for digest "nearby city" section)
+# ============================================================================
+# Maps a city key to a list of other CITY_REGISTRY keys that are nearby.
+# Only include cities that are ACTIVE and have FRESH data.
+# This is intentionally simple — will be replaced by distance-based
+# lookup once lat/lon is added to city configs.
+
+METRO_NEARBY = {
+    # Southeast
+    "atlanta":         ["nashville", "charlotte", "jacksonville"],
+    "nashville":       ["atlanta", "louisville", "charlotte"],
+    "charlotte":       ["nashville", "atlanta"],
+    "jacksonville":    ["orlando", "atlanta"],
+    "orlando":         ["jacksonville", "tampa"],
+    "tampa":           ["orlando", "jacksonville"],
+
+    # Midwest / Great Lakes
+    "chicago":         ["milwaukee", "indianapolis"],
+    "milwaukee":       ["chicago", "madison"],
+    "detroit":         ["toledo"],
+    "indianapolis":    ["chicago", "louisville", "columbus"],
+    "columbus":        ["indianapolis", "cleveland"],
+
+    # Texas
+    "houston":         ["san_antonio", "austin", "dallas"],
+    "austin":          ["san_antonio", "houston"],
+    "dallas":          ["fort_worth", "houston", "austin"],
+    "san_antonio":     ["austin", "houston"],
+    "fort_worth":      ["dallas", "austin"],
+
+    # West
+    "los_angeles":     ["long_beach", "santa_ana", "san_diego"],
+    "san_jose":        ["san_francisco", "oakland"],
+    "phoenix":         ["mesa", "scottsdale", "tucson"],
+    "denver":          ["colorado_springs"],
+    "portland":        ["vancouver_wa", "salem"],
+    "seattle":         ["tacoma", "bellevue"],
+
+    # Northeast
+    "boston":          ["cambridge", "worcester", "providence"],
+    "washington_dc":   ["baltimore"],
+    "baltimore":       ["washington_dc"],
+    "new_york":        ["newark", "jersey_city"],
+    "philadelphia":    ["camden"],
 }
 
 
