@@ -363,70 +363,6 @@ def get_permits_for_digest(cities, since_date, limit=25):
     return permits
 
 
-def get_nearby_permits(subscriber_city, since_date, limit=3):
-    """Get a few permits from a nearby city for the digest.
-    V22: Uses METRO_NEARBY map from city_configs."""
-    from city_configs import METRO_NEARBY, get_city_config
-
-    # Normalize the subscriber's city to a key
-    city_key = subscriber_city.lower().replace(" ", "_").replace(",", "")
-
-    nearby_keys = METRO_NEARBY.get(city_key, [])
-    if not nearby_keys:
-        # Fallback: try same-state cities from the permits table
-        return _get_same_state_permits(subscriber_city, since_date, limit)
-
-    # Try each nearby city until we find one with recent permits
-    conn = permitdb.get_connection()
-    for nearby_key in nearby_keys:
-        config = get_city_config(nearby_key)
-        if not config or not config.get("active"):
-            continue
-        nearby_city_name = config["name"]
-        nearby_state = config.get("state", "")
-
-        query = """
-            SELECT * FROM permits
-            WHERE city = ? AND state = ?
-            AND filing_date >= ?
-            ORDER BY filing_date DESC, estimated_cost DESC
-            LIMIT ?
-        """
-        cursor = conn.execute(query, [nearby_city_name, nearby_state, since_date, limit])
-        permits = [dict(row) for row in cursor]
-        if permits:
-            return permits, nearby_city_name, nearby_state
-
-    return [], None, None
-
-
-def _get_same_state_permits(subscriber_city, since_date, limit=3):
-    """Fallback: find permits from any other city in the same state."""
-    conn = permitdb.get_connection()
-
-    # First, figure out which state the subscriber's city is in
-    state_query = "SELECT state FROM permits WHERE city = ? LIMIT 1"
-    row = conn.execute(state_query, [subscriber_city.title()]).fetchone()
-    if not row:
-        return [], None, None
-
-    state = row[0]
-
-    query = """
-        SELECT * FROM permits
-        WHERE state = ? AND city != ?
-        AND filing_date >= ?
-        ORDER BY filing_date DESC, estimated_cost DESC
-        LIMIT ?
-    """
-    cursor = conn.execute(query, [state, subscriber_city.title(), since_date, limit])
-    permits = [dict(row) for row in cursor]
-    if permits:
-        nearby_city = permits[0].get("city", "Nearby")
-        return permits, nearby_city, state
-    return [], None, None
-
-
 def get_market_snapshot(days=7):
     """Get aggregate stats for the market snapshot section.
     V22: Simple stats across all cities for the past week."""
@@ -471,11 +407,9 @@ def get_market_snapshot(days=7):
     return stats
 
 
-def build_digest_html(user, permits, nearby_permits=None, nearby_city=None,
-                      nearby_state=None, snapshot=None, is_pro=False,
-                      active_cities=None):
+def build_digest_html(user, permits, snapshot=None, is_pro=False, active_cities=None):
     """Build the daily digest email HTML.
-    V22: Three-section layout — Your City, Nearby, Market Snapshot."""
+    V22: Two-section layout — Your City + Market Snapshot."""
     name = user.name or 'there'
     # V12.59: Use active_cities (cities with actual permits) if provided
     display_cities = active_cities or json.loads(user.digest_cities or '[]')
@@ -558,25 +492,11 @@ def build_digest_html(user, permits, nearby_permits=None, nearby_city=None,
           </p>
         </div>'''
 
-    # SECTION 2: Nearby City (only if we have nearby permits)
+    # SECTION 2: Market Snapshot (always shown if we have stats)
     section2_html = ''
-    if nearby_permits and nearby_city:
-        nearby_rows = ''.join(build_permit_card(p, muted=True) for p in nearby_permits[:3])
-        section2_html = f'''
-        <div style="margin-top:24px;border-top:2px solid #e5e7eb;">
-          <div style="padding:16px 32px;background:#fefce8;">
-            <p style="margin:0;font-size:14px;font-weight:600;color:#854d0e;">
-              📍 Also trending near you — {nearby_city}, {nearby_state}
-            </p>
-          </div>
-          <div>{nearby_rows}</div>
-        </div>'''
-
-    # SECTION 3: Market Snapshot (always shown if we have stats)
-    section3_html = ''
     if snapshot and snapshot.get('total_permits', 0) > 0:
         total_val_display = f"${snapshot.get('total_value', 0):,.0f}" if snapshot.get('total_value') else "N/A"
-        section3_html = f'''
+        section2_html = f'''
         <div style="margin-top:24px;border-top:2px solid #e5e7eb;">
           <div style="padding:20px 32px;background:#f0f9ff;">
             <p style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0369a1;">
@@ -608,8 +528,6 @@ def build_digest_html(user, permits, nearby_permits=None, nearby_city=None,
 
     {section2_html}
 
-    {section3_html}
-
     <div style="padding:24px 32px;text-align:center;">
       <a href="{SITE_URL}/dashboard" style="display:inline-block;padding:14px 32px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
         View All Permits
@@ -628,14 +546,13 @@ def build_digest_html(user, permits, nearby_permits=None, nearby_city=None,
 
 def send_daily_digest_to_user(user):
     """Send daily digest to a single user.
-    V22: Now includes nearby city + market snapshot sections."""
+    V22: Your city permits + market snapshot."""
     cities = json.loads(user.digest_cities or '[]')
 
     if not cities:
         return False, "no_cities"
 
-    # V12.64/V22: Use last_digest_sent_at to avoid sending duplicate permits.
-    # Handle both string and datetime formats from SubscriberProxy.
+    # Use last_digest_sent_at to avoid sending duplicate permits.
     if hasattr(user, 'last_digest_sent_at') and user.last_digest_sent_at:
         if isinstance(user.last_digest_sent_at, str):
             since = user.last_digest_sent_at[:10]
@@ -650,27 +567,18 @@ def send_daily_digest_to_user(user):
     # Section 1: Subscriber's city permits
     permits = get_permits_for_digest(cities, since, limit)
 
-    # Section 2: Nearby city permits
-    primary_city = cities[0] if cities else ""
-    nearby_permits, nearby_city, nearby_state = get_nearby_permits(
-        primary_city, since, limit=3
-    )
-
-    # Section 3: Market snapshot (always available)
+    # Section 2: Market snapshot (always available)
     snapshot = get_market_snapshot(days=7)
 
-    # V12.59: Only reference cities that actually have permits
+    # Only reference cities that actually have permits
     cities_with_permits = list(dict.fromkeys(
         p.get('city', '') for p in permits if p.get('city')
     ))
     active_cities = cities_with_permits if cities_with_permits else cities
 
-    # Build HTML with all three sections
+    # Build HTML (no nearby section for now)
     html = build_digest_html(
         user, permits,
-        nearby_permits=nearby_permits,
-        nearby_city=nearby_city,
-        nearby_state=nearby_state,
         snapshot=snapshot,
         is_pro=is_pro,
         active_cities=active_cities
@@ -741,13 +649,13 @@ def send_daily_digest():
     return sent, failed
 
 
-def send_test_digest(email):
+def send_test_digest(email, city=None):
     """Send a test digest to a specific email (admin testing).
     V22: Uses SubscriberProxy instead of User model."""
     user = SubscriberProxy({
         "email": email,
         "name": "Test User",
-        "city": "Chicago",  # Use Chicago since it has fresh data
+        "city": city or "Chicago",
         "plan": "pro",
         "active": True,
         "unsubscribe_token": "test-token"
@@ -1474,8 +1382,8 @@ if __name__ == '__main__':
 
         elif cmd == 'test':
             email = sys.argv[2] if len(sys.argv) > 2 else 'test@example.com'
-            city = sys.argv[3] if len(sys.argv) > 3 else 'Atlanta'
-            send_test_digest(email, [city])
+            city = sys.argv[3] if len(sys.argv) > 3 else None
+            send_test_digest(email, city)
 
         elif cmd == 'lifecycle':
             check_trial_lifecycle()
