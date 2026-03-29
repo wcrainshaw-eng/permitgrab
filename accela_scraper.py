@@ -113,6 +113,48 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    "fort_worth": {
+        "agency_code": "CFW",
+        "module": "Development",
+        "tab_name": "Development",
+        "search_url_path": "Cap/CapHome.aspx?module=Development&TabName=Development",
+    },
+    "san_diego": {
+        "agency_code": "SANDIEGO",
+        "module": "DSD",
+        "tab_name": "Home",
+        "search_url_path": "Cap/CapHome.aspx?module=DSD&TabName=Home",
+    },
+    "anaheim": {
+        "agency_code": "ANAHEIM",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "colorado_springs": {
+        "agency_code": "COSPRINGS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "virginia_beach": {
+        "agency_code": "CVB",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "st_louis_county": {
+        "agency_code": "SLC",
+        "module": "Construction",
+        "tab_name": "Construction",
+        "search_url_path": "Cap/CapHome.aspx?module=Construction&TabName=Construction",
+    },
+    "chandler": {
+        "agency_code": "CHANDLER",
+        "module": "DevServices",
+        "tab_name": "DevServices",
+        "search_url_path": "Cap/CapHome.aspx?module=DevServices&TabName=DevServices",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
