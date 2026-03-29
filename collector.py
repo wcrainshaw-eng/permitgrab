@@ -21,6 +21,14 @@ from city_source_db import (
 import db as permitdb  # V12.50: SQLite database layer
 from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication
 
+# V24: Accela scraper (Playwright-based)
+try:
+    from accela_scraper import fetch_accela
+    ACCELA_AVAILABLE = True
+except ImportError:
+    ACCELA_AVAILABLE = False
+    print("[V24] Playwright/accela_scraper not available - Accela cities will be skipped")
+
 # V18: Valid US state/territory codes for validation
 VALID_US_STATES = {
     'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
@@ -963,6 +971,11 @@ def fetch_permits(city_key, days_back=30):
                 raw = fetch_ckan(config, days_back)
             elif platform == "carto":
                 raw = fetch_carto(config, days_back)
+            elif platform == "accela":
+                if not ACCELA_AVAILABLE:
+                    print(f"  [SKIP] Accela not available (playwright not installed)")
+                    return [], "skip_no_playwright"
+                raw = fetch_accela(config, days_back)
             else:
                 print(f"  [ERROR] Unknown platform: {platform}")
                 return [], "error_unknown_platform"
