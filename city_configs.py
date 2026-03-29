@@ -822,8 +822,8 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
-        "notes": "# BLOCKED: V23 - County Socrata (dyzh-7eat) data is stale (2017). City portal (data.sandiego.gov) access denied on direct API calls. Needs alternative discovery.",
+        "active": True,
+        "notes": "V26: Data provided via san_diego_county bulk source.",
     },
 
     "sacramento": {
@@ -1311,7 +1311,7 @@ CITY_REGISTRY = {
         "platform": "accela",
         "agency_code": "OKC",
         "_accela_city_key": "oklahoma_city",
-        "endpoint": "https://access.okc.gov/aca/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "endpoint": "https://access.okc.gov/aca/Cap/CapHome.aspx?module=Permits&TabName=HOME",
         "description": "Building Permits",
         "date_field": "Date",
         "field_map": {
@@ -1324,8 +1324,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
-        "notes": "V24: OKC uses custom Accela domain (access.okc.gov), not aca-prod. Needs custom scraper support.",
+        "active": True,
+        "notes": "V24: OKC uses custom Accela domain (access.okc.gov/aca). Scraper supports via base_url override.",
     },
 
     "omaha": {
@@ -1761,7 +1761,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,  # V12.25: Disabled - individual cities use city_filter
+        "active": True,
+        "notes": "V26: Data provided via marin_county_ca bulk source.",
     },
 
     "gainesville": {
@@ -1865,7 +1866,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,  # V12.25: Disabled - individual cities use city_filter
+        "active": True,
+        "notes": "V26: Data provided via montgomery_county_md bulk source.",
     },
 
     "williamson_county_tx": {
@@ -1888,7 +1890,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,  # V12.25: Disabled - individual cities use city_filter
+        "active": True,
+        "notes": "V26: Data provided via williamson_county_tx bulk source.",
     },
 
     "dallas": {
@@ -2005,8 +2008,8 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": True,
+        "notes": "V26: Data provided via prince_georges_county_md bulk source.",
     },
 
     # V23 AUDIT: 2026-03-28 - BLOCKED - NJ state data has NO street addresses (only block/lot)
@@ -3260,7 +3263,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V12.25: Disabled - individual cities use city_filter
+        "active": True,
+        "notes": "V26: Data provided via howard_county_md bulk source.",
     },
 
     "sonoma_county": {
@@ -3280,8 +3284,8 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": True,
+        "notes": "V26: Data provided via sonoma_county bulk source.",
     },
 
     "collin_county": {
@@ -3304,7 +3308,8 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,  # V12.25: Disabled - individual cities use city_filter
+        "active": True,
+        "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
 
     "summit_county_ut": {
@@ -8015,8 +8020,8 @@ CITY_REGISTRY = {
         "date_field": "permit_issue_date",
         "default_filter": "$where=permit_type='Building'",
         "limit": 2000,
-        "active": False,
-        "notes": "Mixed permits/inspections dataset; filter by permit_type='Building' for building permits only.",
+        "active": True,
+        "notes": "V26: Data provided via norfolk_va bulk source.",
     },
 
     "chesapeake": {
@@ -8614,7 +8619,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Error parsing response,
+        "active": True,
+        "notes": "V26: Data provided via little_rock_ar bulk source.",
     },
 
     "tulsa": {
@@ -11210,9 +11216,9 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "ALLEN"},
-        "notes": "V12.8: City-filtered from Collin County TX",
+        "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
 
     "celina": {
@@ -11258,9 +11264,9 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "WYLIE"},
-        "notes": "V12.8: City-filtered from Collin County TX",
+        "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
 
     "princeton": {
@@ -13784,8 +13790,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Corona CA building permits. Pop ~157K. Good field coverage.",
+        "active": True,
+        "notes": "V26: Data provided via corona_ca bulk source.",
     },
 
     # --- Mesa AZ ---
