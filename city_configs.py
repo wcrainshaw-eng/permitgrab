@@ -1540,7 +1540,7 @@ CITY_REGISTRY = {
         "date_format": "epoch",
         "limit": 2000,
         "active": False,
-        "notes": "# V23 STALE: ArcGIS endpoint returns Jun 2023 data. Socrata at opendata.lasvegasnevada.gov not responding. Needs fresh source.",
+        "notes": "V26: All sources dead. Old ArcGIS was Baltimore data (wrong). Socrata 403. Hub 404. MapServer stale (Jul 2020).",
     },
 
     "orlando": {
