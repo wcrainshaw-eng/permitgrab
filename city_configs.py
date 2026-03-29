@@ -1300,15 +1300,15 @@ CITY_REGISTRY = {
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/OAKLAND.",
     },
 
-    # V23 AUDIT: 2026-03-28 - LOGIN_REQUIRED - Uses Accela at access.okc.gov
+    # V23 AUDIT: 2026-03-28 - Uses custom Accela at access.okc.gov (not aca-prod)
     "oklahoma_city": {
         "name": "Oklahoma City",
         "state": "OK",
         "slug": "oklahoma-city",
         "platform": "accela",
-        "agency_code": "OKIE",
+        "agency_code": "OKC",
         "_accela_city_key": "oklahoma_city",
-        "endpoint": "https://aca-prod.accela.com/OKIE/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "endpoint": "https://access.okc.gov/aca/Cap/CapHome.aspx?module=Building&TabName=Building",
         "description": "Building Permits",
         "date_field": "Date",
         "field_map": {
@@ -1321,8 +1321,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
-        "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/OKIE.",
+        "active": False,
+        "notes": "V24: OKC uses custom Accela domain (access.okc.gov), not aca-prod. Needs custom scraper support.",
     },
 
     "omaha": {
