@@ -85,6 +85,18 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    "lancaster_ca": {
+        "agency_code": "LANCASTER",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "palmdale": {
+        "agency_code": "PALMDALE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
