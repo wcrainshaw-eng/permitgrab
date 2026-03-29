@@ -989,7 +989,7 @@ CITY_REGISTRY = {
         "platform": "accela",
         "agency_code": "CHARLOTTE",
         "_accela_city_key": "charlotte",
-        "endpoint": "https://aca-prod.accela.com/CHARLOTTE/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "endpoint": "https://aca-prod.accela.com/CHARLOTTE/Cap/CapHome.aspx?module=LandDevelopment&TabName=LandDevelopment",
         "description": "Mecklenburg County Building Permits",
         "date_field": "Date",
         "field_map": {
@@ -5211,7 +5211,7 @@ CITY_REGISTRY = {
         },
         "limit": 2000,
         "active": False,
-        "notes": "V24: Accela portal available but scraper returns 0 results (no CSV export, HTML parsing failed). Needs investigation.",
+        "notes": "V24: Santa Clarita Accela portal requires login for Building module. Cannot scrape without credentials.",
     },
 
     "modesto": {
@@ -9158,7 +9158,7 @@ CITY_REGISTRY = {
         },
         "limit": 2000,
         "active": False,
-        "notes": "V24: Accela portal available but scraper returns 0 results. Needs investigation - may have different layout.",
+        "notes": "V24: Lancaster Accela portal doesn't support date-based search. Only allows search by permit number, type, address, or APN.",
     },
 
     "palmdale": {

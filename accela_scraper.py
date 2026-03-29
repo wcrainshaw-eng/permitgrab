@@ -39,11 +39,9 @@ ACCELA_CONFIGS = {
     },
     "charlotte": {
         "agency_code": "CHARLOTTE",
-        "module": "Building",
-        "tab_name": "Building",
-        # Charlotte has a custom home; try direct URL first, fall back to clicking
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
-        "custom_home": True,
+        "module": "LandDevelopment",
+        "tab_name": "LandDevelopment",
+        "search_url_path": "Cap/CapHome.aspx?module=LandDevelopment&TabName=LandDevelopment",
     },
     "reno": {
         "agency_code": "RENO",
