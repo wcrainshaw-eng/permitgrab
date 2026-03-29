@@ -1131,8 +1131,8 @@ CITY_REGISTRY = {
         },
         "date_field": "createddate",
         "limit": 2000,
-        "active": False,
-        "notes": "V19: Replaced fabricated msmn-pn2k with real dataset 4vab-c87q. Rich data: applicant, estimatedvalueofwork, address, TMK, statusdescription, boolean work-type flags (addition/alteration/demolition/pool/solar/ADU/EV charger), fee calculation, CO issued. Data 2005-Jun 2025. Verified Mar 2026.",
+        "active": True,
+        "notes": "V26: Data provided via honolulu_verified endpoint.",
     },
 
     # V23 AUDIT: 2026-03-28 - LOGIN_REQUIRED - Uses Accela Citizen Access
@@ -4785,8 +4785,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.8: Deactivated - duplicate of new_orleans using same endpoint",
+        "active": True,
+        "notes": "V26: Data provided via new_orleans endpoint.",
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Edmonton, Alberta, Canada
@@ -13672,8 +13672,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Austin TX construction permits from datahub. 82 columns, massive dataset.",
+        "active": True,
+        "notes": "V26: Data provided via austin endpoint.",
     },
 
     # --- Norfolk VA ---
@@ -13696,8 +13696,8 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Norfolk VA permits and inspections. 32 fields incl. fees, work items.",
+        "active": True,
+        "notes": "V26: Data provided via norfolk endpoint.",
     },
 
     # --- Dallas TX ---
@@ -13766,8 +13766,8 @@ CITY_REGISTRY = {
         },
         "date_field": "processed_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Orlando FL permit applications. Includes worktype, square footage.",
+        "active": True,
+        "notes": "V26: Data provided via orlando endpoint.",
     },
 
     # --- Corona CA ---
@@ -13814,8 +13814,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Mesa AZ building permits. Pop ~518K. 34 fields, updated daily.",
+        "active": True,
+        "notes": "V26: Data provided via mesa_new endpoint.",
     },
 
     # --- Buffalo NY ---
@@ -13836,8 +13836,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Buffalo NY building permits. Includes applicant, license info.",
+        "active": True,
+        "notes": "V26: Data provided via buffalo endpoint.",
     },
 
     # --- San Diego County CA (individual city endpoint) ---
@@ -13884,8 +13884,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: College Station TX permits. Pop ~120K. Home of Texas A&M.",
+        "active": True,
+        "notes": "V26: Data provided via college_station endpoint.",
     },
 
     # --- Gainesville FL ---
@@ -13907,8 +13907,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Gainesville FL building permits. Deactivated - duplicate of gainesville.",
+        "active": True,
+        "notes": "V26: Data provided via gainesville endpoint.",
     },
 
     # --- Little Rock AR ---
@@ -13931,8 +13931,8 @@ CITY_REGISTRY = {
         },
         "date_field": "appdate",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Little Rock AR permits. Pop ~202K. First AR city! Includes sq ft, contractor.",
+        "active": True,
+        "notes": "V26: Data provided via little_rock endpoint.",
     },
 
     # --- Fort Worth TX ---
@@ -13979,8 +13979,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V12.60: Framingham MA building permits. Pop ~73K.",
+        "active": True,
+        "notes": "V26: Data provided via framingham endpoint.",
     },
 
     # --- Auburn WA ---
