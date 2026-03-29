@@ -79,6 +79,12 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
         "needs_module_discovery": True,
     },
+    "oakland": {
+        "agency_code": "OAKLAND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
@@ -198,20 +204,54 @@ async def scrape_accela_permits(city_key, days_back=1):
                 await end_input.fill(end_str)
                 break
 
-        # ---- STEP 2: Click Search ----
-        print(f"    [Accela] Submitting search...")
-        search_btn = await page.query_selector('a[id*="btnNewSearch"], input[id*="btnNewSearch"], a:has-text("Search"):not([id*="Header"])')
-        if not search_btn:
-            # Fallback: find the blue Search button at bottom of form
-            search_btn = await page.query_selector('a.ACA_LgButton:has-text("Search")')
-        if not search_btn:
-            # Last resort: any link/button with exact text "Search" in the form area
-            search_btn = await page.query_selector('#ctl00_PlaceHolderMain_btnNewSearch')
+        # ---- STEP 2: Handle any Terms/Disclaimer popups ----
+        # Some Accela portals show a terms acceptance dialog first
+        accept_btn = await page.query_selector('a:has-text("I Agree"), a:has-text("Accept"), button:has-text("Accept"), a:has-text("Continue")')
+        if accept_btn:
+            print(f"    [Accela] Accepting terms/disclaimer...")
+            await accept_btn.click()
+            await page.wait_for_timeout(2000)
 
-        if search_btn:
-            await search_btn.click()
-        else:
-            raise Exception(f"Could not find Search button on {agency} portal")
+        # ---- STEP 3: Click Search ----
+        print(f"    [Accela] Submitting search...")
+
+        # Try multiple selectors for the Search button
+        search_selectors = [
+            'a[id*="btnNewSearch"]',
+            'input[id*="btnNewSearch"]',
+            '#ctl00_PlaceHolderMain_btnNewSearch',
+            'a.ACA_LgButton:has-text("Search")',
+            'a.ACA_SmButton:has-text("Search")',
+            'a[title="Search"]',
+            'input[value="Search"]',
+            'button:has-text("Search")',
+            # Generic fallback - any link with Search text in the main content area
+            '#ctl00_PlaceHolderMain a:has-text("Search")',
+        ]
+
+        search_btn = None
+        for sel in search_selectors:
+            search_btn = await page.query_selector(sel)
+            if search_btn:
+                # Scroll into view and wait for visibility
+                await search_btn.scroll_into_view_if_needed()
+                await page.wait_for_timeout(500)
+                try:
+                    await search_btn.click(timeout=10000)
+                    break
+                except Exception as click_err:
+                    # Try JavaScript click as fallback
+                    try:
+                        await page.evaluate('(el) => el.click()', search_btn)
+                        break
+                    except:
+                        search_btn = None
+                        continue
+
+        if not search_btn:
+            # Save screenshot for debugging
+            await page.screenshot(path=f"/tmp/accela_debug_{agency}.png")
+            raise Exception(f"Could not find/click Search button on {agency} portal. Debug screenshot saved.")
 
         # Wait for results to load (ASP.NET postback)
         await page.wait_for_load_state("networkidle", timeout=30000)

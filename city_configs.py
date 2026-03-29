@@ -503,8 +503,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
-        "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/DETROIT.",
+        "active": False,
+        "notes": "V24: Accela portal requires login. Cannot scrape without credentials.",
     },
 
     "pittsburgh": {
@@ -1280,15 +1280,24 @@ CITY_REGISTRY = {
         "name": "Oakland",
         "state": "CA",
         "slug": "oakland",
-        "platform": "",
-        "endpoint": "",
-        "dataset_id": "",
+        "platform": "accela",
+        "agency_code": "OAKLAND",
+        "_accela_city_key": "oakland",
+        "endpoint": "https://aca-prod.accela.com/OAKLAND/Cap/CapHome.aspx?module=Building&TabName=Building",
         "description": "Building Permits",
-        "field_map": {},
-        "date_field": "",
+        "date_field": "Date",
+        "field_map": {
+            "permit_number": "Record Number",
+            "permit_type": "Record Type",
+            "address": "Address",
+            "description": "Description",
+            "issued_date": "Date",
+            "date": "Date",
+            "status": "Status"
+        },
         "limit": 2000,
-        "active": False,
-        "notes": "# V23 LOGIN_REQUIRED: Oakland uses Accela at aca-prod.accela.com/OAKLAND. Socrata dataset wgz8-438i not found. ArcGIS Hub has no permit data.",
+        "active": True,
+        "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/OAKLAND.",
     },
 
     # V23 AUDIT: 2026-03-28 - LOGIN_REQUIRED - Uses Accela at access.okc.gov
