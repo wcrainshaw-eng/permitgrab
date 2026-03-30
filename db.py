@@ -1332,36 +1332,24 @@ def audit_prod_cities():
     """V34: Comprehensive audit of prod_cities vs actual permit data.
 
     Returns a detailed report of every active prod_city with:
-    - actual permit count from permits table
-    - last permit date from permits table
-    - whether city name matches (data attribution check)
+    - total_permits (synced on startup via _sync_prod_city_counts)
+    - last permit date
     - status recommendation (keep active, pause, or investigate)
+
+    V34b: Optimized — uses pre-synced total_permits from prod_cities
+    instead of expensive GROUP BY on permits table. The counts are
+    synced on every startup, so they're fresh enough for auditing.
     """
     conn = get_connection()
 
-    # Get all active prod_cities
+    # Get all active prod_cities — total_permits already synced on startup
     prod = conn.execute("""
         SELECT city, state, city_slug, total_permits, status,
-               source_type, source_id, last_permit_date, consecutive_failures, last_error
+               source_type, source_id, last_permit_date, newest_permit_date,
+               consecutive_failures, last_error, last_collection
         FROM prod_cities WHERE status = 'active'
         ORDER BY city
     """).fetchall()
-
-    # Get actual permit counts per city from permits table
-    actual_counts = conn.execute("""
-        SELECT LOWER(city) as city_lower, state, COUNT(*) as cnt,
-               MAX(filing_date) as max_filing, MAX(collected_at) as last_collected
-        FROM permits
-        GROUP BY LOWER(city), state
-    """).fetchall()
-    count_map = {}
-    for r in actual_counts:
-        key = (r['city_lower'], r['state'])
-        count_map[key] = {
-            'count': r['cnt'],
-            'max_filing': r['max_filing'],
-            'last_collected': r['last_collected']
-        }
 
     results = {
         'verified_with_data': [],
@@ -1372,21 +1360,16 @@ def audit_prod_cities():
     }
 
     for row in prod:
-        city_lower = row['city'].lower()
-        state = row['state']
-        actual = count_map.get((city_lower, state), {})
-        actual_count = actual.get('count', 0)
-        max_filing = actual.get('max_filing', '')
-        last_collected = actual.get('last_collected', '')
+        actual_count = row['total_permits'] or 0
+        last_permit = row['newest_permit_date'] or row['last_permit_date'] or ''
 
         entry = {
             'city': row['city'],
-            'state': state,
+            'state': row['state'],
             'slug': row['city_slug'],
-            'prod_total_permits': row['total_permits'] or 0,
-            'actual_permits_in_db': actual_count,
-            'max_filing_date': max_filing,
-            'last_collected': last_collected,
+            'total_permits': actual_count,
+            'last_permit_date': last_permit,
+            'last_collection': row['last_collection'] or '',
             'source_type': row['source_type'],
             'source_id': row['source_id'],
             'consecutive_failures': row['consecutive_failures'] or 0,
@@ -1399,12 +1382,15 @@ def audit_prod_cities():
         elif actual_count == 0:
             entry['recommendation'] = 'pause_no_data'
             results['active_no_data'].append(entry)
-        elif max_filing and max_filing < '2025-01-01':
+        elif last_permit and last_permit < '2025-01-01':
             entry['recommendation'] = 'investigate_stale'
             results['stale_data'].append(entry)
         else:
             entry['recommendation'] = 'keep_active'
             results['verified_with_data'].append(entry)
+
+    # Quick count of distinct cities in permits (using indexed column)
+    distinct = conn.execute("SELECT COUNT(DISTINCT city) as cnt FROM permits").fetchone()
 
     results['summary'] = {
         'total_active_prod_cities': len(prod),
@@ -1412,7 +1398,7 @@ def audit_prod_cities():
         'active_but_no_permits': len(results['active_no_data']),
         'stale_data': len(results['stale_data']),
         'errored': len(results['errored']),
-        'distinct_cities_in_permits_table': len(count_map),
+        'distinct_cities_in_permits_table': distinct['cnt'] if distinct else 0,
     }
 
     return results
