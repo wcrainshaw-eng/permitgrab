@@ -10,6 +10,14 @@
 <meta property="og:description" content="Browse {{ total_permits | default(0) | int }} active building permits across {{ cities | length }} {{ state_name }} cities.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://permitgrab.com/permits/{{ state_slug }}">
+<!-- V29 SEO: OG image, site_name, twitter card for state pages -->
+<meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="https://permitgrab.com/static/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ state_name }} Building Permits | PermitGrab">
+<meta name="twitter:description" content="Browse {{ total_permits | default(0) | int }} active building permits across {{ cities | length }} {{ state_name }} cities.">
+<meta name="twitter:image" content="https://permitgrab.com/static/og-image.png">
+<meta name="geo.region" content="US">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 {% include 'partials/analytics.html' %}

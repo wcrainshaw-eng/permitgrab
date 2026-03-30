@@ -2165,6 +2165,21 @@ def inject_nav_context():
 
 
 # ===========================
+# V29: SEO — www to non-www redirect + trailing slash normalization
+# ===========================
+
+@app.before_request
+def seo_redirects():
+    """V29: Redirect www.permitgrab.com → permitgrab.com (301) and normalize trailing slashes."""
+    # www → non-www redirect
+    if request.host.startswith('www.'):
+        return redirect(request.url.replace('://www.', '://', 1), code=301)
+    # Remove trailing slashes (except root)
+    if request.path != '/' and request.path.endswith('/'):
+        return redirect(request.url.replace(request.path, request.path.rstrip('/')), code=301)
+
+
+# ===========================
 # ANALYTICS HOOKS
 # ===========================
 
@@ -7157,12 +7172,18 @@ def blog_index():
     end_idx = start_idx + per_page
     posts = all_posts[start_idx:end_idx]
 
+    # V29: Build prev/next URLs for rel="prev"/rel="next" pagination SEO
+    prev_url = f"/blog?page={page - 1}" if page > 1 else None
+    next_url = f"/blog?page={page + 1}" if page < total_pages else None
+
     return render_template('blog_index.html',
                            posts=posts,
                            page=page,
                            total_pages=total_pages,
                            total_posts=total_posts,
-                           per_page=per_page)
+                           per_page=per_page,
+                           prev_url=prev_url,
+                           next_url=next_url)
 
 
 @app.route('/blog/<slug>')

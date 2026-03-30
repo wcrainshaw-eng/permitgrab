@@ -20,6 +20,9 @@
 <meta name="twitter:title" content="{{ meta_title }}">
 <meta name="twitter:description" content="{{ meta_description }}">
 <meta name="twitter:image" content="{{ og_image or '/static/img/og-default.png' }}">
+<!-- V29 SEO: Geo-targeting meta tags for local search signals -->
+<meta name="geo.region" content="US-{{ city_state | default('') }}">
+<meta name="geo.placename" content="{{ city_name | default('') }}, {{ city_state | default('') }}">
 <meta name="robots" content="{{ robots_directive | default('index, follow') }}">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 

@@ -18,25 +18,56 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ trade.name }} Permits in {{ city.name }}, {{ city.state }}">
 <meta name="twitter:description" content="Real-time {{ trade.name }} contractor leads from {{ city.name }} building permits.">
+<!-- V29 SEO: Geo-targeting meta tags for local search signals -->
+<meta name="geo.region" content="US-{{ city.state | default('') }}">
+<meta name="geo.placename" content="{{ city.name | default('') }}, {{ city.state | default('') }}">
 <meta name="robots" content="{{ robots_directive | default('index, follow') }}">
 
-<!-- V14.0 SEO: Dataset schema for trade page -->
+<!-- V29 SEO: Enhanced Dataset schema for trade page -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "Dataset",
+  "@id": "https://permitgrab.com/permits/{{ city.slug }}/{{ trade.slug }}#dataset",
   "name": "{{ trade.name }} Building Permits in {{ city.name }}, {{ city.state }}",
-  "description": "Active {{ trade.name | lower }} building permit filings in {{ city.name }}, {{ city.state }}. Updated daily.",
+  "description": "Real-time {{ trade.name | lower }} building permit data for {{ city.name }}, {{ city.state }}. Includes permit numbers, addresses, filing dates, and estimated project values.",
   "url": "https://permitgrab.com/permits/{{ city.slug }}/{{ trade.slug }}",
-  "temporalCoverage": "2024/..",
+  "keywords": ["{{ trade.name | lower }}", "building permits", "{{ city.name | lower }}", "{{ city.state | lower }}", "construction leads", "contractor leads"],
+  "temporalCoverage": "2024-01-01/..",
   "spatialCoverage": {
     "@type": "Place",
-    "name": "{{ city.name }}, {{ city.state }}"
+    "name": "{{ city.name }}, {{ city.state }}",
+    "geo": {
+      "@type": "GeoCoordinates"
+    }
   },
-  "publisher": {
+  "provider": {
     "@type": "Organization",
     "name": "PermitGrab",
     "url": "https://permitgrab.com"
+  },
+  "distribution": {
+    "@type": "DataDownload",
+    "encodingFormat": "text/html",
+    "contentUrl": "https://permitgrab.com/permits/{{ city.slug }}/{{ trade.slug }}"
+  },
+  "isAccessibleForFree": false
+}
+</script>
+<!-- V29 SEO: GovernmentService schema for trade page -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "GovernmentService",
+  "name": "{{ trade.name }} Permit Records - {{ city.name }}, {{ city.state }}",
+  "serviceType": "Building Permit Records",
+  "serviceArea": {
+    "@type": "AdministrativeArea",
+    "name": "{{ city.name }}, {{ city.state }}"
+  },
+  "provider": {
+    "@type": "GovernmentOrganization",
+    "name": "{{ city.name }} Building Department"
   }
 }
 </script>
