@@ -433,41 +433,30 @@ def admin_coverage():
     except Exception:
         pass
 
-    # Load permits to analyze coverage (historical data)
-    permits_path = os.path.join(DATA_DIR, 'permits.json')
-    if not os.path.exists(permits_path):
-        return jsonify({
-            'active_cities': active_city_count,
-            'prod_cities_by_status': status_breakdown,
-            'error': 'No permit data file found (permits analyzed from prod_cities only)',
-        })
-
+    # V34: Analyze coverage from SQLite DB (not permits.json which is deprecated)
     try:
-        with open(permits_path) as f:
-            permits = json.load(f)
+        conn = permitdb.get_connection()
+
+        # Get total permits
+        total_row = conn.execute("SELECT COUNT(*) as cnt FROM permits").fetchone()
+        total_permits = total_row['cnt'] if total_row else 0
 
         # Analyze by city and state
+        city_rows = conn.execute("""
+            SELECT city, state, COUNT(*) as cnt
+            FROM permits GROUP BY city, state ORDER BY cnt DESC
+        """).fetchall()
+
         city_counts = {}
         state_counts = {}
-        bulk_source_counts = {}
+        for r in city_rows:
+            city_key = f"{r['city']}, {r['state']}"
+            city_counts[city_key] = r['cnt']
+            state_counts[r['state'] or 'Unknown'] = state_counts.get(r['state'] or 'Unknown', 0) + r['cnt']
 
-        for p in permits:
-            city = p.get('city', 'Unknown')
-            state = p.get('state', 'Unknown')
-            source = p.get('source_bulk', 'individual')
-
-            city_key = f"{city}, {state}"
-            city_counts[city_key] = city_counts.get(city_key, 0) + 1
-            state_counts[state] = state_counts.get(state, 0) + 1
-
-            if source != 'individual':
-                bulk_source_counts[source] = bulk_source_counts.get(source, 0) + 1
-
-        # Sort by permit count
-        top_cities = sorted(city_counts.items(), key=lambda x: -x[1])[:50]
+        top_cities = list(city_counts.items())[:50]
         states_covered = sorted(state_counts.items(), key=lambda x: -x[1])
 
-        # All US states for comparison
         all_states = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
                       'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
                       'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
@@ -475,24 +464,64 @@ def admin_coverage():
                       'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY']
         states_missing = [s for s in all_states if s not in state_counts]
 
+        # V34: Get verified active city count (cities with actual data)
+        verified_count = permitdb.get_prod_city_count()
+
         return jsonify({
-            # V31: Active = cities with live data collection
             'active_cities': active_city_count,
+            'verified_active_with_data': verified_count,
             'prod_cities_by_status': status_breakdown,
-            # Historical data from permits table (not all actively pulled)
-            'historical_cities_in_permits': len(city_counts),
-            'total_permits': len(permits),
+            'distinct_cities_in_permits': len(city_counts),
+            'total_permits': total_permits,
             'total_states_with_data': len(state_counts),
             'states_covered': states_covered,
             'states_missing': states_missing,
             'top_50_cities': top_cities,
-            'bulk_source_breakdown': bulk_source_counts,
-            'permits_from_bulk': sum(bulk_source_counts.values()),
-            'permits_from_individual': len(permits) - sum(bulk_source_counts.values()),
         })
 
     except Exception as e:
         return jsonify({'error': f'Failed to analyze coverage: {str(e)}'}), 500
+
+
+# ===========================
+# V34: ADMIN AUDIT & CLEANUP
+# ===========================
+
+@app.route('/api/admin/audit')
+def admin_audit_cities():
+    """V34: Comprehensive audit of all active cities vs actual permit data.
+    Returns detailed report showing which cities have data, which don't,
+    and recommendations for cleanup.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        results = permitdb.audit_prod_cities()
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({'error': f'Audit failed: {str(e)}'}), 500
+
+
+@app.route('/api/admin/pause-empty', methods=['POST'])
+def admin_pause_empty_cities():
+    """V34: Pause all active prod_cities that have 0 actual permits in DB.
+    This cleans up cities that are marked active but have never successfully collected data.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        paused = permitdb.pause_cities_without_data()
+        return jsonify({
+            'paused_count': len(paused),
+            'paused_cities': paused,
+            'message': f'Paused {len(paused)} cities with no permit data'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Pause operation failed: {str(e)}'}), 500
 
 
 # ===========================
@@ -1751,22 +1780,23 @@ def load_stats():
         return {}
 
 def get_cities_with_data():
-    """V15: Get cities with data, sorted by permit volume.
+    """V15/V34: Get cities with VERIFIED data, sorted by permit volume.
+
+    V34: Now filters out cities with 0 actual permits in the DB.
+    Only returns cities that genuinely have permit data, regardless of
+    what prod_cities.total_permits says (that column can be stale).
 
     V15: Uses prod_cities table if available (collector redesign).
     Falls back to heuristics-based filtering if prod_cities is empty.
-
-    V13.1: Normalize and deduplicate city names (handles inconsistent casing)
-    V13.2: Filter state names as cities, filter non-US entries, cross-state dedup
-    V13.3: Filter garbage city names, fix OK state corruption by prioritizing registry
     """
     # V15: Try prod_cities first (collector redesign)
     try:
         if permitdb.prod_cities_table_exists():
-            prod_cities = permitdb.get_prod_cities(status='active')
+            # V34: Get ALL active prod_cities (min_permits=0) so we can
+            # cross-reference with actual permits table data
+            prod_cities = permitdb.get_prod_cities(status='active', min_permits=0)
             if prod_cities:
-                # V30: Re-sort by actual permit counts from permits table
-                # prod_cities.total_permits can be stale after migrations
+                # V30/V34: Get actual permit counts from permits table
                 try:
                     conn = permitdb.get_connection()
                     count_rows = conn.execute("""
@@ -1774,13 +1804,22 @@ def get_cities_with_data():
                         FROM permits GROUP BY LOWER(city)
                     """).fetchall()
                     count_map = {r[0]: r[1] for r in count_rows}
-                    prod_cities.sort(
-                        key=lambda c: count_map.get(c['name'].lower(), c.get('permit_count', 0)),
-                        reverse=True
-                    )
+
+                    # V34: Filter to ONLY cities with actual permits in DB
+                    verified_cities = []
+                    for c in prod_cities:
+                        actual_count = count_map.get(c['name'].lower(), 0)
+                        if actual_count > 0:
+                            c['permit_count'] = actual_count  # Use real count
+                            verified_cities.append(c)
+
+                    # Sort by actual permit count
+                    verified_cities.sort(key=lambda c: c['permit_count'], reverse=True)
+                    return verified_cities
                 except Exception as sort_err:
-                    print(f"[V30] Footer sort fallback: {sort_err}")
-                return prod_cities
+                    print(f"[V34] Verified city filter fallback: {sort_err}")
+                    # Fallback: return prod_cities filtered by stale total_permits
+                    return [c for c in prod_cities if c.get('permit_count', 0) > 0]
     except Exception as e:
         print(f"[V15] Error getting prod_cities: {e}")
 

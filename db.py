@@ -1136,12 +1136,153 @@ def get_prod_cities(status='active', min_permits=1):
 
 
 def get_prod_city_count():
-    """V15: Get count of active prod cities."""
+    """V15/V34: Get count of active prod cities WITH actual permits in DB.
+
+    V34: Changed to only count cities that have real permit data,
+    not just cities marked 'active' in prod_cities. This ensures
+    the displayed count matches reality.
+    """
+    conn = get_connection()
+    # V34: Count prod_cities that actually have permits in the permits table
+    row = conn.execute("""
+        SELECT COUNT(DISTINCT pc.city_slug) as cnt
+        FROM prod_cities pc
+        INNER JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
+            AND (p.state = pc.state OR p.state IS NULL)
+        WHERE pc.status = 'active'
+    """).fetchone()
+    return row['cnt'] if row else 0
+
+
+def get_verified_city_count():
+    """V34: Get count of all distinct cities with permits in DB,
+    regardless of prod_cities status. Includes bulk-sourced cities."""
     conn = get_connection()
     row = conn.execute(
-        "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active'"
+        "SELECT COUNT(DISTINCT LOWER(city)) as cnt FROM permits"
     ).fetchone()
     return row['cnt'] if row else 0
+
+
+def audit_prod_cities():
+    """V34: Comprehensive audit of prod_cities vs actual permit data.
+
+    Returns a detailed report of every active prod_city with:
+    - actual permit count from permits table
+    - last permit date from permits table
+    - whether city name matches (data attribution check)
+    - status recommendation (keep active, pause, or investigate)
+    """
+    conn = get_connection()
+
+    # Get all active prod_cities
+    prod = conn.execute("""
+        SELECT city, state, city_slug, total_permits, status,
+               source_type, source_id, last_permit_date, consecutive_failures, last_error
+        FROM prod_cities WHERE status = 'active'
+        ORDER BY city
+    """).fetchall()
+
+    # Get actual permit counts per city from permits table
+    actual_counts = conn.execute("""
+        SELECT LOWER(city) as city_lower, state, COUNT(*) as cnt,
+               MAX(filing_date) as max_filing, MAX(collected_at) as last_collected
+        FROM permits
+        GROUP BY LOWER(city), state
+    """).fetchall()
+    count_map = {}
+    for r in actual_counts:
+        key = (r['city_lower'], r['state'])
+        count_map[key] = {
+            'count': r['cnt'],
+            'max_filing': r['max_filing'],
+            'last_collected': r['last_collected']
+        }
+
+    results = {
+        'verified_with_data': [],
+        'active_no_data': [],
+        'stale_data': [],
+        'errored': [],
+        'summary': {}
+    }
+
+    for row in prod:
+        city_lower = row['city'].lower()
+        state = row['state']
+        actual = count_map.get((city_lower, state), {})
+        actual_count = actual.get('count', 0)
+        max_filing = actual.get('max_filing', '')
+        last_collected = actual.get('last_collected', '')
+
+        entry = {
+            'city': row['city'],
+            'state': state,
+            'slug': row['city_slug'],
+            'prod_total_permits': row['total_permits'] or 0,
+            'actual_permits_in_db': actual_count,
+            'max_filing_date': max_filing,
+            'last_collected': last_collected,
+            'source_type': row['source_type'],
+            'source_id': row['source_id'],
+            'consecutive_failures': row['consecutive_failures'] or 0,
+            'last_error': row['last_error'],
+        }
+
+        if row['consecutive_failures'] and row['consecutive_failures'] >= 3:
+            entry['recommendation'] = 'pause_errors'
+            results['errored'].append(entry)
+        elif actual_count == 0:
+            entry['recommendation'] = 'pause_no_data'
+            results['active_no_data'].append(entry)
+        elif max_filing and max_filing < '2025-01-01':
+            entry['recommendation'] = 'investigate_stale'
+            results['stale_data'].append(entry)
+        else:
+            entry['recommendation'] = 'keep_active'
+            results['verified_with_data'].append(entry)
+
+    results['summary'] = {
+        'total_active_prod_cities': len(prod),
+        'verified_with_current_data': len(results['verified_with_data']),
+        'active_but_no_permits': len(results['active_no_data']),
+        'stale_data': len(results['stale_data']),
+        'errored': len(results['errored']),
+        'distinct_cities_in_permits_table': len(count_map),
+    }
+
+    return results
+
+
+def pause_cities_without_data():
+    """V34: Pause all active prod_cities that have 0 actual permits in DB.
+    Returns list of paused city slugs."""
+    conn = get_connection()
+
+    # Find active prod_cities with 0 permits
+    cities_to_pause = conn.execute("""
+        SELECT pc.city_slug, pc.city, pc.state
+        FROM prod_cities pc
+        LEFT JOIN (
+            SELECT LOWER(city) as city_lower, state, COUNT(*) as cnt
+            FROM permits GROUP BY LOWER(city), state
+        ) p ON LOWER(pc.city) = p.city_lower AND (pc.state = p.state OR p.state IS NULL)
+        WHERE pc.status = 'active' AND COALESCE(p.cnt, 0) = 0
+    """).fetchall()
+
+    paused = []
+    for row in cities_to_pause:
+        conn.execute("""
+            UPDATE prod_cities SET
+                status = 'paused',
+                pause_reason = 'V34 audit: no permits in database',
+                data_freshness = 'no_data'
+            WHERE city_slug = ?
+        """, (row['city_slug'],))
+        paused.append({'slug': row['city_slug'], 'city': row['city'], 'state': row['state']})
+
+    conn.commit()
+    return paused
 
 
 def is_prod_city(city_slug):
