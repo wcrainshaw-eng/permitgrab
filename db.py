@@ -250,7 +250,7 @@ def get_connection():
         _local.conn.execute("PRAGMA journal_mode=WAL")  # concurrent reads during writes
         _local.conn.execute("PRAGMA synchronous=NORMAL")  # good durability, better perf
         _local.conn.execute("PRAGMA cache_size=-8000")  # 8MB cache (conservative for 2GB box)
-        _local.conn.execute("PRAGMA busy_timeout=10000")  # wait up to 10s for locks
+        _local.conn.execute("PRAGMA busy_timeout=60000")  # wait up to 60s for locks (V35: startup cleanup takes time)
     return _local.conn
 
 
