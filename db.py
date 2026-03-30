@@ -482,7 +482,10 @@ def init_db():
     # V18: Migrations for staleness detection columns
     _run_v18_migrations(conn)
 
-    print(f"[DB] V18: Database initialized at {DB_PATH}")
+    # V33: Link prod_cities to CITY_REGISTRY source_ids
+    _run_v33_source_linking(conn)
+
+    print(f"[DB] V33: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations(conn):
@@ -533,6 +536,80 @@ def _run_v18_migrations(conn):
         )
     """)
     conn.commit()
+
+
+def _run_v33_source_linking(conn):
+    """V33: Link prod_cities to CITY_REGISTRY source_ids so the collector picks them up.
+
+    Many prod_cities have source_id=NULL or 'N/A' even though they have valid
+    CITY_REGISTRY entries. This migration matches them by slug and updates source_id
+    so the V16 collection loop actually fetches their permits.
+    """
+    try:
+        from city_configs import CITY_REGISTRY
+
+        # Get all prod_cities that have no valid source_id
+        cursor = conn.execute("""
+            SELECT id, city, state, city_slug, source_id, source_type
+            FROM prod_cities
+            WHERE source_id IS NULL OR source_id = '' OR source_id = 'N/A'
+        """)
+        unlinked = cursor.fetchall()
+        if not unlinked:
+            return
+
+        linked_count = 0
+        for row in unlinked:
+            city_slug = row['city_slug']
+            city_name = row['city']
+            state = row['state']
+
+            # Try matching by slug directly, then underscore variant, then name
+            matched_key = None
+            slug_underscore = city_slug.replace('-', '_')
+            slug_with_state = f"{city_slug}-{state.lower()}" if state else None
+            slug_under_state = f"{slug_underscore}_{state.lower()}" if state else None
+
+            # Priority order: exact slug, underscore variant, slug+state, underscore+state
+            for candidate in [city_slug, slug_underscore, slug_with_state, slug_under_state]:
+                if candidate and candidate in CITY_REGISTRY:
+                    matched_key = candidate
+                    break
+
+            # Fallback: match by city name + state
+            if not matched_key:
+                for key, cfg in CITY_REGISTRY.items():
+                    if (cfg.get('name', '').lower() == city_name.lower()
+                            and cfg.get('state', '').upper() == state.upper()):
+                        matched_key = key
+                        break
+
+            # Last resort: match by slug field in registry
+            if not matched_key:
+                for key, cfg in CITY_REGISTRY.items():
+                    if cfg.get('slug') == city_slug:
+                        matched_key = key
+                        break
+
+            if matched_key:
+                cfg = CITY_REGISTRY[matched_key]
+                if cfg.get('active', False):
+                    platform = cfg.get('platform', 'unknown')
+                    conn.execute("""
+                        UPDATE prod_cities
+                        SET source_id = ?, source_type = ?
+                        WHERE id = ?
+                    """, (matched_key, platform, row['id']))
+                    linked_count += 1
+
+        if linked_count > 0:
+            conn.commit()
+            print(f"[V33] Linked {linked_count} prod_cities to CITY_REGISTRY source_ids")
+        else:
+            print("[V33] No unlinked prod_cities needed source_id updates")
+
+    except Exception as e:
+        print(f"[V33] Source linking migration error: {e}")
 
 
 # ---------------------------------------------------------------------------
