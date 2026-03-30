@@ -524,6 +524,39 @@ def admin_pause_empty_cities():
         return jsonify({'error': f'Pause operation failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/cleanup-data', methods=['POST'])
+def admin_cleanup_data():
+    """V34: Run comprehensive data cleanup — fix wrong states, remove garbage records.
+    This is safe to run multiple times (idempotent).
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        conn = permitdb.get_connection()
+        # Get before counts
+        before = conn.execute("SELECT COUNT(*) as cnt FROM permits").fetchone()['cnt']
+        before_cities = conn.execute("SELECT COUNT(DISTINCT city) as cnt FROM permits").fetchone()['cnt']
+
+        fixed = permitdb._run_v34_data_cleanup(conn)
+
+        after = conn.execute("SELECT COUNT(*) as cnt FROM permits").fetchone()['cnt']
+        after_cities = conn.execute("SELECT COUNT(DISTINCT city) as cnt FROM permits").fetchone()['cnt']
+
+        return jsonify({
+            'records_affected': fixed,
+            'permits_before': before,
+            'permits_after': after,
+            'permits_removed': before - after,
+            'distinct_cities_before': before_cities,
+            'distinct_cities_after': after_cities,
+            'cities_removed': before_cities - after_cities,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
+
+
 # ===========================
 # V12.53: ADMIN EMAIL ENDPOINTS
 # ===========================

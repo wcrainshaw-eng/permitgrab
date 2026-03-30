@@ -485,7 +485,10 @@ def init_db():
     # V33: Link prod_cities to CITY_REGISTRY source_ids
     _run_v33_source_linking(conn)
 
-    print(f"[DB] V33: Database initialized at {DB_PATH}")
+    # V34: Run data cleanup (fix wrong states, remove garbage records)
+    _run_v34_data_cleanup(conn)
+
+    print(f"[DB] V34: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations(conn):
@@ -610,6 +613,137 @@ def _run_v33_source_linking(conn):
 
     except Exception as e:
         print(f"[V33] Source linking migration error: {e}")
+
+
+def _run_v34_data_cleanup(conn):
+    """V34: Comprehensive data cleanup for known data quality issues.
+
+    Fixes:
+    1. Wrong state assignments (Houston OK→TX, Austin OK→TX, etc.)
+    2. State names used as city names (South Dakota, Michigan, etc.)
+    3. Permit types used as city names (Gas, Plumbing, etc.)
+    4. Missing states
+    5. Casing inconsistencies for major cities
+    6. Delete garbage records that can't be fixed
+    """
+    try:
+        total_fixed = 0
+
+        # 1. Fix wrong state assignments using prod_cities as truth
+        # Build authoritative city→state map from prod_cities
+        prod_rows = conn.execute(
+            "SELECT LOWER(city) as city_lower, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+        ).fetchall()
+        city_to_state = {r['city_lower']: r['state'] for r in prod_rows}
+
+        # Fix permits where city exists in prod_cities but state doesn't match
+        for city_lower, correct_state in city_to_state.items():
+            result = conn.execute("""
+                UPDATE permits SET state = ?
+                WHERE LOWER(city) = ? AND (state != ? OR state IS NULL OR state = '')
+            """, (correct_state, city_lower, correct_state))
+            if result.rowcount > 0:
+                print(f"[V34] Fixed {result.rowcount} permits: {city_lower} → state={correct_state}")
+                total_fixed += result.rowcount
+
+        # 2. Known specific misattributions not in prod_cities
+        KNOWN_FIXES = [
+            # (city_pattern, wrong_state, correct_state)
+            ('Houston', 'OK', 'TX'),
+            ('HOUSTON', 'OK', 'TX'),
+            ('Austin', 'OK', 'TX'),
+            ('AUSTIN', 'OK', 'TX'),
+            ('San Antonio', 'OK', 'TX'),
+            ('SAN ANTONIO', 'OK', 'TX'),
+            ('Dallas', 'OK', 'TX'),
+            ('DALLAS', 'OK', 'TX'),
+            ('Fort Worth', 'OK', 'TX'),
+            ('FORT WORTH', 'OK', 'TX'),
+            ('Little Rock', 'WI', 'AR'),
+            ('LITTLE ROCK', 'WI', 'AR'),
+            ('North Little Rock', 'WI', 'AR'),
+        ]
+        for city, wrong_state, correct_state in KNOWN_FIXES:
+            result = conn.execute(
+                "UPDATE permits SET state = ? WHERE city = ? AND state = ?",
+                (correct_state, city, wrong_state)
+            )
+            if result.rowcount > 0:
+                print(f"[V34] Fixed {result.rowcount}: {city},{wrong_state} → {correct_state}")
+                total_fixed += result.rowcount
+
+        # 3. Delete records with state names as city names
+        STATE_NAMES_AS_CITIES = [
+            'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+            'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+            'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+            'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+            'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+            'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+            'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+            'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+            'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+            'West Virginia', 'Wisconsin', 'Wyoming',
+            # Also county-as-city patterns
+            'Texas County',
+        ]
+        for state_name in STATE_NAMES_AS_CITIES:
+            result = conn.execute(
+                "DELETE FROM permits WHERE city = ? OR city = ?",
+                (state_name, state_name.upper())
+            )
+            if result.rowcount > 0:
+                print(f"[V34] Deleted {result.rowcount} permits with city='{state_name}'")
+                total_fixed += result.rowcount
+
+        # 4. Delete records with permit types as city names
+        PERMIT_TYPES_AS_CITIES = [
+            'Gas', 'Plumbing', 'Electrical', 'Mechanical', 'Building',
+            'Fire', 'Demolition', 'Roofing', 'Sign', 'Fence',
+            'GAS', 'PLUMBING', 'ELECTRICAL', 'MECHANICAL', 'BUILDING',
+        ]
+        for ptype in PERMIT_TYPES_AS_CITIES:
+            result = conn.execute(
+                "DELETE FROM permits WHERE city = ?", (ptype,)
+            )
+            if result.rowcount > 0:
+                print(f"[V34] Deleted {result.rowcount} permits with city='{ptype}'")
+                total_fixed += result.rowcount
+
+        # 5. Delete records with empty/null city
+        result = conn.execute(
+            "DELETE FROM permits WHERE city IS NULL OR city = '' OR LENGTH(city) < 2"
+        )
+        if result.rowcount > 0:
+            print(f"[V34] Deleted {result.rowcount} permits with empty/short city names")
+            total_fixed += result.rowcount
+
+        # 6. Normalize city casing for major cities (title case)
+        major_cities = conn.execute("""
+            SELECT city, COUNT(*) as cnt FROM permits
+            WHERE city = UPPER(city) AND LENGTH(city) > 3
+            GROUP BY city HAVING cnt > 10
+        """).fetchall()
+        for row in major_cities:
+            # Convert "HOUSTON" to "Houston", "SAN ANTONIO" to "San Antonio"
+            title_case = row['city'].title()
+            result = conn.execute(
+                "UPDATE permits SET city = ? WHERE city = ?",
+                (title_case, row['city'])
+            )
+            if result.rowcount > 0:
+                print(f"[V34] Normalized casing: {row['city']} → {title_case} ({result.rowcount} permits)")
+                total_fixed += result.rowcount
+
+        conn.commit()
+        print(f"[V34] Data cleanup complete: {total_fixed} total records fixed/deleted")
+        return total_fixed
+
+    except Exception as e:
+        print(f"[V34] Data cleanup error: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
 
 
 # ---------------------------------------------------------------------------
