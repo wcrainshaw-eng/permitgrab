@@ -556,6 +556,23 @@ def upsert_permits(permits, source_city_key=None):
             if mapped_city:
                 p['city'] = mapped_city
 
+    # V30: Source-level state normalization — always use the state from prod_cities
+    # as the authoritative source. This fixes issues like Atlanta showing as "TX"
+    # or "OK" when ArcGIS sources don't return state data, or when bulk datasets
+    # have wrong state mappings. prod_cities is the single source of truth.
+    try:
+        conn_tmp = get_connection()
+        prod_rows = conn_tmp.execute(
+            "SELECT LOWER(city) as city_lower, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+        ).fetchall()
+        _city_to_state = {r['city_lower']: r['state'] for r in prod_rows}
+        for p in permits:
+            city = (p.get('city') or '').strip().lower()
+            if city and city in _city_to_state:
+                p['state'] = _city_to_state[city]
+    except Exception as e:
+        print(f"[V30] State normalization warning: {e}")
+
     # V19: Pre-filter to check for existing permits by address+city+state+filing_date
     # This prevents duplicates even when permit_number differs
     conn = get_connection()
