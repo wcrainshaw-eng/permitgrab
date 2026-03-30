@@ -543,7 +543,15 @@ def admin_cleanup_data():
         for row in prod_all:
             cleaned = permitdb.clean_city_name_for_prod(row['city'], row['state'])
             if cleaned != row['city']:
-                conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
+                # Check if cleaned name already exists (avoid UNIQUE constraint violation)
+                existing = conn.execute(
+                    "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
+                    (cleaned, row['state'])
+                ).fetchone()
+                if existing:
+                    conn.execute("DELETE FROM prod_cities WHERE id = ?", (row['id'],))
+                else:
+                    conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
                 name_fixes += 1
         conn.commit()
 

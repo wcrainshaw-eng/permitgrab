@@ -865,8 +865,18 @@ def _sync_prod_city_counts(conn):
         for row in prod_all:
             cleaned = clean_city_name_for_prod(row['city'], row['state'])
             if cleaned != row['city']:
-                conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
-                print(f"[V35] Cleaned prod_city name: '{row['city']}' → '{cleaned}'")
+                # Check if the cleaned name already exists (would violate UNIQUE constraint)
+                existing = conn.execute(
+                    "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
+                    (cleaned, row['state'])
+                ).fetchone()
+                if existing:
+                    # Duplicate — delete the corrupt entry
+                    conn.execute("DELETE FROM prod_cities WHERE id = ?", (row['id'],))
+                    print(f"[V35] Deleted duplicate prod_city: '{row['city']}' ('{cleaned}' already exists)")
+                else:
+                    conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
+                    print(f"[V35] Cleaned prod_city name: '{row['city']}' → '{cleaned}'")
 
         conn.commit()
 
