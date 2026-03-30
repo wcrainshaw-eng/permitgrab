@@ -1549,7 +1549,7 @@ CITY_REGISTRY = {
         "date_format": "epoch",
         "limit": 2000,
         "active": False,
-        "notes": "V26: All sources dead. Old ArcGIS was Baltimore data (wrong). Socrata 403. Hub 404. MapServer stale (Jul 2020).",
+        "notes": "V33: Confirmed all sources dead. Clark County ArcGIS unreachable (timeout). City of LV ArcGIS Hub unreachable. No Socrata. No alternative open data found. Pop 660K — high value, revisit if city launches new portal.",
     },
 
     "orlando": {
@@ -1587,22 +1587,25 @@ CITY_REGISTRY = {
         "lat": 27.95,
         "lon": -82.458,
         "platform": "arcgis",
-        "endpoint": "https://arcgis.tampagov.net/arcgis/rest/services/Planning/ConstructionInspections/FeatureServer/0/query",
-        "dataset_id": "ConstructionInspections_0",
-        "description": "Construction Inspections / Permits",
+        "endpoint": "https://arcgis.tampagov.net/arcgis/rest/services/Planning/PermitsAll/FeatureServer/0/query",
+        "dataset_id": "PermitsAll_0",
+        "description": "All Planning Permits - City of Tampa",
         "field_map": {
             "permit_number": "RECORD_ID",
+            "project_name": "PROJECTNAME1",
             "address": "ADDRESS",
             "zip": "ZIP",
-            "filing_date": "OBJECTID",
             "status": "PROJECTSTATUS",
             "description": "PROJECTDESCRIPTION",
+            "sqft": "NEWCONSTRUCTIONSF",
+            "occupancy_category": "OCCUPANCYCATEGORY",
+            "occupancy_type": "OCCUPANCYTYPE",
         },
         "date_field": "OBJECTID",
         "date_format": "none",
         "limit": 2000,
         "active": True,
-        "notes": "V17h: Switched to ArcGIS tampagov.net ConstructionInspections — RECORD_ID, ADDRESS, ZIP, PROJECTSTATUS, PROJECTDESCRIPTION, OCCUPANCYCATEGORY",
+        "notes": "V33: Switched to PermitsAll endpoint (2,537 records). Old ConstructionInspections endpoint dead. Fields: RECORD_ID, PROJECTNAME1, PROJECTDESCRIPTION, ADDRESS, ZIP, PROJECTSTATUS, NEWCONSTRUCTIONSF, OCCUPANCYCATEGORY, OCCUPANCYTYPE.",
     },
 
     "jacksonville": {
@@ -1685,7 +1688,7 @@ CITY_REGISTRY = {
         "date_format": "epoch",
         "limit": 2000,
         "active": False,
-        "notes": "V28: Data stale (last update April 2024). Endpoint works but no fresh data.",
+        "notes": "V33: Confirmed stale — endpoint responds (43,661 records) but newest data is April 12, 2024. coageo.cabq.gov ArcGIS alive, data not updated by city. Re-check quarterly.",
     },
 
     "cleveland": {
@@ -7381,7 +7384,7 @@ CITY_REGISTRY = {
         "date_format": "epoch",
         "limit": 2000,
         "active": True,
-        "notes": "V12.32: Verified live — MapServer on spokanegis.org, building+planning+engineering permits",
+        "notes": "V33: Verified live — 76,781 records, data through Mar 2026. Transient outage in earlier check. Same endpoint: spokanegis.org/Permit/Permit_WM_Dynamic2/MapServer/0. Fields: SpokanePermitID, PermitType, PermitCategory, FullAddress, OpenDate, Status, DetailShortNotes, Neighborhood.",
     },
 
     "bellevue": {
@@ -7493,23 +7496,23 @@ CITY_REGISTRY = {
         "lat": 43.615,
         "lon": -116.237,
         "platform": "arcgis",
-        "endpoint": "https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/Housing_OpenData/FeatureServer/0/query",
-        "dataset_id": "Housing_OpenData_NewResidentialPermits",
-        "description": "New Residential Permits",
+        "endpoint": "https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/PDS_BuildingPermits_HighImpact/FeatureServer/0/query",
+        "dataset_id": "PDS_BuildingPermits_HighImpact",
+        "description": "High-Impact Building Permits - City of Boise",
         "field_map": {
             "permit_number": "RecordID",
-            "permit_type": "ResidentialType",
-            "work_type": "ResidentialSubtype",
+            "permit_type": "RecordTypeAlias",
             "address": "PropertyAddress",
+            "city": "City",
+            "state": "State",
             "filing_date": "IssuedDate",
             "status": "PermitStatus",
-            "description": "RecordName",
         },
         "date_field": "IssuedDate",
         "date_format": "iso",
         "limit": 2000,
         "active": True,
-        "notes": "V12.32: Verified live — residential permits only, DateOnly format YYYY-MM-DD",
+        "notes": "V33: Switched to PDS_BuildingPermits_HighImpact (139 records). Old Housing_OpenData endpoint dead. Fields: RecordID, PropertyAddress, City, State, RecordTypeAlias, PermitStatus, IssuedDate.",
     },
 
     "provo": {
