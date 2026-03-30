@@ -1822,37 +1822,15 @@ def get_cities_with_data():
     V15: Uses prod_cities table if available (collector redesign).
     Falls back to heuristics-based filtering if prod_cities is empty.
     """
-    # V15: Try prod_cities first (collector redesign)
+    # V15/V34: Try prod_cities first (collector redesign)
+    # V34: total_permits is synced with actual DB counts on startup,
+    # so we can trust it for filtering. No expensive JOIN needed per-request.
     try:
         if permitdb.prod_cities_table_exists():
-            # V34: Get ALL active prod_cities (min_permits=0) so we can
-            # cross-reference with actual permits table data
-            prod_cities = permitdb.get_prod_cities(status='active', min_permits=0)
+            # min_permits=1 filters out cities with 0 real permits
+            prod_cities = permitdb.get_prod_cities(status='active', min_permits=1)
             if prod_cities:
-                # V30/V34: Get actual permit counts from permits table
-                try:
-                    conn = permitdb.get_connection()
-                    count_rows = conn.execute("""
-                        SELECT LOWER(city) as city_lower, COUNT(*) as cnt
-                        FROM permits GROUP BY LOWER(city)
-                    """).fetchall()
-                    count_map = {r[0]: r[1] for r in count_rows}
-
-                    # V34: Filter to ONLY cities with actual permits in DB
-                    verified_cities = []
-                    for c in prod_cities:
-                        actual_count = count_map.get(c['name'].lower(), 0)
-                        if actual_count > 0:
-                            c['permit_count'] = actual_count  # Use real count
-                            verified_cities.append(c)
-
-                    # Sort by actual permit count
-                    verified_cities.sort(key=lambda c: c['permit_count'], reverse=True)
-                    return verified_cities
-                except Exception as sort_err:
-                    print(f"[V34] Verified city filter fallback: {sort_err}")
-                    # Fallback: return prod_cities filtered by stale total_permits
-                    return [c for c in prod_cities if c.get('permit_count', 0) > 0]
+                return prod_cities
     except Exception as e:
         print(f"[V15] Error getting prod_cities: {e}")
 
