@@ -14570,17 +14570,17 @@ BULK_SOURCES = {
         "county_field": "county",
         "field_map": {
             "permit_number": "permitno",
-            "filing_date": "permitdate",
+            "filing_date": "processdate",
             "permit_type": "permittypedesc",
             "description": "permittypedesc",
             "estimated_cost": "constcost",
             "status": "permitstatusdesc",
             "square_feet": "squarefeet",
         },
-        "date_field": "permitdate",
+        "date_field": "processdate",
         "limit": 50000,  # Per-page limit for bulk fetch
-        "active": False,
-        "notes": "V12.31: Statewide dataset covering all 550 NJ municipalities",
+        "active": True,
+        "notes": "V31: Reactivated. Statewide dataset covering all 550 NJ municipalities. Uses processdate (permitdate has bad data).",
     },
 
     # =========================================================================
@@ -14896,15 +14896,15 @@ BULK_SOURCES = {
             "permit_number": "record_id",
             "permit_type": "record_category",
             "description": "use",
-            "filing_date": "issued_date",
+            "filing_date": "open_date",
             "address": "full_address",
             "status": "record_status",
             "contractor_name": "contractor_name",
         },
-        "date_field": "issued_date",
+        "date_field": "open_date",
         "limit": 50000,
         "active": False,
-        "notes": "V12.60: San Diego County public endpoint. Alpine, Borrego Springs, Fallbrook, Lakeside, Ramona, Valley Center.",
+        "notes": "V31: Fixed date_field to open_date (issued_date doesn't exist). Data stale as of 2023 — keep inactive until freshness confirmed.",
     },
 
     "little_rock_ar_bulk": {
@@ -15121,8 +15121,8 @@ BULK_SOURCES = {
         },
         "date_field": "issue_date",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Austin TX datahub permits. 82 columns, massive dataset. Covers metro area.",
+        "active": True,
+        "notes": "V31: Reactivated. Austin TX datahub permits. 82 columns, massive dataset. Covers metro area. Fresh data confirmed 2026-03-30.",
     },
 
     "pierce_county_wa_socrata_bulk": {
@@ -15139,14 +15139,14 @@ BULK_SOURCES = {
             "permit_type": "applicationtype",
             "description": "workdescription",
             "status": "applicationstatus",
-            "filing_date": "issueddate",
+            "filing_date": "applicationdate",
             "address": "siteaddress",
             "estimated_cost": "buildingvaluation",
         },
-        "date_field": "issueddate",
+        "date_field": "applicationdate",
         "limit": 50000,
-        "active": False,
-        "notes": "V12.60: Pierce County WA Socrata permits. 27 fields, good coverage.",
+        "active": True,
+        "notes": "V31: Reactivated. Pierce County WA Socrata permits. Fixed date_field to applicationdate (issueddate doesn't exist). Tacoma, Lakewood, etc.",
     },
 
     "buffalo_ny_bulk": {
