@@ -488,6 +488,9 @@ def init_db():
     # V34: Run data cleanup (fix wrong states, remove garbage records)
     _run_v34_data_cleanup(conn)
 
+    # V34: Sync prod_cities.total_permits with actual permit counts in DB
+    _sync_prod_city_counts(conn)
+
     print(f"[DB] V34: Database initialized at {DB_PATH}")
 
 
@@ -744,6 +747,38 @@ def _run_v34_data_cleanup(conn):
         import traceback
         traceback.print_exc()
         return 0
+
+
+def _sync_prod_city_counts(conn):
+    """V34: Sync prod_cities.total_permits with actual permit counts in DB.
+
+    This runs on startup after data cleanup to ensure prod_cities.total_permits
+    reflects reality. Fast because it uses the indexed permits(city) column.
+    """
+    try:
+        # Get actual counts per city from permits table
+        actual = conn.execute("""
+            SELECT LOWER(city) as city_lower, COUNT(*) as cnt
+            FROM permits GROUP BY LOWER(city)
+        """).fetchall()
+        count_map = {r['city_lower']: r['cnt'] for r in actual}
+
+        # Update each prod_city
+        prod = conn.execute("SELECT id, city FROM prod_cities").fetchall()
+        updated = 0
+        for row in prod:
+            actual_count = count_map.get(row['city'].lower(), 0)
+            conn.execute(
+                "UPDATE prod_cities SET total_permits = ? WHERE id = ?",
+                (actual_count, row['id'])
+            )
+            updated += 1
+
+        conn.commit()
+        nonzero = sum(1 for r in prod if count_map.get(r['city'].lower(), 0) > 0)
+        print(f"[V34] Synced {updated} prod_cities permit counts ({nonzero} have data)")
+    except Exception as e:
+        print(f"[V34] Sync error: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -1270,21 +1305,16 @@ def get_prod_cities(status='active', min_permits=1):
 
 
 def get_prod_city_count():
-    """V15/V34: Get count of active prod cities WITH actual permits in DB.
+    """V15/V34: Get count of active prod cities WITH actual permits.
 
-    V34: Changed to only count cities that have real permit data,
-    not just cities marked 'active' in prod_cities. This ensures
-    the displayed count matches reality.
+    V34: Only counts active cities where total_permits > 0.
+    The total_permits column is synced with actual DB counts
+    during startup via _sync_prod_city_counts().
     """
     conn = get_connection()
-    # V34: Count prod_cities that actually have permits in the permits table
-    row = conn.execute("""
-        SELECT COUNT(DISTINCT pc.city_slug) as cnt
-        FROM prod_cities pc
-        INNER JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
-            AND (p.state = pc.state OR p.state IS NULL)
-        WHERE pc.status = 'active'
-    """).fetchone()
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active' AND total_permits > 0"
+    ).fetchone()
     return row['cnt'] if row else 0
 
 
