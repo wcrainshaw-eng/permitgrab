@@ -36,6 +36,14 @@ GARBAGE_CITY_PATTERNS = [
     r'^unknown$',   # Unknown values
     r'^tbd$',       # TBD values
     r'^-$',         # Just a dash
+    # V32: Additional garbage patterns found in data quality audit
+    r'^dob now',        # NYC DOB system names (e.g., "DOB NOW: Build – Approved")
+    r'^building$',      # Generic "Building" as city name
+    r'^permits?$',      # "Permit" or "Permits" as city name
+    r'permit application', # "Hamlin Building Permit Application"
+    r'^archived',       # Archived dataset names
+    r'featureserver',   # ArcGIS layer names leaking as city names
+    r'mapserver',       # ArcGIS layer names
 ]
 
 # V19: Neighborhood/subdivision names that should map to their parent city
@@ -621,6 +629,27 @@ def upsert_permits(permits, source_city_key=None):
 
     permits = filtered_permits
 
+    # V32: Filter out permits with garbage city names before insertion
+    pre_filter_count = len(permits)
+    permits = [p for p in permits if not is_garbage_city_name(p.get('city', ''))]
+    garbage_filtered = pre_filter_count - len(permits)
+    if garbage_filtered > 0:
+        print(f"[V32] Filtered {garbage_filtered} permits with garbage city names")
+
+    # V32: Filter out permits with invalid/empty state codes
+    VALID_US_STATES = {
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA',
+        'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
+        'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX',
+        'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    }
+    pre_state_count = len(permits)
+    permits = [p for p in permits if (p.get('state', '') or '').upper() in VALID_US_STATES]
+    state_filtered = pre_state_count - len(permits)
+    if state_filtered > 0:
+        print(f"[V32] Filtered {state_filtered} permits with invalid state codes")
+
     # V12.56: Safety net - convert any dict/list values to strings to prevent SQLite binding errors
     for permit in permits:
         for key, val in list(permit.items()):
@@ -702,7 +731,7 @@ def upsert_permits(permits, source_city_key=None):
             p.get('status'), p.get('filing_date'), p.get('issued_date'), p.get('date'),
             p.get('contact_name'), p.get('contact_phone'), p.get('contact_email'), p.get('owner_name'),
             p.get('contractor_name'), p.get('square_feet'), p.get('lifecycle_label'),
-            source_city_key, now, now
+            source_city_key or p.get('source_bulk') or p.get('source_city') or p.get('source_city_key'), now, now
         ))
 
     conn.commit()
@@ -710,11 +739,13 @@ def upsert_permits(permits, source_city_key=None):
     return new_count, updated_count
 
 
-def query_permits(city=None, trade=None, value=None, status=None, quality=None,
+def query_permits(city=None, state=None, trade=None, value=None, status=None, quality=None,
                   search=None, page=1, per_page=50, order_by='filing_date DESC'):
     """
     Query permits with filters and pagination. Replaces the Python list
     comprehension filtering in /api/permits.
+
+    V32: Added state parameter to prevent cross-state data pollution.
 
     Returns:
         (permits_list, total_count)
@@ -726,6 +757,9 @@ def query_permits(city=None, trade=None, value=None, status=None, quality=None,
     if city:
         conditions.append("city = ?")
         params.append(city)
+    if state:
+        conditions.append("state = ?")
+        params.append(state)
     if trade and trade != 'all-trades':
         conditions.append("LOWER(trade_category) = LOWER(?)")
         params.append(trade)
@@ -1041,6 +1075,37 @@ def is_prod_city(city_slug):
         (city_slug,)
     ).fetchone()
     return row is not None, row['status'] if row else None
+
+
+def lookup_prod_city_by_slug(slug):
+    """V32: Look up a city from prod_cities by slug, with fuzzy matching.
+    Handles bulk source slug mismatch — e.g., URL slug 'lakewood' matching
+    prod_cities slug 'lakewood-nj' from NJ bulk source.
+
+    Returns (city_name, state, city_slug) or (None, None, None).
+    """
+    conn = get_connection()
+
+    # Exact match first
+    row = conn.execute(
+        "SELECT city, state, city_slug FROM prod_cities WHERE city_slug = ? AND status = 'active'",
+        (slug,)
+    ).fetchone()
+    if row:
+        return row['city'], row['state'], row['city_slug']
+
+    # Fuzzy match: slug is a prefix (e.g., 'lakewood' matches 'lakewood-nj')
+    # Only match if exactly one state suffix follows
+    row = conn.execute("""
+        SELECT city, state, city_slug FROM prod_cities
+        WHERE city_slug LIKE ? || '-__' AND status = 'active'
+        ORDER BY total_permits DESC
+        LIMIT 1
+    """, (slug,)).fetchone()
+    if row:
+        return row['city'], row['state'], row['city_slug']
+
+    return None, None, None
 
 
 def get_city_health_status():

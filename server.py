@@ -1248,8 +1248,10 @@ def discover_cities_from_permits():
 
 def get_city_by_slug_auto(slug):
     """
-    V12.32: Look up city config by slug, checking both CITY_REGISTRY
-    and auto-discovered cities from bulk source data.
+    V12.32: Look up city config by slug, checking CITY_REGISTRY,
+    auto-discovered cities from bulk source data, and prod_cities.
+    V32: Added prod_cities fallback for bulk source cities whose slugs
+    include state suffixes (e.g., 'lakewood-nj' for URL 'lakewood').
     Returns (city_key, city_config) or (None, None) if not found.
     """
     # First try explicit registry (faster, has full config)
@@ -1269,6 +1271,21 @@ def get_city_by_slug_auto(slug):
             'active': True,
             'auto_discovered': True,
         }
+
+    # V32: Check prod_cities table (handles bulk source slugs like 'lakewood-nj')
+    try:
+        city_name, state, prod_slug = permitdb.lookup_prod_city_by_slug(slug)
+        if city_name:
+            return prod_slug, {
+                'name': city_name,
+                'state': state,
+                'slug': prod_slug,
+                'active': True,
+                'auto_discovered': True,
+                'from_prod_cities': True,
+            }
+    except Exception as e:
+        print(f"[V32] Error looking up prod_city for slug '{slug}': {e}")
 
     return None, None
 
@@ -2526,12 +2543,14 @@ def api_permits():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
 
-    # Resolve city slug to name if needed
+    # V32: Resolve city slug to name and state for cross-state filtering
     city_name = None
+    city_state = None
     if city:
         city_key, city_config = get_city_by_slug(city)
         if city_config:
             city_name = city_config.get('name', city)
+            city_state = city_config.get('state', '')
         else:
             city_name = city  # Use as-is if not a valid slug
 
@@ -2562,8 +2581,10 @@ def api_permits():
     """
 
     # V12.50: Query SQLite database (replaces loading 100K permits into memory)
+    # V32: Pass state to prevent cross-state data pollution
     permits, total = permitdb.query_permits(
         city=city_name,
+        state=city_state,
         trade=trade_name,
         value=value or None,
         status=status_filter or None,
@@ -6285,15 +6306,25 @@ def city_landing_inner(city_slug):
 
     # V12.51: Use SQLite for city permits
     filter_name = config.get('raw_name', config['name'])
+    filter_state = config.get('state', '')
     conn = permitdb.get_connection()
 
+    # V32: Add state filter to prevent cross-state data pollution
+    # (e.g., Newark NJ showing Oklahoma permits)
+    if filter_state:
+        state_clause = " AND state = ?"
+        state_params = (filter_name, filter_state)
+    else:
+        state_clause = ""
+        state_params = (filter_name,)
+
     # Get stats via SQL aggregation
-    stats_row = conn.execute("""
+    stats_row = conn.execute(f"""
         SELECT COUNT(*) as permit_count,
                COALESCE(SUM(estimated_cost), 0) as total_value,
                COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
-        FROM permits WHERE city = ?
-    """, (filter_name,)).fetchone()
+        FROM permits WHERE city = ?{state_clause}
+    """, state_params).fetchone()
 
     permit_count = stats_row['permit_count']
     total_value = stats_row['total_value']
@@ -6301,9 +6332,9 @@ def city_landing_inner(city_slug):
     high_value_count = stats_row['high_value_count']
 
     # Get permits for display (limited set, sorted by value)
-    cursor = conn.execute("""
-        SELECT * FROM permits WHERE city = ? ORDER BY estimated_cost DESC LIMIT 100
-    """, (filter_name,))
+    cursor = conn.execute(f"""
+        SELECT * FROM permits WHERE city = ?{state_clause} ORDER BY estimated_cost DESC LIMIT 100
+    """, state_params)
     city_permits = [dict(row) for row in cursor]
 
     # V15: noindex for non-prod cities or empty cities
