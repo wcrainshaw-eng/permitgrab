@@ -69,13 +69,12 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
     },
     "oklahoma_city": {
-        "agency_code": "OKIE",
-        "module": "Building",
-        "tab_name": "Building",
-        # OKC module might be different — Code must verify by loading the page
-        # and checking which tabs exist. Try Building first, then Permits.
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
-        "needs_module_discovery": True,
+        "agency_code": "OKC",
+        "module": "Permits",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=HOME",
+        # OKC uses a custom Accela domain, not aca-prod.accela.com
+        "base_url": "https://access.okc.gov/aca",
     },
     "oakland": {
         "agency_code": "OAKLAND",
@@ -224,7 +223,11 @@ async def scrape_accela_permits(city_key, days_back=1):
 
     config = ACCELA_CONFIGS[city_key]
     agency = config["agency_code"]
-    search_url = f"{BASE_URL}/{agency}/{config['search_url_path']}"
+    # Support custom base URLs (e.g. OKC uses access.okc.gov/aca instead of aca-prod.accela.com)
+    if "base_url" in config:
+        search_url = f"{config['base_url']}/{config['search_url_path']}"
+    else:
+        search_url = f"{BASE_URL}/{agency}/{config['search_url_path']}"
 
     browser = await _get_browser()
     context = await browser.new_context(
