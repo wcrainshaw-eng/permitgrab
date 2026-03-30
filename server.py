@@ -6603,17 +6603,33 @@ def search_page():
     all_cities = get_cities_with_data()
     query_lower = query.lower()
 
-    # Direct city match
+    # Direct city match (exact query == city name)
     for city in all_cities:
         city_name = city.get('name', '') or city.get('city', '')
         if city_name.lower() == query_lower:
             slug = city.get('slug', city_name.lower().replace(' ', '-'))
             return redirect(f'/permits/{slug}')
 
-    # Partial city match - redirect to cities page with filter
+    # City name appears in query (e.g. "denver roofing" contains "denver")
+    best_match = None
+    best_len = 0
+    for city in all_cities:
+        city_name = (city.get('name', '') or city.get('city', '')).lower()
+        if city_name and city_name in query_lower and len(city_name) > best_len:
+            best_match = city
+            best_len = len(city_name)
+    if best_match:
+        slug = best_match.get('slug', (best_match.get('name', '') or best_match.get('city', '')).lower().replace(' ', '-'))
+        # Check if query has a trade keyword after the city name
+        remainder = query_lower.replace((best_match.get('name', '') or best_match.get('city', '')).lower(), '').strip()
+        if remainder:
+            # Try to match a trade — redirect to city+trade page
+            return redirect(f'/permits/{slug}/{remainder.replace(" ", "-")}')
+        return redirect(f'/permits/{slug}')
+
+    # Query appears in a city name (e.g. "den" matches "denver")
     matching_cities = [c for c in all_cities if query_lower in (c.get('name', '') or c.get('city', '')).lower()]
     if matching_cities:
-        # Redirect to first match
         city = matching_cities[0]
         slug = city.get('slug', (city.get('name', '') or city.get('city', '')).lower().replace(' ', '-'))
         return redirect(f'/permits/{slug}')
