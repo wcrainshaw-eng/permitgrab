@@ -559,10 +559,9 @@ CITY_REGISTRY = {
             "description": "CLASS",
         },
         "date_field": "DATE_ISSUED",
-        "date_format": "epoch",
         "limit": 2000,
         "active": True,
-        "notes": "V17h: Switched to ArcGIS FeatureServer/316 — residential construction permits with contractor names",
+        "notes": "V28: Removed date_format=epoch — ArcGIS server needs standard DATE syntax. 77K records, updated daily. Endpoint verified returning fresh data 2026-03-29.",
     },
 
     "portland": {
