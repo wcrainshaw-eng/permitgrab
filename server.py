@@ -557,6 +557,137 @@ def admin_cleanup_data():
         return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/query', methods=['POST'])
+def admin_query():
+    """V34: Run a read-only SQL query for diagnostics.
+    Body: {"sql": "SELECT ...", "limit": 100}
+    Only SELECT statements allowed.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        sql = data.get('sql', '').strip()
+        limit = min(data.get('limit', 100), 1000)
+
+        # Safety: only allow SELECT
+        if not sql.upper().startswith('SELECT'):
+            return jsonify({'error': 'Only SELECT queries allowed'}), 400
+        for forbidden in ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'ATTACH']:
+            if forbidden in sql.upper().split('SELECT', 1)[-1]:
+                return jsonify({'error': f'Forbidden keyword: {forbidden}'}), 400
+
+        conn = permitdb.get_connection()
+        rows = conn.execute(sql).fetchmany(limit)
+        result = [dict(r) for r in rows]
+        return jsonify({'rows': result, 'count': len(result)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/fix-states', methods=['POST'])
+def admin_fix_states():
+    """V34b: Targeted state fix — fix specific city+wrong_state → correct_state.
+    Body: {"fixes": [["city_name", "wrong_state", "correct_state"], ...]}
+    Or use {"auto": true} to fix all known misattributions.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        conn = permitdb.get_connection()
+        total_fixed = 0
+        details = []
+
+        if data.get('auto'):
+            # Auto-fix: use prod_cities state as truth for all permits
+            prod_rows = conn.execute(
+                "SELECT city, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+            ).fetchall()
+            for row in prod_rows:
+                city = row['city']
+                correct_state = row['state']
+                # Fix exact match and LOWER match
+                result = conn.execute(
+                    "UPDATE permits SET state = ? WHERE (city = ? OR LOWER(city) = LOWER(?)) AND state != ?",
+                    (correct_state, city, city, correct_state)
+                )
+                if result.rowcount > 0:
+                    details.append(f"{city} → {correct_state}: {result.rowcount} fixed")
+                    total_fixed += result.rowcount
+            conn.commit()
+        else:
+            fixes = data.get('fixes', [])
+            for city, wrong_state, correct_state in fixes:
+                result = conn.execute(
+                    "UPDATE permits SET state = ? WHERE LOWER(city) = LOWER(?) AND state = ?",
+                    (correct_state, city, wrong_state)
+                )
+                if result.rowcount > 0:
+                    details.append(f"{city} {wrong_state}→{correct_state}: {result.rowcount}")
+                    total_fixed += result.rowcount
+            conn.commit()
+
+        return jsonify({'total_fixed': total_fixed, 'details': details})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/fix-prod-cities', methods=['POST'])
+def admin_fix_prod_cities():
+    """V34b: Fix prod_cities table — clean city names, remove state from city names."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        conn = permitdb.get_connection()
+        fixes = []
+
+        # Fix city names that have state appended (e.g., "Norfolk Va" → "Norfolk")
+        rows = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+        for row in rows:
+            city = row['city']
+            state = row['state'] or ''
+            original = city
+
+            # Remove state abbreviation from end (e.g., "Norfolk Va" → "Norfolk")
+            import re
+            # Match " XX" or " Xx" at end where XX matches state
+            if state and len(state) == 2:
+                pattern = rf'\s+{re.escape(state)}$'
+                cleaned = re.sub(pattern, '', city, flags=re.IGNORECASE)
+                if cleaned != city:
+                    city = cleaned
+
+            # Fix "Prince George'South County Md" → "Prince George's County"
+            city = city.replace("George'South", "George's")
+
+            # Fix "Saint." → "St."
+            city = city.replace("Saint.", "St.")
+
+            # Fix "Little Rock Ar Metro" → "Little Rock"
+            city = re.sub(r'\s+(Metro|Area|Region)$', '', city, flags=re.IGNORECASE)
+
+            # Fix double state references
+            if city != original:
+                conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (city, row['id']))
+                fixes.append(f"{original} → {city}")
+
+        conn.commit()
+
+        # Also sync the counts after name fixes
+        permitdb._sync_prod_city_counts(conn)
+
+        return jsonify({'fixes': fixes, 'count': len(fixes)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ===========================
 # V12.53: ADMIN EMAIL ENDPOINTS
 # ===========================
