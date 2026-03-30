@@ -404,15 +404,43 @@ def admin_suggested_fixes():
 
 @app.route('/api/admin/coverage')
 def admin_coverage():
-    """V12.33: Get coverage statistics - which cities/states have data."""
+    """V12.33/V31: Get coverage statistics - which cities/states have data.
+    V31: Distinguishes active cities (with live data sources) from historical
+    cities that only appear in permit data from bulk sources.
+    """
     valid, error = check_admin_key()
     if not valid:
         return error
 
-    # Load permits to analyze coverage
+    # V31: Active cities = prod_cities with status='active' (these are being pulled)
+    active_city_count = 0
+    active_cities_list = []
+    try:
+        if permitdb.prod_cities_table_exists():
+            active_cities_list = permitdb.get_prod_cities(status='active')
+            active_city_count = len(active_cities_list)
+    except Exception:
+        pass
+
+    # Also get counts by status for a full breakdown
+    status_breakdown = {}
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute(
+            "SELECT status, COUNT(*) as cnt FROM prod_cities GROUP BY status"
+        ).fetchall()
+        status_breakdown = {r['status']: r['cnt'] for r in rows}
+    except Exception:
+        pass
+
+    # Load permits to analyze coverage (historical data)
     permits_path = os.path.join(DATA_DIR, 'permits.json')
     if not os.path.exists(permits_path):
-        return jsonify({'error': 'No permit data found'}), 404
+        return jsonify({
+            'active_cities': active_city_count,
+            'prod_cities_by_status': status_breakdown,
+            'error': 'No permit data file found (permits analyzed from prod_cities only)',
+        })
 
     try:
         with open(permits_path) as f:
@@ -448,8 +476,12 @@ def admin_coverage():
         states_missing = [s for s in all_states if s not in state_counts]
 
         return jsonify({
+            # V31: Active = cities with live data collection
+            'active_cities': active_city_count,
+            'prod_cities_by_status': status_breakdown,
+            # Historical data from permits table (not all actively pulled)
+            'historical_cities_in_permits': len(city_counts),
             'total_permits': len(permits),
-            'total_cities_with_data': len(city_counts),
             'total_states_with_data': len(state_counts),
             'states_covered': states_covered,
             'states_missing': states_missing,
@@ -1197,8 +1229,8 @@ def discover_cities_from_permits():
                             'name': city_name,
                             'state': state,
                             'slug': slug,
-                            'configured': False,  # Auto-discovered
-                            'active': True,
+                            'configured': False,  # Auto-discovered from bulk permit data
+                            'active': False,  # V31: Not actively pulled — just has historical permit data
                             'source_bulk': True,
                         }
                         added_count += 1
@@ -1258,9 +1290,10 @@ def get_cities_by_state_auto(state_abbrev):
 
 
 def get_total_city_count_auto():
-    """V15: Get total count of active cities.
+    """V15/V31: Get total count of actively collected cities.
 
-    V15: Uses prod_cities table if available (collector redesign).
+    V31: Only counts cities with live data collection (prod_cities status='active').
+    Does NOT include historical bulk-source cities that aren't being actively pulled.
     Falls back to get_cities_with_data() heuristics if prod_cities is empty.
     """
     try:
@@ -2392,7 +2425,7 @@ def index():
             default_city = user.city or ''
             default_trade = user.trade or ''
 
-    # V12.32: Pass city_count including auto-discovered bulk source cities
+    # V31: City count = only actively pulled cities (not historical bulk data)
     city_count = get_total_city_count_auto()
 
     # V13: Pass ALL cities for dropdown (sorted by state then city name)
@@ -3457,7 +3490,7 @@ def pricing_page():
     """Render the Pricing page. V12.51: SQL-backed"""
     user = get_current_user()
     cities = get_all_cities_info()
-    city_count = get_total_city_count_auto()  # V12.32: Include bulk source cities
+    city_count = get_total_city_count_auto()  # V31: Active cities only
     footer_cities = get_cities_with_data()
     # V12.51: Get permit count from SQLite
     stats = permitdb.get_permit_stats()

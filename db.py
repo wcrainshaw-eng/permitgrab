@@ -768,22 +768,32 @@ def get_permit_stats():
     """
     Get aggregate stats. Replaces loading all permits just to count them.
     This is a single SQL query — uses ~0 memory regardless of dataset size.
+
+    V31: city_count now reflects actively collected cities (prod_cities with
+    status='active'), not every distinct city name in the permits table.
+    The old COUNT(DISTINCT city) included historical bulk-source data.
     """
     conn = get_connection()
     row = conn.execute("""
         SELECT
             COUNT(*) as total_permits,
             COALESCE(SUM(estimated_cost), 0) as total_value,
-            COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count,
-            COUNT(DISTINCT city) as city_count
+            COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
         FROM permits
     """).fetchone()
+
+    # V31: City count from actively pulled sources only
+    active_city_count = get_prod_city_count() if prod_cities_table_exists() else 0
+    # Fallback: if prod_cities not populated yet, use distinct cities from permits
+    if active_city_count == 0:
+        fallback = conn.execute("SELECT COUNT(DISTINCT city) as cnt FROM permits").fetchone()
+        active_city_count = fallback['cnt'] if fallback else 0
 
     return {
         'total_permits': row['total_permits'],
         'total_value': row['total_value'],
         'high_value_count': row['high_value_count'],
-        'city_count': row['city_count'],
+        'city_count': active_city_count,
     }
 
 
