@@ -79,7 +79,9 @@ def get_city_config(source_key):
 
 def get_active_bulk_sources():
     """Return list of active bulk source keys.
-    V17: Also includes sources from discovered_sources table."""
+    V17: Also includes sources from discovered_sources table.
+    V33: Always merges DB sources with BULK_SOURCES dict so new entries
+    added to city_configs.py are picked up immediately."""
     conn = permitdb.get_connection()
     source_keys = set()
 
@@ -100,12 +102,14 @@ def get_active_bulk_sources():
     except:
         pass  # Table may not exist yet
 
-    if source_keys:
-        return list(source_keys)
-
-    # Fallback to legacy BULK_SOURCES dict
+    # V33: Always merge with BULK_SOURCES dict (don't just fallback)
+    # This ensures new entries added to city_configs.py are picked up
+    # even when the DB already has some bulk sources
     from city_configs import get_active_bulk_sources as _legacy_get
-    return _legacy_get()
+    for key in _legacy_get():
+        source_keys.add(key)
+
+    return list(source_keys)
 
 
 def get_bulk_source_config(source_key):
