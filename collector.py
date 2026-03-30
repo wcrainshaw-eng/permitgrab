@@ -331,6 +331,11 @@ def fetch_socrata(config, days_back):
         filter_value = city_filter["value"]
         where_clause += f" AND upper({filter_field}) = upper('{filter_value}')"
 
+    # V31: Append extra where_filter if configured (e.g., permit type filtering)
+    extra_filter = config.get("where_filter")
+    if extra_filter:
+        where_clause += f" AND ({extra_filter})"
+
     params = {
         "$limit": limit,
         "$order": f"{date_field} DESC",
@@ -506,7 +511,12 @@ def fetch_socrata_bulk(config, days_back=90):
         }
 
         if date_field:
-            params["$where"] = f"{date_field} > '{since_date}'"
+            where_clause = f"{date_field} > '{since_date}'"
+            # V31: Append extra where_filter if configured (e.g., permit type filtering)
+            extra_filter = config.get("where_filter")
+            if extra_filter:
+                where_clause += f" AND ({extra_filter})"
+            params["$where"] = where_clause
 
         print(f"    Fetching page {page + 1} (offset {offset})...", flush=True)
 

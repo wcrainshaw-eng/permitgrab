@@ -15121,8 +15121,9 @@ BULK_SOURCES = {
         },
         "date_field": "issue_date",
         "limit": 50000,
+        "where_filter": "permit_type_desc='Building Permit'",
         "active": True,
-        "notes": "V31: Reactivated. Austin TX datahub permits. 82 columns, massive dataset. Covers metro area. Fresh data confirmed 2026-03-30.",
+        "notes": "V31: Reactivated + filtered. Austin TX datahub permits. Filtered to Building Permits only (excludes electrical/plumbing/mechanical/driveway). Fresh data confirmed 2026-03-30.",
     },
 
     "pierce_county_wa_socrata_bulk": {
@@ -15145,8 +15146,9 @@ BULK_SOURCES = {
         },
         "date_field": "applicationdate",
         "limit": 50000,
+        "where_filter": "applicationtype IN('Construction Residential','Construction Commercial','Residential Site Development','Site Dev Residential','Site Development','Residential Demolition')",
         "active": True,
-        "notes": "V31: Reactivated. Pierce County WA Socrata permits. Fixed date_field to applicationdate (issueddate doesn't exist). Tacoma, Lakewood, etc.",
+        "notes": "V31: Reactivated + filtered. Pierce County WA Socrata permits. Filtered to construction/building types only (excludes mechanical/plumbing/sewer/alarms/signs). Tacoma, Lakewood, etc.",
     },
 
     "buffalo_ny_bulk": {
