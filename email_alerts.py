@@ -6,6 +6,7 @@ Uses SendGrid SMTP and queries SQLite for permit data.
 
 import json
 import os
+import re
 import smtplib
 import secrets
 from email.mime.text import MIMEText
@@ -360,6 +361,28 @@ def get_permits_for_digest(cities, since_date, limit=25):
         for p in permits:
             p['_is_fallback'] = True
 
+    # V30: Inject state and city_slug from prod_cities when missing in permit data.
+    # Many ArcGIS sources (e.g. Atlanta) don't provide state in their API response,
+    # causing emails to show "Atlanta, 30336" or "Atlanta, TX" (wrong state).
+    try:
+        prod_cities = permitdb.get_prod_cities(status=None, min_permits=0)
+        city_lookup = {}
+        for pc in prod_cities:
+            city_lookup[pc['name'].lower()] = {
+                'state': pc.get('state', ''),
+                'slug': pc.get('slug', '')
+            }
+        for p in permits:
+            city_key = (p.get('city') or '').lower()
+            if city_key in city_lookup:
+                # Always inject slug for clickable links
+                p['_city_slug'] = city_lookup[city_key]['slug']
+                # Inject state if missing or looks wrong (single char, empty, etc.)
+                if not p.get('state') or len(str(p.get('state', '')).strip()) < 2:
+                    p['state'] = city_lookup[city_key]['state']
+    except Exception as e:
+        print(f"[V30] Digest city lookup fallback: {e}")
+
     return permits
 
 
@@ -430,11 +453,31 @@ def build_digest_html(user, permits, snapshot=None, is_pro=False, active_cities=
         if muted:
             value_color = '#9ca3af'
 
-        # Contact info - visible for Pro, blurred for Free
+        # V30: Contact info — detect license numbers vs real names
+        # License numbers look like "CGC061641", "EC13010401", etc. — no spaces, alphanumeric
+        def is_likely_license(val):
+            """Check if a contact_name value is actually a license/ID number."""
+            if not val:
+                return False
+            val = val.strip()
+            # License patterns: all-caps alphanumeric with no spaces, or common prefixes
+            if re.match(r'^[A-Z]{2,4}\d{4,}$', val):
+                return True  # e.g. CGC061641, EC13010401
+            if re.match(r'^[A-Z0-9]{5,}$', val) and not ' ' in val:
+                return True  # e.g. alphanumeric IDs
+            if re.match(r'^\d{5,}$', val):
+                return True  # pure numeric IDs
+            return False
+
         if is_pro:
             contact_section = ''
             if p.get('contact_name'):
-                contact_section += f'<div style="font-size:13px;color:#111827;font-weight:500;">📞 {p["contact_name"]}</div>'
+                cn = p['contact_name'].strip()
+                if is_likely_license(cn):
+                    # V30: Show as license number, not phone contact
+                    contact_section += f'<div style="font-size:13px;color:#6b7280;">🪪 License: {cn}</div>'
+                else:
+                    contact_section += f'<div style="font-size:13px;color:#111827;font-weight:500;">📞 {cn}</div>'
             if p.get('contact_phone'):
                 contact_section += f'<div style="font-size:13px;color:#2563eb;">{p["contact_phone"]}</div>'
             if p.get('contact_email'):
@@ -445,17 +488,22 @@ def build_digest_html(user, permits, snapshot=None, is_pro=False, active_cities=
               🔒 Contact info hidden — <a href="''' + SITE_URL + '''/pricing" style="color:#f97316;">Upgrade to Pro</a>
             </div>'''
 
+        # V30: Build clickable link to city page
+        city_slug = p.get('_city_slug', '')
+        city_link = f'{SITE_URL}/permits/{city_slug}' if city_slug else f'{SITE_URL}/dashboard'
+
         return f'''
         <div style="padding:16px;border-bottom:1px solid #e5e7eb;{'opacity:0.85;' if muted else ''}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px;background:#dbeafe;color:#1e40af;">{p.get('trade_category', 'Other')}</span>
             <span style="font-weight:700;font-size:16px;color:{value_color};">{cost}</span>
           </div>
-          <div style="font-weight:600;font-size:15px;color:#111827;margin-bottom:4px;">{p.get('address', 'Address pending')}</div>
+          <a href="{city_link}" style="font-weight:600;font-size:15px;color:#2563eb;text-decoration:none;display:block;margin-bottom:4px;">{p.get('address', 'Address pending')}</a>
           <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">{p.get('city', '')}, {p.get('state', '')} {p.get('zip', '')}</div>
           <div style="font-size:14px;color:#4b5563;margin-bottom:8px;">{(p.get('description') or '')[:150]}</div>
           <div style="font-size:12px;color:#9ca3af;">Filed: {p.get('filing_date', 'N/A')} · #{p.get('permit_number', '')}</div>
           {contact_section}
+          <a href="{city_link}" style="display:inline-block;margin-top:8px;font-size:12px;color:#2563eb;text-decoration:none;font-weight:500;">View on PermitGrab →</a>
         </div>'''
 
     # Build permit rows for Section 1
