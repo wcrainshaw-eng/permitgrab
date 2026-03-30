@@ -1795,7 +1795,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V34: Deactivated — duplicate of 'gainesville_fl' which has richer field map.",
     },
 
     "mesa_new": {
@@ -3320,7 +3321,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
 
@@ -3432,6 +3433,7 @@ CITY_REGISTRY = {
             "narrow_lot": "permit_narrow_lot",
             "occupancy_required": "permit_occupancy_required",
             "flood_zone": "permit_building_flood_zone",
+
             "ward": "ward",
             "super_ward": "super_ward",
             "parcel": "parcel_gpin",
@@ -3445,8 +3447,8 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V19: Full 32-field map — permit number, address, application/issue/finalize dates, type, status, use class/type/group, work type, structure, sqft, total fee/payments/balance, project cost, flood zone, ward/super ward, parcel GPIN, narrow lot, occupancy required, inspection details, geocoded location. 97K+ building records. Data through 2024. Verified.",
+        "active": False,
+        "notes": "V34: Deactivated — duplicate of 'norfolk'. V19: Full 32-field map — permit number, address, application/issue/finalize dates, type, status, use class/type/group, work type, structure, sqft, total fee/payments/balance, project cost, flood zone, ward/super ward, parcel GPIN, narrow lot, occupancy required, inspection details, geocoded location. 97K+ building records. Data through 2024. Verified.",
     },
 
     "frederick": {
@@ -4775,7 +4777,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.8: Fixed date_field typo but dataset ends June 2025 - no longer updated",
     },
 
@@ -4797,7 +4799,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via new_orleans endpoint.",
     },
 
@@ -10356,7 +10358,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
+        "notes": "V34: Deactivated — duplicate of 'cambridge' which has richer field map.",
     },
 
     "quincy_ma": {
@@ -11228,7 +11231,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "situscity", "value": "ALLEN"},
         "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
@@ -11276,7 +11279,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "situscity", "value": "WYLIE"},
         "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
@@ -13684,7 +13687,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via austin endpoint.",
     },
 
@@ -13708,7 +13711,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via norfolk endpoint.",
     },
 
@@ -13778,7 +13781,7 @@ CITY_REGISTRY = {
         },
         "date_field": "processed_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via orlando endpoint.",
     },
 
@@ -13848,8 +13851,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": True,
-        "notes": "V26: Data provided via buffalo endpoint.",
+        "active": False,
+        "notes": "V34: Deactivated — duplicate of 'buffalo' which has richer field map.",
     },
 
     # --- San Diego County CA (individual city endpoint) ---
@@ -13896,7 +13899,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via college_station endpoint.",
     },
 
@@ -13991,7 +13994,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via framingham endpoint.",
     },
 
