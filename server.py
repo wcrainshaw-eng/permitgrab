@@ -526,7 +526,7 @@ def admin_pause_empty_cities():
 
 @app.route('/api/admin/cleanup-data', methods=['POST'])
 def admin_cleanup_data():
-    """V34: Run comprehensive data cleanup — fix wrong states, remove garbage records.
+    """V35: Run comprehensive data cleanup — fix wrong states, remove garbage records.
     This is safe to run multiple times (idempotent).
     """
     valid, error = check_admin_key()
@@ -535,23 +535,47 @@ def admin_cleanup_data():
 
     try:
         conn = permitdb.get_connection()
-        # Get before counts
         before = conn.execute("SELECT COUNT(*) as cnt FROM permits").fetchone()['cnt']
-        before_cities = conn.execute("SELECT COUNT(DISTINCT city) as cnt FROM permits").fetchone()['cnt']
 
-        fixed = permitdb._run_v34_data_cleanup(conn)
+        # Step 1: Clean prod_cities names first (so state lookups work)
+        prod_all = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+        name_fixes = 0
+        for row in prod_all:
+            cleaned = permitdb.clean_city_name_for_prod(row['city'], row['state'])
+            if cleaned != row['city']:
+                conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
+                name_fixes += 1
+        conn.commit()
+
+        # Step 2: Fix wrong states using cleaned prod_cities as truth
+        prod_rows = conn.execute(
+            "SELECT city, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+        ).fetchall()
+        state_fixes = 0
+        for row in prod_rows:
+            result = conn.execute(
+                "UPDATE permits SET state = ? WHERE (city = ? OR LOWER(city) = LOWER(?)) AND state != ?",
+                (row['state'], row['city'], row['city'], row['state'])
+            )
+            if result.rowcount > 0:
+                state_fixes += result.rowcount
+        conn.commit()
+
+        # Step 3: Run V34/V35 data cleanup (garbage deletion, casing fixes)
+        cleanup_fixed = permitdb._run_v34_data_cleanup(conn)
+
+        # Step 4: Sync permit counts
+        permitdb._sync_prod_city_counts(conn)
 
         after = conn.execute("SELECT COUNT(*) as cnt FROM permits").fetchone()['cnt']
-        after_cities = conn.execute("SELECT COUNT(DISTINCT city) as cnt FROM permits").fetchone()['cnt']
 
         return jsonify({
-            'records_affected': fixed,
+            'prod_city_names_fixed': name_fixes,
+            'state_assignments_fixed': state_fixes,
+            'cleanup_records_affected': cleanup_fixed,
             'permits_before': before,
             'permits_after': after,
             'permits_removed': before - after,
-            'distinct_cities_before': before_cities,
-            'distinct_cities_after': after_cities,
-            'cities_removed': before_cities - after_cities,
         })
     except Exception as e:
         return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500

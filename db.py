@@ -46,6 +46,36 @@ GARBAGE_CITY_PATTERNS = [
     r'mapserver',       # ArcGIS layer names
 ]
 
+# V35: Strengthened garbage patterns — catches dataset/layer names that leaked through V32 filters
+GARBAGE_CITY_PATTERNS_V35 = [
+    r'county\s+sewer',        # "Kitsap County Sewer Data_WFL1"
+    r'development\s+permit',  # "CFW Development Permits Table"
+    r'building\s+and\s+safety', # "Building and Safety"
+    r'case\s+history',        # "LA County Permitting (EPIC-LA Case History)"
+    r'bureau\s+of',           # "Bureau of Engineering Permit Information"
+    r'inspection',            # "Gas and Inspections"
+    r'permit\s+info',         # "Permit Information"
+    r'\bwfl\d',               # ArcGIS WFL layer names
+    r'\bwgs\d',               # WGS coordinate system in name
+    r'data_',                 # "Sewer Data_WFL1"
+    r'^table$',               # Just "Table"
+    r'epic-la',               # EPIC-LA system names
+    r'^gas$',                 # "Gas" as city name
+    r'^plumbing$',
+    r'^electrical$',
+    r'^mechanical$',
+    r'^roofing$',
+    r'^sign$',
+    r'^fence$',
+    r'^fire$',
+    r'^demolition$',
+    r'limited\s+alteration',  # "DOB NOW: Build – Limited Alteration Applications"
+    r'approved\s+permit',     # System status descriptions
+    r'\bfeature\s*layer\b',
+    r'\brest\s*service\b',
+    r'^city\s+of\s+',         # "City of Chicago" → should be just "Chicago"
+]
+
 # V19: Neighborhood/subdivision names that should map to their parent city
 # Format: {(neighborhood, state): actual_city}
 NEIGHBORHOOD_TO_CITY = {
@@ -103,16 +133,46 @@ NEIGHBORHOOD_TO_CITY = {
 
 
 def is_garbage_city_name(city_name):
-    """V18: Check if a city name is garbage (database field name, test data, etc.)."""
+    """V18/V35: Check if a city name is garbage (database field name, test data, etc.)."""
     if not city_name:
         return True
     name_lower = city_name.strip().lower()
     if len(name_lower) < 2:
         return True
-    for pattern in GARBAGE_CITY_PATTERNS:
+    # V35: Also reject if longer than 40 chars (real city names are shorter)
+    if len(name_lower) > 40:
+        return True
+    for pattern in GARBAGE_CITY_PATTERNS + GARBAGE_CITY_PATTERNS_V35:
         if re.search(pattern, name_lower, re.IGNORECASE):
             return True
     return False
+
+
+def clean_city_name_for_prod(city_name, state=""):
+    """V35: Clean city name before storing in prod_cities.
+    Removes state abbreviations, fixes known corruptions.
+    """
+    if not city_name:
+        return city_name
+    import re
+    cleaned = city_name.strip()
+
+    # Remove state abbreviation from end (e.g., "Norfolk Va" → "Norfolk")
+    if state and len(state) == 2:
+        pattern = rf'\s+{re.escape(state)}$'
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+    # Remove " Metro", " Area", " Region" suffixes
+    cleaned = re.sub(r'\s+(Metro|Area|Region)$', '', cleaned, flags=re.IGNORECASE)
+
+    # Fix known corruptions
+    cleaned = cleaned.replace("George'South", "George's")
+    cleaned = cleaned.replace("Saint.", "St.")
+
+    # Remove "City of " prefix
+    cleaned = re.sub(r'^City\s+of\s+', '', cleaned, flags=re.IGNORECASE)
+
+    return cleaned.strip()
 
 
 def normalize_city_name(city_name):
@@ -738,6 +798,50 @@ def _run_v34_data_cleanup(conn):
                 print(f"[V34] Normalized casing: {row['city']} → {title_case} ({result.rowcount} permits)")
                 total_fixed += result.rowcount
 
+        # V35: Fix "City of X" → "X" in permits
+        city_of_rows = conn.execute("""
+            SELECT DISTINCT city FROM permits
+            WHERE city LIKE 'City of %' OR city LIKE 'CITY OF %'
+        """).fetchall()
+        for row in city_of_rows:
+            old_name = row['city']
+            new_name = re.sub(r'^City\s+of\s+', '', old_name, flags=re.IGNORECASE).strip()
+            if new_name and len(new_name) > 2:
+                result = conn.execute(
+                    "UPDATE permits SET city = ? WHERE city = ?",
+                    (new_name, old_name)
+                )
+                if result.rowcount > 0:
+                    print(f"[V35] Renamed city: '{old_name}' → '{new_name}' ({result.rowcount} permits)")
+                    total_fixed += result.rowcount
+
+        # V35: Delete all garbage records that match V35 patterns
+        garbage_rows = conn.execute("""
+            SELECT DISTINCT city, COUNT(*) as cnt FROM permits
+            WHERE LENGTH(city) > 40
+               OR city LIKE '%Sewer%'
+               OR city LIKE '%WFL%'
+               OR city LIKE '%WGS%'
+               OR city LIKE '%Table%'
+               OR city LIKE '%Safety%'
+               OR city LIKE '%Engineering%'
+               OR city LIKE '%EPIC%'
+               OR city LIKE '%Bureau%'
+               OR city LIKE '%Inspection%'
+               OR city LIKE '%Feature%Layer%'
+               OR city LIKE '%Rest%Service%'
+               OR city LIKE '%Case History%'
+               OR city LIKE '%Development Permit%'
+               OR city LIKE '%DOB NOW%'
+               OR city LIKE '%Limited Alteration%'
+            GROUP BY city
+        """).fetchall()
+        for row in garbage_rows:
+            result = conn.execute("DELETE FROM permits WHERE city = ?", (row['city'],))
+            if result.rowcount > 0:
+                print(f"[V35] Deleted {result.rowcount} garbage permits with city='{row['city']}'")
+                total_fixed += result.rowcount
+
         conn.commit()
         print(f"[V34] Data cleanup complete: {total_fixed} total records fixed/deleted")
         return total_fixed
@@ -756,6 +860,16 @@ def _sync_prod_city_counts(conn):
     reflects reality. Fast because it uses the indexed permits(city) column.
     """
     try:
+        # V35: Clean prod_cities names before syncing counts
+        prod_all = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+        for row in prod_all:
+            cleaned = clean_city_name_for_prod(row['city'], row['state'])
+            if cleaned != row['city']:
+                conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
+                print(f"[V35] Cleaned prod_city name: '{row['city']}' → '{cleaned}'")
+
+        conn.commit()
+
         # Get actual counts per city from permits table
         actual = conn.execute("""
             SELECT LOWER(city) as city_lower, COUNT(*) as cnt

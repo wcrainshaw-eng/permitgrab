@@ -783,9 +783,23 @@ def collect_bulk_source(source_key, config, days_back=90):
             continue
 
         # Create virtual config for this city
+        # V35: Try to get correct state from prod_cities lookup instead of
+        # blindly using bulk source config state. This prevents the "Oklahoma problem"
+        # where a Texas bulk source with wrong state config poisons all cities.
+        city_state = state  # Default to source config state
+        try:
+            prod_match = permitdb.get_connection().execute(
+                "SELECT state FROM prod_cities WHERE LOWER(city) = LOWER(?) AND state IS NOT NULL AND state != ''",
+                (city_name,)
+            ).fetchone()
+            if prod_match:
+                city_state = prod_match['state']
+        except Exception:
+            pass  # Fall back to config state
+
         virtual_config = {
             "name": city_name,
-            "state": state,
+            "state": city_state,
             "slug": city_slug,
             "platform": platform,
             "field_map": config.get("field_map", {}),
@@ -1936,6 +1950,21 @@ def collect_all(days_back=30):
     return collect_refresh(days_back)
 
 
+def _find_registry_config_for_city(city_name, state):
+    """V35: Find a CITY_REGISTRY config key that matches a city name + state.
+    Returns the config key if found, None otherwise."""
+    from city_configs import CITY_REGISTRY
+    city_lower = city_name.lower().strip()
+    for key, config in CITY_REGISTRY.items():
+        if not config.get('active', True):
+            continue
+        config_name = config.get('name', '').lower().strip()
+        config_state = config.get('state', '')
+        if config_name == city_lower and config_state == state:
+            return key
+    return None
+
+
 def _collect_all_inner(days_back=30, additive_mode=True):
     """Inner implementation of collect_all (called with lock held).
 
@@ -2026,12 +2055,31 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
         # V16 PHASE 2: Collect from individual city sources (not bulk, not bulk_harvest)
         print("\n  [V16] Phase 2: Individual city collection")
-        individual_cities = [
-            c for c in prod_cities_list
-            if c.get('source_id')
-            and c.get('source_id') != 'bulk_harvest'
-            and c.get('source_id') not in bulk_sources_collected
-        ]
+        # V35: Don't skip bulk_harvest cities if they have an individual config
+        # in CITY_REGISTRY. Previously these were skipped entirely, leaving 121+
+        # cities with zero data forever.
+        individual_cities = []
+        for c in prod_cities_list:
+            source_id = c.get('source_id', '')
+            if not source_id:
+                continue
+            # Already collected as bulk source in Phase 1? Skip.
+            if source_id in bulk_sources_collected:
+                continue
+            # V35: If source_id is 'bulk_harvest', check if there's a CITY_REGISTRY
+            # config for this city that could collect individually
+            if source_id == 'bulk_harvest':
+                city_name = c.get('name', '')
+                city_state = c.get('state', '')
+                registry_config = _find_registry_config_for_city(city_name, city_state)
+                if registry_config:
+                    # Override source_id so Phase 2 can collect it
+                    c = dict(c)  # Don't mutate original
+                    c['source_id'] = registry_config
+                    individual_cities.append(c)
+                # else: truly bulk-only, no individual config exists — skip
+                continue
+            individual_cities.append(c)
 
         for city_info in individual_cities:
             source_id = city_info.get('source_id')
