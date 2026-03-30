@@ -625,6 +625,189 @@ body {
   color: var(--primary);
 }
 
+/* V33: INLINE EMAIL CAPTURE */
+.inline-capture {
+  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+  border: 2px solid #f97316;
+  border-radius: 16px;
+  padding: 40px 32px;
+  max-width: 700px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+.inline-capture h3 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.inline-capture .capture-sub {
+  font-size: 16px;
+  color: var(--gray-600);
+  margin-bottom: 24px;
+}
+.inline-capture-form {
+  display: flex;
+  gap: 12px;
+  max-width: 500px;
+  margin: 0 auto 16px;
+}
+.inline-capture-form input[type="email"] {
+  flex: 1;
+  padding: 14px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 15px;
+}
+.inline-capture-form input[type="email"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(249,115,22,.15);
+}
+.inline-capture-form button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .2s;
+}
+.inline-capture-form button:hover {
+  background: #ea580c;
+  transform: translateY(-1px);
+}
+.inline-capture .capture-note {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.inline-capture .capture-proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--gray-600);
+  font-weight: 500;
+}
+.inline-capture .capture-proof .green-dot {
+  width: 8px; height: 8px;
+  background: #16a34a;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* V33: GATED CONTENT TEASER */
+.gated-teaser {
+  position: relative;
+  margin-top: -40px;
+  padding-top: 60px;
+  background: linear-gradient(to bottom, transparent 0%, white 30%);
+  text-align: center;
+  padding-bottom: 32px;
+}
+.gated-teaser .teaser-inner {
+  background: white;
+  border: 2px dashed var(--gray-300);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.gated-teaser h4 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.gated-teaser p {
+  font-size: 15px;
+  color: var(--gray-500);
+  margin-bottom: 20px;
+}
+.gated-teaser .teaser-btn {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: none;
+  transition: all .2s;
+}
+.gated-teaser .teaser-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+/* V33: STICKY BOTTOM BAR */
+.sticky-signup-bar {
+  position: fixed;
+  bottom: -80px;
+  left: 0;
+  right: 0;
+  background: var(--gray-900);
+  padding: 14px 24px;
+  z-index: 900;
+  transition: bottom .4s ease;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.15);
+}
+.sticky-signup-bar.visible { bottom: 0; }
+.sticky-signup-bar .bar-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.sticky-signup-bar .bar-text {
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sticky-signup-bar .bar-text span {
+  color: var(--accent);
+}
+.sticky-signup-bar .bar-form {
+  display: flex;
+  gap: 8px;
+}
+.sticky-signup-bar .bar-form input {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 220px;
+}
+.sticky-signup-bar .bar-form button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .2s;
+}
+.sticky-signup-bar .bar-form button:hover { background: #ea580c; }
+.sticky-signup-bar .bar-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.5);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.sticky-signup-bar .bar-close:hover { color: white; }
+
 /* CTA SECTION */
 .cta-section {
   background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
@@ -656,6 +839,22 @@ body {
 
 .cta-section .btn-cta:hover {
   background: var(--gray-100);
+}
+
+/* V33: CTA social proof */
+.cta-proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 24px;
+  font-size: 14px;
+  opacity: .7;
+}
+.cta-proof-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* EXPLORE OTHER CITIES */
@@ -837,6 +1036,11 @@ body {
   .main-content { grid-template-columns: 1fr; }
   .footer-inner { flex-direction: column; }
   .cross-links-grid { grid-template-columns: 1fr; }
+  /* V33 responsive */
+  .inline-capture-form { flex-direction: column; }
+  .sticky-signup-bar .bar-inner { flex-direction: column; text-align: center; }
+  .sticky-signup-bar .bar-form { width: 100%; }
+  .sticky-signup-bar .bar-form input { flex: 1; min-width: 0; }
 }
 </style>
 </head>
@@ -957,6 +1161,37 @@ body {
       </div>
     </div>
     {% endfor %}
+
+    <!-- V33: Gated content teaser — show "more permits" prompt -->
+    {% if permit_count > 8 %}
+    <div class="gated-teaser">
+      <div class="teaser-inner">
+        <h4>{{ permit_count - 8 }}+ More Permits Available</h4>
+        <p>Sign up for free alerts to see all {{ city_name }} permits with project details, contact info, and daily updates.</p>
+        <a href="/get-alerts" class="teaser-btn">Unlock All {{ city_name }} Permits</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<!-- V33: INLINE EMAIL CAPTURE — highest-conversion placement right after permits -->
+{% if not is_coming_soon %}
+<section style="max-width: 1200px; margin: 0 auto; padding: 0 32px 48px;">
+  <div class="inline-capture" id="inline-capture">
+    <h3>Get {{ city_name }} Permits in Your Inbox</h3>
+    <p class="capture-sub">New permits delivered daily — filtered to your trade. Be the first contractor to call.</p>
+    <form class="inline-capture-form" onsubmit="handleInlineCapture(event)">
+      <input type="email" id="inline-email" placeholder="you@company.com" required>
+      <button type="submit" id="inline-submit-btn">Get Free Alerts</button>
+    </form>
+    <div id="inline-alert" style="display:none; margin-bottom: 12px;"></div>
+    <p class="capture-note">Free daily digest. No credit card required. Unsubscribe anytime.</p>
+    <div class="capture-proof">
+      <span class="green-dot"></span>
+      <span>{{ permit_count }}+ permits tracked in {{ city_name }}</span>
+    </div>
   </div>
 </section>
 {% endif %}
@@ -1046,11 +1281,20 @@ body {
   </div>
 </section>
 
-<!-- CTA -->
+<!-- V33: Upgraded CTA with social proof and inline form -->
 <section class="cta-section">
-  <h2>Start Finding {{ city_name }} Leads Today</h2>
-  <p>Join thousands of contractors using PermitGrab to find new business. Browse permits free or upgrade for contact info.</p>
-  <a href="/?city={{ city_name }}" class="btn-cta">Browse {{ city_name }} Permits Free</a>
+  <h2>Stop Chasing Leads. Start Finding Jobs.</h2>
+  <p>{{ city_name }} contractors are already using permit data to find real projects before their competition. Get started free.</p>
+  <form class="inline-capture-form" onsubmit="handleCtaCapture(event)" style="max-width: 480px; margin: 0 auto 16px;">
+    <input type="email" id="cta-email" placeholder="you@company.com" required style="background: rgba(255,255,255,.95); color: var(--gray-900);">
+    <button type="submit" id="cta-submit-btn" style="background: var(--accent); padding: 14px 24px;">Start Free</button>
+  </form>
+  <div id="cta-alert" style="display:none; margin-bottom: 12px;"></div>
+  <div class="cta-proof">
+    <div class="cta-proof-item">&#10003; {{ permit_count }}+ permits tracked</div>
+    <div class="cta-proof-item">&#10003; Updated daily</div>
+    <div class="cta-proof-item">&#10003; No credit card</div>
+  </div>
 </section>
 
 <!-- V17d: Related Articles for cross-linking SEO -->
@@ -1121,6 +1365,133 @@ body {
 </section>
 
 {% include 'partials/footer.html' %}
+
+<!-- V33: Sticky bottom signup bar -->
+{% if not is_coming_soon %}
+<div class="sticky-signup-bar" id="sticky-bar">
+  <div class="bar-inner">
+    <div class="bar-text">Get <span>{{ city_name }}</span> permits in your inbox daily</div>
+    <form class="bar-form" onsubmit="handleBarCapture(event)">
+      <input type="email" id="bar-email" placeholder="you@company.com" required>
+      <button type="submit" id="bar-submit-btn">Get Free Alerts</button>
+    </form>
+    <button class="bar-close" onclick="closeStickyBar()" aria-label="Close">&times;</button>
+  </div>
+</div>
+{% endif %}
+
+<!-- V33: Conversion capture scripts -->
+<script>
+// Shared subscribe function
+async function subscribeEmail(email, sourceId) {
+  const city = '{{ city_name }}';
+  try {
+    const resp = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, city: city, trade: 'General Construction' })
+    });
+    const data = await resp.json();
+    return { ok: resp.ok, data: data };
+  } catch (err) {
+    return { ok: false, data: { error: 'Network error. Please try again.' } };
+  }
+}
+
+function showFormAlert(containerId, message, type) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML = '<div style="padding:10px 16px;border-radius:8px;font-size:14px;text-align:center;' +
+    (type === 'success' ? 'background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : 'background:#fef2f2;color:#dc2626;border:1px solid #fecaca') +
+    '">' + message + '</div>';
+}
+
+// Inline capture (mid-page)
+async function handleInlineCapture(e) {
+  e.preventDefault();
+  const email = document.getElementById('inline-email').value.trim();
+  const btn = document.getElementById('inline-submit-btn');
+  btn.disabled = true; btn.textContent = 'Signing up...';
+  const result = await subscribeEmail(email, 'inline');
+  if (result.ok) {
+    showFormAlert('inline-alert', "You're in! Check your inbox for your first {{ city_name }} permit digest.", 'success');
+    document.getElementById('inline-email').value = '';
+    // Hide sticky bar since they already signed up
+    const bar = document.getElementById('sticky-bar');
+    if (bar) bar.classList.remove('visible');
+    window._stickyBarDismissed = true;
+  } else {
+    showFormAlert('inline-alert', result.data.error || 'Unable to sign up. Please try again.', 'error');
+  }
+  btn.disabled = false; btn.textContent = 'Get Free Alerts';
+}
+
+// Bottom CTA capture
+async function handleCtaCapture(e) {
+  e.preventDefault();
+  const email = document.getElementById('cta-email').value.trim();
+  const btn = document.getElementById('cta-submit-btn');
+  btn.disabled = true; btn.textContent = 'Signing up...';
+  const result = await subscribeEmail(email, 'cta');
+  if (result.ok) {
+    showFormAlert('cta-alert', "You're in! Check your inbox for your first permit digest.", 'success');
+    document.getElementById('cta-email').value = '';
+    window._stickyBarDismissed = true;
+  } else {
+    showFormAlert('cta-alert', result.data.error || 'Unable to sign up. Please try again.', 'error');
+  }
+  btn.disabled = false; btn.textContent = 'Start Free';
+}
+
+// Sticky bar capture
+async function handleBarCapture(e) {
+  e.preventDefault();
+  const email = document.getElementById('bar-email').value.trim();
+  const btn = document.getElementById('bar-submit-btn');
+  btn.disabled = true; btn.textContent = 'Signing up...';
+  const result = await subscribeEmail(email, 'sticky');
+  if (result.ok) {
+    showFormAlert('bar-email', '', 'success'); // won't show but clears
+    closeStickyBar();
+    // Show success at inline capture location
+    showFormAlert('inline-alert', "You're in! Check your inbox for your first {{ city_name }} permit digest.", 'success');
+    const inlineEl = document.getElementById('inline-capture');
+    if (inlineEl) inlineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    // Show error inline in the bar
+    alert(result.data.error || 'Unable to sign up. Please try again.');
+  }
+  btn.disabled = false; btn.textContent = 'Get Free Alerts';
+}
+
+// Sticky bar scroll trigger
+window._stickyBarDismissed = false;
+function closeStickyBar() {
+  const bar = document.getElementById('sticky-bar');
+  if (bar) bar.classList.remove('visible');
+  window._stickyBarDismissed = true;
+}
+
+(function() {
+  const bar = document.getElementById('sticky-bar');
+  if (!bar) return;
+  let lastScrollY = 0;
+  const permitSection = document.querySelector('.permits-preview');
+  if (!permitSection) return;
+
+  window.addEventListener('scroll', function() {
+    if (window._stickyBarDismissed) return;
+    const rect = permitSection.getBoundingClientRect();
+    // Show bar when user scrolls past the permit preview section
+    if (rect.bottom < 0) {
+      bar.classList.add('visible');
+    } else {
+      bar.classList.remove('visible');
+    }
+  }, { passive: true });
+})();
+</script>
 
 </body>
 </html>
