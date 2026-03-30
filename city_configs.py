@@ -820,7 +820,7 @@ CITY_REGISTRY = {
 
     # V23 AUDIT: 2026-03-28 - STALE - County data from 2017, City portal access denied
     "san_diego": {
-        "name": "San Diego County",
+        "name": "San Diego",
         "state": "CA",
         "slug": "san-diego",
         "lat": 32.716,
@@ -832,8 +832,8 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": True,
-        "notes": "V26: Data provided via san_diego_county bulk source.",
+        "active": False,
+        "notes": "V28: Placeholder — data collected via san_diego_county bulk source.",
     },
 
     "sacramento": {
@@ -1259,8 +1259,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V19: Re-activated - endpoint verified working
-        "notes": "V12.32: Verified live — premium: contractor name+address, applicant, sq_ft, valuation",
+        "active": False,  # V28: Consolidated — use mesa_new instead (better field_map)
+        "notes": "V28: DUPLICATE — mesa_new has fuller field_map with contractor_email, license, applicant.",
     },
 
     "milwaukee": {
@@ -1685,8 +1685,8 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.32: Verified live — contractor names, valuations, work descriptions, owner names",
+        "active": False,
+        "notes": "V28: Data stale (last update April 2024). Endpoint works but no fresh data.",
     },
 
     "cleveland": {
@@ -13800,8 +13800,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": True,
-        "notes": "V26: Data provided via corona_ca bulk source.",
+        "active": False,  # V28: Consolidated — use corona instead (has permit_subtype, zip)
+        "notes": "V28: DUPLICATE — corona entry has fuller field_map.",
     },
 
     # --- Mesa AZ ---
@@ -13824,8 +13824,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V26: Data provided via mesa_new endpoint.",
+        "active": False,  # V28: Consolidated — use mesa_new instead
+        "notes": "V28: DUPLICATE — mesa_new has fuller field_map.",
     },
 
     # --- Buffalo NY ---
@@ -13941,8 +13941,8 @@ CITY_REGISTRY = {
         },
         "date_field": "appdate",
         "limit": 2000,
-        "active": True,
-        "notes": "V26: Data provided via little_rock endpoint.",
+        "active": False,  # V28: Consolidated — use little_rock instead (22-field map)
+        "notes": "V28: DUPLICATE — little_rock entry has 22-field map with contractor_trade, sqft, fees.",
     },
 
     # --- Fort Worth TX ---
@@ -14593,23 +14593,23 @@ BULK_SOURCES = {
         "state": "CA",
         "platform": "socrata",
         "mode": "bulk",
-        "endpoint": "https://internal-sandiegocounty.data.socrata.com/resource/im3c-szc4.json",
-        "dataset_id": "im3c-szc4",
+        "endpoint": "https://data.sandiegocounty.gov/resource/dyzh-7eat.json",
+        "dataset_id": "dyzh-7eat",
         "description": "San Diego County Building Permits - 18 cities",
         "city_field": "city",
         "field_map": {
-            "permit_number": "permit_number",
-            "filing_date": "issue_date",
-            "permit_type": "permit_type",
-            "description": "description",
-            "estimated_cost": "valuation",
-            "address": "site_address",
-            "status": "status",
+            "permit_number": "record_id",
+            "filing_date": "issued_date",
+            "permit_type": "record_category",
+            "description": "use",
+            "address": "full_address",
+            "status": "record_status",
+            "contractor_name": "contractor_name",
         },
-        "date_field": "issue_date",
+        "date_field": "issued_date",
         "limit": 50000,
         "active": True,
-        "notes": "V12.31: County dataset covering San Diego, Carlsbad, Oceanside, etc.",
+        "notes": "V28: Switched from internal to public endpoint. Covers San Diego, Carlsbad, Oceanside, etc.",
     },
 
     "sonoma_county": {

@@ -6587,6 +6587,42 @@ def city_trade_landing(city_slug, trade_slug):
 
 
 # ===========================
+# V28: SEARCH PAGE — Required for SearchAction schema (sitelinks searchbox)
+# ===========================
+
+@app.route('/search')
+def search_page():
+    """V28: Search page for SearchAction schema.
+    Redirects to cities browse filtered by query, or shows permits filtered by query.
+    """
+    query = request.args.get('q', '').strip()
+    if not query:
+        return redirect('/cities')
+
+    # Try to find a matching city
+    all_cities = get_cities_with_data()
+    query_lower = query.lower()
+
+    # Direct city match
+    for city in all_cities:
+        city_name = city.get('name', '') or city.get('city', '')
+        if city_name.lower() == query_lower:
+            slug = city.get('slug', city_name.lower().replace(' ', '-'))
+            return redirect(f'/permits/{slug}')
+
+    # Partial city match - redirect to cities page with filter
+    matching_cities = [c for c in all_cities if query_lower in (c.get('name', '') or c.get('city', '')).lower()]
+    if matching_cities:
+        # Redirect to first match
+        city = matching_cities[0]
+        slug = city.get('slug', (city.get('name', '') or city.get('city', '')).lower().replace(' ', '-'))
+        return redirect(f'/permits/{slug}')
+
+    # No match - redirect to cities browse
+    return redirect('/cities')
+
+
+# ===========================
 # V17e: CITIES BROWSE PAGE — Hub for all city landing pages
 # ===========================
 
@@ -6638,51 +6674,8 @@ def cities_browse():
 # SITEMAP & ROBOTS.TXT
 # ===========================
 
-@app.route('/sitemap.xml')
-def sitemap():
-    """V13.4: Generate XML sitemap for SEO - uses dict to prevent duplicates."""
-    today = datetime.now().strftime('%Y-%m-%d')
-
-    # V13.4: Use dict keyed by URL to guarantee no duplicates
-    url_map = {}
-    _add_count = [0]  # Use list to allow modification in nested function
-
-    def add_url(loc, changefreq='daily', priority='0.5', lastmod=None):
-        """Add URL to sitemap, skipping if already exists."""
-        _add_count[0] += 1
-        if loc not in url_map:
-            url_map[loc] = {
-                'loc': loc,
-                'changefreq': changefreq,
-                'priority': priority,
-                'lastmod': lastmod or today
-            }
-
-    # Static pages
-    add_url(SITE_URL, 'daily', '1.0')
-    add_url(f"{SITE_URL}/pricing", 'weekly', '0.9')
-    add_url(f"{SITE_URL}/contractors", 'daily', '0.8')
-    add_url(f"{SITE_URL}/map", 'daily', '0.8')
-    add_url(f"{SITE_URL}/get-alerts", 'weekly', '0.7')
-    add_url(f"{SITE_URL}/blog", 'weekly', '0.7')
-    add_url(f"{SITE_URL}/cities", 'daily', '0.9')
-    add_url(f"{SITE_URL}/stats", 'daily', '0.7')
-    add_url(f"{SITE_URL}/about", 'monthly', '0.6')
-    add_url(f"{SITE_URL}/contact", 'monthly', '0.5')
-    add_url(f"{SITE_URL}/privacy", 'monthly', '0.3')
-    add_url(f"{SITE_URL}/terms", 'monthly', '0.3')
-
-    # State hub pages (higher priority than city pages)
-    for state_slug in STATE_CONFIG.keys():
-        add_url(f"{SITE_URL}/permits/{state_slug}", 'daily', '0.85')
-
-    # Get cities with permits for filtering
-    # V18: get_cities_with_data() uses get_prod_cities(status='active') which
-    # automatically excludes paused cities (including stale_data paused ones)
-    cities_with_data = get_cities_with_data()
-    cities_with_permits = {c['name'] for c in cities_with_data}
-
-    # Get real lastmod timestamps per city from permit data
+def _get_city_lastmod_map():
+    """V28: Get lastmod timestamps per city from permit data."""
     city_lastmod = {}
     try:
         conn = permitdb.get_connection()
@@ -6696,60 +6689,164 @@ def sitemap():
                     pass
     except Exception:
         pass
+    return city_lastmod
 
-    # V13.4: Use state_slugs set to skip city slugs that match state hub slugs
-    state_slugs = set(STATE_CONFIG.keys())
 
-    # Include auto-discovered cities from bulk sources
-    all_discovered_cities = discover_cities_from_permits()
-    for slug, city_info in all_discovered_cities.items():
-        # Skip if this slug is already a state hub (add_url won't duplicate anyway)
-        if slug in state_slugs:
-            continue
-        # Skip cities with no permits
-        if city_info['name'] not in cities_with_permits:
-            continue
-
-        lastmod = city_lastmod.get(slug, today)
-        add_url(f"{SITE_URL}/permits/{slug}", 'daily', '0.8', lastmod)
-
-        # Add city × trade pages (skip 'all-trades')
-        for trade_slug in get_trade_slugs():
-            if trade_slug == 'all-trades':
-                continue
-            add_url(f"{SITE_URL}/permits/{slug}/{trade_slug}", 'daily', '0.7', lastmod)
-
-    # Add blog posts
-    blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
-    if os.path.exists(blog_dir):
-        for filename in os.listdir(blog_dir):
-            if filename.endswith('.md'):
-                slug = filename.replace('.md', '')
-                add_url(f"{SITE_URL}/blog/{slug}", 'monthly', '0.6')
-
-    # V13.5: Debug logging to trace sitemap duplication
-    print(f"[SITEMAP DEBUG] add_url called {_add_count[0]} times, url_map has {len(url_map)} unique URLs")
-
-    # V13.4: Generate XML from url_map (dict guarantees no duplicates)
+def _generate_sitemap_xml(urls):
+    """V28: Generate XML sitemap from list of URL dicts."""
     xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n',
                  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
-
-    url_count = 0
-    for url in url_map.values():
+    for url in urls:
         xml_parts.append('  <url>\n')
         xml_parts.append(f"    <loc>{url['loc']}</loc>\n")
         xml_parts.append(f"    <lastmod>{url['lastmod']}</lastmod>\n")
         xml_parts.append(f"    <changefreq>{url['changefreq']}</changefreq>\n")
         xml_parts.append(f"    <priority>{url['priority']}</priority>\n")
         xml_parts.append('  </url>\n')
-        url_count += 1
-
     xml_parts.append('</urlset>')
+    return ''.join(xml_parts)
 
-    print(f"[SITEMAP DEBUG] Generated XML with {url_count} URL entries")
 
-    xml = ''.join(xml_parts)
-    return Response(xml, mimetype='application/xml')
+@app.route('/sitemap.xml')
+def sitemap_index():
+    """V28: Sitemap index pointing to child sitemaps."""
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n',
+                 '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
+
+    child_sitemaps = [
+        ('sitemap-pages.xml', today),
+        ('sitemap-cities.xml', today),
+        ('sitemap-trades.xml', today),
+        ('sitemap-blog.xml', today),
+    ]
+
+    for sitemap_name, lastmod in child_sitemaps:
+        xml_parts.append('  <sitemap>\n')
+        xml_parts.append(f"    <loc>{SITE_URL}/{sitemap_name}</loc>\n")
+        xml_parts.append(f"    <lastmod>{lastmod}</lastmod>\n")
+        xml_parts.append('  </sitemap>\n')
+
+    xml_parts.append('</sitemapindex>')
+    return Response(''.join(xml_parts), mimetype='application/xml')
+
+
+@app.route('/sitemap-pages.xml')
+def sitemap_pages():
+    """V28: Sitemap for static pages."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    urls = [
+        {'loc': SITE_URL, 'changefreq': 'daily', 'priority': '1.0', 'lastmod': today},
+        {'loc': f"{SITE_URL}/pricing", 'changefreq': 'weekly', 'priority': '0.9', 'lastmod': today},
+        {'loc': f"{SITE_URL}/contractors", 'changefreq': 'daily', 'priority': '0.8', 'lastmod': today},
+        {'loc': f"{SITE_URL}/map", 'changefreq': 'daily', 'priority': '0.8', 'lastmod': today},
+        {'loc': f"{SITE_URL}/get-alerts", 'changefreq': 'weekly', 'priority': '0.7', 'lastmod': today},
+        {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7', 'lastmod': today},
+        {'loc': f"{SITE_URL}/cities", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
+        {'loc': f"{SITE_URL}/stats", 'changefreq': 'daily', 'priority': '0.7', 'lastmod': today},
+        {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6', 'lastmod': today},
+        {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5', 'lastmod': today},
+        {'loc': f"{SITE_URL}/privacy", 'changefreq': 'monthly', 'priority': '0.3', 'lastmod': today},
+        {'loc': f"{SITE_URL}/terms", 'changefreq': 'monthly', 'priority': '0.3', 'lastmod': today},
+    ]
+    return Response(_generate_sitemap_xml(urls), mimetype='application/xml')
+
+
+@app.route('/sitemap-cities.xml')
+def sitemap_cities():
+    """V28: Sitemap for city pages and state hub pages."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    url_map = {}
+
+    # State hub pages
+    for state_slug in STATE_CONFIG.keys():
+        url_map[f"{SITE_URL}/permits/{state_slug}"] = {
+            'loc': f"{SITE_URL}/permits/{state_slug}",
+            'changefreq': 'daily',
+            'priority': '0.85',
+            'lastmod': today
+        }
+
+    # Get cities with permits
+    cities_with_data = get_cities_with_data()
+    cities_with_permits = {c['name'] for c in cities_with_data}
+    city_lastmod = _get_city_lastmod_map()
+    state_slugs = set(STATE_CONFIG.keys())
+
+    # City pages from discovered cities
+    all_discovered_cities = discover_cities_from_permits()
+    for slug, city_info in all_discovered_cities.items():
+        if slug in state_slugs:
+            continue
+        if city_info['name'] not in cities_with_permits:
+            continue
+
+        lastmod = city_lastmod.get(slug, today)
+        loc = f"{SITE_URL}/permits/{slug}"
+        if loc not in url_map:
+            url_map[loc] = {
+                'loc': loc,
+                'changefreq': 'daily',
+                'priority': '0.8',
+                'lastmod': lastmod
+            }
+
+    return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
+
+
+@app.route('/sitemap-trades.xml')
+def sitemap_trades():
+    """V28: Sitemap for city × trade pages."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    url_map = {}
+
+    cities_with_data = get_cities_with_data()
+    cities_with_permits = {c['name'] for c in cities_with_data}
+    city_lastmod = _get_city_lastmod_map()
+    state_slugs = set(STATE_CONFIG.keys())
+    trade_slugs = [t for t in get_trade_slugs() if t != 'all-trades']
+
+    all_discovered_cities = discover_cities_from_permits()
+    for slug, city_info in all_discovered_cities.items():
+        if slug in state_slugs:
+            continue
+        if city_info['name'] not in cities_with_permits:
+            continue
+
+        lastmod = city_lastmod.get(slug, today)
+        for trade_slug in trade_slugs:
+            loc = f"{SITE_URL}/permits/{slug}/{trade_slug}"
+            if loc not in url_map:
+                url_map[loc] = {
+                    'loc': loc,
+                    'changefreq': 'daily',
+                    'priority': '0.7',
+                    'lastmod': lastmod
+                }
+
+    return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
+
+
+@app.route('/sitemap-blog.xml')
+def sitemap_blog():
+    """V28: Sitemap for blog posts."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    urls = []
+
+    blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
+    if os.path.exists(blog_dir):
+        for filename in os.listdir(blog_dir):
+            if filename.endswith('.md'):
+                slug = filename.replace('.md', '')
+                urls.append({
+                    'loc': f"{SITE_URL}/blog/{slug}",
+                    'changefreq': 'monthly',
+                    'priority': '0.6',
+                    'lastmod': today
+                })
+
+    return Response(_generate_sitemap_xml(urls), mimetype='application/xml')
 
 
 @app.route('/logout')

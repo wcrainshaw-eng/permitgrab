@@ -134,6 +134,27 @@
   ]
 }
 </script>
+<!-- V28 SEO: GovernmentService schema for local relevance -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "GovernmentService",
+  "name": "{{ city_name }} Building Permit Records",
+  "serviceType": "Building Permit Data",
+  "areaServed": {
+    "@type": "City",
+    "name": "{{ city_name }}",
+    "containedInPlace": {
+      "@type": "State",
+      "name": "{{ state_name or city_state }}"
+    }
+  },
+  "provider": {
+    "@type": "GovernmentOrganization",
+    "name": "{{ city_name }} Building Department"
+  }
+}
+</script>
 
 <style>
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
