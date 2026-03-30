@@ -28,22 +28,23 @@ import db as permitdb  # V12.50: SQLite database layer (renamed to avoid Flask-S
 # V14.1: TRADE_MAPPING - SQL LIKE patterns for matching permits to trades
 # Used by city_trade_landing() to filter permits at database level
 TRADE_MAPPING = {
-    'plumbing': ['%plumbing%', '%plumb%', '%pipe%', '%sewer%', '%water heater%', '%drain%', '%backflow%'],
-    'electrical': ['%electrical%', '%electric%', '%wiring%', '%panel%', '%circuit%', '%generator%', '%outlet%'],
-    'hvac': ['%hvac%', '%heating%', '%air conditioning%', '%a/c%', '%furnace%', '%ductwork%', '%ventilation%', '%heat pump%', '%boiler%', '%mechanical%'],
-    'roofing': ['%roofing%', '%roof%', '%reroof%', '%re-roof%', '%shingle%', '%gutter%'],
-    'general-construction': ['%general%', '%addition%', '%alteration%', '%remodel%', '%renovation%', '%new construction%', '%new building%', '%build%', '%tenant improvement%'],
-    'demolition': ['%demolition%', '%demo%', '%tear down%', '%abatement%'],
-    'fire-protection': ['%fire%', '%sprinkler%', '%fire alarm%', '%fire suppression%'],
-    'painting': ['%painting%', '%paint%', '%coating%'],
-    'concrete': ['%concrete%', '%foundation%', '%slab%', '%footing%', '%masonry%', '%brick%', '%paving%'],
-    'landscaping': ['%landscape%', '%landscaping%', '%irrigation%', '%fence%', '%deck%', '%patio%', '%pool%'],
-    'solar': ['%solar%', '%photovoltaic%', '%pv %', '% pv%'],
-    'new-construction': ['%new build%', '%new construction%', '%ground up%', '%new building%', '%new dwelling%', '%new home%'],
-    'interior-renovation': ['%interior%', '%interior renovation%', '%interior remodel%', '%fit out%', '%fitout%', '%tenant finish%'],
-    'windows-doors': ['%window%', '%door%', '%storefront%', '%glazing%'],
-    'structural': ['%structural%', '%steel%', '%framing%', '%load bearing%', '%beam%', '%column%'],
-    'addition': ['%addition%', '%add on%', '%extension%', '%expand%', '%enlarge%'],
+    # V30: Broadened patterns — added hyphenated, compound, and ArcGIS-format variants
+    'plumbing': ['%plumbing%', '%plumb%', '%pipe%', '%sewer%', '%water heater%', '%drain%', '%backflow%', '%water line%', '%gas line%', '%water service%', '%sewer line%', '%plbg%'],
+    'electrical': ['%electrical%', '%electric%', '%wiring%', '%panel%', '%circuit%', '%generator%', '%outlet%', '%elec %', '% elec%', '%service upgrade%', '%meter%', '%transformer%', '%sub-panel%', '%subpanel%'],
+    'hvac': ['%hvac%', '%heating%', '%air conditioning%', '%a/c%', '%furnace%', '%ductwork%', '%ventilation%', '%heat pump%', '%boiler%', '%mechanical%', '%mech %', '% mech%', '%mini split%', '%minisplit%', '%ac unit%', '%condenser%', '%air handler%', '%cooling%'],
+    'roofing': ['%roofing%', '%roof%', '%reroof%', '%re-roof%', '%shingle%', '%gutter%', '%reroofing%', '%roof replacement%', '%roof repair%', '%residential-reroof%', '%commercial-reroof%', '%rooftop%', '%membrane%', '%flashing%', '%tpo%', '%epdm%'],
+    'general-construction': ['%general%', '%alteration%', '%remodel%', '%renovation%', '%tenant improvement%', '%ti %', '% ti%', '%build out%', '%buildout%', '%commercial remodel%', '%residential remodel%', '%repair%', '%maintenance%'],
+    'demolition': ['%demolition%', '%demo%', '%tear down%', '%abatement%', '%removal%', '%strip out%', '%gut%'],
+    'fire-protection': ['%fire%', '%sprinkler%', '%fire alarm%', '%fire suppression%', '%fire protection%', '%hood suppression%', '%standpipe%'],
+    'painting': ['%painting%', '%paint%', '%coating%', '%stucco%', '%exterior finish%'],
+    'concrete': ['%concrete%', '%foundation%', '%slab%', '%footing%', '%masonry%', '%brick%', '%paving%', '%flatwork%', '%retaining wall%', '%block%', '%sidewalk%', '%driveway%', '%curb%'],
+    'landscaping': ['%landscape%', '%landscaping%', '%irrigation%', '%fence%', '%deck%', '%patio%', '%pool%', '%pergola%', '%grading%', '%retaining%', '%hardscape%', '%sprinkler system%', '%gazebo%'],
+    'solar': ['%solar%', '%photovoltaic%', '%pv %', '% pv%', '%pv system%', '%solar panel%', '%net meter%', '%battery storage%', '%solar electric%'],
+    'new-construction': ['%new build%', '%new construction%', '%ground up%', '%new building%', '%new dwelling%', '%new home%', '%new single%', '%new multi%', '%new commercial%', '%new residential%', '%addition%', '%sfr%', '%single family%', '%new house%'],
+    'interior-renovation': ['%interior%', '%interior renovation%', '%interior remodel%', '%fit out%', '%fitout%', '%tenant finish%', '%finish out%', '%interior alteration%', '%kitchen%', '%bathroom%', '%bath remodel%'],
+    'windows-doors': ['%window%', '%door%', '%storefront%', '%glazing%', '%fenestration%', '%skylight%', '%sliding%', '%entry door%', '%garage door%'],
+    'structural': ['%structural%', '%steel%', '%framing%', '%load bearing%', '%beam%', '%column%', '%truss%', '%joist%', '%header%', '%shear wall%', '%seismic%'],
+    'addition': ['%addition%', '%add on%', '%extension%', '%expand%', '%enlarge%', '%bump out%', '%second story%', '%2nd story%', '%adu%', '%accessory dwelling%', '%guest house%'],
 }
 
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
@@ -1711,6 +1712,21 @@ def get_cities_with_data():
         if permitdb.prod_cities_table_exists():
             prod_cities = permitdb.get_prod_cities(status='active')
             if prod_cities:
+                # V30: Re-sort by actual permit counts from permits table
+                # prod_cities.total_permits can be stale after migrations
+                try:
+                    conn = permitdb.get_connection()
+                    count_rows = conn.execute("""
+                        SELECT LOWER(city) as city_lower, COUNT(*) as cnt
+                        FROM permits GROUP BY LOWER(city)
+                    """).fetchall()
+                    count_map = {r[0]: r[1] for r in count_rows}
+                    prod_cities.sort(
+                        key=lambda c: count_map.get(c['name'].lower(), c.get('permit_count', 0)),
+                        reverse=True
+                    )
+                except Exception as sort_err:
+                    print(f"[V30] Footer sort fallback: {sort_err}")
                 return prod_cities
     except Exception as e:
         print(f"[V15] Error getting prod_cities: {e}")
@@ -2406,8 +2422,11 @@ def dashboard_redirect():
 # V10 Fix 5: /alerts redirects to account page
 @app.route('/alerts')
 def alerts_redirect():
-    """Redirect /alerts to account page where alert settings live."""
-    return redirect('/account')
+    """V30: Redirect to appropriate alerts page based on login status."""
+    user = get_current_user()
+    if user:
+        return redirect('/account')
+    return redirect('/get-alerts')
 
 
 @app.route('/health')
@@ -6534,6 +6553,17 @@ def city_trade_landing(city_slug, trade_slug):
 
     # Results are already sorted by date from SQL
 
+    # V30: Fallback — show recent city permits if no trade-specific matches found
+    # This prevents empty trade pages which kill conversion and risk thin content penalties
+    trade_fallback = False
+    if not matching_permits:
+        cursor = conn.execute(
+            "SELECT * FROM permits WHERE LOWER(city) LIKE ? ORDER BY filing_date DESC LIMIT 20",
+            (f"%{city_name.split(',')[0].strip().lower()}%",)
+        )
+        matching_permits = [dict(row) for row in cursor]
+        trade_fallback = True
+
     # Calculate stats
     # V12.23: Use module-level datetime/timedelta imports
     now = datetime.now()
@@ -6565,8 +6595,8 @@ def city_trade_landing(city_slug, trade_slug):
     # Other cities for cross-linking (exclude current)
     other_cities = [{"name": c['name'], "slug": c['slug']} for c in ALL_CITIES if c['slug'] != city_slug]
 
-    # V12.5: noindex for empty city×trade pages
-    robots_directive = "noindex, follow" if len(matching_permits) == 0 else "index, follow"
+    # V30: noindex for thin trade pages (fewer than 5 trade-specific permits, or fallback mode)
+    robots_directive = "noindex, follow" if (trade_fallback or len(matching_permits) < 5) else "index, follow"
 
     # V14.0: Get state info for internal linking
     state_abbrev = city_config.get('state', '')
@@ -6598,6 +6628,7 @@ def city_trade_landing(city_slug, trade_slug):
         state_slug=state_slug,
         state_name=state_name,
         city_blog_url=city_blog_url,
+        trade_fallback=trade_fallback,
     )
 
 

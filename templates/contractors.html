@@ -631,7 +631,12 @@ function renderTable(data) {
   const tbody = document.getElementById('contractors-table');
 
   if (data.contractors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-400);">No contractors found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">' +
+      '<div style="max-width: 500px; margin: 0 auto;">' +
+      '<h3 style="color: #374151; margin-bottom: 12px;">Contractor Intelligence is building...</h3>' +
+      '<p style="color: #6b7280; line-height: 1.6; margin-bottom: 16px;">We\'re analyzing permit data across 290+ cities to identify active contractors and their project history. This feature populates as more data is collected.</p>' +
+      '<p style="margin-bottom: 0;"><a href="/cities" style="color: #f97316; font-weight: 600; text-decoration: none;">Browse permits by city →</a></p>' +
+      '</div></td></tr>';
     document.getElementById('pagination').innerHTML = '';
     return;
   }
