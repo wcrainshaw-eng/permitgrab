@@ -1319,8 +1319,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V28: Consolidated — use mesa_new instead (better field_map)
-        "notes": "V28: DUPLICATE — mesa_new has fuller field_map with contractor_email, license, applicant.",
+        "active": False,  # V35: Deactivated — old dataset (2gkz-7z4f) stale since Jan 2026. mesa_new is now active with fresh data from citydata.mesaaz.gov
+        "notes": "V35: DEACTIVATED — old data.mesaaz.gov dataset stale (last issued_date Jan 2026). Replaced by mesa_new (citydata.mesaaz.gov/dzpk-hxfb) which has daily-fresh data.",
     },
 
     "milwaukee": {
@@ -1653,20 +1653,21 @@ CITY_REGISTRY = {
         "description": "All Planning Permits - City of Tampa",
         "field_map": {
             "permit_number": "RECORD_ID",
+            "permit_type": "RECORDTYPE",
             "project_name": "PROJECTNAME1",
             "address": "ADDRESS",
             "zip": "ZIP",
             "status": "PROJECTSTATUS",
             "description": "PROJECTDESCRIPTION",
+            "filing_date": "CREATEDDATE",
             "sqft": "NEWCONSTRUCTIONSF",
             "occupancy_category": "OCCUPANCYCATEGORY",
             "occupancy_type": "OCCUPANCYTYPE",
         },
-        "date_field": "OBJECTID",
-        "date_format": "none",
+        "date_field": "CREATEDDATE",
         "limit": 2000,
-        "active": False,
-        "notes": "V33: Switched to PermitsAll endpoint (2,537 records). Old ConstructionInspections endpoint dead. Fields: RECORD_ID, PROJECTNAME1, PROJECTDESCRIPTION, ADDRESS, ZIP, PROJECTSTATUS, NEWCONSTRUCTIONSF, OCCUPANCYCATEGORY, OCCUPANCYTYPE.",
+        "active": False,  # SERVER-BLOCKED: arcgis.tampagov.net returns 403 from Render
+        "notes": "V38: Fixed date_field from OBJECTID to CREATEDDATE (esriFieldTypeDate). Added RECORDTYPE and filing_date mappings. Data is fresh (newest 2026-03-24, 2,514 records). BUT arcgis.tampagov.net returns 403 Forbidden from Render server — self-hosted ArcGIS blocks non-browser requests. Config is correct if access issue can be resolved (proxy, custom headers). No Socrata, no ArcGIS Hub mirror, no Accela public portal, no CKAN.",
     },
 
     "jacksonville": {
@@ -1886,8 +1887,8 @@ CITY_REGISTRY = {
         },
         "date_field": "opened_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V18: Upgraded field_map — premium data: contractor_name, contractor_email, contractor_license, applicant, total_fee_assessed",
+        "active": True,  # V35: Activated — test-and-backfill SUCCESS. 2000 permits, fresh data through 2026-03-30. citydata.mesaaz.gov has daily-updated data.
+        "notes": "V35: ACTIVATED — citydata.mesaaz.gov/dzpk-hxfb. Daily-fresh data. Richer fields than old dataset: contractor_email, contractor_license, applicant, total_fee_assessed, opened_date.",
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Fixed field_map to use site_addr instead of geolocation
@@ -6658,27 +6659,15 @@ CITY_REGISTRY = {
         "name": "El Paso",
         "state": "TX",
         "slug": "el-paso",
-        "platform": "socrata",
-        "endpoint": "https://data.elpasotexas.gov/resource/b4q2-2spt.json",
-        "dataset_id": "b4q2-2spt",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner_name",
-            "contact_name": "contractor_name",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
+        "platform": "accela",
+        "endpoint": "https://aca-prod.accela.com/ELPASO/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "dataset_id": "",
+        "description": "Building Permits via Accela Citizen Access",
+        "field_map": {},
+        "date_field": "",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Error parsing response,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # V35: Switched from dead Socrata to Accela. Needs deploy + scraper test before activating.
+        "notes": "V35: Old Socrata domain (data.elpasotexas.gov) DNS dead. Accela at aca-prod.accela.com/ELPASO confirmed live. Agency=ELPASO, module=Building.",
     },
 
     "arlington": {
@@ -7839,9 +7828,9 @@ CITY_REGISTRY = {
         "name": "Wichita",
         "state": "KS",
         "slug": "wichita",
-        "platform": "socrata",
-        "endpoint": "https://data.wichita.gov/resource/3vnz-ph8k.json",
-        "dataset_id": "3vnz-ph8k",
+        "platform": "accela",
+        "endpoint": "https://aca-prod.accela.com/WICHITA",
+        "agency_code": "WICHITA",
         "description": "Building Permits",
         "field_map": {
             "permit_number": "permit_number",
@@ -7856,8 +7845,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Error parsing response,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # Needs deploy — Accela WICHITA portal live, module=Engineering
+        "notes": "V38: Switched from fabricated Socrata to live Accela portal. Agency=WICHITA, module=Engineering (labeled 'Permitting' in UI). Socrata data.wichita.gov confirmed dead.",
     },
 
     "des_moines": {

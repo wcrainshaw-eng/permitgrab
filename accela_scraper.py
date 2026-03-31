@@ -390,6 +390,12 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    "el_paso_tx": {
+        "agency_code": "ELPASO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
     # V35 batch 3
     "charlotte_county_fl": {
         "agency_code": "BOCC",
@@ -432,6 +438,12 @@ ACCELA_CONFIGS = {
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "wichita": {
+        "agency_code": "WICHITA",
+        "module": "Engineering",
+        "tab_name": "Engineering",
+        "search_url_path": "Cap/CapHome.aspx?module=Engineering&TabName=Engineering",
     },
 }
 
