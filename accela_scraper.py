@@ -154,6 +154,103 @@ ACCELA_CONFIGS = {
         "tab_name": "DevServices",
         "search_url_path": "Cap/CapHome.aspx?module=DevServices&TabName=DevServices",
     },
+    # V35: New Accela cities
+    "sacramento": {
+        "agency_code": "SACRAMENTO",
+        "module": "Building",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=HOME",
+    },
+    "atlanta": {
+        "agency_code": "ATLANTA_GA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&customglobalsearch=true",
+    },
+    "dayton": {
+        "agency_code": "DAYTON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "cleveland": {
+        "agency_code": "COC",
+        "module": "BuildingHousing",
+        "tab_name": "BuildingHousing",
+        "search_url_path": "Cap/CapHome.aspx?module=BuildingHousing&TabName=BuildingHousing",
+    },
+    "salt_lake_city": {
+        "agency_code": "SLCREF",
+        "module": "Building",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=HOME",
+    },
+    "brownsville_tx": {
+        "agency_code": "BROWNSVILLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "clark_county_nv": {
+        "agency_code": "CLARKCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lee_county_fl": {
+        "agency_code": "LEECO",
+        "module": "Permitting",
+        "tab_name": "Permitting",
+        "search_url_path": "Cap/CapHome.aspx?module=Permitting&TabName=Permitting",
+    },
+    "brevard_county_fl": {
+        "agency_code": "BREVARD",
+        "module": "Building",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=HOME",
+    },
+    "polk_county_fl": {
+        "agency_code": "POLKCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "pasco_county_fl": {
+        "agency_code": "PASCO",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "sarasota_county_fl": {
+        "agency_code": "SARASOTA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "santa_clara_county": {
+        "agency_code": "SCCGOV",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "bernalillo_county_nm": {
+        "agency_code": "BERNCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "brookline_ma": {
+        "agency_code": "BROOKLINE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "evanston_il": {
+        "agency_code": "EVANSTON",
+        "module": "Building",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=HOME",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
