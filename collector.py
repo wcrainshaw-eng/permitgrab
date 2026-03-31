@@ -398,7 +398,22 @@ def fetch_arcgis(config, days_back):
         # If using "none" date_format, filter in Python
         if date_format == "none" and date_field and results:
             since_epoch = int(since_dt.timestamp() * 1000)
-            results = [r for r in results if r.get(date_field, 0) and r[date_field] >= since_epoch]
+            since_iso = since_dt.strftime("%Y-%m-%d")
+            filtered = []
+            for r in results:
+                val = r.get(date_field)
+                if not val:
+                    continue
+                # Handle epoch milliseconds (numbers)
+                if isinstance(val, (int, float)) and val >= since_epoch:
+                    filtered.append(r)
+                # Handle ISO/string dates (e.g. "2026-01-15" or "2026-01-15T...")
+                elif isinstance(val, str) and len(val) >= 10 and val[:10] >= since_iso:
+                    filtered.append(r)
+                # If we can't parse it, include it (don't drop data silently)
+                elif not isinstance(val, (int, float, str)):
+                    filtered.append(r)
+            results = filtered
         return results
     return []
 

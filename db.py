@@ -753,6 +753,7 @@ def _fix_arcgis_date_formats(conn):
         FIX_TARGETS = {
             'phoenix', 'arlington', 'chattanooga', 'cleveland',
             'columbus', 'durham', 'knoxville', 'minneapolis',
+            'baltimore', 'sacramento', 'virginia_beach', 'asheville_nc', 'deltona_fl',
         }
 
         import json

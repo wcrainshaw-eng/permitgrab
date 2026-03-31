@@ -723,15 +723,17 @@ def admin_test_and_backfill():
         test_config = dict(config)
         test_config['limit'] = 5  # Just 5 records for testing
 
+        test_config['limit'] = 10  # Small sample for testing
         try:
+            # Use 365-day window for test so we don't miss cities with older data
             if platform == 'socrata':
-                test_raw = fetch_socrata(test_config, 30)
+                test_raw = fetch_socrata(test_config, 365)
             elif platform == 'arcgis':
-                test_raw = fetch_arcgis(test_config, 30)
+                test_raw = fetch_arcgis(test_config, 365)
             elif platform == 'ckan':
-                test_raw = fetch_ckan(test_config, 30)
+                test_raw = fetch_ckan(test_config, 365)
             elif platform == 'carto':
-                test_raw = fetch_carto(test_config, 30)
+                test_raw = fetch_carto(test_config, 365)
             else:
                 return jsonify({'error': f'Unsupported platform: {platform}'}), 400
         except Exception as e:
