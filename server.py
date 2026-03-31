@@ -626,7 +626,7 @@ def admin_scraper_history():
         conn = permitdb.get_connection()
         # Get the most recent run for each city
         runs = conn.execute("""
-            SELECT city_slug, city_name, state,
+            SELECT city_slug, source_name, city, state,
                    permits_found, permits_inserted, status, error_message,
                    duration_ms, run_started_at,
                    ROW_NUMBER() OVER (PARTITION BY city_slug ORDER BY run_started_at DESC) as rn
@@ -647,7 +647,7 @@ def admin_scraper_history():
         for slug, r in latest.items():
             entry = {
                 'slug': slug,
-                'name': r.get('city_name', slug),
+                'name': r.get('source_name') or r.get('city') or slug,
                 'state': r.get('state', ''),
                 'permits_found': r.get('permits_found', 0),
                 'status': r.get('status', ''),
