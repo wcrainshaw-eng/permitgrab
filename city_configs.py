@@ -417,10 +417,10 @@ CITY_REGISTRY = {
             "ssl": "SSL",
         },
         "date_field": "ISSUE_DATE",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
-        "notes": "V19: Replaced wrong DDOT_TOPS/MapServer with correct DCRA FeatureServer. Using 'Last 30 Days' rolling feed (layer 4) for daily scraping. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, NEIGHBORHOODCLUSTER, lat/lon. Also available: yearly layers (2015-2025) at FeatureServer/15-17,24-25. Verified Mar 2026 with same-day permit data.",
+        "active": True,
+        "notes": "V35: DCRA FeatureServer layer 4 (Last 30 Days rolling feed). date_format=none because epoch WHERE fails. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, lat/lon. Backfilled 2,000 permits 2026-03-31.",
     },
 
     # V23 AUDIT: 2026-03-28 - NO_DATA - CKAN endpoint needs verification
@@ -535,7 +535,7 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": True,
-        "notes": "V12.39: Fixed CKAN endpoint - PLI Permits",
+        "notes": "V35: PLI Permits (2019-present). resource_id f4d1177a confirmed fresh 2026-03-27. Has owner_name, contractor_name, total_project_value.",
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - ArcGIS verified working with Mar 2026 data
