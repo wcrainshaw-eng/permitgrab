@@ -848,6 +848,275 @@ def admin_test_and_backfill():
         return jsonify({'error': f'Test and backfill failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/discover-and-activate', methods=['POST'])
+def admin_discover_and_activate():
+    """V35: Auto-discover fresh endpoints for stale cities, test, backfill, and activate.
+
+    POST body (all optional):
+      {"cities": ["milwaukee", "sacramento"]}  — specific cities to process
+      If omitted, processes ALL stale cities from the discovery module.
+
+    For each city:
+    1. Search Socrata Discovery API, ArcGIS Hub, CKAN catalogs
+    2. Test each discovered endpoint for 30-day freshness
+    3. Build field mapping from sample data
+    4. Backfill 180 days of historical data
+    5. Normalize, insert, and activate
+
+    Returns detailed results for each city.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from discover_fresh_endpoints import discover_all, STALE_CITIES
+        from collector import normalize_permit, fetch_socrata, fetch_arcgis, fetch_ckan, fetch_carto
+        from city_source_db import get_city_config
+        from db import normalize_city_slug
+
+        data = request.get_json() or {}
+        target_cities = data.get('cities')  # None = all stale cities
+        days_back = data.get('days_back', 180)
+        dry_run = data.get('dry_run', False)
+
+        # Step 1: Discover fresh endpoints
+        discovery_results = discover_all(target_cities)
+
+        # Step 2: For each FOUND city, run test-and-backfill
+        activation_results = {}
+        for city_key, disc in discovery_results.items():
+            if disc["status"] not in ("FOUND", "EXISTING_WORKS"):
+                activation_results[city_key] = {
+                    "status": disc["status"],
+                    "message": f"No fresh endpoint found: {disc['status']}",
+                }
+                continue
+
+            if dry_run:
+                activation_results[city_key] = {
+                    "status": "DRY_RUN",
+                    "config": disc["config"],
+                    "freshness": disc["freshness"],
+                    "message": f"Would activate with {disc['config']['platform']} endpoint",
+                }
+                continue
+
+            config = disc["config"]
+            platform = config.get("platform", "socrata")
+
+            try:
+                # Backfill: fetch 180 days
+                config["active"] = True
+                if platform == "socrata":
+                    raw = fetch_socrata(config, days_back)
+                elif platform == "arcgis":
+                    raw = fetch_arcgis(config, days_back)
+                elif platform == "ckan":
+                    raw = fetch_ckan(config, days_back)
+                elif platform == "carto":
+                    raw = fetch_carto(config, days_back)
+                else:
+                    activation_results[city_key] = {"status": "ERROR", "error": f"Unknown platform: {platform}"}
+                    continue
+
+                if not raw:
+                    activation_results[city_key] = {"status": "ERROR", "error": "Backfill returned 0 records"}
+                    continue
+
+                # Normalize — we need a config in the registry or city_sources for normalize_permit to work.
+                # Use the discovered config's field_map directly.
+                normalized = []
+                fmap = config.get("field_map", {})
+                city_name = config.get("name", city_key)
+                state = config.get("state", "")
+
+                for record in raw:
+                    try:
+                        # Manual normalization using discovered field_map
+                        import re as _re
+                        def _get(field_name):
+                            raw_key = fmap.get(field_name, "")
+                            if not raw_key:
+                                return ""
+                            return str(record.get(raw_key, "")).strip()
+
+                        permit_number = _get("permit_number")
+                        if not permit_number:
+                            continue
+
+                        # Parse date
+                        date_str = _get("filing_date") or _get("date") or _get("issued_date")
+                        parsed_date = ""
+                        if date_str:
+                            if str(date_str).isdigit() and len(str(date_str)) >= 10:
+                                try:
+                                    parsed_date = datetime.fromtimestamp(int(date_str) / 1000).strftime("%Y-%m-%d")
+                                except (ValueError, OSError):
+                                    pass
+                            if not parsed_date:
+                                for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+                                    try:
+                                        parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
+                                        break
+                                    except ValueError:
+                                        continue
+                            if not parsed_date and '/' in str(date_str):
+                                try:
+                                    parts = str(date_str).split()[0].split('/')
+                                    if len(parts) == 3:
+                                        m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
+                                        parsed_date = f"{y:04d}-{m:02d}-{d:02d}"
+                                except (ValueError, IndexError):
+                                    pass
+                            if not parsed_date:
+                                parsed_date = str(date_str)[:10]
+
+                        # Parse cost
+                        cost_str = _get("estimated_cost")
+                        try:
+                            cost = float(_re.sub(r'[^\d.]', '', cost_str)) if cost_str else 0
+                        except (ValueError, TypeError):
+                            cost = 0
+                        if cost > 50_000_000:
+                            cost = 50_000_000
+
+                        address = _get("address") or "Address not provided"
+                        description = _get("description") or _get("work_type") or ""
+
+                        normalized.append({
+                            "permit_number": permit_number,
+                            "permit_type": _get("permit_type") or "Building Permit",
+                            "work_type": _get("work_type") or "",
+                            "address": address,
+                            "city": city_name,
+                            "state": state,
+                            "zip": _get("zip") or "",
+                            "filing_date": parsed_date,
+                            "status": _get("status") or "",
+                            "estimated_cost": cost,
+                            "description": description,
+                            "owner_name": _get("owner_name") or "",
+                            "contact_name": _get("contact_name") or "",
+                        })
+                    except Exception:
+                        continue
+
+                if not normalized:
+                    activation_results[city_key] = {
+                        "status": "ERROR",
+                        "error": f"Got {len(raw)} raw records but 0 normalized. Field map may be wrong.",
+                        "config": config,
+                    }
+                    continue
+
+                # Insert
+                inserted = permitdb.upsert_permits(normalized, source_city_key=city_key)
+
+                # Activate in city_sources
+                conn = permitdb.get_connection()
+                existing = conn.execute(
+                    "SELECT source_key FROM city_sources WHERE source_key = ?", (city_key,)
+                ).fetchone()
+
+                if existing:
+                    # Update existing source with new endpoint info
+                    conn.execute("""
+                        UPDATE city_sources SET
+                            status = 'active',
+                            endpoint = ?,
+                            platform = ?,
+                            date_field = ?,
+                            field_map = ?
+                        WHERE source_key = ?
+                    """, (
+                        config["endpoint"],
+                        platform,
+                        config.get("date_field", ""),
+                        json.dumps(config.get("field_map", {})),
+                        city_key,
+                    ))
+                else:
+                    # Insert new city_source
+                    conn.execute("""
+                        INSERT INTO city_sources (source_key, name, state, platform, endpoint,
+                            date_field, field_map, status, mode)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'city')
+                    """, (
+                        city_key,
+                        city_name,
+                        state,
+                        platform,
+                        config["endpoint"],
+                        config.get("date_field", ""),
+                        json.dumps(config.get("field_map", {})),
+                    ))
+
+                # Create/update prod_city
+                existing_prod = conn.execute(
+                    "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
+                    (city_name, state)
+                ).fetchone()
+                if existing_prod:
+                    conn.execute("""
+                        UPDATE prod_cities SET status = 'active', total_permits = ?, source_id = ?
+                        WHERE id = ?
+                    """, (len(normalized), city_key, existing_prod['id']))
+                else:
+                    conn.execute("""
+                        INSERT INTO prod_cities (city, state, city_slug, source_id, status, total_permits)
+                        VALUES (?, ?, ?, ?, 'active', ?)
+                    """, (city_name, state, normalize_city_slug(city_name), city_key, len(normalized)))
+
+                conn.commit()
+
+                activation_results[city_key] = {
+                    "status": "ACTIVATED",
+                    "raw_fetched": len(raw),
+                    "normalized": len(normalized),
+                    "inserted": inserted,
+                    "platform": platform,
+                    "endpoint": config["endpoint"],
+                    "date_field": config.get("date_field"),
+                    "newest_date": disc["freshness"].get("newest_date"),
+                    "message": f"✓ {city_name} is live. {len(normalized)} permits backfilled.",
+                }
+
+            except Exception as e:
+                activation_results[city_key] = {
+                    "status": "ERROR",
+                    "error": str(e),
+                    "config": config,
+                }
+
+        # Summary
+        activated = [k for k, v in activation_results.items() if v.get("status") == "ACTIVATED"]
+        failed = [k for k, v in activation_results.items() if v.get("status") == "ERROR"]
+        not_found = [k for k, v in activation_results.items() if v.get("status") in ("NOT_FOUND", "STALE")]
+
+        return jsonify({
+            "summary": {
+                "activated": len(activated),
+                "failed": len(failed),
+                "not_found": len(not_found),
+                "dry_run": dry_run,
+            },
+            "activated_cities": activated,
+            "failed_cities": failed,
+            "not_found_cities": not_found,
+            "details": activation_results,
+            "discovery": {k: {
+                "status": v["status"],
+                "endpoints_found": len(v.get("all_discovered", [])),
+                "endpoints_tested": len(v.get("all_tested", [])),
+            } for k, v in discovery_results.items()},
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': f'Discovery failed: {str(e)}', 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/api/admin/pause-empty', methods=['POST'])
 def admin_pause_empty_cities():
     """V34: Pause all active prod_cities that have 0 actual permits in DB.
