@@ -571,6 +571,48 @@ def admin_city_health():
         return jsonify({'error': f'Health check failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/reactivate-paused', methods=['POST'])
+def admin_reactivate_paused():
+    """V35: Lightweight endpoint to reactivate paused cities that have permit data.
+    Only does one fast UPDATE — no heavy cleanup."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        conn = permitdb.get_connection()
+        # First sync counts for paused cities only
+        paused = conn.execute(
+            "SELECT id, city, state FROM prod_cities WHERE status = 'paused'"
+        ).fetchall()
+        updated_counts = 0
+        for row in paused:
+            actual = conn.execute(
+                "SELECT COUNT(*) as cnt FROM permits WHERE LOWER(city) = LOWER(?) AND state = ?",
+                (row['city'], row['state'])
+            ).fetchone()['cnt']
+            if actual > 0:
+                conn.execute(
+                    "UPDATE prod_cities SET total_permits = ?, status = 'active' WHERE id = ?",
+                    (actual, row['id'])
+                )
+                updated_counts += 1
+        conn.commit()
+
+        # Get the updated list
+        reactivated = conn.execute(
+            "SELECT city, state, total_permits FROM prod_cities WHERE status = 'active' ORDER BY total_permits DESC"
+        ).fetchall()
+
+        return jsonify({
+            'reactivated_count': updated_counts,
+            'total_active': len(reactivated),
+            'message': f'Reactivated {updated_counts} paused cities with data'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Reactivation failed: {str(e)}'}), 500
+
+
 @app.route('/api/admin/pause-empty', methods=['POST'])
 def admin_pause_empty_cities():
     """V34: Pause all active prod_cities that have 0 actual permits in DB.
