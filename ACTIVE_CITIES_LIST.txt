@@ -1,0 +1,266 @@
+========================================================================================================================
+ACTIVE CITIES - COMPLETE DETAILED LIST
+========================================================================================================================
+
+Total Active Cities: 210
+Generated: 2026-03-31
+
+Key                                  City Name                      State  Platform   Slug                     
+------------------------------------------------------------------------------------------------------------------------
+fayetteville_ar                      Fayetteville                   AR     socrata    fayetteville-ar          
+little_rock                          Little Rock                    AR     socrata    little-rock              
+chandler                             Chandler                       AZ     accela     chandler                 
+mesa                                 Mesa                           AZ     socrata    mesa                     
+peoria                               Peoria                         AZ     arcgis     peoria                   
+phoenix                              Phoenix                        AZ     arcgis     phoenix                  
+pima_county_az                       Pima County                    AZ     accela     pima-county-az           
+queen_creek_az                       Queen Creek                    AZ     accela     queen-creek-az           
+scottsdale                           Scottsdale                     AZ     arcgis     scottsdale               
+tempe                                Tempe                          AZ     arcgis     tempe                    
+tucson                               Tucson                         AZ     arcgis     tucson                   
+alameda_ca                           Alameda                        CA     accela     alameda-ca               
+anaheim                              Anaheim                        CA     arcgis     anaheim                  
+bolinas                              Bolinas                        CA     socrata    bolinas                  
+contra_costa_county_ca               Contra Costa County            CA     accela     contra-costa-county-ca   
+corona                               Corona                         CA     socrata    corona                   
+dillon_beach                         Dillon Beach                   CA     socrata    dillon-beach             
+fairfax                              Fairfax                        CA     socrata    fairfax                  
+forest_knolls                        Forest Knolls                  CA     socrata    forest-knolls            
+greenbrae                            Greenbrae                      CA     socrata    greenbrae                
+inverness                            Inverness                      CA     socrata    inverness                
+kentfield                            Kentfield                      CA     socrata    kentfield                
+los_angeles                          Los Angeles                    CA     socrata    los-angeles              
+mill_valley                          Mill Valley                    CA     socrata    mill-valley              
+monterey_county_ca                   Monterey County                CA     accela     monterey-county-ca       
+novato                               Novato                         CA     socrata    novato                   
+oakland                              Oakland                        CA     accela     oakland                  
+palo_alto_ca                         Palo Alto                      CA     accela     palo-alto-ca             
+sacramento                           Sacramento                     CA     arcgis     sacramento               
+sacramento_ca                        Sacramento                     CA     accela     sacramento-ca            
+sacramento_county_ca                 Sacramento County              CA     arcgis     sacramento-county        
+san_bernardino_county_ca             San Bernardino County          CA     accela     san-bernardino-county-ca 
+san_francisco                        San Francisco                  CA     socrata    san-francisco            
+san_jose                             San Jose                       CA     ckan       san-jose                 
+san_leandro_ca                       San Leandro                    CA     accela     san-leandro-ca           
+san_mateo_county_ca                  San Mateo County               CA     accela     san-mateo-county-ca      
+santa_clara_county_ca                Santa Clara County             CA     accela     santa-clara-county-ca    
+sonoma_county                        Sonoma County                  CA     socrata    sonoma-county            
+stinson_beach                        Stinson Beach                  CA     socrata    stinson-beach            
+woodacre                             Woodacre                       CA     socrata    woodacre                 
+aurora_co                            Aurora                         CO     arcgis     aurora-co                
+boulder                              Boulder                        CO     arcgis     boulder                  
+denver                               Denver                         CO     arcgis     denver                   
+fort_collins                         Fort Collins                   CO     socrata    fort-collins             
+loveland_co                          Loveland                       CO     accela     loveland-co              
+weld_county_co                       Weld County                    CO     accela     weld-county-co           
+washington_dc                        Washington DC                  DC     arcgis     washington-dc            
+brevard_county_fl                    Brevard County                 FL     accela     brevard-county-fl        
+cape_coral                           Cape Coral                     FL     arcgis     cape-coral               
+charlotte_county_fl                  Charlotte County               FL     accela     charlotte-county-fl      
+citrus_county_fl                     Citrus County                  FL     accela     citrus-county-fl         
+deland_fl                            DeLand                         FL     accela     deland-fl                
+deltona_fl                           Deltona                        FL     arcgis     deltona                  
+fort_lauderdale_fl                   Fort Lauderdale                FL     accela     fort-lauderdale-fl       
+fort_lauderdale                      Fort Lauderdale                FL     arcgis     fort-lauderdale          
+gainesville_fl                       Gainesville                    FL     socrata    gainesville-fl           
+hialeah                              Hialeah                        FL     arcgis     hialeah                  
+hillsborough_county_fl               Hillsborough County            FL     accela     hillsborough-county-fl   
+lee_county_fl                        Lee County                     FL     accela     lee-county-fl            
+leon_county_fl                       Leon County                    FL     accela     leon-county-fl           
+martin_county_fl                     Martin County                  FL     accela     martin-county-fl         
+miami_dade                           Miami-Dade County              FL     arcgis     miami                    
+orlando                              Orlando                        FL     socrata    orlando                  
+pasco_county_fl                      Pasco County                   FL     accela     pasco-county-fl          
+pembroke_pines                       Pembroke Pines                 FL     socrata    pembroke-pines           
+pinellas_county_fl                   Pinellas County                FL     accela     pinellas-county-fl       
+polk_county_fl                       Polk County                    FL     accela     polk-county-fl           
+sarasota_county_fl                   Sarasota County                FL     accela     sarasota-county-fl       
+st_petersburg                        St. Petersburg                 FL     arcgis     st-petersburg            
+tallahassee                          Tallahassee                    FL     arcgis     tallahassee              
+tampa_fl                             Tampa                          FL     accela     tampa-fl                 
+alpharetta_ga                        Alpharetta                     GA     arcgis     alpharetta-ga            
+atlanta                              Atlanta                        GA     arcgis     atlanta                  
+atlanta_ga                           Atlanta                        GA     accela     atlanta-ga               
+coweta_county_ga                     Coweta County                  GA     accela     coweta-county-ga         
+gwinnett_county_ga                   Gwinnett County                GA     accela     gwinnett-county-ga       
+honolulu                             Honolulu                       HI     socrata    honolulu                 
+boise                                Boise                          ID     arcgis     boise                    
+chicago                              Chicago                        IL     socrata    chicago                  
+cook_county                          Cook County                    IL     socrata    cook-county              
+evanston_il                          Evanston                       IL     accela     evanston-il              
+fort_wayne_in                        Fort Wayne                     IN     accela     fort-wayne-in            
+indianapolis                         Indianapolis                   IN     accela     indianapolis             
+louisville                           Louisville                     KY     arcgis     louisville               
+baton_rouge                          Baton Rouge                    LA     socrata    baton-rouge              
+new_orleans                          New Orleans                    LA     socrata    new-orleans              
+boston                               Boston                         MA     ckan       boston                   
+brookline_ma                         Brookline                      MA     accela     brookline-ma             
+cambridge                            Cambridge                      MA     socrata    cambridge                
+cambridge_ma                         Cambridge                      MA     socrata    cambridge-ma             
+quincy_ma                            Quincy                         MA     socrata    quincy-ma                
+anne_arundel_county_md               Anne Arundel County            MD     accela     anne-arundel-county-md   
+ashton                               Ashton                         MD     socrata    ashton                   
+baltimore                            Baltimore                      MD     arcgis     baltimore                
+beallsville                          Beallsville                    MD     socrata    beallsville              
+bethesda                             Bethesda                       MD     socrata    bethesda                 
+boyds                                Boyds                          MD     socrata    boyds                    
+brookeville                          Brookeville                    MD     socrata    brookeville              
+burtonsville                         Burtonsville                   MD     socrata    burtonsville             
+cabin_john                           Cabin John                     MD     socrata    cabin-john               
+chevy_chase                          Chevy Chase                    MD     socrata    chevy-chase              
+clarksburg                           Clarksburg                     MD     socrata    clarksburg               
+damascus                             Damascus                       MD     socrata    damascus                 
+dickerson                            Dickerson                      MD     socrata    dickerson                
+gaithersburg                         Gaithersburg                   MD     socrata    gaithersburg             
+germantown                           Germantown                     MD     socrata    germantown               
+glen_echo                            Glen Echo                      MD     socrata    glen-echo                
+howard_county                        Howard County                  MD     socrata    howard-county            
+kensington                           Kensington                     MD     socrata    kensington               
+montgomery_county_md                 Montgomery County              MD     socrata    montgomery-county-md     
+montgomery_village                   Montgomery Village             MD     socrata    montgomery-village       
+mount_airy                           Mount Airy                     MD     socrata    mount-airy               
+olney                                Olney                          MD     socrata    olney                    
+poolesville                          Poolesville                    MD     socrata    poolesville              
+potomac                              Potomac                        MD     socrata    potomac                  
+prince_georges_county                Prince Georges County          MD     socrata    prince-georges-county    
+rockville                            Rockville                      MD     socrata    rockville                
+sandy_spring                         Sandy Spring                   MD     socrata    sandy-spring             
+silver_spring                        Silver Spring                  MD     socrata    silver-spring            
+takoma_park                          Takoma Park                    MD     socrata    takoma-park              
+detroit                              Detroit                        MI     arcgis     detroit                  
+minneapolis                          Minneapolis                    MN     arcgis     minneapolis              
+kansas_city                          Kansas City                    MO     socrata    kansas-city              
+asheville_nc                         Asheville                      NC     arcgis     asheville                
+cary                                 Cary                           NC     socrata    cary                     
+charlotte                            Charlotte                      NC     accela     charlotte                
+durham                               Durham                         NC     arcgis     durham                   
+fayetteville_nc                      Fayetteville                   NC     arcgis     fayetteville-nc          
+greensboro                           Greensboro                     NC     arcgis     greensboro               
+raleigh                              Raleigh                        NC     arcgis     raleigh                  
+wilmington_nc                        Wilmington                     NC     arcgis     wilmington-nc            
+fargo                                Fargo                          ND     socrata    fargo                    
+bernalillo_county_nm                 Bernalillo County              NM     accela     bernalillo-county-nm     
+clark_county_nv                      Clark County                   NV     accela     clark-county-nv          
+henderson_nv                         Henderson                      NV     socrata    henderson                
+henderson                            Henderson                      NV     socrata    henderson                
+reno                                 Reno                           NV     accela     reno                     
+albany                               Albany                         NY     socrata    albany                   
+new_york                             New York City                  NY     socrata    new-york                 
+cincinnati                           Cincinnati                     OH     socrata    cincinnati               
+cleveland                            Cleveland                      OH     arcgis     cleveland                
+cleveland_oh                         Cleveland                      OH     accela     cleveland-oh             
+columbus                             Columbus                       OH     arcgis     columbus                 
+dayton_oh                            Dayton                         OH     accela     dayton-oh                
+oklahoma_city                        Oklahoma City                  OK     accela     oklahoma-city            
+clackamas_county_or                  Clackamas County               OR     accela     clackamas-county-or      
+portland                             Portland                       OR     arcgis     portland                 
+salem                                Salem                          OR     arcgis     salem                    
+philadelphia                         Philadelphia                   PA     carto      philadelphia             
+pittsburgh                           Pittsburgh                     PA     ckan       pittsburgh               
+charleston                           Charleston                     SC     arcgis     charleston               
+charleston_sc                        Charleston                     SC     socrata    charleston-sc            
+columbia_sc                          Columbia                       SC     socrata    columbia-sc              
+sioux_falls                          Sioux Falls                    SD     arcgis     sioux-falls              
+chattanooga                          Chattanooga                    TN     arcgis     chattanooga              
+knoxville                            Knoxville                      TN     arcgis     knoxville                
+memphis                              Memphis                        TN     accela     memphis                  
+murfreesboro_tn                      Murfreesboro                   TN     arcgis     murfreesboro             
+nashville                            Nashville                      TN     arcgis     nashville-tn             
+allen_tx                             Allen                          TX     socrata    allen-tx                 
+anna                                 Anna                           TX     socrata    anna                     
+arlington                            Arlington                      TX     arcgis     arlington                
+austin                               Austin                         TX     socrata    austin                   
+blue_ridge                           Blue Ridge                     TX     socrata    blue-ridge               
+brownsville_tx                       Brownsville                    TX     accela     brownsville-tx           
+cedar_park                           Cedar Park                     TX     socrata    cedar-park               
+celina                               Celina                         TX     socrata    celina                   
+collin_county_tx                     Collin County                  TX     socrata    collin-county-tx         
+dallas                               Dallas                         TX     accela     dallas                   
+dallas_tx                            Dallas                         TX     socrata    dallas-tx                
+fairview                             Fairview                       TX     socrata    fairview                 
+farmersville                         Farmersville                   TX     socrata    farmersville             
+florence_tx                          Florence                       TX     socrata    florence-tx              
+fort_worth                           Fort Worth                     TX     arcgis     fort-worth               
+frisco                               Frisco                         TX     socrata    frisco                   
+georgetown_tx                        Georgetown                     TX     socrata    georgetown-tx            
+granger_tx                           Granger                        TX     socrata    granger-tx               
+hutto                                Hutto                          TX     socrata    hutto                    
+jarrell                              Jarrell                        TX     socrata    jarrell                  
+leander                              Leander                        TX     socrata    leander                  
+liberty_hill                         Liberty Hill                   TX     socrata    liberty-hill             
+mckinney                             Mckinney                       TX     socrata    mckinney                 
+pflugerville                         Pflugerville                   TX     socrata    pflugerville             
+plano                                Plano                          TX     socrata    plano                    
+round_rock                           Round Rock                     TX     socrata    round-rock               
+san_antonio                          San Antonio                    TX     ckan       san-antonio              
+san_marcos                           San Marcos                     TX     arcgis     san-marcos-tx            
+sugar_land_tx                        Sugar Land                     TX     ckan       sugar-land-tx            
+williamson_county_tx                 Williamson County              TX     socrata    williamson-county-tx     
+wylie_tx                             Wylie                          TX     socrata    wylie-tx                 
+provo                                Provo                          UT     socrata    provo                    
+salt_lake_city_ut                    Salt Lake City                 UT     accela     salt-lake-city-ut        
+west_valley_city                     West Valley City               UT     socrata    west-valley-city         
+arlington_va                         Arlington                      VA     socrata    arlington-va             
+arlington_county_va                  Arlington County               VA     accela     arlington-county-va      
+chesapeake                           Chesapeake                     VA     socrata    chesapeake               
+chesterfield_county_va               Chesterfield County            VA     accela     chesterfield-county-va   
+fairfax_va                           Fairfax                        VA     accela     fairfax-va               
+norfolk                              Norfolk                        VA     socrata    norfolk                  
+norfolk_va                           Norfolk                        VA     socrata    norfolk-va               
+richmond                             Richmond                       VA     socrata    richmond                 
+virginia_beach                       Virginia Beach                 VA     arcgis     virginia-beach           
+bellevue                             Bellevue                       WA     arcgis     bellevue                 
+bellingham_wa                        Bellingham                     WA     arcgis     bellingham               
+everett_wa                           Everett                        WA     socrata    everett-wa               
+pierce_county_wa                     Pierce County                  WA     arcgis     pierce-county-wa         
+seattle                              Seattle                        WA     socrata    seattle                  
+spokane                              Spokane                        WA     arcgis     spokane                  
+tacoma                               Tacoma                         WA     arcgis     tacoma                   
+milwaukee                            Milwaukee                      WI     ckan       milwaukee                
+
+========================================================================================================================
+SUMMARY BY STATE
+========================================================================================================================
+  AR: 2
+  AZ: 9
+  CA: 29
+  CO: 6
+  DC: 1
+  FL: 24
+  GA: 5
+  HI: 1
+  ID: 1
+  IL: 3
+  IN: 2
+  KY: 1
+  LA: 2
+  MA: 5
+  MD: 29
+  MI: 1
+  MN: 1
+  MO: 1
+  NC: 8
+  ND: 1
+  NM: 1
+  NV: 4
+  NY: 2
+  OH: 5
+  OK: 1
+  OR: 3
+  PA: 2
+  SC: 3
+  SD: 1
+  TN: 5
+  TX: 31
+  UT: 3
+  VA: 9
+  WA: 7
+  WI: 1
+
+SUMMARY BY PLATFORM
+============================================================
+  socrata: 100
+  accela: 52
+  arcgis: 51
+  ckan: 6
+  carto: 1
