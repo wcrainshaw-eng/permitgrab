@@ -162,7 +162,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Full 27-field map — zone, APC, CPA, neighborhood council (CNC), census tract, council district, APN, use code/desc, lat/lon, EV charger flag, solar flag, work description, valuation, status/status_date. Data through Mar 22, 2026. Verified.",
     },
 
@@ -216,7 +216,7 @@ CITY_REGISTRY = {
         },
         "date_field": "filed_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Switched to Issued Building Permits dataset
@@ -765,7 +765,7 @@ CITY_REGISTRY = {
         "date_field": "ApplicationDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Replaced dead MD_OpenData/MapServer with ArcGIS FeatureServer miamidade_permit_data. SUPERB data: ContractorName/Phone/Address, OwnerName, EstimatedValue, SquareFootage, ArchitectName, ApplicationTypeDescription, ProposedUseDescription. Verified Mar 2026 with permits issued 3/22/2026.",
     },
 
@@ -949,7 +949,7 @@ CITY_REGISTRY = {
         "date_field": "APPLIED_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: New — Sacramento County permits via ArcGIS FeatureServer. Data current Dec 2025. Covers unincorporated Sac County + cities like Folsom, Citrus Heights, Elk Grove, Carmichael. Pop ~1.6M county.",
     },
 
@@ -1048,7 +1048,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "none",
         "limit": 1000,
-        "active": False,
+        "active": True,
         "notes": "V17g: Switched to verified ArcGIS FeatureServer (old Socrata was fabricated)",
     },
 
@@ -1158,7 +1158,7 @@ CITY_REGISTRY = {
         "date_field": "File_Date",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Full 30-field map — permit type/subtype/category, work description, special text, full address components, lot/block/tract, legal description, owner name, job value, use type, specific use, units, sqft, status/status date. Verified Mar 2026.",
     },
 
@@ -1319,7 +1319,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,  # V28: Consolidated — use mesa_new instead (better field_map)
+        "active": True,  # V28: Consolidated — use mesa_new instead (better field_map)
         "notes": "V28: DUPLICATE — mesa_new has fuller field_map with contractor_email, license, applicant.",
     },
 
@@ -3239,7 +3239,7 @@ CITY_REGISTRY = {
         "date_field": "permitissueddate",
         "city_filter": {"field": "situscity", "value": "ALLEN"},
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: New — Allen permits via Collin County Socrata. Pop ~105K.",
     },
     "wylie_tx": {
@@ -3312,7 +3312,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedDate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.9: New — Pierce County WA ArcGIS permits. Covers Lakewood, Tacoma unincorp, etc.",
     },
 
@@ -7084,7 +7084,7 @@ CITY_REGISTRY = {
         },
         "date_field": "IssDate",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "henderson": {
@@ -7374,7 +7374,7 @@ CITY_REGISTRY = {
         "date_field": "AppliedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata with real Leon County ArcGIS MapServer — ULTRA premium: ContractorPhone, ContractorEmail, ContractorLicenseNum, EstProjectCost, TotalSqFt, Fee, HousingUnits",
     },
 
@@ -7576,7 +7576,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUE_DATE",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "columbia_sc": {
@@ -8751,7 +8751,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUEDDATE",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "boise": {
@@ -8776,7 +8776,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "iso",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V33: Switched to PDS_BuildingPermits_HighImpact (139 records). Old Housing_OpenData endpoint dead. Fields: RecordID, PropertyAddress, City, State, RecordTypeAlias, PermitStatus, IssuedDate.",
     },
 
@@ -8957,7 +8957,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Replaced fabricated Socrata with real ArcGIS MapServer from gis.siouxfalls.gov. Has permit type, status, work class, address, valuation, dwelling units, contractor name, apply/issue/finalize dates. Epoch date format. Data through Mar 21, 2026. Verified.",
     },
 
@@ -9008,7 +9008,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_INITIATED",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V25: Fixed - switched from dead Socrata to ArcGIS MapServer. Data current Mar 2026.",
     },
 
@@ -9060,7 +9060,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUE_DATE",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -9165,7 +9165,7 @@ CITY_REGISTRY = {
         "date_field": "PRMT_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: New — ArcGIS MapServer layer 1. PRMT_TYPE is integer code (101=residential). Data current through 2026. Pop ~153K.",
     },
 
@@ -9193,7 +9193,7 @@ CITY_REGISTRY = {
         "date_field": "date_opened",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: New — Accela permits via ArcGIS. Rich data with record_type hierarchy (group/category/type/subtype). Data current through Mar 2026. Pop ~95K.",
     },
 
@@ -9218,7 +9218,7 @@ CITY_REGISTRY = {
         "date_field": "INDATE",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: New — Volusia County AMANDA permits via ArcGIS. County-wide (includes Deltona, DeLand, Orange City, etc). FOLDERNAME contains address+city. FOLDERTYPE: RES/COM/etc. Data current Feb 2026. Pop ~94K.",
     },
 
@@ -9244,7 +9244,7 @@ CITY_REGISTRY = {
         "date_field": "APPLIED",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: New — City of Bellingham permits via ArcGIS MapServer. Data current Mar 2026. Includes building, fire protection, sign permits. Pop ~95K.",
     },
 
@@ -11621,7 +11621,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V34: Deactivated — duplicate of 'cambridge' which has richer field map.",
     },
 
@@ -14974,7 +14974,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via norfolk endpoint.",
     },
 
