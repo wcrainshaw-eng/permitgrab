@@ -812,21 +812,24 @@ def admin_test_and_backfill():
         # Create/update prod_city
         city_name = config.get('name', city_key.replace('_', ' ').title())
         state = config.get('state', '')
+        from db import normalize_city_slug
+        city_slug = normalize_city_slug(city_name)
+        # Look up by city+state OR by slug (handles cases where slug exists from prior attempt)
         existing_prod = conn.execute(
-            "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
-            (city_name, state)
+            "SELECT id FROM prod_cities WHERE (city = ? AND state = ?) OR city_slug = ?",
+            (city_name, state, city_slug)
         ).fetchone()
         if existing_prod:
             conn.execute("""
-                UPDATE prod_cities SET status = 'active', total_permits = ?, source_id = ?
+                UPDATE prod_cities SET status = 'active', total_permits = ?, source_id = ?,
+                    city = ?, state = ?
                 WHERE id = ?
-            """, (len(normalized), city_key, existing_prod['id']))
+            """, (len(normalized), city_key, city_name, state, existing_prod['id']))
         else:
-            from db import normalize_city_slug
             conn.execute("""
                 INSERT INTO prod_cities (city, state, city_slug, source_id, status, total_permits)
                 VALUES (?, ?, ?, ?, 'active', ?)
-            """, (city_name, state, normalize_city_slug(city_name), city_key, len(normalized)))
+            """, (city_name, state, city_slug, city_key, len(normalized)))
 
         conn.commit()
 
@@ -1052,21 +1055,23 @@ def admin_discover_and_activate():
                         json.dumps(config.get("field_map", {})),
                     ))
 
-                # Create/update prod_city
+                # Create/update prod_city (lookup by slug too to avoid UNIQUE constraint)
+                city_slug = normalize_city_slug(city_name)
                 existing_prod = conn.execute(
-                    "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
-                    (city_name, state)
+                    "SELECT id FROM prod_cities WHERE (city = ? AND state = ?) OR city_slug = ?",
+                    (city_name, state, city_slug)
                 ).fetchone()
                 if existing_prod:
                     conn.execute("""
-                        UPDATE prod_cities SET status = 'active', total_permits = ?, source_id = ?
+                        UPDATE prod_cities SET status = 'active', total_permits = ?, source_id = ?,
+                            city = ?, state = ?
                         WHERE id = ?
-                    """, (len(normalized), city_key, existing_prod['id']))
+                    """, (len(normalized), city_key, city_name, state, existing_prod['id']))
                 else:
                     conn.execute("""
                         INSERT INTO prod_cities (city, state, city_slug, source_id, status, total_permits)
                         VALUES (?, ?, ?, ?, 'active', ?)
-                    """, (city_name, state, normalize_city_slug(city_name), city_key, len(normalized)))
+                    """, (city_name, state, city_slug, city_key, len(normalized)))
 
                 conn.commit()
 

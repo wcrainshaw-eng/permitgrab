@@ -754,6 +754,7 @@ def _fix_arcgis_date_formats(conn):
             'phoenix', 'arlington', 'chattanooga', 'cleveland',
             'columbus', 'durham', 'knoxville', 'minneapolis',
             'baltimore', 'sacramento', 'virginia_beach', 'asheville_nc', 'deltona_fl',
+            'washington_dc',
         }
 
         import json
