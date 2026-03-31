@@ -675,6 +675,176 @@ def admin_scraper_history():
         return jsonify({'error': f'Scraper history failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/test-and-backfill', methods=['POST'])
+def admin_test_and_backfill():
+    """V35: Test an endpoint, backfill 6 months of data, and activate the source.
+
+    POST body: {"city_key": "phoenix"} — uses existing CITY_REGISTRY config
+    OR: {"city_key": "new_city", "config": {...}} — provide full config
+
+    Steps:
+    1. Test: fetch 5 records to verify the endpoint works
+    2. Backfill: fetch 180 days of historical data
+    3. Normalize and insert into DB
+    4. Activate: set city_source status='active', create/update prod_city
+    5. Report results
+
+    This ensures we KNOW the collector will succeed before activating.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        city_key = data.get('city_key')
+        if not city_key:
+            return jsonify({'error': 'city_key is required'}), 400
+
+        days_back = data.get('days_back', 180)
+
+        # Import collection functions
+        from collector import fetch_permits, normalize_permit
+        from city_source_db import get_city_config
+
+        # Get config (from request body or existing registry)
+        config = data.get('config')
+        if not config:
+            config = get_city_config(city_key)
+        if not config:
+            return jsonify({'error': f'No config found for {city_key}. Provide config in request body.'}), 404
+
+        # Force active for testing
+        config['active'] = True
+
+        # Step 1: TEST — fetch a small sample to verify endpoint works
+        from collector import fetch_socrata, fetch_arcgis, fetch_ckan, fetch_carto
+        platform = config.get('platform', 'socrata')
+        test_config = dict(config)
+        test_config['limit'] = 5  # Just 5 records for testing
+
+        try:
+            if platform == 'socrata':
+                test_raw = fetch_socrata(test_config, 30)
+            elif platform == 'arcgis':
+                test_raw = fetch_arcgis(test_config, 30)
+            elif platform == 'ckan':
+                test_raw = fetch_ckan(test_config, 30)
+            elif platform == 'carto':
+                test_raw = fetch_carto(test_config, 30)
+            else:
+                return jsonify({'error': f'Unsupported platform: {platform}'}), 400
+        except Exception as e:
+            return jsonify({
+                'status': 'FAILED',
+                'step': 'test',
+                'error': str(e),
+                'message': f'Endpoint test failed for {city_key}. Do NOT activate.'
+            }), 400
+
+        if not test_raw:
+            return jsonify({
+                'status': 'FAILED',
+                'step': 'test',
+                'error': 'Endpoint returned 0 records',
+                'message': f'Endpoint for {city_key} returned no data. Do NOT activate.'
+            }), 400
+
+        # Step 2: BACKFILL — fetch full historical data
+        config['limit'] = config.get('limit', 2000)  # Restore normal limit
+        try:
+            if platform == 'socrata':
+                raw = fetch_socrata(config, days_back)
+            elif platform == 'arcgis':
+                raw = fetch_arcgis(config, days_back)
+            elif platform == 'ckan':
+                raw = fetch_ckan(config, days_back)
+            elif platform == 'carto':
+                raw = fetch_carto(config, days_back)
+        except Exception as e:
+            return jsonify({
+                'status': 'FAILED',
+                'step': 'backfill_fetch',
+                'error': str(e),
+                'test_passed': True,
+                'test_records': len(test_raw),
+            }), 500
+
+        # Step 3: NORMALIZE — convert raw records to our schema
+        normalized = []
+        for record in raw:
+            try:
+                permit = normalize_permit(record, city_key)
+                if permit and permit.get('permit_number'):
+                    normalized.append(permit)
+            except Exception:
+                continue
+
+        if not normalized:
+            return jsonify({
+                'status': 'WARNING',
+                'step': 'normalize',
+                'raw_fetched': len(raw),
+                'normalized': 0,
+                'message': f'Got {len(raw)} raw records but 0 normalized. Check field_map config.'
+            }), 400
+
+        # Step 4: INSERT into DB
+        inserted = permitdb.upsert_permits(normalized, source_city_key=city_key)
+
+        # Step 5: ACTIVATE — update city_sources and prod_cities
+        conn = permitdb.get_connection()
+
+        # Activate in city_sources
+        existing = conn.execute(
+            "SELECT source_key FROM city_sources WHERE source_key = ?", (city_key,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE city_sources SET status = 'active' WHERE source_key = ?",
+                (city_key,)
+            )
+        # No else — if it's not in city_sources, the CITY_REGISTRY dict entry is used
+
+        # Create/update prod_city
+        city_name = config.get('name', city_key.replace('_', ' ').title())
+        state = config.get('state', '')
+        existing_prod = conn.execute(
+            "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
+            (city_name, state)
+        ).fetchone()
+        if existing_prod:
+            conn.execute("""
+                UPDATE prod_cities SET status = 'active', total_permits = ?, source_id = ?
+                WHERE id = ?
+            """, (len(normalized), city_key, existing_prod['id']))
+        else:
+            from db import normalize_city_slug
+            conn.execute("""
+                INSERT INTO prod_cities (city, state, city_slug, source_id, status, total_permits)
+                VALUES (?, ?, ?, ?, 'active', ?)
+            """, (city_name, state, normalize_city_slug(city_name), city_key, len(normalized)))
+
+        conn.commit()
+
+        return jsonify({
+            'status': 'SUCCESS',
+            'city_key': city_key,
+            'city_name': city_name,
+            'state': state,
+            'platform': platform,
+            'test_records': len(test_raw),
+            'raw_fetched': len(raw),
+            'normalized': len(normalized),
+            'inserted': inserted,
+            'days_back': days_back,
+            'message': f'✓ {city_name} is live. {len(normalized)} permits backfilled. Collector will pick it up next run.'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Test and backfill failed: {str(e)}'}), 500
+
+
 @app.route('/api/admin/pause-empty', methods=['POST'])
 def admin_pause_empty_cities():
     """V34: Pause all active prod_cities that have 0 actual permits in DB.
