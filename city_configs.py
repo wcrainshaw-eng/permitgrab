@@ -355,6 +355,35 @@ CITY_REGISTRY = {
 
     # NEW SOCRATA CITIES
 
+    "everett_wa": {
+        "name": "Everett",
+        "state": "WA",
+        "slug": "everett-wa",
+        "lat": 47.979,
+        "lon": -122.202,
+        "platform": "socrata",
+        "endpoint": "https://data.everettwa.gov/resource/3w3u-656c.json",
+        "dataset_id": "3w3u-656c",
+        "description": "Trakit Permits (data.everettwa.gov)",
+        "field_map": {
+            "permit_number": "permitno",
+            "permit_type": "permittype",
+            "work_type": "permitsubtype",
+            "address": "siteaddress",
+            "contact_name": "applicantname",
+            "contractor_name": "contractorname",
+            "owner_name": "ownername",
+            "filing_date": "applieddate",
+            "estimated_cost": "jobvalue",
+            "description": "permitdesc",
+        },
+        "date_field": "applieddate",
+        "date_format": "iso",
+        "limit": 1000,
+        "active": True,
+        "notes": "V35: Socrata Trakit Permits. Fresh daily. Has BUILDING, MECHANICAL, ELECTRICAL, PLUMBING, COMPLAINT types.",
+    },
+
     "cambridge": {
         "name": "Cambridge",
         "state": "MA",
@@ -7351,16 +7380,16 @@ CITY_REGISTRY = {
             "address": "address_line_1",
             "zip": "zip",
             "contact_name": "applicant_name",
-            "filing_date": "issued_date",
+            "filing_date": "application_date",
             "status": "current_status",
             "estimated_cost": "valuation",
             "description": "description",
         },
-        "date_field": "issued_date",
-        "date_format": "epoch",
+        "date_field": "application_date",
+        "date_format": "none",
         "limit": 2000,
         "active": True,
-        "notes": "V12.32: Verified live — Accela data, has applicant_name, valuation, permit categories",
+        "notes": "V35.1: Fixed date_field from issued_date→application_date (issued_date is null for recent permits). date_format 'none' — orderByFields not supported.",
     },
 
     "spokane": {
