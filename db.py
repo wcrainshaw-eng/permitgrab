@@ -734,6 +734,37 @@ def _run_v34_data_cleanup(conn):
                     print(f"[V35] Fixed {result.rowcount} permits: {row['city']} OK → TX")
                     total_fixed += result.rowcount
 
+        # V35: Fix LA→CA misassignment (LA County bulk source tagged CA cities as Louisiana)
+        ACTUALLY_LOUISIANA = {
+            'orleans', 'new orleans', 'baton rouge', 'cameron parish', 'shreveport',
+            'lafayette', 'lake charles', 'kenner', 'bossier city', 'slidell',
+            'houma', 'hammond', 'monroe', 'alexandria', 'natchitoches', 'opelousas',
+            'ruston', 'sulphur', 'zachary', 'west monroe', 'denham springs',
+            'pineville', 'bogalusa', 'crowley', 'minden', 'abbeville', 'thibodaux',
+            'eunice', 'rayne', 'morgan city', 'covington', 'mandeville', 'gonzales',
+            'metairie', 'marrero', 'harvey', 'chalmette', 'gretna', 'westwego',
+            'terrytown', 'avondale', 'estelle', 'river ridge', 'destrehan', 'arabi',
+            'luling', 'laplace', 'prairieville', 'central', 'youngsville',
+            'breaux bridge', 'scott', 'carencro', 'broussard', 'new iberia',
+            'jennings', 'leesville', 'marksville', 'ville platte', 'deridder',
+            'tallulah', 'winnfield', 'jonesboro', 'grambling', 'bastrop', 'oakdale',
+            'welsh', 'church point', 'st. martinville', 'kaplan', 'jeanerette',
+            'patterson', 'franklin', 'berwick', 'lutcher', 'gramercy', 'reserve',
+            'hahnville', 'belle chasse', 'jefferson',
+        }
+        la_cities = conn.execute(
+            "SELECT DISTINCT city FROM permits WHERE state = 'LA'"
+        ).fetchall()
+        for row in la_cities:
+            if row['city'].lower().strip() not in ACTUALLY_LOUISIANA:
+                result = conn.execute(
+                    "UPDATE permits SET state = 'CA' WHERE city = ? AND state = 'LA'",
+                    (row['city'],)
+                )
+                if result.rowcount > 0:
+                    print(f"[V35] Fixed {result.rowcount} permits: {row['city']} LA → CA")
+                    total_fixed += result.rowcount
+
         # Other known misattributions
         KNOWN_FIXES = [
             ('Little Rock', 'WI', 'AR'),
@@ -848,6 +879,19 @@ def _run_v34_data_cleanup(conn):
                OR city LIKE '%Development Permit%'
                OR city LIKE '%DOB NOW%'
                OR city LIKE '%Limited Alteration%'
+               OR city LIKE '%Permit Application%'
+               OR city LIKE '%Permit Review%'
+               OR city LIKE '%Plan Review%'
+               OR city LIKE '%Violation%'
+               OR city LIKE '%Data Model%'
+               OR city LIKE '%Relationship%'
+               OR city LIKE '%MapServer%'
+               OR city LIKE '%FeatureServer%'
+               OR city LIKE '%Open Data%'
+               OR city LIKE '%Dataset%'
+               OR city IN ('Permits', 'Issued', 'Development', 'Trades', 'General',
+                           'Plumbing', 'Electrical', 'Mechanical', 'Roofing', 'Sign',
+                           'Fence', 'Fire', 'Demolition', 'Gas', 'Building')
             GROUP BY city
         """).fetchall()
         for row in garbage_rows:
