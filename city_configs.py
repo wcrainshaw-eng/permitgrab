@@ -384,6 +384,38 @@ CITY_REGISTRY = {
         "notes": "V35: Socrata Trakit Permits. Fresh daily. Has BUILDING, MECHANICAL, ELECTRICAL, PLUMBING, COMPLAINT types.",
     },
 
+    # NEW CKAN CITIES
+
+    "sugar_land_tx": {
+        "name": "Sugar Land",
+        "state": "TX",
+        "slug": "sugar-land-tx",
+        "lat": 29.620,
+        "lon": -95.635,
+        "platform": "ckan",
+        "endpoint": "https://data.sugarlandtx.gov/api/3/action/datastore_search",
+        "dataset_id": "cba72fda-a133-4f3e-88d2-d8ebcb901963",
+        "description": "Building Permits (data.sugarlandtx.gov)",
+        "field_map": {
+            "permit_number": "Permit Number",
+            "permit_type": "Type",
+            "work_type": "Workclass",
+            "address": "Address",
+            "zip": "Zip Code",
+            "filing_date": "Applied Date",
+            "issue_date": "Issued Date",
+            "status": "Permit Status",
+            "estimated_cost": "Permit Valuation",
+            "description": "Permit Description",
+            "contact_name": "Contact Company Name",
+            "parcel": "Parcel Number",
+        },
+        "date_field": "Applied Date",
+        "limit": 2000,
+        "active": True,
+        "notes": "V35: CKAN datastore API. Fresh daily (updated 2026-03-31). Has Type, Workclass, Permit Valuation, Contact Company Name.",
+    },
+
     "cambridge": {
         "name": "Cambridge",
         "state": "MA",
