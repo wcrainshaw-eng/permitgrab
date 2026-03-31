@@ -959,6 +959,15 @@ def _sync_prod_city_counts(conn):
         conn.commit()
         nonzero = sum(1 for r in prod if count_map.get(r['city'].lower(), 0) > 0)
         print(f"[V34] Synced {updated} prod_cities permit counts ({nonzero} have data)")
+
+        # V35: Auto-reactivate paused cities that now have data
+        reactivated = conn.execute("""
+            UPDATE prod_cities SET status = 'active'
+            WHERE status = 'paused' AND total_permits > 0
+        """)
+        if reactivated.rowcount > 0:
+            print(f"[V35] Reactivated {reactivated.rowcount} paused cities that have data")
+        conn.commit()
     except Exception as e:
         print(f"[V34] Sync error: {e}")
 
