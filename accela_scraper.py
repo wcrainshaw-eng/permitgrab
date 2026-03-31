@@ -390,6 +390,31 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V35 batch 3
+    "charlotte_county_fl": {
+        "agency_code": "BOCC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "leon_county_fl": {
+        "agency_code": "LEONCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "pima_county_az": {
+        "agency_code": "PIMA",
+        "module": "Building",
+        "tab_name": "Home",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Home",
+    },
+    "queen_creek_az": {
+        "agency_code": "QC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
