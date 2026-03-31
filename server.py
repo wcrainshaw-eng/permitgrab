@@ -613,6 +613,68 @@ def admin_reactivate_paused():
         return jsonify({'error': f'Reactivation failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/scraper-history')
+def admin_scraper_history():
+    """V35: Per-city collection history from scraper_runs table.
+    Shows last collection result for every city to identify broken vs working endpoints.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        conn = permitdb.get_connection()
+        # Get the most recent run for each city
+        runs = conn.execute("""
+            SELECT city_slug, city_name, state,
+                   permits_found, permits_inserted, status, error_message,
+                   duration_ms, run_started_at,
+                   ROW_NUMBER() OVER (PARTITION BY city_slug ORDER BY run_started_at DESC) as rn
+            FROM scraper_runs
+        """).fetchall()
+
+        # Filter to most recent per city
+        latest = {}
+        for r in runs:
+            if r['city_slug'] not in latest or r['rn'] == 1:
+                if r['rn'] == 1:
+                    latest[r['city_slug']] = dict(r)
+
+        # Categorize
+        working = []  # returned permits
+        empty = []    # success but 0 permits
+        errored = []  # error status
+        for slug, r in latest.items():
+            entry = {
+                'slug': slug,
+                'name': r.get('city_name', slug),
+                'state': r.get('state', ''),
+                'permits_found': r.get('permits_found', 0),
+                'status': r.get('status', ''),
+                'error': r.get('error_message', ''),
+                'last_run': r.get('run_started_at', ''),
+                'duration_ms': r.get('duration_ms', 0),
+            }
+            if r.get('status') == 'error' or (r.get('error_message') and r.get('error_message') != ''):
+                errored.append(entry)
+            elif r.get('permits_found', 0) > 0:
+                working.append(entry)
+            else:
+                empty.append(entry)
+
+        return jsonify({
+            'total_cities': len(latest),
+            'working': len(working),
+            'empty': len(empty),
+            'errored': len(errored),
+            'working_cities': sorted(working, key=lambda x: -x['permits_found']),
+            'empty_cities': sorted(empty, key=lambda x: x['name']),
+            'errored_cities': sorted(errored, key=lambda x: x['name']),
+        })
+    except Exception as e:
+        return jsonify({'error': f'Scraper history failed: {str(e)}'}), 500
+
+
 @app.route('/api/admin/pause-empty', methods=['POST'])
 def admin_pause_empty_cities():
     """V34: Pause all active prod_cities that have 0 actual permits in DB.

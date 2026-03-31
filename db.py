@@ -548,10 +548,13 @@ def init_db():
     # V34: Run data cleanup (fix wrong states, remove garbage records)
     _run_v34_data_cleanup(conn)
 
+    # V35: Deactivate city sources redundant with bulk sources
+    _deactivate_bulk_covered_cities(conn)
+
     # V34: Sync prod_cities.total_permits with actual permit counts in DB
     _sync_prod_city_counts(conn)
 
-    print(f"[DB] V34: Database initialized at {DB_PATH}")
+    print(f"[DB] V35: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations(conn):
@@ -676,6 +679,63 @@ def _run_v33_source_linking(conn):
 
     except Exception as e:
         print(f"[V33] Source linking migration error: {e}")
+
+
+def _deactivate_bulk_covered_cities(conn):
+    """V35: Deactivate ALL city_sources that have never produced a single permit.
+
+    If a source has never delivered data, it's dead weight — wasting collection
+    cycles and dragging down the success rate. Only keep sources that have
+    actually produced permits in prod_cities or the permits table.
+    """
+    try:
+        # Step 1: Find all source_keys that have EVER produced data
+        # Check prod_cities for sources with permits
+        prod_sources = conn.execute("""
+            SELECT DISTINCT source_id FROM prod_cities
+            WHERE total_permits > 0 AND source_id IS NOT NULL AND source_id != ''
+        """).fetchall()
+        working_sources = {r['source_id'] for r in prod_sources}
+
+        # Also check source_city_key in permits table (catches bulk sources)
+        permit_sources = conn.execute("""
+            SELECT DISTINCT source_city_key FROM permits
+            WHERE source_city_key IS NOT NULL AND source_city_key != ''
+        """).fetchall()
+        for r in permit_sources:
+            working_sources.add(r['source_city_key'])
+
+        # Safety check: if we found very few working sources, something is wrong
+        # with the data — don't mass-deactivate in that case
+        if len(working_sources) < 50:
+            print(f"[V35] Only {len(working_sources)} working sources found — skipping deactivation (safety threshold: 50)")
+            return
+
+        # Step 2: Deactivate any active city_source NOT in the working set
+        active_sources = conn.execute("""
+            SELECT source_key FROM city_sources WHERE status = 'active'
+        """).fetchall()
+
+        deactivated = 0
+        kept = 0
+        for row in active_sources:
+            if row['source_key'] not in working_sources:
+                conn.execute(
+                    "UPDATE city_sources SET status = 'inactive' WHERE source_key = ?",
+                    (row['source_key'],)
+                )
+                deactivated += 1
+            else:
+                kept += 1
+
+        if deactivated > 0:
+            conn.commit()
+            print(f"[V35] Deactivated {deactivated} city sources that never produced data. Kept {kept} working sources.")
+        else:
+            print(f"[V35] All {kept} active city sources have data — nothing to deactivate")
+
+    except Exception as e:
+        print(f"[V35] Source deactivation error: {e}")
 
 
 def _run_v34_data_cleanup(conn):
