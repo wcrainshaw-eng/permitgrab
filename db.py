@@ -709,19 +709,33 @@ def _run_v34_data_cleanup(conn):
                 print(f"[V34] Fixed {result.rowcount} permits: {city_lower} → state={correct_state}")
                 total_fixed += result.rowcount
 
-        # 2. Known specific misattributions not in prod_cities
+        # 2. V35: Bulk fix for OK→TX misassignment
+        # A Texas bulk source had state="OK" in its config, poisoning ~58K permits.
+        # Only a handful of cities tagged "OK" are actually in Oklahoma.
+        ACTUALLY_OKLAHOMA = {
+            'warr acres', 'oklahoma city', 'tulsa', 'norman', 'edmond',
+            'broken arrow', 'moore', 'midwest city', 'enid', 'stillwater',
+            'lawton', 'muskogee', 'bartlesville', 'bethany', 'del city',
+            'yukon', 'mustang', 'shawnee', 'bixby', 'jenks', 'owasso',
+            'sand springs', 'sapulpa', 'claremore', 'ponca city', 'duncan',
+            'ardmore', 'ada', 'mcalester', 'durant', 'tahlequah', 'el reno',
+            'guthrie', 'chickasha', 'okmulgee', 'altus', 'pryor creek',
+        }
+        ok_cities = conn.execute(
+            "SELECT DISTINCT city FROM permits WHERE state = 'OK'"
+        ).fetchall()
+        for row in ok_cities:
+            if row['city'].lower().strip() not in ACTUALLY_OKLAHOMA:
+                result = conn.execute(
+                    "UPDATE permits SET state = 'TX' WHERE city = ? AND state = 'OK'",
+                    (row['city'],)
+                )
+                if result.rowcount > 0:
+                    print(f"[V35] Fixed {result.rowcount} permits: {row['city']} OK → TX")
+                    total_fixed += result.rowcount
+
+        # Other known misattributions
         KNOWN_FIXES = [
-            # (city_pattern, wrong_state, correct_state)
-            ('Houston', 'OK', 'TX'),
-            ('HOUSTON', 'OK', 'TX'),
-            ('Austin', 'OK', 'TX'),
-            ('AUSTIN', 'OK', 'TX'),
-            ('San Antonio', 'OK', 'TX'),
-            ('SAN ANTONIO', 'OK', 'TX'),
-            ('Dallas', 'OK', 'TX'),
-            ('DALLAS', 'OK', 'TX'),
-            ('Fort Worth', 'OK', 'TX'),
-            ('FORT WORTH', 'OK', 'TX'),
             ('Little Rock', 'WI', 'AR'),
             ('LITTLE ROCK', 'WI', 'AR'),
             ('North Little Rock', 'WI', 'AR'),
