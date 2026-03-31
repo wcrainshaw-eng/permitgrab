@@ -723,17 +723,18 @@ def admin_test_and_backfill():
         test_config = dict(config)
         test_config['limit'] = 5  # Just 5 records for testing
 
-        test_config['limit'] = 10  # Small sample for testing
+        test_config['limit'] = 10  # Small sample for freshness check
         try:
-            # Use 365-day window for test so we don't miss cities with older data
+            # Test with 30-day window — if there's no data in the last 30 days,
+            # the source is stale and not worth activating for leads
             if platform == 'socrata':
-                test_raw = fetch_socrata(test_config, 365)
+                test_raw = fetch_socrata(test_config, 30)
             elif platform == 'arcgis':
-                test_raw = fetch_arcgis(test_config, 365)
+                test_raw = fetch_arcgis(test_config, 30)
             elif platform == 'ckan':
-                test_raw = fetch_ckan(test_config, 365)
+                test_raw = fetch_ckan(test_config, 30)
             elif platform == 'carto':
-                test_raw = fetch_carto(test_config, 365)
+                test_raw = fetch_carto(test_config, 30)
             else:
                 return jsonify({'error': f'Unsupported platform: {platform}'}), 400
         except Exception as e:
@@ -748,8 +749,8 @@ def admin_test_and_backfill():
             return jsonify({
                 'status': 'FAILED',
                 'step': 'test',
-                'error': 'Endpoint returned 0 records',
-                'message': f'Endpoint for {city_key} returned no data. Do NOT activate.'
+                'error': 'No permits in last 30 days',
+                'message': f'{city_key} has no data in the last 30 days. Stale source — do NOT activate.'
             }), 400
 
         # Step 2: BACKFILL — fetch full historical data
