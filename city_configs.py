@@ -3553,7 +3553,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: Reactivated — data.cstx.gov verified working",
     },
 
@@ -8237,7 +8237,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.39: Fixed endpoint to 7f3h-uj5i, reactivated",
     },
 
