@@ -352,7 +352,9 @@ def fetch_arcgis(config, days_back):
     endpoint = config["endpoint"]
     date_field = config["date_field"]
     limit = config.get("limit", 2000)
-    date_format = config.get("date_format", "date")  # "date", "epoch", or "none"
+    # V35: Check field_map._date_format as override (used for city_sources entries)
+    fmap = config.get("field_map", {})
+    date_format = fmap.get("_date_format") or config.get("date_format", "date")  # "date", "epoch", or "none"
 
     # Calculate date filter
     since_dt = datetime.now() - timedelta(days=days_back)

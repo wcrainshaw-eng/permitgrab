@@ -551,6 +551,9 @@ def init_db():
     # V35: Deactivate city sources redundant with bulk sources
     _deactivate_bulk_covered_cities(conn)
 
+    # V35: Fix ArcGIS date_format for MapServer endpoints that can't handle epoch filters
+    _fix_arcgis_date_formats(conn)
+
     # V34: Sync prod_cities.total_permits with actual permit counts in DB
     _sync_prod_city_counts(conn)
 
@@ -736,6 +739,47 @@ def _deactivate_bulk_covered_cities(conn):
 
     except Exception as e:
         print(f"[V35] Source deactivation error: {e}")
+
+
+def _fix_arcgis_date_formats(conn):
+    """V35: Fix ArcGIS endpoints that can't handle date filters in WHERE clause.
+
+    Many MapServer endpoints (and some FeatureServer) return 400 errors when we use
+    epoch or DATE comparisons. Fix by storing date_format in field_map JSON (since
+    city_sources table has no date_format column) and updating the collector to read it.
+    """
+    try:
+        # These cities have endpoints that choke on date queries in WHERE clause
+        FIX_TARGETS = {
+            'phoenix', 'arlington', 'chattanooga', 'cleveland',
+            'columbus', 'durham', 'knoxville', 'minneapolis',
+        }
+
+        import json
+        fixed = 0
+        for key in FIX_TARGETS:
+            row = conn.execute(
+                "SELECT source_key, field_map FROM city_sources WHERE source_key = ?",
+                (key,)
+            ).fetchone()
+            if row:
+                try:
+                    fmap = json.loads(row['field_map']) if row['field_map'] else {}
+                except:
+                    fmap = {}
+                if fmap.get('_date_format') != 'none':
+                    fmap['_date_format'] = 'none'
+                    conn.execute(
+                        "UPDATE city_sources SET field_map = ? WHERE source_key = ?",
+                        (json.dumps(fmap), key)
+                    )
+                    fixed += 1
+
+        if fixed > 0:
+            conn.commit()
+            print(f"[V35] Fixed date_format for {fixed} ArcGIS endpoints (stored _date_format=none in field_map)")
+    except Exception as e:
+        print(f"[V35] ArcGIS date format fix error: {e}")
 
 
 def _run_v34_data_cleanup(conn):
