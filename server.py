@@ -719,6 +719,11 @@ def admin_test_and_backfill():
 
         # Step 1: TEST — fetch a small sample to verify endpoint works
         from collector import fetch_socrata, fetch_arcgis, fetch_ckan, fetch_carto
+        try:
+            from accela_scraper import fetch_accela
+            _accela_available = True
+        except ImportError:
+            _accela_available = False
         platform = config.get('platform', 'socrata')
         test_config = dict(config)
         test_config['limit'] = 5  # Just 5 records for testing
@@ -735,6 +740,10 @@ def admin_test_and_backfill():
                 test_raw = fetch_ckan(test_config, 30)
             elif platform == 'carto':
                 test_raw = fetch_carto(test_config, 30)
+            elif platform == 'accela':
+                if not _accela_available:
+                    return jsonify({'error': 'Accela scraper not available (Playwright not installed)'}), 400
+                test_raw = fetch_accela(test_config, 30)
             else:
                 return jsonify({'error': f'Unsupported platform: {platform}'}), 400
         except Exception as e:
@@ -764,6 +773,8 @@ def admin_test_and_backfill():
                 raw = fetch_ckan(config, days_back)
             elif platform == 'carto':
                 raw = fetch_carto(config, days_back)
+            elif platform == 'accela':
+                raw = fetch_accela(config, days_back)
         except Exception as e:
             return jsonify({
                 'status': 'FAILED',
