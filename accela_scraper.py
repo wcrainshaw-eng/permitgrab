@@ -951,4 +951,5 @@ def fetch_accela(config, days_back):
         return permits
     except Exception as e:
         print(f"    [Accela] Scraper failed for {city_key}: {str(e)[:200]}")
-        return []
+        # V45: Re-raise so collector logs this as 'error' with message, not silent 'no_new'
+        raise
