@@ -19,7 +19,7 @@ from city_source_db import (
     record_collection, reset_failure, increment_failure
 )
 import db as permitdb  # V12.50: SQLite database layer
-from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication
+from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication 
 
 # V24: Accela scraper (Playwright-based)
 try:
