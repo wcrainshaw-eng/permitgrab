@@ -19,7 +19,7 @@ from city_source_db import (
     record_collection, reset_failure, increment_failure
 )
 import db as permitdb  # V12.50: SQLite database layer
-from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication 
+from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication
 
 # V24: Accela scraper (Playwright-based)
 try:
@@ -408,8 +408,18 @@ def fetch_arcgis(config, days_back):
                 if isinstance(val, (int, float)) and val >= since_epoch:
                     filtered.append(r)
                 # Handle ISO/string dates (e.g. "2026-01-15" or "2026-01-15T...")
-                elif isinstance(val, str) and len(val) >= 10 and val[:10] >= since_iso:
+                elif isinstance(val, str) and len(val) >= 10 and val[:4].isdigit() and val[:10] >= since_iso:
                     filtered.append(r)
+                # Handle US date strings (e.g. "03/22/2026" -> MM/DD/YYYY) - V49
+                elif isinstance(val, str) and len(val) >= 10 and '/' in val:
+                    try:
+                        parts = val.split('/')
+                        if len(parts) == 3:
+                            iso_val = f"{parts[2][:4]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+                            if iso_val >= since_iso:
+                                filtered.append(r)
+                    except (IndexError, ValueError):
+                        filtered.append(r)  # Don't drop data silently
                 # If we can't parse it, include it (don't drop data silently)
                 elif not isinstance(val, (int, float, str)):
                     filtered.append(r)
@@ -687,12 +697,37 @@ def fetch_arcgis_bulk(config, days_back=90):
             traceback.print_exc()
             break
 
-    # Post-fetch: if date_format is "none", filter by epoch in Python
+    # Post-fetch: if date_format is "none", filter by date in Python (V48: smart multi-format)
     if date_format == "none" and date_field and all_records:
         since_epoch = int(since_dt.timestamp() * 1000)
+        since_iso = since_dt.strftime("%Y-%m-%d")
         before_count = len(all_records)
-        all_records = [r for r in all_records if r.get(date_field, 0) and r[date_field] >= since_epoch]
-        print(f"    [V17] Date filter (epoch): {before_count} -> {len(all_records)} records", flush=True)
+        filtered = []
+        for r in all_records:
+            val = r.get(date_field)
+            if not val:
+                continue
+            # Handle epoch milliseconds (numbers)
+            if isinstance(val, (int, float)) and val >= since_epoch:
+                filtered.append(r)
+            # Handle ISO/string dates (e.g. "2026-01-15" or "2026-01-15T...")
+            elif isinstance(val, str) and len(val) >= 10 and val[:4].isdigit() and val[:10] >= since_iso:
+                filtered.append(r)
+            # Handle US date strings (e.g. "03/22/2026" -> MM/DD/YYYY)
+            elif isinstance(val, str) and len(val) >= 10 and '/' in val:
+                try:
+                    parts = val.split('/')
+                    if len(parts) == 3:
+                        iso_val = f"{parts[2][:4]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+                        if iso_val >= since_iso:
+                            filtered.append(r)
+                except (IndexError, ValueError):
+                    filtered.append(r)  # Don't drop data silently
+            # If we can't parse it, include it (don't drop data silently)
+            elif not isinstance(val, (int, float, str)):
+                filtered.append(r)
+        all_records = filtered
+        print(f"    [V48] Date filter (smart): {before_count} -> {len(all_records)} records", flush=True)
 
     print(f"    [V17] ArcGIS bulk fetch complete: {len(all_records)} total records", flush=True)
     return all_records
@@ -1446,8 +1481,30 @@ def fetch_history_arcgis(config, years_back=1):
     if "features" in data:
         results = [f["attributes"] for f in data["features"]]
         if date_format == "none" and date_field and results:
+            # V48: Smart date filter for "none" format
             since_epoch = int(since_dt.timestamp() * 1000)
-            results = [r for r in results if r.get(date_field, 0) and r[date_field] >= since_epoch]
+            since_iso = since_dt.strftime("%Y-%m-%d")
+            filtered = []
+            for r in results:
+                val = r.get(date_field)
+                if not val:
+                    continue
+                if isinstance(val, (int, float)) and val >= since_epoch:
+                    filtered.append(r)
+                elif isinstance(val, str) and len(val) >= 10 and val[:4].isdigit() and val[:10] >= since_iso:
+                    filtered.append(r)
+                elif isinstance(val, str) and len(val) >= 10 and '/' in val:
+                    try:
+                        parts = val.split('/')
+                        if len(parts) == 3:
+                            iso_val = f"{parts[2][:4]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+                            if iso_val >= since_iso:
+                                filtered.append(r)
+                    except (IndexError, ValueError):
+                        filtered.append(r)
+                elif not isinstance(val, (int, float, str)):
+                    filtered.append(r)
+            results = filtered
         return results
     return []
 
