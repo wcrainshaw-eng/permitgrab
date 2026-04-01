@@ -579,7 +579,7 @@ CITY_REGISTRY = {
         "lon": -79.996,
         "platform": "ckan",
         "endpoint": "https://data.wprdc.org/api/3/action/datastore_search",
-        "resource_id": "f4d1177a-f597-4c32-8cbf-7885f56253f6",
+        "dataset_id": "f4d1177a-f597-4c32-8cbf-7885f56253f6",
         "description": "PLI Permits",
         "field_map": {
             "permit_number": "permit_id",
@@ -597,7 +597,7 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": False,
-        "notes": "V35: PLI Permits (2019-present). resource_id f4d1177a confirmed fresh 2026-03-27. Has owner_name, contractor_name, total_project_value.",
+        "notes": "V52: Fixed resource_id->dataset_id key bug. 60K+ permits, data current 2026-03-30. PENDING Render test before activation.",
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - ArcGIS verified working with Mar 2026 data
@@ -1489,7 +1489,7 @@ CITY_REGISTRY = {
         "lat": 32.222,
         "lon": -110.974,
         "platform": "arcgis",
-        "endpoint": "https://gis.tucsonaz.gov/public/rest/services/PublicMaps/PermitsCode/MapServer/85/query",
+        "endpoint": "https://mapdata.tucsonaz.gov/arcgis/rest/services/PublicMaps/PermitsCode/MapServer/85/query",
         "dataset_id": "PDSD_ResidentialBldg_85",
         "description": "Residential Building Permits - City of Tucson (ArcGIS MapServer)",
         "field_map": {
@@ -1520,7 +1520,7 @@ CITY_REGISTRY = {
         "date_format": "epoch",
         "limit": 2000,
         "active": False,
-        "notes": "V19: Updated to gis.tucsonaz.gov (from mapdata.tucsonaz.gov). Full 30-field map — apply/issue/expire/complete dates, parcel, structure type, census code, project name, sqft, lat/lon, ward. Data through Mar 2026. Verified. Also available: MultiFamily layer 84.",
+        "notes": "V52: Reverted endpoint back to mapdata.tucsonaz.gov (gis.tucsonaz.gov stopped working). Data current 2026-03-28. PENDING Render test before activation.",
     },
 
     "longview_tx": {
