@@ -1425,20 +1425,28 @@ CITY_REGISTRY = {
         "notes": "V42: Activated. Accela portal confirmed live with Permits, Licenses, Planning, Rentals, Fire, PublicWorks, Enforcement modules.",
     },
 
-    # V23 AUDIT: 2026-03-28 - BLOCKED - Only web dashboards, no API
+    # V50: Found working JSON endpoint! Returns last 30 days of permits
     "st_louis": {
         "name": "St. Louis",
         "state": "MO",
         "slug": "st-louis",
-        "platform": "",
-        "endpoint": "",
-        "dataset_id": "",
-        "description": "Building Permits",
-        "field_map": {},
-        "date_field": "",
+        "platform": "json",  # Custom JSON endpoint - needs handler added to collector
+        "endpoint": "https://www.stlouis-mo.gov/customcf/endpoints/building-permits/building-permits-30-days-export.cfm?permitType=all&dataType=json",
+        "dataset_id": "stl-permits-30day",
+        "description": "Building Permits - City of St. Louis",
+        "field_map": {
+            "address": "ADDRESS",
+            "permit_type": "PROJECTTYPE",
+            "structure_type": "STRUCTURETYPE",
+            "filing_date": "APPLICATIONDATE",
+            "issued_date": "ISSUEDATE",
+            "estimated_cost": "ESTPROJECTCOST",
+            "description": "APPLICATIONDESCRIPTION",
+        },
+        "date_field": "APPLICATIONDATE",
         "limit": 2000,
-        "active": False,
-        "notes": "# V23 BLOCKED: stlouis-mo.gov/data has building permits but ONLY as web dashboards (by neighborhood, ward, year). No API or bulk download available.",
+        "active": False,  # Needs custom JSON platform handler in collector.py
+        "notes": "V50: Found working JSON API! Returns 30-day rolling window. Fields: ADDRESS, PROJECTTYPE, STRUCTURETYPE, APPLICATIONDATE, ISSUEDATE, DAYSTOISSUE, ESTPROJECTCOST, APPLICATIONDESCRIPTION. Needs 'json' platform handler.",
     },
 
     "tucson": {
@@ -1541,27 +1549,15 @@ CITY_REGISTRY = {
         "name": "Long Beach",
         "state": "CA",
         "slug": "long-beach",
-        "platform": "socrata",
-        "endpoint": "https://data.longbeach.gov/resource/6yaw-2i7d.json",
-        "dataset_id": "6yaw-2i7d",
+        "platform": "",
+        "endpoint": "",
+        "dataset_id": "",
         "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_type",
-            "address": "address",
-            "zip": "zip_code",
-            "owner_name": "owner",
-            "contact_name": "contractor",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
+        "field_map": {},
+        "date_field": "",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # V50: BLOCKED - No public API, Liferay portal only
+        "notes": "V50: Confirmed no API. Uses Liferay portal at permitslicenses.longbeach.gov (not Accela). Web search only, no bulk data export.",
     },
 
     "fresno": {
@@ -1612,9 +1608,8 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V43: Activated — FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
-        "status": "paused",
-        "notes": "V43: Activated. Las Vegas ArcGIS FeatureServer confirmed working. Previous notes about dead sources were wrong — this endpoint is live.",
+        "active": True,  # V43/V50: Activated — FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
+        "notes": "V50: Verified live. Las Vegas ArcGIS FeatureServer confirmed working. Fresh 2026 data.",
     },
 
     "orlando": {
@@ -1645,34 +1640,8 @@ CITY_REGISTRY = {
         "notes": "V18: Added contractor_name field mapping — premium data includes contractor name, address, phone",
     },
 
-    "tampa": {
-        "name": "Tampa",
-        "state": "FL",
-        "slug": "tampa",
-        "lat": 27.95,
-        "lon": -82.458,
-        "platform": "arcgis",
-        "endpoint": "https://arcgis.tampagov.net/arcgis/rest/services/Planning/PermitsAll/FeatureServer/0/query",
-        "dataset_id": "PermitsAll_0",
-        "description": "All Planning Permits - City of Tampa",
-        "field_map": {
-            "permit_number": "RECORD_ID",
-            "permit_type": "RECORDTYPE",
-            "project_name": "PROJECTNAME1",
-            "address": "ADDRESS",
-            "zip": "ZIP",
-            "status": "PROJECTSTATUS",
-            "description": "PROJECTDESCRIPTION",
-            "filing_date": "CREATEDDATE",
-            "sqft": "NEWCONSTRUCTIONSF",
-            "occupancy_category": "OCCUPANCYCATEGORY",
-            "occupancy_type": "OCCUPANCYTYPE",
-        },
-        "date_field": "CREATEDDATE",
-        "limit": 2000,
-        "active": False,  # SERVER-BLOCKED: arcgis.tampagov.net returns 403 from Render
-        "notes": "V38: Fixed date_field from OBJECTID to CREATEDDATE (esriFieldTypeDate). Added RECORDTYPE and filing_date mappings. Data is fresh (newest 2026-03-24, 2,514 records). BUT arcgis.tampagov.net returns 403 Forbidden from Render server — self-hosted ArcGIS blocks non-browser requests. Config is correct if access issue can be resolved (proxy, custom headers). No Socrata, no ArcGIS Hub mirror, no Accela public portal, no CKAN.",
-    },
+    # V50: DUPLICATE - Tampa covered by tampa_fl Accela config below
+    # "tampa": {...}  # Removed - ArcGIS endpoint blocked (403), use tampa_fl Accela instead
 
     "jacksonville": {
         "name": "Jacksonville",
@@ -1698,8 +1667,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
-        "notes": "V12.5: No public API — uses JaxEPICS proprietary system",
+        "active": False,  # V50: BLOCKED - Uses custom JaxEPICS system
+        "notes": "V50: Confirmed. Jacksonville uses custom JaxEPICS (jaxepics.coj.net) - no public API. ArcGIS endpoint dead (400). Pop ~950K.",
     },
 
     "virginia_beach": {
@@ -1753,8 +1722,8 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
-        "notes": "V33: Confirmed stale — endpoint responds (43,661 records) but newest data is April 12, 2024. coageo.cabq.gov ArcGIS alive, data not updated by city. Re-check quarterly.",
+        "active": False,  # V50: ArcGIS stale (April 2024), CSV-only alt
+        "notes": "V50: ArcGIS confirmed stale (April 2024). CSV available at data.cabq.gov/business/buildingpermits/ but no live API. Pop ~560K.",
     },
 
     "cleveland": {
@@ -7145,25 +7114,15 @@ CITY_REGISTRY = {
         "name": "North Las Vegas",
         "state": "NV",
         "slug": "north-las-vegas",
-        "platform": "socrata",
-        "endpoint": "https://data.cityofnorthlasvegas.com/resource/6dkr-hqx8.json",
-        "dataset_id": "6dkr-hqx8",
+        "platform": "",
+        "endpoint": "",
+        "dataset_id": "",
         "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
+        "field_map": {},
+        "date_field": "",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Error parsing response,
-        "notes": "V12.6: Deactivated — fabricated Socrata domain",
+        "active": False,  # V50: BLOCKED - No public API available
+        "notes": "V50: Confirmed no public API. cityofnorthlasvegas.com has permit center but no open data. Pop ~270K.",
     },
 
     "reno": {
