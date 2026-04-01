@@ -1519,8 +1519,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "date",
         "limit": 2000,
-        "active": False,
-        "notes": "V52: Fixed endpoint (mapdata.tucsonaz.gov) and date_format (date not epoch - MapServer rejects epoch). Data current 2026-03-31.",
+        "active": True,
+        "notes": "V52: Fixed endpoint + date_format. Render-tested and backfilled 2026-04-01.",
     },
 
     "longview_tx": {
@@ -1698,8 +1698,8 @@ CITY_REGISTRY = {
         "date_field": "ApplicationDate",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
-        "notes": "V52: date_format=none (FeatureServer rejects epoch AND DATE syntax). Data current 2026-03-27.",
+        "active": True,
+        "notes": "V52: New endpoint + date_format=none. Render-tested and backfilled 2026-04-01.",
     },
 
     "virginia_beach": {
