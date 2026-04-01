@@ -2256,8 +2256,32 @@ def sync_city_registry_to_prod_cities():
         for row in conn.execute("SELECT city_slug, source_id FROM prod_cities"):
             existing_slugs[row['city_slug']] = row['source_id']
 
+        # V46: Also pause prod_cities entries whose config is now inactive
+        paused = 0
         for city_key, config in CITY_REGISTRY.items():
             if not config.get('active', False):
+                # Check if this city is active in prod_cities and needs pausing
+                slug = config.get('slug', config.get('name', '').lower().replace(' ', '-'))
+                if city_key in existing and existing[city_key]['status'] == 'active':
+                    conn.execute("""
+                        UPDATE prod_cities SET status = 'paused',
+                            notes = 'V46: Auto-paused — config inactive'
+                        WHERE source_id = ?
+                    """, (city_key,))
+                    paused += 1
+                    print(f"  [V46] Paused {city_key} (config inactive)")
+                elif slug in existing_slugs:
+                    # Check by slug too
+                    for row in conn.execute("SELECT status FROM prod_cities WHERE city_slug = ?", (slug,)):
+                        if row['status'] == 'active':
+                            conn.execute("""
+                                UPDATE prod_cities SET status = 'paused',
+                                    notes = 'V46: Auto-paused — config inactive'
+                                WHERE city_slug = ?
+                            """, (slug,))
+                            paused += 1
+                            print(f"  [V46] Paused {slug} (config inactive, matched by slug)")
+                            break
                 skipped += 1
                 continue
 
@@ -2323,10 +2347,10 @@ def sync_city_registry_to_prod_cities():
 
         conn.commit()
 
-        if synced > 0 or updated > 0:
-            print(f"[V44] Synced CITY_REGISTRY -> prod_cities: {synced} new, {updated} updated, {skipped} skipped")
+        if synced > 0 or updated > 0 or paused > 0:
+            print(f"[V46] Synced CITY_REGISTRY -> prod_cities: {synced} new, {updated} updated, {paused} paused, {skipped} skipped")
         else:
-            print(f"[V44] prod_cities in sync ({skipped} already present)")
+            print(f"[V46] prod_cities in sync ({skipped} already present)")
 
     except Exception as e:
         print(f"[V44] Sync error: {e}")
