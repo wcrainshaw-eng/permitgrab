@@ -2225,6 +2225,114 @@ def is_data_loading():
     except Exception:
         return True
 
+
+def sync_city_registry_to_prod_cities():
+    """V44: Auto-sync all active CITY_REGISTRY entries to prod_cities on startup.
+
+    Ensures newly activated cities in city_configs.py (e.g. Accela cities from V42,
+    Socrata/ArcGIS cities from V43) are registered in prod_cities for scheduled
+    collection. Without this, cities activated in city_configs.py but not in
+    prod_cities never get collected by the scheduler.
+
+    Uses city_slug as the unique key. If a city already exists in prod_cities,
+    only updates source_type and source_id to point to the correct config.
+    Does NOT overwrite status, notes, or collection stats for existing entries.
+    """
+    from city_configs import CITY_REGISTRY
+
+    synced = 0
+    updated = 0
+    skipped = 0
+
+    try:
+        conn = permitdb.get_connection()
+
+        # Get existing prod_cities by source_id for conflict detection
+        existing = {}
+        for row in conn.execute("SELECT city_slug, source_id, status FROM prod_cities"):
+            existing[row['source_id']] = row
+
+        existing_slugs = {}
+        for row in conn.execute("SELECT city_slug, source_id FROM prod_cities"):
+            existing_slugs[row['city_slug']] = row['source_id']
+
+        for city_key, config in CITY_REGISTRY.items():
+            if not config.get('active', False):
+                skipped += 1
+                continue
+
+            city_name = config.get('name', '')
+            state = config.get('state', '')
+            platform = config.get('platform', '')
+            slug = config.get('slug', city_name.lower().replace(' ', '-'))
+
+            if not city_name or not state:
+                continue
+
+            # Normalize slug same way as db.py
+            try:
+                normalized_slug = permitdb.normalize_city_slug(city_name)
+            except Exception:
+                normalized_slug = slug
+
+            if city_key in existing:
+                # Already in prod_cities with this source_id — skip
+                skipped += 1
+                continue
+
+            if normalized_slug in existing_slugs:
+                # Slug exists but with different source_id — check if we should update
+                old_source = existing_slugs[normalized_slug]
+                old_config = CITY_REGISTRY.get(old_source, {})
+
+                # If old source is inactive and new source is active, update
+                if not old_config.get('active', False):
+                    conn.execute("""
+                        UPDATE prod_cities SET
+                            source_id = ?,
+                            source_type = ?,
+                            notes = ?,
+                            verified_date = datetime('now')
+                        WHERE city_slug = ?
+                    """, (city_key, platform,
+                          f"V44: Updated source from {old_source} to {city_key}",
+                          normalized_slug))
+                    updated += 1
+                    print(f"  [V44] Updated {city_name}: {old_source} -> {city_key}")
+                else:
+                    # Both sources active — keep existing, skip new
+                    skipped += 1
+                continue
+
+            # New city — insert into prod_cities
+            try:
+                permitdb.upsert_prod_city(
+                    city=city_name,
+                    state=state,
+                    city_slug=slug,
+                    source_type=platform,
+                    source_id=city_key,
+                    source_scope='city',
+                    status='active',
+                    added_by='v44_sync',
+                    notes=f"V44: Auto-synced from city_configs.py"
+                )
+                synced += 1
+            except Exception as e:
+                print(f"  [V44] Error syncing {city_key}: {e}")
+
+        conn.commit()
+
+        if synced > 0 or updated > 0:
+            print(f"[V44] Synced CITY_REGISTRY -> prod_cities: {synced} new, {updated} updated, {skipped} skipped")
+        else:
+            print(f"[V44] prod_cities in sync ({skipped} already present)")
+
+    except Exception as e:
+        print(f"[V44] Sync error: {e}")
+        import traceback
+        traceback.print_exc()
+
 # Admin password from environment
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
@@ -8461,6 +8569,9 @@ def start_collectors():
 # V12.12: Preload existing data from disk BEFORE starting collectors
 # This ensures stale data is served immediately rather than showing 0 permits
 preload_data_from_disk()
+
+# V44: Ensure all active CITY_REGISTRY entries are in prod_cities for collection
+sync_city_registry_to_prod_cities()
 
 # Start collectors when module is loaded (works with gunicorn --preload)
 start_collectors()

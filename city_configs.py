@@ -3613,7 +3613,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "TOWN OF CICERO"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Cicero permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~81K.",
     },
 
@@ -3640,7 +3640,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SCHAUMBURG"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Schaumburg permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~79K.",
     },
 
@@ -3667,7 +3667,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF EVANSTON"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Evanston permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -3694,7 +3694,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ARLINGTON HEIGHTS"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Arlington Heights permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -3724,7 +3724,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF PALATINE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Palatine permits via Cook County Socrata. Pop ~67K.",
     },
 
@@ -3751,7 +3751,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SKOKIE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Skokie permits via Cook County Socrata. Pop ~67K.",
     },
 
@@ -3778,7 +3778,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF DES PLAINES"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Des Plaines permits via Cook County Socrata. Pop ~60K.",
     },
 
@@ -3805,7 +3805,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ORLAND PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Orland Park permits via Cook County Socrata. Pop ~58K.",
     },
 
@@ -3832,7 +3832,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF OAK LAWN"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Lawn permits via Cook County Socrata. Pop ~58K.",
     },
 
@@ -3859,7 +3859,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BERWYN"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Berwyn permits via Cook County Socrata. Pop ~57K.",
     },
 
@@ -3886,7 +3886,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MT PROSPECT"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Mount Prospect permits via Cook County Socrata. Pop ~56K.",
     },
 
@@ -3913,7 +3913,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF TINLEY PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Tinley Park permits via Cook County Socrata. Pop ~55K.",
     },
 
@@ -3940,7 +3940,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF OAK PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Park permits via Cook County Socrata. Pop ~54K.",
     },
 
@@ -3967,7 +3967,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HOFFMAN ESTATES"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Hoffman Estates permits via Cook County Socrata. Pop ~52K.",
     },
 
@@ -3994,7 +3994,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF GLENVIEW"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Glenview permits via Cook County Socrata. Pop ~48K.",
     },
 
@@ -4021,7 +4021,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BUFFALO GROVE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Buffalo Grove permits via Cook County Socrata. Pop ~43K.",
     },
 
@@ -4048,7 +4048,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BARTLETT"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Bartlett permits via Cook County Socrata. Pop ~41K.",
     },
 
@@ -4075,7 +4075,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF PARK RIDGE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Park Ridge permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4102,7 +4102,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF STREAMWOOD"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Streamwood permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4129,7 +4129,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF WHEELING"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Wheeling permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4156,7 +4156,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HANOVER PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Hanover Park permits via Cook County Socrata. Pop ~37K.",
     },
 
@@ -4183,7 +4183,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF CALUMET CITY"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Calumet City permits via Cook County Socrata. Pop ~36K.",
     },
 
@@ -4210,7 +4210,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF NORTHBROOK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Northbrook permits via Cook County Socrata. Pop ~35K.",
     },
 
@@ -4237,7 +4237,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ELK GROVE VILLAGE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Elk Grove Village permits via Cook County Socrata. Pop ~32K.",
     },
 
@@ -4264,7 +4264,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF NILES"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Niles permits via Cook County Socrata. Pop ~30K.",
     },
 
@@ -4291,7 +4291,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BURBANK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Burbank permits via Cook County Socrata. Pop ~29K.",
     },
 
@@ -4318,7 +4318,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF WILMETTE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Wilmette permits via Cook County Socrata. Pop ~28K.",
     },
 
@@ -4345,7 +4345,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF CHICAGO HEIGHTS"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Chicago Heights permits via Cook County Socrata. Pop ~27K.",
     },
 
@@ -4372,7 +4372,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF OAK FOREST"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Forest permits via Cook County Socrata. Pop ~27K.",
     },
 
@@ -4399,7 +4399,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MORTON GROVE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Morton Grove permits via Cook County Socrata. Pop ~25K.",
     },
 
@@ -4426,7 +4426,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MELROSE PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Melrose Park permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4453,7 +4453,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ELMWOOD PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Elmwood Park permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4480,7 +4480,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF ROLLING MEADOWS"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Rolling Meadows permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4507,7 +4507,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ROSELLE"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Roselle permits via Cook County Socrata. Pop ~22K.",
     },
 
@@ -4534,7 +4534,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BLUE ISLAND"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Blue Island permits via Cook County Socrata. Pop ~22K.",
     },
 
@@ -4561,7 +4561,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF PARK FOREST"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Park Forest permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4588,7 +4588,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SOUTH HOLLAND"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — South Holland permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4615,7 +4615,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF DOLTON"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Dolton permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4642,7 +4642,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF EVERGREEN PARK"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Evergreen Park permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4669,7 +4669,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BROOKFIELD"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Brookfield permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4696,7 +4696,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HOMEWOOD"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Homewood permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4723,7 +4723,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MATTESON"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Matteson permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4750,7 +4750,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ALSIP"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Alsip permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4777,7 +4777,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF PALOS HILLS"},
         "limit": 2000,
-        "active": True  # V43: Cook County Socrata — 660K records, addresses confirmed,
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Palos Hills permits via Cook County Socrata. Pop ~18K.",
     },
 

@@ -136,6 +136,12 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    "chula_vista": {
+        "agency_code": "CHULAVISTA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
     "virginia_beach": {
         "agency_code": "CVB",
         "module": "Permits",
@@ -229,9 +235,9 @@ ACCELA_CONFIGS = {
     },
     "santa_clara_county": {
         "agency_code": "SCCGOV",
-        "module": "Building",
-        "tab_name": "Building",
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "module": "Development",
+        "tab_name": "Development",
+        "search_url_path": "Cap/CapHome.aspx?module=Development&TabName=Development",
     },
     "bernalillo_county_nm": {
         "agency_code": "BERNCO",
@@ -272,9 +278,9 @@ ACCELA_CONFIGS = {
     },
     "fort_lauderdale_fl": {
         "agency_code": "FTL",
-        "module": "Building",
-        "tab_name": "Building",
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
     },
     "gwinnett_county_ga": {
         "agency_code": "GWINNETT",
@@ -296,9 +302,9 @@ ACCELA_CONFIGS = {
     },
     "denver_co": {
         "agency_code": "DENVER",
-        "module": "Building",
-        "tab_name": "Building",
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "module": "Development",
+        "tab_name": "Development",
+        "search_url_path": "Cap/CapHome.aspx?module=Development&TabName=Development",
     },
     "contra_costa_county_ca": {
         "agency_code": "CCC",
@@ -320,9 +326,9 @@ ACCELA_CONFIGS = {
     },
     "anne_arundel_county_md": {
         "agency_code": "AACO",
-        "module": "Building",
-        "tab_name": "Building",
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
     },
     "palo_alto_ca": {
         "agency_code": "PALOALTO",
@@ -344,6 +350,18 @@ ACCELA_CONFIGS = {
     },
     "fort_wayne_in": {
         "agency_code": "ACFW",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "grand_rapids_mi": {
+        "agency_code": "GRANDRAPIDS",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "birmingham_al": {
+        "agency_code": "BIRMINGHAM",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
@@ -444,6 +462,18 @@ ACCELA_CONFIGS = {
         "module": "Engineering",
         "tab_name": "Engineering",
         "search_url_path": "Cap/CapHome.aspx?module=Engineering&TabName=Engineering",
+    },
+    "lexington_ky": {
+        "agency_code": "LEXKY",
+        "module": "Building",
+        "tab_name": "Building Inspection",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building%20Inspection",
+    },
+    "lincoln": {
+        "agency_code": "LINCOLN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
 }
 
