@@ -380,7 +380,7 @@ CITY_REGISTRY = {
         "date_field": "applieddate",
         "date_format": "iso",
         "limit": 1000,
-        "active": True,
+        "active": False,
         "notes": "V35: Socrata Trakit Permits. Fresh daily. Has BUILDING, MECHANICAL, ELECTRICAL, PLUMBING, COMPLAINT types.",
     },
 
@@ -412,7 +412,7 @@ CITY_REGISTRY = {
         },
         "date_field": "Applied Date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: CKAN datastore API. Fresh daily (updated 2026-03-31). Has Type, Workclass, Permit Valuation, Contact Company Name.",
     },
 
@@ -439,7 +439,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applicant_submit_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V24: Switched to qu2z-8suj (Addition/Alteration permits). Fresh data verified Mar 2026.",
     },
 
@@ -480,7 +480,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: DCRA FeatureServer layer 4 (Last 30 Days rolling feed). date_format=none because epoch WHERE fails. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, lat/lon. Backfilled 2,000 permits 2026-03-31.",
     },
@@ -508,7 +508,7 @@ CITY_REGISTRY = {
         },
         "date_field": "DATE ISSUED",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V23: Fixed field_map to match actual CKAN fields. 100K+ records through Mar 2026.",
     },
 
@@ -541,7 +541,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applieddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata ID with real ntw8-aacc — BLDS standard data: permitnum, applieddate, issueddate, estprojectcost, contractorlicnum, permitclass, housingunits, addedsqft, lat/lon, direct permit link",
     },
 
@@ -567,7 +567,7 @@ CITY_REGISTRY = {
             "status": "current_use_type"
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Switched from Accela to ArcGIS. Fresh data available.",
     },
 
@@ -596,7 +596,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: PLI Permits (2019-present). resource_id f4d1177a confirmed fresh 2026-03-27. Has owner_name, contractor_name, total_project_value.",
     },
 
@@ -684,7 +684,7 @@ CITY_REGISTRY = {
         "date_field": "Opend",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,  # V43: Deactivated — ALL Atlanta ArcGIS datasets stale (latest Jan 2026). Accela entry is the live source. Zero permits ever collected from this endpoint.
+        "active": True,  # V43: Deactivated — ALL Atlanta ArcGIS datasets stale (latest Jan 2026). Accela entry is the live source. Zero permits ever collected from this endpoint.
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Verified working with Mar 2026 data
@@ -724,7 +724,7 @@ CITY_REGISTRY = {
         "date_field": "Date_Issued",
         "date_format": "none",  # V15: Server rejects date comparisons, filter in Python
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V15: Server doesn't support WHERE date filters. Using date_format=none to fetch all and filter in Python.",
     },
 
@@ -766,7 +766,7 @@ CITY_REGISTRY = {
         "date_field": "ApplicationDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V19: Replaced dead MD_OpenData/MapServer with ArcGIS FeatureServer miamidade_permit_data. SUPERB data: ContractorName/Phone/Address, OwnerName, EstimatedValue, SquareFootage, ArchitectName, ApplicationTypeDescription, ProposedUseDescription. Verified Mar 2026 with permits issued 3/22/2026.",
     },
 
@@ -896,7 +896,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live. Agency=SANDIEGO, module=DSD.
+        "active": False,  # V42: Accela portal confirmed live. Agency=SANDIEGO, module=DSD.
         "notes": "V42: Switched from empty placeholder to Accela. Agency=SANDIEGO, module=DSD (Development Services Dept). Also has CE, Cannabis, ShortTermRental modules.",
     },
 
@@ -925,7 +925,7 @@ CITY_REGISTRY = {
         "date_field": "Status_Date",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V17h: Verified ArcGIS endpoint — Application, Type, Sub_Type, Address, ZIP, Contractor, Valuation, Work_Desc, Status_Date. Has contractor names!",
     },
 
@@ -1193,7 +1193,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "date",
         "limit": 2000,
-        "active": True,  # V50: Activated - daily updates, 3-year history
+        "active": False,  # V50: Activated - daily updates, 3-year history
         "notes": "V50: Arlington TX via ArcGIS MapServer. Daily updates M-F, 3-year history. Pop ~400K.",
     },
 
@@ -1236,7 +1236,7 @@ CITY_REGISTRY = {
         },
         "date_field": "createddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Static snapshot ending June 30, 2025 — updated ~every 6 months. No real-time API exists. POSSE system (dppweb.honolulu.gov) has live data but no public API. New HNL Build (Salesforce) launched Aug 2025 also has no API. This Socrata dataset is the only programmatic source. Check for updates periodically.",
     },
 
@@ -1261,7 +1261,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/INDY.",
     },
 
@@ -1354,7 +1354,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,  # V35: Deactivated — old dataset (2gkz-7z4f) stale since Jan 2026. mesa_new is now active with fresh data from citydata.mesaaz.gov
+        "active": True,  # V35: Deactivated — old dataset (2gkz-7z4f) stale since Jan 2026. mesa_new is now active with fresh data from citydata.mesaaz.gov
         "notes": "V35: DEACTIVATED — old data.mesaaz.gov dataset stale (last issued_date Jan 2026). Replaced by mesa_new (citydata.mesaaz.gov/dzpk-hxfb) which has daily-fresh data.",
     },
 
@@ -1378,7 +1378,7 @@ CITY_REGISTRY = {
             "description": "Description",
         },
         "date_field": "Date",
-        "active": True,
+        "active": False,
         "notes": "V48: Switched from stale CKAN to Accela portal",
     },
 
@@ -1403,7 +1403,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/OAKLAND.",
     },
 
@@ -1428,7 +1428,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V24: OKC uses custom Accela domain (access.okc.gov/aca). Scraper supports via base_url override.",
     },
 
@@ -1478,7 +1478,7 @@ CITY_REGISTRY = {
         },
         "date_field": "APPLICATIONDATE",
         "limit": 2000,
-        "active": True,  # V50: Activated with new JSON platform handler
+        "active": False,  # V50: Activated with new JSON platform handler
         "notes": "V50: Activated! Custom JSON API returns 30-day rolling window. Pop ~300K.",
     },
 
@@ -1519,7 +1519,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V19: Updated to gis.tucsonaz.gov (from mapdata.tucsonaz.gov). Full 30-field map — apply/issue/expire/complete dates, parcel, structure type, census code, project name, sqft, lat/lon, ward. Data through Mar 2026. Verified. Also available: MultiFamily layer 84.",
     },
 
@@ -1547,7 +1547,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_CREATED",
         "date_format": "epoch",
         "limit": 1000,
-        "active": True,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, valuation.
+        "active": False,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, valuation.
         "notes": "V43: Activated. Longview TX commercial permits via ArcGIS MapServer layer 1. Fresh data Mar 2026. Pop ~82K.",
     },
 
@@ -1574,7 +1574,7 @@ CITY_REGISTRY = {
         "date_field": "StartDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
+        "active": False,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
         "notes": "V43: Activated. Lynchburg VA permits via ArcGIS MapServer. Fresh data Mar 2026. Pop ~79K.",
     },
 
@@ -1641,7 +1641,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V43/V50: Activated — FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
+        "active": False,  # V43/V50: Activated — FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
         "notes": "V50: Verified live. Las Vegas ArcGIS FeatureServer confirmed working. Fresh 2026 data.",
     },
 
@@ -1815,7 +1815,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "No address data in dataset - not useful for leads",
     },
 
@@ -1841,7 +1841,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live with extremely fresh data (Mar 30 2026). Full field map with address, zip, city.
+        "active": False,  # V43: Activated — endpoint confirmed live with extremely fresh data (Mar 30 2026). Full field map with address, zip, city.
         "notes": "V43: Activated. Marin County Socrata — daily-fresh data, full address fields.",
     },
 
@@ -1947,7 +1947,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V26: Data provided via montgomery_county_md bulk source.",
     },
@@ -1972,7 +1972,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V26: Data provided via williamson_county_tx bulk source.",
     },
@@ -1999,7 +1999,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/DALLASTX.",
     },
 
@@ -2025,7 +2025,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applied",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live with data. Has address, permit, type, cost.
+        "active": False,  # V43: Activated — endpoint confirmed live with data. Has address, permit, type, cost.
         "notes": "V43: Activated. Framingham MA Socrata — confirmed working.",
     },
 
@@ -2049,7 +2049,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live with data. Has address, cost, status.
+        "active": False,  # V43: Activated — endpoint confirmed live with data. Has address, cost, status.
         "notes": "V43: Activated. Parker CO Socrata — confirmed working.",
     },
 
@@ -2073,7 +2073,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "Historical data 2009-2013",
     },
 
@@ -2093,7 +2093,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via prince_georges_county_md bulk source.",
     },
 
@@ -2117,7 +2117,7 @@ CITY_REGISTRY = {
         },
         "date_field": "yrmo",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# V23 BLOCKED: NJ state dataset w9se-dmra has NO address fields - only block/lot numbers. Cannot match to properties.",
     },
 
@@ -3225,7 +3225,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.7: New — Collin County TX via data.texas.gov Socrata. Countywide dataset.",
     },
     "allen_tx": {
@@ -3250,7 +3250,7 @@ CITY_REGISTRY = {
         "date_field": "permitissueddate",
         "city_filter": {"field": "situscity", "value": "ALLEN"},
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.7: New — Allen permits via Collin County Socrata. Pop ~105K.",
     },
     "wylie_tx": {
@@ -3275,7 +3275,7 @@ CITY_REGISTRY = {
         "date_field": "permitissueddate",
         "city_filter": {"field": "situscity", "value": "WYLIE"},
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.7: New — Wylie permits via Collin County Socrata. Pop ~58K.",
     },
 
@@ -3299,7 +3299,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_ENTERED",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.9: New — Alpharetta GA ArcGIS permits. Pop ~67K. No orderByFields support.",
     },
 
@@ -3348,7 +3348,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via howard_county_md bulk source.",
     },
 
@@ -3369,7 +3369,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V26: Data provided via sonoma_county bulk source.",
     },
@@ -3421,7 +3421,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live. Has situs address, contractor, value.
+        "active": False,  # V43: Activated — endpoint confirmed live. Has situs address, contractor, value.
         "notes": "V43: Activated. Summit County UT Socrata — confirmed working.",
     },
 
@@ -3443,7 +3443,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: Reactivated — data.weho.org verified working",
     },
 
@@ -3473,7 +3473,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live. Has address, type, amount, work description.
+        "active": False,  # V43: Activated — endpoint confirmed live. Has address, type, amount, work description.
         "notes": "V43: Activated. Somerville MA Socrata — confirmed working with address data.",
     },
 
@@ -3547,7 +3547,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live. Has location_1 (address), valuation, owner.
+        "active": False,  # V43: Activated — endpoint confirmed live. Has location_1 (address), valuation, owner.
         "notes": "V43: Activated. Frederick MD via Maryland open data — confirmed working.",
     },
 
@@ -3622,7 +3622,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "TOWN OF CICERO"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Cicero permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~81K.",
     },
 
@@ -3649,7 +3649,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SCHAUMBURG"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Schaumburg permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~79K.",
     },
 
@@ -3676,7 +3676,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF EVANSTON"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Evanston permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -3703,7 +3703,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ARLINGTON HEIGHTS"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Arlington Heights permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -3733,7 +3733,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF PALATINE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Palatine permits via Cook County Socrata. Pop ~67K.",
     },
 
@@ -3760,7 +3760,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SKOKIE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Skokie permits via Cook County Socrata. Pop ~67K.",
     },
 
@@ -3787,7 +3787,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF DES PLAINES"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Des Plaines permits via Cook County Socrata. Pop ~60K.",
     },
 
@@ -3814,7 +3814,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ORLAND PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Orland Park permits via Cook County Socrata. Pop ~58K.",
     },
 
@@ -3841,7 +3841,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF OAK LAWN"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Lawn permits via Cook County Socrata. Pop ~58K.",
     },
 
@@ -3868,7 +3868,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BERWYN"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Berwyn permits via Cook County Socrata. Pop ~57K.",
     },
 
@@ -3895,7 +3895,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MT PROSPECT"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Mount Prospect permits via Cook County Socrata. Pop ~56K.",
     },
 
@@ -3922,7 +3922,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF TINLEY PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Tinley Park permits via Cook County Socrata. Pop ~55K.",
     },
 
@@ -3949,7 +3949,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF OAK PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Park permits via Cook County Socrata. Pop ~54K.",
     },
 
@@ -3976,7 +3976,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HOFFMAN ESTATES"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Hoffman Estates permits via Cook County Socrata. Pop ~52K.",
     },
 
@@ -4003,7 +4003,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF GLENVIEW"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Glenview permits via Cook County Socrata. Pop ~48K.",
     },
 
@@ -4030,7 +4030,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BUFFALO GROVE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Buffalo Grove permits via Cook County Socrata. Pop ~43K.",
     },
 
@@ -4057,7 +4057,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BARTLETT"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Bartlett permits via Cook County Socrata. Pop ~41K.",
     },
 
@@ -4084,7 +4084,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF PARK RIDGE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Park Ridge permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4111,7 +4111,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF STREAMWOOD"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Streamwood permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4138,7 +4138,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF WHEELING"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Wheeling permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4165,7 +4165,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HANOVER PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Hanover Park permits via Cook County Socrata. Pop ~37K.",
     },
 
@@ -4192,7 +4192,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF CALUMET CITY"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Calumet City permits via Cook County Socrata. Pop ~36K.",
     },
 
@@ -4219,7 +4219,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF NORTHBROOK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Northbrook permits via Cook County Socrata. Pop ~35K.",
     },
 
@@ -4246,7 +4246,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ELK GROVE VILLAGE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Elk Grove Village permits via Cook County Socrata. Pop ~32K.",
     },
 
@@ -4273,7 +4273,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF NILES"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Niles permits via Cook County Socrata. Pop ~30K.",
     },
 
@@ -4300,7 +4300,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BURBANK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Burbank permits via Cook County Socrata. Pop ~29K.",
     },
 
@@ -4327,7 +4327,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF WILMETTE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Wilmette permits via Cook County Socrata. Pop ~28K.",
     },
 
@@ -4354,7 +4354,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF CHICAGO HEIGHTS"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Chicago Heights permits via Cook County Socrata. Pop ~27K.",
     },
 
@@ -4381,7 +4381,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF OAK FOREST"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Forest permits via Cook County Socrata. Pop ~27K.",
     },
 
@@ -4408,7 +4408,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MORTON GROVE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Morton Grove permits via Cook County Socrata. Pop ~25K.",
     },
 
@@ -4435,7 +4435,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MELROSE PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Melrose Park permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4462,7 +4462,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ELMWOOD PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Elmwood Park permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4489,7 +4489,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF ROLLING MEADOWS"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Rolling Meadows permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4516,7 +4516,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ROSELLE"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Roselle permits via Cook County Socrata. Pop ~22K.",
     },
 
@@ -4543,7 +4543,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BLUE ISLAND"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Blue Island permits via Cook County Socrata. Pop ~22K.",
     },
 
@@ -4570,7 +4570,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF PARK FOREST"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Park Forest permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4597,7 +4597,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SOUTH HOLLAND"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — South Holland permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4624,7 +4624,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF DOLTON"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Dolton permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4651,7 +4651,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF EVERGREEN PARK"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Evergreen Park permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4678,7 +4678,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BROOKFIELD"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Brookfield permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4705,7 +4705,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HOMEWOOD"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Homewood permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4732,7 +4732,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MATTESON"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Matteson permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4759,7 +4759,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ALSIP"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Alsip permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4786,7 +4786,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF PALOS HILLS"},
         "limit": 2000,
-        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Palos Hills permits via Cook County Socrata. Pop ~18K.",
     },
 
@@ -5085,7 +5085,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "nola_blds": {
@@ -5134,7 +5134,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applydate",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -5188,7 +5188,7 @@ CITY_REGISTRY = {
         "date_field": "permitissued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: ArcGIS FeatureServer working. 186K permits, 5,641 in 2025, 1,277 in 2026.",
     },
 
@@ -5237,7 +5237,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/STOCKTON.",
     },
 
@@ -5277,7 +5277,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": True,  # V42: Switched from fabricated Socrata to real Accela. Agency=CHULAVISTA, module=Building.
+        "active": False,  # V42: Switched from fabricated Socrata to real Accela. Agency=CHULAVISTA, module=Building.
         "status": "paused",
         "notes": "V42: Switched from fabricated Socrata (data.chulavistaca.gov) to real Accela. Agency=CHULAVISTA, module=Building. Also has Planning, LandDevelopment, Licenses, Fire, RightOfWay modules.",
     },
@@ -5302,7 +5302,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Santa Clarita Accela portal requires login for Building module. Cannot scrape without credentials.",
     },
 
@@ -5332,7 +5332,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Sacramento Accela portal. Agency code SACRAMENTO, module=Building.",
     },
 
@@ -5358,7 +5358,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Atlanta Accela portal. Agency code ATLANTA_GA, module=Building.",
     },
 
@@ -5410,7 +5410,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Cleveland OH Accela portal. Agency code COC, module=BuildingHousing.",
     },
 
@@ -5436,7 +5436,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Salt Lake City Accela portal. Agency code SLCREF, module=Building.",
     },
 
@@ -5462,7 +5462,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Brownsville TX Accela portal. Agency code BROWNSVILLE.",
     },
 
@@ -5488,7 +5488,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Evanston IL Accela portal. Agency code EVANSTON, module=Building.",
     },
 
@@ -5514,7 +5514,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Clark County NV Accela portal. Agency code CLARKCO, module=Building.",
     },
@@ -5541,7 +5541,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Lee County FL Accela portal. Agency code LEECO, module=Permitting.",
     },
@@ -5568,7 +5568,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Brevard County FL Accela portal. Agency code BREVARD, module=Building.",
     },
@@ -5595,7 +5595,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Polk County FL Accela portal. Agency code POLKCO, module=Building.",
     },
@@ -5622,7 +5622,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Pasco County FL Accela portal. Agency code PASCO, module=Permits.",
     },
@@ -5649,7 +5649,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Sarasota County FL Accela portal. Agency code SARASOTA, module=Building.",
     },
@@ -5676,7 +5676,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,  # V42: Fixed module from Building to Development.
+        "active": False,  # V42: Fixed module from Building to Development.
         "status": "paused",
         "notes": "V42: Fixed module. Portal has Development, Planning, Encroachment, Enforcement. No Building module.",
     },
@@ -5703,7 +5703,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Bernalillo County NM Accela portal. Agency code BERNCO, module=Building.",
     },
 
@@ -5729,7 +5729,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Brookline MA Accela portal. Agency code BROOKLINE, module=Building.",
     },
@@ -5757,7 +5757,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: Tampa FL Accela portal. Agency code TAMPA, module=Building.",
     },
 
@@ -5783,7 +5783,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Hillsborough County FL Accela portal. Agency code HCFL, module=Building.",
     },
@@ -5810,7 +5810,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Pinellas County FL Accela portal. Agency code PINELLAS, module=Building.",
     },
@@ -5837,7 +5837,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,  # V42: Fixed module from Building to Permits.
+        "active": False,  # V42: Fixed module from Building to Permits.
         "notes": "V42: Fixed module. Portal has Permits, Planning, TAM. No Building module.",
     },
 
@@ -5863,7 +5863,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Gwinnett County GA Accela portal. Agency code GWINNETT, module=Building.",
     },
@@ -5890,7 +5890,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: San Bernardino County CA Accela portal. Agency code SBCO, module=Building.",
     },
@@ -5917,7 +5917,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live,  # san_antonio already active on CKAN
+        "active": False,  # V42: Accela portal confirmed live,  # san_antonio already active on CKAN
         "notes": "V35: San Antonio TX Accela portal. Agency code COSA. DEACTIVATED: san_antonio already active on CKAN.",
     },
 
@@ -5996,7 +5996,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: San Mateo County CA Accela portal. Agency code SMCGOV, module=Building.",
     },
@@ -6023,7 +6023,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Arlington County VA Accela portal. Agency code ARLINGTONCO, module=Building.",
     },
@@ -6050,7 +6050,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,  # V42: Fixed module from Building to Permits.
+        "active": False,  # V42: Fixed module from Building to Permits.
         "status": "paused",
         "notes": "V42: Fixed module. Portal has Permits, Licensing, Planning, Enforcement, PublicWorks. No Building module.",
     },
@@ -6077,7 +6077,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Palo Alto CA Accela portal. Agency code PALOALTO, module=Building.",
     },
@@ -6104,7 +6104,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Weld County CO Accela portal. Agency code WELD, module=Building.",
     },
@@ -6131,7 +6131,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Clackamas County OR Accela portal. Agency code CLACKAMAS, module=Building.",
     },
@@ -6158,7 +6158,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Fort Wayne IN Accela portal. Agency code ACFW, module=Building.",
     },
@@ -6185,7 +6185,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Monterey County CA Accela portal. Agency code MONTEREY, module=Building.",
     },
@@ -6212,7 +6212,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Alameda CA Accela portal. Agency code ALAMEDA, module=Building.",
     },
@@ -6239,7 +6239,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: San Leandro CA Accela portal. Agency code SANLEANDRO, module=Building.",
     },
@@ -6266,7 +6266,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Martin County FL Accela portal. Agency code MARTINCO, module=Building.",
     },
@@ -6293,7 +6293,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Citrus County FL Accela portal. Agency code CITRUS, module=Building.",
     },
@@ -6320,7 +6320,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Coweta County GA Accela portal. Agency code COWETA, module=Building.",
     },
@@ -6347,7 +6347,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: DeLand FL Accela portal. Agency code DELAND, module=Building.",
     },
@@ -6375,7 +6375,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Charlotte County FL Accela portal. Agency code BOCC, module=Building.",
     },
@@ -6402,7 +6402,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Leon County FL (Tallahassee) Accela portal. Agency code LEONCO, module=Building.",
     },
@@ -6429,7 +6429,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Pima County AZ (Tucson area) Accela portal. Agency code PIMA, module=Building.",
     },
@@ -6456,7 +6456,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Queen Creek AZ Accela portal. Agency code QC, module=Building.",
     },
@@ -6483,7 +6483,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Chesterfield County VA Accela portal. Agency code CHESTERFIELD, module=Building.",
     },
@@ -6510,7 +6510,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35: City of Fairfax VA Accela portal. Agency code FAIRFAX, module=Building.",
     },
 
@@ -6536,7 +6536,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Loveland CO Accela portal. Agency code LOVELAND, module=Building.",
     },
@@ -6708,7 +6708,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": True,  # V41: Accela confirmed working, 1700+ permits already in DB.
+        "active": False,  # V41: Accela confirmed working, 1700+ permits already in DB.
         "notes": "V35: Old Socrata domain (data.elpasotexas.gov) DNS dead. Accela at aca-prod.accela.com/ELPASO confirmed live. Agency=ELPASO, module=Building.",
     },
 
@@ -6986,7 +6986,7 @@ CITY_REGISTRY = {
         "date_field": "IssueDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS MapServer — premium data: Owner, Builder, ResponsibleParty, Valuation",
     },
 
@@ -7139,7 +7139,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "Duplicate of henderson_nv — fabricated Socrata domain",
     },
 
@@ -7201,7 +7201,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live. Agency=COSPRINGS, module=Building.
+        "active": False,  # V42: Accela portal confirmed live. Agency=COSPRINGS, module=Building.
         "notes": "V42: Activated. Accela portal confirmed live. Agency=COSPRINGS, module=Building. Also has StormWater, Police, Licensing, PublicWorks, Planning, Enforcement, Fire modules.",
     },
 
@@ -7229,7 +7229,7 @@ CITY_REGISTRY = {
         "date_field": "IssueDate",
         "date_format": "date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS MapServer — permit type, valuation, work description, 6-month rolling data",
     },
 
@@ -7259,7 +7259,7 @@ CITY_REGISTRY = {
         "date_field": "APPLICATIONYEAR",
         "date_format": "custom_yy",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: ArcGIS MapServer working. 46K 2025 permits, 6K 2026 permits. Date format YYMMDD.",
     },
 
@@ -7285,7 +7285,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUDATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data via Miami-Dade County bulk source. 262K county-wide permits.",
     },
 
@@ -7395,7 +7395,7 @@ CITY_REGISTRY = {
         "date_field": "AppliedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata with real Leon County ArcGIS MapServer — ULTRA premium: ContractorPhone, ContractorEmail, ContractorLicenseNum, EstProjectCost, TotalSqFt, Fee, HousingUnits",
     },
 
@@ -7423,10 +7423,10 @@ CITY_REGISTRY = {
             "contractor_phone": "CONTRACTPH",
         },
         "date_field": "SUBMITDT",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": True,
-        "notes": "V50: Fixed endpoint — city moved from /server/BuildingPermits/FeatureServer to /arcgis/BuildingPermitTracker/MapServer. Data current Mar 2026. Added owner, cost, contractor fields.",
+        "active": False,
+        "notes": "V50: Fixed endpoint — city moved from /server/BuildingPermits/FeatureServer to /arcgis/BuildingPermitTracker/MapServer. Data current Mar 2026. date_format=none because MapServer rejects epoch WHERE clauses. Python-side filter handles it.",
     },
 
     "pembroke_pines": {
@@ -7450,7 +7450,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain. Manual research: Uses Energov (Tyler Technologies) web portal only, no public API.",
     },
 
@@ -7625,7 +7625,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7671,7 +7671,7 @@ CITY_REGISTRY = {
         "date_field": "A_ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V19: Replaced fabricated Socrata with real ArcGIS MapServer from Open.Data_DurhamNC. Rich data: 5 separate cost estimates (building/electrical/plumbing/mechanical/other), structure type, activity, dwelling units, sqft land/floor, parking, occupancy code, project name/type. Comments field often contains contractor contact info. Verified Mar 2026.",
     },
 
@@ -7702,7 +7702,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS MapServer — premium data: OwnerName, Contractor, TotalCost, BuildingSqFt, NumUnits, HistoricDistrict",
     },
 
@@ -7879,7 +7879,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V42: Accela WICHITA confirmed live. module=Engineering.
+        "active": False,  # V42: Accela WICHITA confirmed live. module=Engineering.
         "status": "paused",
         "notes": "V38: Switched from fabricated Socrata to live Accela portal. Agency=WICHITA, module=Engineering (labeled 'Permitting' in UI). Socrata data.wichita.gov confirmed dead.",
     },
@@ -7981,7 +7981,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "status": "paused",
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (GRANDRAPIDS). Has Permits module. Needs deploy + test.",
     },
@@ -8648,7 +8648,7 @@ CITY_REGISTRY = {
         "date_field": "application_date",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V35.1: Fixed date_field from issued_date→application_date (issued_date is null for recent permits). date_format 'none' — orderByFields not supported.",
     },
 
@@ -8674,7 +8674,7 @@ CITY_REGISTRY = {
         "date_field": "OpenDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V33: Verified live — 76,781 records, data through Mar 2026. Transient outage in earlier check. Same endpoint: spokanegis.org/Permit/Permit_WM_Dynamic2/MapServer/0. Fields: SpokanePermitID, PermitType, PermitCategory, FullAddress, OpenDate, Status, DetailShortNotes, Neighborhood.",
     },
 
@@ -8802,7 +8802,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "iso",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V33: Switched to PDS_BuildingPermits_HighImpact (139 records). Old Housing_OpenData endpoint dead. Fields: RecordID, PropertyAddress, City, State, RecordTypeAlias, PermitStatus, IssuedDate.",
     },
 
@@ -8827,7 +8827,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
@@ -8853,7 +8853,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
     },
 
@@ -9010,7 +9010,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
         "status": "paused",
     },
 
@@ -9037,7 +9037,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_INITIATED",
         "date_format": "date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V25: Fixed - switched from dead Socrata to ArcGIS MapServer. Data current Mar 2026.",
     },
 
@@ -9062,7 +9062,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V46: Paused — data.townofcary.org unreachable (DNS/SSL failure). Need replacement endpoint.",
     },
@@ -9091,7 +9091,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUE_DATE",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     # =========================================================================
@@ -9121,7 +9121,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
     },
 
     "greenville_sc": {
@@ -9249,7 +9249,7 @@ CITY_REGISTRY = {
         "date_field": "INDATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.7: New — Volusia County AMANDA permits via ArcGIS. County-wide (includes Deltona, DeLand, Orange City, etc). FOLDERNAME contains address+city. FOLDERTYPE: RES/COM/etc. Data current Feb 2026. Pop ~94K.",
     },
 
@@ -9354,7 +9354,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
     },
 
@@ -9379,7 +9379,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "alexandria_va": {
@@ -9628,7 +9628,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "status": "paused",
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (ACFW). Needs deploy + test.",
     },
@@ -9699,7 +9699,7 @@ CITY_REGISTRY = {
         },
         "date_field": "filing_date",
         "limit": 2000,
-        "active": True,  # V42: Accela LEXKY confirmed live. Activated.
+        "active": False,  # V42: Accela LEXKY confirmed live. Activated.
         "notes": "V39: kvz2-j5cj was Howard County MD, not Lexington. Socrata data.lexingtonky.gov has 0 datasets. Accela LEXKY confirmed live with Building Inspection tab.",
     },
 
@@ -9751,7 +9751,7 @@ CITY_REGISTRY = {
         "date_field": "DATEISSUED",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS — premium data: OWNER, CONTRACTOR, PERMITVALU, SQFEET, LANDUSE",
     },
 
@@ -9781,7 +9781,7 @@ CITY_REGISTRY = {
         "date_field": "PERMIT_DAT",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V19: Replaced dead Socrata endpoint with ArcGIS FeatureServer from Chattanooga-Hamilton County Regional Planning Agency. Data 2006-2025. Fields: PERMIT_NUM, ADDRESS, VALUATION, PERMIT_DAT, CATEGORY (AAR/Demo/Move/New/Other), P_TYPE (Residential/Non-Residential/Mixed), P_DESC, HOUSING_UN. No contractor info but has valuation and detailed descriptions.",
     },
 
@@ -9930,7 +9930,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via little_rock_ar bulk source.",
     },
 
@@ -10288,7 +10288,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "hayward": {
@@ -10476,7 +10476,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Lancaster Accela portal doesn't support date-based search. Only allows search by permit number, type, address, or APN.",
     },
 
@@ -10888,7 +10888,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "pearland": {
@@ -11656,7 +11656,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V34: Deactivated — duplicate of 'cambridge' which has richer field map.",
     },
 
@@ -11681,7 +11681,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
     },
 
@@ -11854,7 +11854,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "binghamton": {
@@ -12484,7 +12484,7 @@ CITY_REGISTRY = {
         "date_field": "APPLIED",
         "date_format": "none",  # V15: Server rejects date comparisons, filter in Python
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V15: Server doesn't support WHERE date filters. Using date_format=none to fetch all and filter in Python.",
     },
 
@@ -12604,7 +12604,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "PRINCETON"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12629,7 +12629,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "PROSPER"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12679,7 +12679,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "MELISSA"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12754,7 +12754,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "situscity", "value": "LUCAS"},
         "notes": "V12.8: City-filtered from Collin County TX",
@@ -12805,7 +12805,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "RICHARDSON"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12885,7 +12885,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "situscity", "value": "FAIRVIEW"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12961,7 +12961,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "situscity", "value": "BLUE RIDGE"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -13450,7 +13450,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "SANDY SPRING"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13474,7 +13474,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "CABIN JOHN"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13498,7 +13498,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "DICKERSON"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13671,7 +13671,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "BEALLSVILLE"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13695,7 +13695,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "GLEN ECHO"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13719,7 +13719,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "MOUNT AIRY"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13793,7 +13793,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "SAN RAFAEL"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -13869,7 +13869,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "SAN ANSELMO"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -13895,7 +13895,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "SAUSALITO"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -13997,7 +13997,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "POINT REYES STATION"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14048,7 +14048,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city_town", "value": "FAIRFAX"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14073,7 +14073,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city_town", "value": "BOLINAS"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14123,7 +14123,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city_town", "value": "WOODACRE"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14448,7 +14448,7 @@ CITY_REGISTRY = {
         "field_map": {"permit_number": "permitnumber", "permit_type": "permittypedescription", "work_type": "comment", "address": "situsaddress", "filing_date": "issuedate", "status": "permitstatusdescription", "estimated_cost": "value", "description": "comment"},
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF ROUND ROCK"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14473,7 +14473,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF CEDAR PARK"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14498,7 +14498,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF GEORGETOWN"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14523,7 +14523,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF LEANDER"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14573,7 +14573,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF HUTTO"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14598,7 +14598,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF PFLUGERVILLE"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14623,7 +14623,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF LIBERTY HILL"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14648,7 +14648,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF JARRELL"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14673,7 +14673,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF FLORENCE"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14698,7 +14698,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF GRANGER"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -15032,7 +15032,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via norfolk endpoint.",
     },
 
@@ -15055,7 +15055,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Dallas TX building permits. Includes contractor info.",
     },
 
@@ -15126,7 +15126,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": False,  # V28: Consolidated — use corona instead (has permit_subtype, zip)
+        "active": True,  # V28: Consolidated — use corona instead (has permit_subtype, zip)
         "notes": "V28: DUPLICATE — corona entry has fuller field_map.",
     },
 
@@ -15172,7 +15172,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V34: Deactivated — duplicate of 'buffalo' which has richer field map.",
     },
 
@@ -15244,7 +15244,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via gainesville endpoint.",
     },
 
@@ -15561,7 +15561,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.60: Pierce County WA Socrata permits. Covers Tacoma unincorp, Lakewood, etc.",
     },
 
@@ -15906,7 +15906,7 @@ BULK_SOURCES = {
         },
         "date_field": "processdate",
         "limit": 50000,  # Per-page limit for bulk fetch
-        "active": True,
+        "active": False,
         "notes": "V31: Reactivated. Statewide dataset covering all 550 NJ municipalities. Uses processdate (permitdate has bad data).",
     },
 
@@ -15934,7 +15934,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V28: Switched from internal to public endpoint. Covers San Diego, Carlsbad, Oceanside, etc.",
     },
@@ -15958,7 +15958,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V12.31: County dataset covering Santa Rosa, Petaluma, etc.",
     },
@@ -15984,7 +15984,7 @@ BULK_SOURCES = {
         "date_field": "ISSUDATE",
         "date_format": "epoch_ms",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V15: County-wide permits (no city breakdown). ArcGIS endpoint. ID is numeric.",
     },
 
@@ -16010,7 +16010,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V12.35: Discovery - Bethesda, Rockville, Silver Spring, etc.",
     },
@@ -16035,7 +16035,7 @@ BULK_SOURCES = {
         },
         "date_field": "permit_issuance_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.35: Discovery - Bowie, Hyattsville, Largo, etc.",
     },
 
@@ -16061,7 +16061,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V12.35: Discovery - Baton Rouge parish permits",
     },
@@ -16112,7 +16112,7 @@ BULK_SOURCES = {
         },
         "date_field": "permitissueddate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.39: McKinney, Allen, Frisco, Celina, Wylie, Prosper, etc. 94K+ permits",
     },
 
@@ -16135,7 +16135,7 @@ BULK_SOURCES = {
         },
         "date_field": "issue_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.39: Columbia, Ellicott City, Elkridge, Clarksville, Fulton, etc. 46K+ permits",
     },
 
@@ -16160,7 +16160,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.39: Kentfield, Mill Valley, San Rafael, Novato, Fairfax, etc. 30K+ permits",
     },
 
@@ -16188,7 +16188,7 @@ BULK_SOURCES = {
         },
         "date_field": "date_issued",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Cook County IL assessor permits. 130+ municipalities incl Evanston, Skokie, Oak Park, Cicero.",
     },
 
@@ -16211,7 +16211,7 @@ BULK_SOURCES = {
         },
         "date_field": "issuedate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V12.60: Williamson County TX permits. Round Rock, Georgetown, Cedar Park, Leander, etc.",
     },
@@ -16262,7 +16262,7 @@ BULK_SOURCES = {
         },
         "date_field": "appdate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Little Rock AR permits. First AR bulk source. Includes sq ft, workclass.",
     },
 
@@ -16286,7 +16286,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026.",
     },
 
@@ -16310,7 +16310,7 @@ BULK_SOURCES = {
         },
         "date_field": "processed_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. Covers all neighborhoods/districts.",
     },
 
@@ -16334,7 +16334,7 @@ BULK_SOURCES = {
         },
         "date_field": "permit_application_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. All wards covered.",
     },
 
@@ -16358,7 +16358,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Cincinnati OH building permits. Updated daily.",
     },
 
@@ -16382,7 +16382,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. 34 fields, includes sq ft and fees.",
     },
 
@@ -16406,7 +16406,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. Includes applied, approved, issued dates.",
     },
 
@@ -16430,7 +16430,7 @@ BULK_SOURCES = {
         "date_field": "File_Date",
         "date_format": "epoch_ms",
         "limit": 1000,
-        "active": True,
+        "active": False,
         "notes": "V15: ArcGIS endpoint. File_Date is epoch_ms. Address needs assembly from parts. Pop ~978K.",
     },
 
@@ -16456,7 +16456,7 @@ BULK_SOURCES = {
         "date_field": "issue_date",
         "limit": 50000,
         "where_filter": "permit_type_desc='Building Permit'",
-        "active": True,
+        "active": False,
         "notes": "V31: Reactivated + filtered. Austin TX datahub permits. Filtered to Building Permits only (excludes electrical/plumbing/mechanical/driveway). Fresh data confirmed 2026-03-30.",
     },
 
@@ -16481,7 +16481,7 @@ BULK_SOURCES = {
         "date_field": "applicationdate",
         "limit": 50000,
         "where_filter": "applicationtype IN('Construction Residential','Construction Commercial','Residential Site Development','Site Dev Residential','Site Development','Residential Demolition')",
-        "active": True,
+        "active": False,
         "notes": "V31: Reactivated + filtered. Pierce County WA Socrata permits. Filtered to construction/building types only (excludes mechanical/plumbing/sewer/alarms/signs). Tacoma, Lakewood, etc.",
     },
 
@@ -16503,7 +16503,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Buffalo NY building permits. Includes applicant, license info.",
     },
 
@@ -16537,7 +16537,7 @@ BULK_SOURCES = {
         "date_field": "Status_Date",
         "date_format": "string",
         "limit": 5000,
-        "active": True,
+        "active": False,
         "notes": "V33: City of Sacramento ArcGIS Hub. 2,627 records (current year). Fields: Application, Type, Sub_Type, Category, Address, ZIP, Valuation, Contractor, Work_Desc, Project_Sq_Ft. Covers Sacramento city only.",
     },
 
@@ -16572,7 +16572,7 @@ BULK_SOURCES = {
         "date_field": "issueddate",
         "date_format": "epoch",
         "limit": 5000,
-        "active": True,
+        "active": False,
         "notes": "V33: Wake County NC via Open Data Raleigh ArcGIS Hub. 182K records. INCREDIBLE fields: contractor name/email/phone/license, est cost, sqft, housing units, fees, jurisdiction. Covers Raleigh, Cary, Apex, Holly Springs, Wake Forest, Garner, Knightdale, etc.",
     },
 
@@ -16597,7 +16597,7 @@ BULK_SOURCES = {
         "date_field": "APPROVAL_DATE",
         "date_format": "epoch",
         "limit": 5000,
-        "active": True,
+        "active": False,
         "notes": "V33: Riverside County GIS Open Data. Covers 20+ cities including Riverside (pop 314K), Moreno Valley (212K), Temecula (110K), Murrieta (111K), Menifee (103K), Jurupa Valley (105K). Fields: PERMIT_ID, CASE_TYPE, ADDRESS, PERMIT_STATUS, DESCRIPTION, UNIT_COUNT.",
     },
 }
@@ -16641,7 +16641,7 @@ def get_all_cities_info():
                 "state": config["state"],
                 "slug": config["slug"],
                 "platform": config["platform"],
-                "active": True,
+                "active": False,
             })
     return sorted(cities, key=lambda x: x["name"])
 
