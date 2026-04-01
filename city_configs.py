@@ -1166,6 +1166,37 @@ CITY_REGISTRY = {
         "notes": "V19: Full 30-field map — permit type/subtype/category, work description, special text, full address components, lot/block/tract, legal description, owner name, job value, use type, specific use, units, sqft, status/status date. Verified Mar 2026.",
     },
 
+    # V50: Arlington TX - ArcGIS MapServer, 3-year permit history
+    "arlington_tx": {
+        "name": "Arlington",
+        "state": "TX",
+        "slug": "arlington-tx",
+        "lat": 32.736,
+        "lon": -97.108,
+        "platform": "arcgis",
+        "endpoint": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/1/query",
+        "dataset_id": "OD_Property_IssuedPermits",
+        "description": "City of Arlington Issued Permits (ArcGIS MapServer)",
+        "field_map": {
+            "permit_number": "FOLDERSEQUENCE",
+            "permit_type": "FOLDERTYPE",
+            "permit_subtype": "SUBDESC",
+            "work_type": "WORKDESC",
+            "address": "FOLDERNAME",
+            "filing_date": "ISSUEDATE",
+            "finalize_date": "FINALDATE",
+            "status": "STATUSDESC",
+            "estimated_cost": "ConstructionValuationDeclared",
+            "use_type": "MainUse",
+            "description": "FOLDERCONDITION",
+        },
+        "date_field": "ISSUEDATE",
+        "date_format": "date",
+        "limit": 2000,
+        "active": True,  # V50: Activated - daily updates, 3-year history
+        "notes": "V50: Arlington TX via ArcGIS MapServer. Daily updates M-F, 3-year history. Pop ~400K.",
+    },
+
     "honolulu": {
         "name": "Honolulu",
         "state": "HI",
