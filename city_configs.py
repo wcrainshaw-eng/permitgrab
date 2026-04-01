@@ -1430,7 +1430,9 @@ CITY_REGISTRY = {
         "name": "St. Louis",
         "state": "MO",
         "slug": "st-louis",
-        "platform": "json",  # Custom JSON endpoint - needs handler added to collector
+        "lat": 38.627,
+        "lon": -90.199,
+        "platform": "json",
         "endpoint": "https://www.stlouis-mo.gov/customcf/endpoints/building-permits/building-permits-30-days-export.cfm?permitType=all&dataType=json",
         "dataset_id": "stl-permits-30day",
         "description": "Building Permits - City of St. Louis",
@@ -1445,8 +1447,8 @@ CITY_REGISTRY = {
         },
         "date_field": "APPLICATIONDATE",
         "limit": 2000,
-        "active": False,  # Needs custom JSON platform handler in collector.py
-        "notes": "V50: Found working JSON API! Returns 30-day rolling window. Fields: ADDRESS, PROJECTTYPE, STRUCTURETYPE, APPLICATIONDATE, ISSUEDATE, DAYSTOISSUE, ESTPROJECTCOST, APPLICATIONDESCRIPTION. Needs 'json' platform handler.",
+        "active": True,  # V50: Activated with new JSON platform handler
+        "notes": "V50: Activated! Custom JSON API returns 30-day rolling window. Pop ~300K.",
     },
 
     "tucson": {

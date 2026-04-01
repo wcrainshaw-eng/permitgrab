@@ -506,6 +506,78 @@ def fetch_carto(config, days_back):
     return []
 
 
+def fetch_json(config, days_back):
+    """
+    V50: Fetch permits from a generic JSON REST API.
+    Used for custom endpoints that return JSON but aren't Socrata/ArcGIS/CKAN/Carto.
+    Example: St. Louis MO ColdFusion endpoint.
+    """
+    endpoint = config["endpoint"]
+    date_field = config.get("date_field", "")
+    limit = config.get("limit", 2000)
+
+    # Calculate date filter for Python-side filtering
+    since_dt = datetime.now() - timedelta(days=days_back)
+    since_date = since_dt.strftime("%Y-%m-%d")
+
+    # Simple GET request - no special params (endpoint should be fully formed)
+    resp = SESSION.get(endpoint, timeout=API_TIMEOUT_SECONDS)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Handle various JSON response structures
+    records = []
+    if isinstance(data, list):
+        records = data
+    elif isinstance(data, dict):
+        # Try common keys for nested data
+        for key in ["data", "records", "results", "permits", "features"]:
+            if key in data:
+                records = data[key]
+                break
+        # If features (GeoJSON-like), extract attributes
+        if records and isinstance(records[0], dict) and "attributes" in records[0]:
+            records = [r["attributes"] for r in records]
+
+    # Apply limit
+    records = records[:limit]
+
+    # Filter by date if date_field is specified
+    if date_field and records:
+        filtered = []
+        for r in records:
+            val = r.get(date_field)
+            if not val:
+                filtered.append(r)  # Include records without date (don't drop)
+                continue
+
+            # Handle various date formats
+            try:
+                # ISO format: 2026-03-15 or 2026-03-15T00:00:00
+                if isinstance(val, str) and len(val) >= 10 and val[:4].isdigit():
+                    if val[:10] >= since_date:
+                        filtered.append(r)
+                # US format: 03/15/2026 (MM/DD/YYYY)
+                elif isinstance(val, str) and "/" in val:
+                    parts = val.split("/")
+                    if len(parts) == 3:
+                        iso_val = f"{parts[2][:4]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+                        if iso_val >= since_date:
+                            filtered.append(r)
+                # Epoch milliseconds
+                elif isinstance(val, (int, float)):
+                    if val >= since_dt.timestamp() * 1000:
+                        filtered.append(r)
+                else:
+                    filtered.append(r)  # Unknown format, include
+            except (ValueError, IndexError):
+                filtered.append(r)  # Parse error, include anyway
+
+        records = filtered
+
+    return records
+
+
 # ============================================================================
 # BULK SOURCE FETCHERS (V12.31)
 # ============================================================================
@@ -945,7 +1017,9 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
             except (ValueError, OSError):
                 pass
         if not parsed_date:
-            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+            # V50: Added St. Louis format "February, 02 2026 00:00:00"
+            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d",
+                        "%m/%d/%Y", "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
                 try:
                     parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
                     break
@@ -1052,6 +1126,8 @@ def fetch_permits(city_key, days_back=30):
                     print(f"  [SKIP] Accela not available (playwright not installed)")
                     return [], "skip_no_playwright"
                 raw = fetch_accela(config, days_back)
+            elif platform == "json":
+                raw = fetch_json(config, days_back)
             else:
                 print(f"  [ERROR] Unknown platform: {platform}")
                 return [], "error_unknown_platform"
@@ -1192,7 +1268,9 @@ def normalize_permit(raw_record, city_key):
             except (ValueError, OSError):
                 pass
         if not parsed_date:
-            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
+            # V50: Added St. Louis format "February, 02 2026 00:00:00"
+            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d",
+                        "%m/%d/%Y", "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
                 try:
                     parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
                     break
@@ -1588,6 +1666,10 @@ def fetch_permit_history(city_key, years_back=1):
             raw = fetch_history_ckan(config, years_back)
         elif platform == "carto":
             raw = fetch_history_carto(config, years_back)
+        elif platform == "json":
+            # V50: JSON endpoints may have limited history (e.g., St. Louis = 30 days)
+            # Just fetch what's available
+            raw = fetch_json(config, days_back=years_back * 365)
         else:
             return []
 
