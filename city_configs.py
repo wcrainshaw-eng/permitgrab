@@ -412,7 +412,7 @@ CITY_REGISTRY = {
         },
         "date_field": "Applied Date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: CKAN datastore API. Fresh daily (updated 2026-03-31). Has Type, Workclass, Permit Valuation, Contact Company Name.",
     },
 
@@ -480,7 +480,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: DCRA FeatureServer layer 4 (Last 30 Days rolling feed). date_format=none because epoch WHERE fails. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, lat/lon. Backfilled 2,000 permits 2026-03-31.",
     },
@@ -541,7 +541,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applieddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata ID with real ntw8-aacc — BLDS standard data: permitnum, applieddate, issueddate, estprojectcost, contractorlicnum, permitclass, housingunits, addedsqft, lat/lon, direct permit link",
     },
 
@@ -556,7 +556,7 @@ CITY_REGISTRY = {
         "endpoint": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_building_permits/FeatureServer/0",
         "description": "BSEED Building Permits",
         "date_field": "submitted_date",
-        "date_format": "epoch",
+        "date_format": "none",
         "field_map": {
             "permit_number": "record_id",
             "permit_type": "permit_type",
@@ -567,7 +567,7 @@ CITY_REGISTRY = {
             "status": "current_use_type"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Switched from Accela to ArcGIS. Fresh data available.",
     },
 
@@ -724,7 +724,7 @@ CITY_REGISTRY = {
         "date_field": "Date_Issued",
         "date_format": "none",  # V15: Server rejects date comparisons, filter in Python
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V15: Server doesn't support WHERE date filters. Using date_format=none to fetch all and filter in Python.",
     },
 
@@ -764,9 +764,9 @@ CITY_REGISTRY = {
             "folio": "FolioNumber",
         },
         "date_field": "ApplicationDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Replaced dead MD_OpenData/MapServer with ArcGIS FeatureServer miamidade_permit_data. SUPERB data: ContractorName/Phone/Address, OwnerName, EstimatedValue, SquareFootage, ArchitectName, ApplicationTypeDescription, ProposedUseDescription. Verified Mar 2026 with permits issued 3/22/2026.",
     },
 
@@ -925,7 +925,7 @@ CITY_REGISTRY = {
         "date_field": "Status_Date",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V17h: Verified ArcGIS endpoint — Application, Type, Sub_Type, Address, ZIP, Contractor, Valuation, Work_Desc, Status_Date. Has contractor names!",
     },
 
@@ -1191,9 +1191,9 @@ CITY_REGISTRY = {
             "description": "FOLDERCONDITION",
         },
         "date_field": "ISSUEDATE",
-        "date_format": "date",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,  # V50: Activated - daily updates, 3-year history
+        "active": True,  # V50: Activated - daily updates, 3-year history
         "notes": "V50: Arlington TX via ArcGIS MapServer. Daily updates M-F, 3-year history. Pop ~400K.",
     },
 
@@ -1545,9 +1545,9 @@ CITY_REGISTRY = {
             "contractor_name": "APPLICANT",
         },
         "date_field": "DATE_CREATED",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 1000,
-        "active": False,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, valuation.
+        "active": True,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, valuation.
         "notes": "V43: Activated. Longview TX commercial permits via ArcGIS MapServer layer 1. Fresh data Mar 2026. Pop ~82K.",
     },
 
@@ -1572,9 +1572,9 @@ CITY_REGISTRY = {
             "contractor_name": "Contact",
         },
         "date_field": "StartDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
+        "active": True,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
         "notes": "V43: Activated. Lynchburg VA permits via ArcGIS MapServer. Fresh data Mar 2026. Pop ~79K.",
     },
 
@@ -3297,7 +3297,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_ENTERED",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.9: New — Alpharetta GA ArcGIS permits. Pop ~67K. No orderByFields support.",
     },
 
@@ -5132,7 +5132,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applydate",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -5184,9 +5184,9 @@ CITY_REGISTRY = {
             "parcel": "parcel",
         },
         "date_field": "permitissued",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: ArcGIS FeatureServer working. 186K permits, 5,641 in 2025, 1,277 in 2026.",
     },
 
@@ -6982,9 +6982,9 @@ CITY_REGISTRY = {
             "description": "PermitType",
         },
         "date_field": "IssueDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS MapServer — premium data: Owner, Builder, ResponsibleParty, Valuation",
     },
 
@@ -7225,9 +7225,9 @@ CITY_REGISTRY = {
             "description": "FolderDescription",
         },
         "date_field": "IssueDate",
-        "date_format": "date",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS MapServer — permit type, valuation, work description, 6-month rolling data",
     },
 
@@ -7281,9 +7281,9 @@ CITY_REGISTRY = {
             "parcel": "FOLIO",
         },
         "date_field": "ISSUDATE",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data via Miami-Dade County bulk source. 262K county-wide permits.",
     },
 
@@ -7391,9 +7391,9 @@ CITY_REGISTRY = {
             "description": "Description",
         },
         "date_field": "AppliedDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata with real Leon County ArcGIS MapServer — ULTRA premium: ContractorPhone, ContractorEmail, ContractorLicenseNum, EstProjectCost, TotalSqFt, Fee, HousingUnits",
     },
 
@@ -7423,7 +7423,7 @@ CITY_REGISTRY = {
         "date_field": "SUBMITDT",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V50: Fixed endpoint — city moved from /server/BuildingPermits/FeatureServer to /arcgis/BuildingPermitTracker/MapServer. Data current Mar 2026. date_format=none because MapServer rejects epoch WHERE clauses. Python-side filter handles it.",
     },
 
@@ -7698,9 +7698,9 @@ CITY_REGISTRY = {
             "description": "Description",
         },
         "date_field": "IssuedDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS MapServer — premium data: OwnerName, Contractor, TotalCost, BuildingSqFt, NumUnits, HistoricDistrict",
     },
 
@@ -8184,9 +8184,9 @@ CITY_REGISTRY = {
             "sqft": "JobSquareFootage",
         },
         "date_field": "ISSUE_DATE",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: New — Johns Creek permits via ArcGIS FeatureServer (DataHub). Data current Dec 2025. Includes fire, plumbing, ROW, building permits. Pop ~82K.",
     },
 
@@ -8646,7 +8646,7 @@ CITY_REGISTRY = {
         "date_field": "application_date",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35.1: Fixed date_field from issued_date→application_date (issued_date is null for recent permits). date_format 'none' — orderByFields not supported.",
     },
 
@@ -8670,9 +8670,9 @@ CITY_REGISTRY = {
             "description": "DetailShortNotes",
         },
         "date_field": "OpenDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V33: Verified live — 76,781 records, data through Mar 2026. Transient outage in earlier check. Same endpoint: spokanegis.org/Permit/Permit_WM_Dynamic2/MapServer/0. Fields: SpokanePermitID, PermitType, PermitCategory, FullAddress, OpenDate, Status, DetailShortNotes, Neighborhood.",
     },
 
@@ -8798,9 +8798,9 @@ CITY_REGISTRY = {
             "status": "PermitStatus",
         },
         "date_field": "IssuedDate",
-        "date_format": "iso",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V33: Switched to PDS_BuildingPermits_HighImpact (139 records). Old Housing_OpenData endpoint dead. Fields: RecordID, PropertyAddress, City, State, RecordTypeAlias, PermitStatus, IssuedDate.",
     },
 
@@ -9033,9 +9033,9 @@ CITY_REGISTRY = {
             "estimated_cost": "LIST_VALUE",
         },
         "date_field": "DATE_INITIATED",
-        "date_format": "date",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V25: Fixed - switched from dead Socrata to ArcGIS MapServer. Data current Mar 2026.",
     },
 
@@ -9088,8 +9088,9 @@ CITY_REGISTRY = {
             "contact_name": "GENERAL_CONTRACTOR",
         },
         "date_field": "ISSUE_DATE",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     # =========================================================================
@@ -9247,7 +9248,7 @@ CITY_REGISTRY = {
         "date_field": "INDATE",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: New — Volusia County AMANDA permits via ArcGIS. County-wide (includes Deltona, DeLand, Orange City, etc). FOLDERNAME contains address+city. FOLDERTYPE: RES/COM/etc. Data current Feb 2026. Pop ~94K.",
     },
 
@@ -9749,7 +9750,7 @@ CITY_REGISTRY = {
         "date_field": "DATEISSUED",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata with real ArcGIS — premium data: OWNER, CONTRACTOR, PERMITVALU, SQFEET, LANDUSE",
     },
 
@@ -9779,7 +9780,7 @@ CITY_REGISTRY = {
         "date_field": "PERMIT_DAT",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V19: Replaced dead Socrata endpoint with ArcGIS FeatureServer from Chattanooga-Hamilton County Regional Planning Agency. Data 2006-2025. Fields: PERMIT_NUM, ADDRESS, VALUATION, PERMIT_DAT, CATEGORY (AAR/Demo/Move/New/Other), P_TYPE (Residential/Non-Residential/Mixed), P_DESC, HOUSING_UN. No contractor info but has valuation and detailed descriptions.",
     },
 
@@ -11231,8 +11232,9 @@ CITY_REGISTRY = {
             "description": "Project",
         },
         "date_field": "Issued_Date",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "santa_fe": {
@@ -11922,9 +11924,9 @@ CITY_REGISTRY = {
             "estimated_cost": "VAL_TOTAL",
         },
         "date_field": "DATE_B",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.7: New — Newport Beach permits via ArcGIS FeatureServer. Data current Mar 2026. Includes building, commercial, residential permits. Pop ~85K.",
     },
@@ -12482,7 +12484,7 @@ CITY_REGISTRY = {
         "date_field": "APPLIED",
         "date_format": "none",  # V15: Server rejects date comparisons, filter in Python
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V15: Server doesn't support WHERE date filters. Using date_format=none to fetch all and filter in Python.",
     },
 
@@ -15006,7 +15008,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via austin endpoint.",
     },
 
@@ -15076,7 +15078,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.60: Cincinnati OH building permits. 27 fields, updated daily.",
     },
 
@@ -15100,7 +15102,7 @@ CITY_REGISTRY = {
         },
         "date_field": "processed_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via orlando endpoint.",
     },
 
