@@ -937,19 +937,29 @@ def fetch_accela(config, days_back):
                 break
 
     if not city_key:
-        print(f"    [Accela] Cannot determine city_key from config")
-        return []
+        # V46: Raise instead of silent return so collector logs as error
+        raise ValueError(f"Cannot determine Accela city_key from config: {config.get('name', 'unknown')}")
 
     try:
-        # Run the async scraper in an event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            permits = loop.run_until_complete(scrape_accela_permits(city_key, days_back))
-        finally:
-            loop.close()
+        # V46: Reset global browser/playwright before each call.
+        # The old approach (new_event_loop + close) left stale globals that
+        # silently broke on subsequent cities. asyncio.run() properly creates
+        # and tears down the loop, and resetting globals ensures a fresh
+        # Chromium launch each time (no stale singleton from a dead loop).
+        global _playwright, _browser
+        _playwright = None
+        _browser = None
+        permits = asyncio.run(_scrape_with_cleanup(city_key, days_back))
         return permits
     except Exception as e:
         print(f"    [Accela] Scraper failed for {city_key}: {str(e)[:200]}")
         # V45: Re-raise so collector logs this as 'error' with message, not silent 'no_new'
         raise
+
+
+async def _scrape_with_cleanup(city_key, days_back):
+    """V46: Wrapper that ensures browser cleanup after each scrape."""
+    try:
+        return await scrape_accela_permits(city_key, days_back)
+    finally:
+        await close_browser()
