@@ -666,9 +666,9 @@ CITY_REGISTRY = {
         "lat": 33.749,
         "lon": -84.388,
         "platform": "arcgis",
-        "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/test_building_permit/FeatureServer/0/query",
-        "dataset_id": "test_building_permit",
-        "description": "Building Permits (via Accela sync, updated to Feb 2025)",
+        "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/Building_Permit_latest/FeatureServer/0/query",
+        "dataset_id": "Building_Permit_latest",
+        "description": "Atlanta Building Permits (latest ArcGIS dataset, data through Jan 2026)",
         "field_map": {
             "permit_number": "RecordID",
             "permit_type": "TypeCombo",
@@ -683,7 +683,7 @@ CITY_REGISTRY = {
         "date_field": "Opend",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V43: Deactivated — ALL Atlanta ArcGIS datasets stale (latest Jan 2026). Accela entry is the live source. Zero permits ever collected from this endpoint.
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Verified working with Mar 2026 data
