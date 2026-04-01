@@ -596,8 +596,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
-        "notes": "V52: Fixed resource_id->dataset_id key bug. 60K+ permits, data current 2026-03-30. PENDING Render test before activation.",
+        "active": True,
+        "notes": "V52: Fixed resource_id->dataset_id key bug. 60K+ permits. Render-tested and backfilled 2026-04-01.",
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - ArcGIS verified working with Mar 2026 data
@@ -1517,10 +1517,10 @@ CITY_REGISTRY = {
             "filing_date": "ISSUEDATE",
         },
         "date_field": "ISSUEDATE",
-        "date_format": "epoch",
+        "date_format": "date",
         "limit": 2000,
         "active": False,
-        "notes": "V52: Reverted endpoint back to mapdata.tucsonaz.gov (gis.tucsonaz.gov stopped working). Data current 2026-03-28. PENDING Render test before activation.",
+        "notes": "V52: Fixed endpoint (mapdata.tucsonaz.gov) and date_format (date not epoch - MapServer rejects epoch). Data current 2026-03-31.",
     },
 
     "longview_tx": {
@@ -1696,10 +1696,10 @@ CITY_REGISTRY = {
             "description": "WorkDesc",
         },
         "date_field": "ApplicationDate",
-        "date_format": "epoch",
+        "date_format": "none",
         "limit": 2000,
         "active": False,
-        "notes": "V51: New endpoint found - old one dead. Data current Mar 2026. PENDING Render test before activation.",
+        "notes": "V52: date_format=none (FeatureServer rejects epoch AND DATE syntax). Data current 2026-03-27.",
     },
 
     "virginia_beach": {
