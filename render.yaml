@@ -6,9 +6,7 @@
 services:
   - type: web
     name: permitgrab
-    runtime: python
-    buildCommand: pip install -r requirements.txt && playwright install chromium --with-deps
-    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 1
+    runtime: docker
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
