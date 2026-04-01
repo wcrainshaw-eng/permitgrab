@@ -7406,9 +7406,9 @@ CITY_REGISTRY = {
         "lat": 26.125,
         "lon": -80.144,
         "platform": "arcgis",
-        "endpoint": "https://gis.fortlauderdale.gov/server/rest/services/BuildingPermits/FeatureServer/0/query",
-        "dataset_id": "BuildingPermits_FtLauderdale",
-        "description": "City of Fort Lauderdale Building Permits",
+        "endpoint": "https://gis.fortlauderdale.gov/arcgis/rest/services/BuildingPermitTracker/BuildingPermitTracker/MapServer/0/query",
+        "dataset_id": "BuildingPermitTracker_FtLauderdale",
+        "description": "City of Fort Lauderdale Building Permits (BuildingPermitTracker MapServer)",
         "field_map": {
             "permit_number": "PERMITID",
             "permit_type": "PERMITTYPE",
@@ -7417,12 +7417,16 @@ CITY_REGISTRY = {
             "issue_date": "APPROVEDT",
             "status": "PERMITSTAT",
             "description": "PERMITDESC",
+            "owner_name": "OWNERNAME",
+            "estimated_cost": "ESTCOST",
+            "contractor": "CONTRACTOR",
+            "contractor_phone": "CONTRACTPH",
         },
         "date_field": "SUBMITDT",
         "date_format": "epoch",
         "limit": 2000,
         "active": True,
-        "notes": "V18: Replaced fabricated Socrata with real City ArcGIS FeatureServer — PERMITID, PERMITTYPE, SUBMITDT, APPROVEDT, FULLADDR, PERMITDESC",
+        "notes": "V50: Fixed endpoint — city moved from /server/BuildingPermits/FeatureServer to /arcgis/BuildingPermitTracker/MapServer. Data current Mar 2026. Added owner, cost, contractor fields.",
     },
 
     "pembroke_pines": {
@@ -10155,8 +10159,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,
-        "notes": "V19: Full 21-field map — contractor name+address, permit subtype, work type, est value + state valuation, ward, district, PIN, lat/lon, expiration/final dates. Data through Jun 2025. Verified.",
+        "active": False,  # V50: Stale data - last update Jun 2025
+        "notes": "V19: Full 21-field map — contractor name+address. STALE: Last data Jun 2025.",
     },
 
     "rochester_mn": {
