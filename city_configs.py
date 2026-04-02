@@ -173,7 +173,7 @@ CITY_REGISTRY = {
         "lat": 30.267,
         "lon": -97.743,
         "platform": "socrata",
-        "endpoint": "https://datahub.austintexas.gov/resource/3syk-w9eu.json",
+        "endpoint": "https://data.austintexas.gov/resource/3syk-w9eu.json",
         "dataset_id": "3syk-w9eu",
         "description": "Issued Construction Permits",
         "field_map": {
@@ -8253,8 +8253,8 @@ CITY_REGISTRY = {
         "lat": 42.886,
         "lon": -78.878,
         "platform": "socrata",
-        "endpoint": "https://data.buffalony.gov/resource/7f3h-uj5i.json",
-        "dataset_id": "7f3h-uj5i",
+        "endpoint": "https://data.buffalony.gov/resource/9p2d-f3yt.json",
+        "dataset_id": "9p2d-f3yt",
         "description": "Permits in the Right of Way",
         "field_map": {
             "permit_number": "permit_number",
@@ -8268,7 +8268,7 @@ CITY_REGISTRY = {
         "date_field": "issued",
         "limit": 2000,
         "active": True,
-        "notes": "V12.39: Fixed endpoint to 7f3h-uj5i, reactivated",
+        "notes": "V12.39: Fixed endpoint to 9p2d-f3yt, reactivated",
     },
 
     "rochester": {
@@ -15009,7 +15009,7 @@ CITY_REGISTRY = {
             "address": "original_address1",
             "estimated_cost": "total_job_valuation",
         },
-        "date_field": "issue_date",
+        "date_field": "applieddate",
         "limit": 2000,
         "active": True,
         "notes": "V26: Data provided via austin endpoint.",
