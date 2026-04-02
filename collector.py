@@ -354,7 +354,7 @@ def fetch_arcgis(config, days_back):
     limit = config.get("limit", 2000)
     # V35: Check field_map._date_format as override (used for city_sources entries)
     fmap = config.get("field_map", {})
-    date_format = fmap.get("_date_format") or config.get("date_format", "date")  # "date", "epoch", or "none"
+    date_format = fmap.get("_date_format") or config.get("date_format", "date")  # "date", "epoch", "string", or "none"
 
     # Calculate date filter
     since_dt = datetime.now() - timedelta(days=days_back)
@@ -362,6 +362,11 @@ def fetch_arcgis(config, days_back):
     if date_format == "epoch":
         since_epoch = int(since_dt.timestamp() * 1000)
         where_clause = f"{date_field} >= {since_epoch}"
+    elif date_format == "string":
+        # V54: For string-type date fields (ISO format like "2026-03-31"),
+        # use server-side string comparison instead of fetching everything
+        since_date = since_dt.strftime("%Y-%m-%d")
+        where_clause = f"{date_field} >= '{since_date}'"
     elif date_format == "none":
         where_clause = "1=1"
     else:
@@ -692,6 +697,10 @@ def fetch_arcgis_bulk(config, days_back=90):
         # V15: epoch_ms/timestamp use timestamp format for ArcGIS esriFieldTypeDate fields
         since_ts = since_dt.strftime("%Y-%m-%d %H:%M:%S")
         where_clause = f"{date_field} >= timestamp '{since_ts}'" if date_field else "1=1"
+    elif date_format == "string":
+        # V54: String-type date fields (ISO format) — server-side string comparison
+        since_date = since_dt.strftime("%Y-%m-%d")
+        where_clause = f"{date_field} >= '{since_date}'" if date_field else "1=1"
     elif date_format == "none" or not date_field:
         where_clause = "1=1"
     else:
@@ -2300,7 +2309,7 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                     state=state,
                     permits_found=permit_count,
                     permits_inserted=permit_count,
-                    status='success' if fetch_status == 'success' and permit_count > 0 else ('no_new' if fetch_status == 'success' else 'error'),
+                    status='success' if fetch_status == 'success' and permit_count > 0 else ('no_new' if fetch_status == 'success' else ('skip' if fetch_status.startswith('skip') else 'error')),
                     error_message=None if fetch_status == 'success' else fetch_status,
                     duration_ms=duration_ms
                 )

@@ -494,7 +494,7 @@ CITY_REGISTRY = {
         "lon": -98.493,
         "platform": "ckan",
         "endpoint": "https://data.sanantonio.gov/api/3/action/datastore_search",
-        "resource_id": "c21106f9-3ef5-4f3a-8604-f992b4db7512",
+        "dataset_id": "c21106f9-3ef5-4f3a-8604-f992b4db7512",
         "description": "Building Permits (CKAN - Open Data SA)",
         "field_map": {
             "permit_number": "PERMIT #",
@@ -508,8 +508,8 @@ CITY_REGISTRY = {
         },
         "date_field": "DATE ISSUED",
         "limit": 2000,
-        "active": False,
-        "notes": "V23: Fixed field_map to match actual CKAN fields. 100K+ records through Mar 2026.",
+        "active": True,
+        "notes": "V54: Reactivated. 102K records through Mar 2026. Fixed dataset_id key (was resource_id).",
     },
 
     "kansas_city": {
@@ -556,7 +556,7 @@ CITY_REGISTRY = {
         "endpoint": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_building_permits/FeatureServer/0",
         "description": "BSEED Building Permits",
         "date_field": "submitted_date",
-        "date_format": "none",
+        "date_format": "string",
         "field_map": {
             "permit_number": "record_id",
             "permit_type": "permit_type",
@@ -568,7 +568,7 @@ CITY_REGISTRY = {
         },
         "limit": 2000,
         "active": True,
-        "notes": "V26: Switched from Accela to ArcGIS. Fresh data available.",
+        "notes": "V54: Fixed date_format from 'none' to 'string' — submitted_date is ISO string (2026-03-31). Server-side filtering now works.",
     },
 
     "pittsburgh": {
@@ -893,11 +893,19 @@ CITY_REGISTRY = {
         "endpoint": "https://aca-prod.accela.com/SANDIEGO/Cap/CapHome.aspx?module=DSD&TabName=DSD",
         "dataset_id": "",
         "description": "Building Permits via Accela Citizen Access",
-        "field_map": {},
-        "date_field": "",
+        "field_map": {
+            "permit_number": "Record Number",
+            "permit_type": "Record Type",
+            "address": "Address",
+            "description": "Description",
+            "issued_date": "Date",
+            "date": "Date",
+            "status": "Status"
+        },
+        "date_field": "Date",
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live. Agency=SANDIEGO, module=DSD.
-        "notes": "V42: Switched from empty placeholder to Accela. Agency=SANDIEGO, module=DSD (Development Services Dept). Also has CE, Cannabis, ShortTermRental modules.",
+        "active": True,
+        "notes": "V54: Reactivated Accela with field_map. Agency=SANDIEGO, module=DSD. Top-10 city.",
     },
 
     "sacramento": {
@@ -1261,8 +1269,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
-        "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/INDY.",
+        "active": True,
+        "notes": "V54: Reactivated Accela — Playwright installed on Render. Top-15 city by population.",
     },
 
     "louisville": {
@@ -1378,8 +1386,8 @@ CITY_REGISTRY = {
             "description": "Description",
         },
         "date_field": "Date",
-        "active": False,
-        "notes": "V48: Switched from stale CKAN to Accela portal",
+        "active": True,
+        "notes": "V54: Reactivated Accela — Playwright confirmed working on Render. Top-30 city.",
     },
 
     # V23 AUDIT: 2026-03-28 - LOGIN_REQUIRED - Uses Accela
@@ -1403,8 +1411,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
-        "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/OAKLAND.",
+        "active": True,
+        "notes": "V54: Reactivated Accela — Playwright confirmed working on Render.",
     },
 
     # V23 AUDIT: 2026-03-28 - Uses custom Accela at access.okc.gov (not aca-prod)
@@ -1428,8 +1436,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
-        "notes": "V24: OKC uses custom Accela domain (access.okc.gov/aca). Scraper supports via base_url override.",
+        "active": True,
+        "notes": "V54: Reactivated Accela — uses custom domain access.okc.gov. Playwright confirmed working on Render.",
     },
 
     "omaha": {
@@ -1997,8 +2005,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
-        "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/DALLASTX.",
+        "active": True,
+        "notes": "V54: Reactivated Accela — Socrata endpoint (dallas_tx) dead since 2019. Playwright installed on Render.",
     },
 
     "framingham": {
@@ -2047,8 +2055,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live with data. Has address, cost, status.
-        "notes": "V43: Activated. Parker CO Socrata — confirmed working.",
+        "active": False,
+        "notes": "V54: Deactivated — data ends 2017, no recent permits.",
     },
 
     "albany": {
@@ -2071,8 +2079,8 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": True,
-        "notes": "Historical data 2009-2013",
+        "active": False,
+        "notes": "V54: Deactivated — frozen dataset, historical data 2009-2013 only.",
     },
 
     "prince_georges_county": {
@@ -3471,8 +3479,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live. Has address, type, amount, work description.
-        "notes": "V43: Activated. Somerville MA Socrata — confirmed working with address data.",
+        "active": False,
+        "notes": "V54: Deactivated — data stale since Oct 2023, no recent permits.",
     },
 
     "norfolk_new": {
@@ -5184,10 +5192,10 @@ CITY_REGISTRY = {
             "parcel": "parcel",
         },
         "date_field": "permitissued",
-        "date_format": "none",
+        "date_format": "date",
         "limit": 2000,
         "active": True,
-        "notes": "V26: ArcGIS FeatureServer working. 186K permits, 5,641 in 2025, 1,277 in 2026.",
+        "notes": "V54: Fixed date_format from 'none' to 'date' — DATE syntax confirmed working. Fresh data Mar 2026.",
     },
 
     "riverside": {
@@ -6706,8 +6714,8 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,  # V41: Accela confirmed working, 1700+ permits already in DB.
-        "notes": "V35: Old Socrata domain (data.elpasotexas.gov) DNS dead. Accela at aca-prod.accela.com/ELPASO confirmed live. Agency=ELPASO, module=Building.",
+        "active": True,
+        "notes": "V54: Reactivated Accela — old Socrata domain DNS dead. Playwright installed on Render. Agency=ELPASO, module=Building.",
     },
 
     "arlington": {
@@ -7281,10 +7289,10 @@ CITY_REGISTRY = {
             "parcel": "FOLIO",
         },
         "date_field": "ISSUDATE",
-        "date_format": "none",
+        "date_format": "date",
         "limit": 2000,
         "active": True,
-        "notes": "V26: Data via Miami-Dade County bulk source. 262K county-wide permits.",
+        "notes": "V54: Fixed date_format from 'none' to 'date' — DATE syntax confirmed working. Fresh data Mar 2026.",
     },
 
     "port_st_lucie": {
@@ -7421,10 +7429,10 @@ CITY_REGISTRY = {
             "contractor_phone": "CONTRACTPH",
         },
         "date_field": "SUBMITDT",
-        "date_format": "none",
+        "date_format": "date",
         "limit": 2000,
         "active": True,
-        "notes": "V50: Fixed endpoint — city moved from /server/BuildingPermits/FeatureServer to /arcgis/BuildingPermitTracker/MapServer. Data current Mar 2026. date_format=none because MapServer rejects epoch WHERE clauses. Python-side filter handles it.",
+        "notes": "V54: Fixed date_format from 'none' to 'date' — DATE syntax confirmed working on MapServer (epoch rejected but DATE accepted). Fresh data Mar 2026.",
     },
 
     "pembroke_pines": {
@@ -9301,9 +9309,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-        "status": "paused",
-        "notes": "V46: Paused — dataset 7rnz-5kxm returns 404, data removed from Socrata. Need replacement endpoint.",
+        "active": False,
+        "notes": "V54: Deactivated — dataset 7rnz-5kxm returns 404. No replacement found on data.richmondgov.com.",
     },
 
     "norfolk": {
@@ -9733,25 +9740,26 @@ CITY_REGISTRY = {
         "lat": 35.961,
         "lon": -83.921,
         "platform": "arcgis",
-        "endpoint": "https://services1.arcgis.com/QWaOgwdmpqI9HUzf/arcgis/rest/services/LDTM_Permits/FeatureServer/0/query",
-        "dataset_id": "LDTM_Permits",
+        "endpoint": "https://services1.arcgis.com/QWaOgwdmpqI9HUzf/arcgis/rest/services/BuildingPermits_KNO/FeatureServer/0/query",
+        "dataset_id": "BuildingPermits_KNO",
         "description": "Knox County Building Permits (Knoxville, Farragut, Knox County)",
         "field_map": {
-            "permit_number": "PERMITNUMB",
+            "permit_number": "PERMITNUMBER",
             "permit_type": "PERMITTYPE",
             "work_type": "CLASSWORK",
             "address": "ADDRESS",
             "owner_name": "OWNER",
             "contact_name": "CONTRACTOR",
             "filing_date": "DATEISSUED",
-            "estimated_cost": "PERMITVALU",
-            "description": "DESCRIPTIO",
+            "estimated_cost": "PERMITVALUE",
+            "description": "GOVTREMARKS",
+            "land_use": "LANDUSE",
         },
         "date_field": "DATEISSUED",
-        "date_format": "none",
+        "date_format": "epoch",
         "limit": 2000,
         "active": True,
-        "notes": "V18: Replaced fabricated Socrata with real ArcGIS — premium data: OWNER, CONTRACTOR, PERMITVALU, SQFEET, LANDUSE",
+        "notes": "V54: Switched from LDTM_Permits (stale Jan 2025) to BuildingPermits_KNO. Epoch dates, fresh 2026 data. OWNER, CONTRACTOR, PERMITVALUE.",
     },
 
     "chattanooga": {
@@ -9760,28 +9768,24 @@ CITY_REGISTRY = {
         "slug": "chattanooga",
         "lat": 35.046,
         "lon": -85.309,
-        "platform": "arcgis",
-        "endpoint": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0/query",
-        "dataset_id": "Chatt_permits_to_12_31_2025",
-        "description": "Chattanooga/Hamilton County Building Permits 2006-2025 (Regional Planning Agency)",
+        "platform": "socrata",
+        "endpoint": "https://www.chattadata.org/resource/v7br-pci3.json",
+        "dataset_id": "v7br-pci3",
+        "description": "All Permit Data — Chattanooga Development Review & Permitting",
         "field_map": {
-            "permit_number": "PERMIT_NUM",
-            "permit_type": "P_TYPE",
-            "work_type": "CATEGORY",
-            "address": "ADDRESS",
-            "filing_date": "PERMIT_DAT",
-            "estimated_cost": "VALUATION",
-            "description": "P_DESC",
-            "housing_units": "HOUSING_UN",
-            "development_type": "DEV_TYPE_C",
-            "city": "CITY",
-            "council_district": "COUNCIL_DISTRICT",
+            "permit_number": "permitnum",
+            "permit_type": "permit_class",
+            "address": "address",
+            "filing_date": "applieddate",
+            "issued_date": "issueddate",
+            "status": "status",
+            "description": "description",
+            "contractor": "contractor",
         },
-        "date_field": "PERMIT_DAT",
-        "date_format": "none",
+        "date_field": "issueddate",
         "limit": 2000,
         "active": True,
-        "notes": "V19: Replaced dead Socrata endpoint with ArcGIS FeatureServer from Chattanooga-Hamilton County Regional Planning Agency. Data 2006-2025. Fields: PERMIT_NUM, ADDRESS, VALUATION, PERMIT_DAT, CATEGORY (AAR/Demo/Move/New/Other), P_TYPE (Residential/Non-Residential/Mixed), P_DESC, HOUSING_UN. No contractor info but has valuation and detailed descriptions.",
+        "notes": "V54: Replaced frozen ArcGIS (ended 12/31/2025) with ChattaData Socrata portal. Fresh data 2006-present. Has contractor, status, dates.",
     },
 
     "huntsville": {
@@ -10287,7 +10291,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": False,
+        "notes": "V54: Deactivated — dead URL, domain unreachable.",
     },
 
     "hayward": {
@@ -11656,8 +11661,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V34: Deactivated — duplicate of 'cambridge' which has richer field map.",
+        "active": False,
+        "notes": "V54: Deactivated — duplicate of 'cambridge' which has richer field map.",
     },
 
     "quincy_ma": {
@@ -15055,8 +15060,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.60: Dallas TX building permits. Includes contractor info.",
+        "active": False,
+        "notes": "V54: Deactivated — data ends 12/31/2019. Confirmed dead via API test.",
     },
 
     # --- Cincinnati OH ---
