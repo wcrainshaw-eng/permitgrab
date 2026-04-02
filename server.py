@@ -2300,8 +2300,18 @@ def sync_city_registry_to_prod_cities():
                 normalized_slug = slug
 
             if city_key in existing:
-                # Already in prod_cities with this source_id — skip
-                skipped += 1
+                # Already in prod_cities with this source_id
+                # V53: Un-pause if config is active but prod_cities is paused
+                if existing[city_key]['status'] == 'paused':
+                    conn.execute("""
+                        UPDATE prod_cities SET status = 'active',
+                            notes = 'V53: Auto-reactivated — config active in CITY_REGISTRY'
+                        WHERE source_id = ?
+                    """, (city_key,))
+                    updated += 1
+                    print(f"  [V53] Reactivated {city_key} (was paused, config is active)")
+                else:
+                    skipped += 1
                 continue
 
             if normalized_slug in existing_slugs:
@@ -2324,8 +2334,26 @@ def sync_city_registry_to_prod_cities():
                     updated += 1
                     print(f"  [V44] Updated {city_name}: {old_source} -> {city_key}")
                 else:
-                    # Both sources active — keep existing, skip new
-                    skipped += 1
+                    # V53: Both sources active — insert as additional entry with unique slug
+                    # This allows multiple endpoints for the same city to coexist
+                    try:
+                        unique_slug = f"{slug}-{city_key}"  # e.g. "norfolk-norfolk_va"
+                        permitdb.upsert_prod_city(
+                            city=city_name,
+                            state=state,
+                            city_slug=unique_slug,
+                            source_type=platform,
+                            source_id=city_key,
+                            source_scope='city',
+                            status='active',
+                            added_by='v53_sync',
+                            notes=f"V53: Additional source (slug conflict with {old_source})"
+                        )
+                        synced += 1
+                        print(f"  [V53] Added {city_key} as additional source for {city_name}")
+                    except Exception as e:
+                        print(f"  [V53] Error adding {city_key}: {e}")
+                        skipped += 1
                 continue
 
             # New city — insert into prod_cities
