@@ -316,9 +316,7 @@ def atomic_write_json(filepath, data, indent=2):
 def fetch_socrata(config, days_back):
     """Fetch permits from a Socrata SODA API."""
     endpoint = config["endpoint"]
-    # V55: Auto-append /query if missing — ArcGIS REST API requires it
-    if not endpoint.rstrip('/').endswith('/query'):
-        endpoint = endpoint.rstrip('/') + '/query'
+    # V60: Removed V55 /query auto-append — was incorrectly appending /query to Socrata .json URLs causing 404s
     date_field = config["date_field"]
     limit = config.get("limit", 2000)
 
