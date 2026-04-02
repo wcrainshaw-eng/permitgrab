@@ -16816,6 +16816,42 @@ BULK_SOURCES = {
         "active": True,
     },
 }
+    # --- Miami FL (ArcGIS) ---
+    "miami_fl": {
+        "city": "Miami",
+        "state": "FL",
+        "slug": "miami",
+        "lat": 25.762,
+        "lon": -80.192,
+        "platform": "arcgis",
+        "endpoint": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
+        "date_field": "ISSUE_DATE",
+        "active": True,
+    },
+    # --- Janesville WI (Socrata) ---
+    "janesville_wi": {
+        "city": "Janesville",
+        "state": "WI",
+        "slug": "janesville",
+        "lat": 42.683,
+        "lon": -89.019,
+        "platform": "socrata",
+        "endpoint": "https://janesville.data.socrata.com/resource/qskr-bfe6.json",
+        "date_field": "issue_date",
+        "active": True,
+    },
+    # --- Forsyth County GA (ArcGIS) ---
+    "forsyth_county_ga": {
+        "city": "Forsyth County",
+        "state": "GA",
+        "slug": "forsyth-county",
+        "lat": 34.228,
+        "lon": -84.143,
+        "platform": "arcgis",
+        "endpoint": "https://geo.forsythco.com/gis3/rest/services/Public_EnerGovPlans/Building_Permits/FeatureServer/0",
+        "date_field": "ISSUED_DATE",
+        "active": True,
+    },
 
 # ============================================================================
 # HELPER FUNCTIONS
