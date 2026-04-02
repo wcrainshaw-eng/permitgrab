@@ -366,6 +366,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.everettwa.gov/resource/3w3u-656c.json",
         "dataset_id": "3w3u-656c",
         "description": "Trakit Permits (data.everettwa.gov)",
+        "date_field": "issueddate",
         "field_map": {
             "permit_number": "permitno",
             "permit_type": "permittype",
@@ -1662,6 +1663,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.cityoforlando.net/resource/ryhf-m453.json",
         "dataset_id": "ryhf-m453",
         "description": "City of Orlando Permit Applications",
+        "date_field": "processed_date",
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "application_type",
@@ -1938,6 +1940,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.montgomerycountymd.gov/resource/qxie-8qnp.json",
         "dataset_id": "qxie-8qnp",
         "description": "Electrical Building Permits",
+        "date_field": "issueddate",
         "field_map": {
             "permit_number": "permitno",
             "permit_type": "worktype",
@@ -11649,6 +11652,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.cambridgema.gov/resource/9qm7-wbdc.json",
         "dataset_id": "9qm7-wbdc",
         "description": "Building Permits - Cambridge MA Open Data (Socrata)",
+        "date_field": "issue_date",
         "field_map": {
             "permit_number": "id",
             "permit_type": "permit_type",
@@ -15072,6 +15076,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.cincinnati-oh.gov/resource/uhjb-xac9.json",
         "dataset_id": "uhjb-xac9",
         "description": "Cincinnati OH Building Permits",
+        "date_field": "issueddate",
         "field_map": {
             "permit_number": "permitnum",
             "description": "description",
@@ -15309,6 +15314,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.framinghamma.gov/resource/2vzw-yean.json",
         "dataset_id": "2vzw-yean",
         "description": "Framingham MA Building Permits",
+        "date_field": "applied",
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "permit_type",
@@ -15860,6 +15866,7 @@ CITY_REGISTRY = {
         "endpoint": "https://data.oxnard.org/resource/vmzx-48vx.json",
         "dataset_id": "vmzx-48vx",
         "description": "Oxnard CA Building Permits",
+        "date_field": "permitissuedate",
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "permit_type",
@@ -16027,6 +16034,7 @@ BULK_SOURCES = {
         "endpoint": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json",
         "dataset_id": "weik-ttee",
         "description": "Prince George's County MD Permits - 100+ cities",
+        "date_field": "permit_issuance_date",
         "city_field": "city",
         "field_map": {
             "permit_number": "permit_case_id",
@@ -16051,6 +16059,7 @@ BULK_SOURCES = {
         "endpoint": "https://data.brla.gov/resource/7fq7-8j7r.json",
         "dataset_id": "7fq7-8j7r",
         "description": "East Baton Rouge Parish Building Permits",
+        "date_field": "issueddate",
         "city_field": "city1",
         "field_map": {
             "permit_number": "permitnumber",
@@ -16151,6 +16160,7 @@ BULK_SOURCES = {
         "endpoint": "https://data.marincounty.gov/resource/mkbn-caye.json",
         "dataset_id": "mkbn-caye",
         "description": "Marin County Building Permits (30 cities)",
+        "date_field": "issued_date",
         "city_field": "city_town",
         "field_map": {
             "permit_number": "permit_number",
