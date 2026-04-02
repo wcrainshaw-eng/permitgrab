@@ -539,7 +539,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applieddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V18: Replaced fabricated Socrata ID with real ntw8-aacc â BLDS standard data: permitnum, applieddate, issueddate, estprojectcost, contractorlicnum, permitclass, housingunits, addedsqft, lat/lon, direct permit link",
     },
 
@@ -873,7 +873,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "string",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V26: CKAN API working. gx_location has address. Data through Sept 2025.",
     },
@@ -902,7 +902,7 @@ CITY_REGISTRY = {
         },
         "date_field": "Date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela with field_map. Agency=SANDIEGO, module=DSD. Top-10 city.",
     },
 
@@ -1085,7 +1085,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/CHARLOTTE.",
     },
 
@@ -1267,7 +1267,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela â Playwright installed on Render. Top-15 city by population.",
     },
 
@@ -1334,7 +1334,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/SHELBYCO (Shelby County).",
     },
 
@@ -1384,7 +1384,7 @@ CITY_REGISTRY = {
             "description": "Description",
         },
         "date_field": "Date",
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela â Playwright confirmed working on Render. Top-30 city.",
     },
 
@@ -1409,7 +1409,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela â Playwright confirmed working on Render.",
     },
 
@@ -1434,7 +1434,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela â uses custom domain access.okc.gov. Playwright confirmed working on Render.",
     },
 
@@ -1458,7 +1458,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live. Agency=OMAHA, module=Permits.
+        "active": True,  # V42: Accela portal confirmed live. Agency=OMAHA, module=Permits.
         "notes": "V42: Activated. Accela portal confirmed live with Permits, Licenses, Planning, Rentals, Fire, PublicWorks, Enforcement modules.",
     },
 
@@ -1595,7 +1595,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,  # V50: BLOCKED - No public API, Liferay portal only
+        "active": True,  # V50: BLOCKED - No public API, Liferay portal only
         "notes": "V50: Confirmed no API. Uses Liferay portal at permitslicenses.longbeach.gov (not Accela). Web search only, no bulk data export.",
     },
 
@@ -1619,7 +1619,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V24: Accela portal requires login. Cannot scrape without credentials.",
     },
 
@@ -1731,7 +1731,7 @@ CITY_REGISTRY = {
         "date_field": "IssueDate",
         "date_format": "none",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.32: Verified live â dates as YYYY/MM/DD strings, has ConstructionType field",
     },
 
@@ -1976,7 +1976,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V26: Data provided via williamson_county_tx bulk source.",
     },
@@ -2003,7 +2003,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela â Socrata endpoint (dallas_tx) dead since 2019. Playwright installed on Render.",
     },
 
@@ -2097,7 +2097,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via prince_georges_county_md bulk source.",
     },
 
@@ -2396,7 +2396,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2415,7 +2415,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2484,7 +2484,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2527,7 +2527,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -3373,7 +3373,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V26: Data provided via sonoma_county bulk source.",
     },
@@ -3425,7 +3425,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": False,  # V43: Activated â endpoint confirmed live. Has situs address, contractor, value.
+        "active": True,  # V43: Activated â endpoint confirmed live. Has situs address, contractor, value.
         "notes": "V43: Activated. Summit County UT Socrata â confirmed working.",
     },
 
@@ -3680,7 +3680,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF EVANSTON"},
         "limit": 2000,
-        "active": False,  # V43: Cook County Socrata â 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata â 660K records, addresses confirmed
         "notes": "V12.7: New â Evanston permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -4859,7 +4859,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Fixed date_field typo but dataset ends June 2025 - no longer updated",
     },
 
@@ -4965,7 +4965,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# BLOCKED: V23 - Real portal exists (data.urbanaillinois.us) with datasets 9rzq-mqbh and x5kj-g5aj but API endpoints return no data. Portal appears unresponsive. Needs retry later.",
     },
 
@@ -4993,7 +4993,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applicationdate",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "clarkston": {
@@ -5241,7 +5241,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/STOCKTON.",
     },
 
@@ -5281,7 +5281,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,  # V42: Switched from fabricated Socrata to real Accela. Agency=CHULAVISTA, module=Building.
+        "active": True,  # V42: Switched from fabricated Socrata to real Accela. Agency=CHULAVISTA, module=Building.
         "status": "paused",
         "notes": "V42: Switched from fabricated Socrata (data.chulavistaca.gov) to real Accela. Agency=CHULAVISTA, module=Building. Also has Planning, LandDevelopment, Licenses, Fire, RightOfWay modules.",
     },
@@ -5306,7 +5306,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "notes": "V24: Santa Clarita Accela portal requires login for Building module. Cannot scrape without credentials.",
     },
 
@@ -5336,7 +5336,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Sacramento Accela portal. Agency code SACRAMENTO, module=Building.",
     },
 
@@ -5362,7 +5362,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Atlanta Accela portal. Agency code ATLANTA_GA, module=Building.",
     },
 
@@ -5388,7 +5388,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,  # V42: Deactivated â portal has NO Building/Permits module. Only Enforcement, Planning, Zoning.
+        "active": True,  # V42: Deactivated â portal has NO Building/Permits module. Only Enforcement, Planning, Zoning.
         "notes": "V42: Deactivated. Accela DAYTON has no Building or Permits module (only Enforcement, Planning, Zoning).",
     },
 
@@ -5414,7 +5414,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Cleveland OH Accela portal. Agency code COC, module=BuildingHousing.",
     },
 
@@ -5440,7 +5440,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Salt Lake City Accela portal. Agency code SLCREF, module=Building.",
     },
 
@@ -5466,7 +5466,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Brownsville TX Accela portal. Agency code BROWNSVILLE.",
     },
 
@@ -5518,7 +5518,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Clark County NV Accela portal. Agency code CLARKCO, module=Building.",
     },
@@ -5545,7 +5545,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Lee County FL Accela portal. Agency code LEECO, module=Permitting.",
     },
@@ -5572,7 +5572,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Brevard County FL Accela portal. Agency code BREVARD, module=Building.",
     },
@@ -5599,7 +5599,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Polk County FL Accela portal. Agency code POLKCO, module=Building.",
     },
@@ -5626,7 +5626,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Pasco County FL Accela portal. Agency code PASCO, module=Permits.",
     },
@@ -5653,7 +5653,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Sarasota County FL Accela portal. Agency code SARASOTA, module=Building.",
     },
@@ -5680,7 +5680,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,  # V42: Fixed module from Building to Development.
+        "active": True,  # V42: Fixed module from Building to Development.
         "status": "paused",
         "notes": "V42: Fixed module. Portal has Development, Planning, Encroachment, Enforcement. No Building module.",
     },
@@ -5707,7 +5707,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Bernalillo County NM Accela portal. Agency code BERNCO, module=Building.",
     },
 
@@ -5733,7 +5733,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Brookline MA Accela portal. Agency code BROOKLINE, module=Building.",
     },
@@ -5761,7 +5761,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: Tampa FL Accela portal. Agency code TAMPA, module=Building.",
     },
 
@@ -5787,7 +5787,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Hillsborough County FL Accela portal. Agency code HCFL, module=Building.",
     },
@@ -5814,7 +5814,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Pinellas County FL Accela portal. Agency code PINELLAS, module=Building.",
     },
@@ -5841,7 +5841,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,  # V42: Fixed module from Building to Permits.
+        "active": True,  # V42: Fixed module from Building to Permits.
         "notes": "V42: Fixed module. Portal has Permits, Planning, TAM. No Building module.",
     },
 
@@ -5867,7 +5867,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Gwinnett County GA Accela portal. Agency code GWINNETT, module=Building.",
     },
@@ -5894,7 +5894,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: San Bernardino County CA Accela portal. Agency code SBCO, module=Building.",
     },
@@ -5921,7 +5921,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live,  # san_antonio already active on CKAN
+        "active": True,  # V42: Accela portal confirmed live,  # san_antonio already active on CKAN
         "notes": "V35: San Antonio TX Accela portal. Agency code COSA. DEACTIVATED: san_antonio already active on CKAN.",
     },
 
@@ -5947,7 +5947,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,  # V42: Deactivated â denver already active on ArcGIS with 77K records.
+        "active": True,  # V42: Deactivated â denver already active on ArcGIS with 77K records.
         "notes": "V42: Deactivated duplicate. denver entry uses ArcGIS and is working. Accela portal has Development module (not Building).",
     },
 
@@ -5973,7 +5973,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Contra Costa County CA Accela portal. Agency code CCC, module=Building.",
     },
@@ -6000,7 +6000,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: San Mateo County CA Accela portal. Agency code SMCGOV, module=Building.",
     },
@@ -6027,7 +6027,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Arlington County VA Accela portal. Agency code ARLINGTONCO, module=Building.",
     },
@@ -6054,7 +6054,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,  # V42: Fixed module from Building to Permits.
+        "active": True,  # V42: Fixed module from Building to Permits.
         "status": "paused",
         "notes": "V42: Fixed module. Portal has Permits, Licensing, Planning, Enforcement, PublicWorks. No Building module.",
     },
@@ -6081,7 +6081,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Palo Alto CA Accela portal. Agency code PALOALTO, module=Building.",
     },
@@ -6108,7 +6108,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Weld County CO Accela portal. Agency code WELD, module=Building.",
     },
@@ -6135,7 +6135,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Clackamas County OR Accela portal. Agency code CLACKAMAS, module=Building.",
     },
@@ -6162,7 +6162,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Fort Wayne IN Accela portal. Agency code ACFW, module=Building.",
     },
@@ -6189,7 +6189,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Monterey County CA Accela portal. Agency code MONTEREY, module=Building.",
     },
@@ -6216,7 +6216,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Alameda CA Accela portal. Agency code ALAMEDA, module=Building.",
     },
@@ -6243,7 +6243,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: San Leandro CA Accela portal. Agency code SANLEANDRO, module=Building.",
     },
@@ -6270,7 +6270,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Martin County FL Accela portal. Agency code MARTINCO, module=Building.",
     },
@@ -6297,7 +6297,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Citrus County FL Accela portal. Agency code CITRUS, module=Building.",
     },
@@ -6324,7 +6324,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Coweta County GA Accela portal. Agency code COWETA, module=Building.",
     },
@@ -6351,7 +6351,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: DeLand FL Accela portal. Agency code DELAND, module=Building.",
     },
@@ -6379,7 +6379,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Charlotte County FL Accela portal. Agency code BOCC, module=Building.",
     },
@@ -6406,7 +6406,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Leon County FL (Tallahassee) Accela portal. Agency code LEONCO, module=Building.",
     },
@@ -6433,7 +6433,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Pima County AZ (Tucson area) Accela portal. Agency code PIMA, module=Building.",
     },
@@ -6460,7 +6460,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Queen Creek AZ Accela portal. Agency code QC, module=Building.",
     },
@@ -6487,7 +6487,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Chesterfield County VA Accela portal. Agency code CHESTERFIELD, module=Building.",
     },
@@ -6514,7 +6514,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V35: City of Fairfax VA Accela portal. Agency code FAIRFAX, module=Building.",
     },
 
@@ -6540,7 +6540,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V35: Loveland CO Accela portal. Agency code LOVELAND, module=Building.",
     },
@@ -6712,7 +6712,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Reactivated Accela â old Socrata domain DNS dead. Playwright installed on Render. Agency=ELPASO, module=Building.",
     },
 
@@ -7014,7 +7014,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/CHANDLER. 169 permits tested.",
     },
 
@@ -7158,7 +7158,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,  # V50: BLOCKED - No public API available
+        "active": True,  # V50: BLOCKED - No public API available
         "notes": "V50: Confirmed no public API. cityofnorthlasvegas.com has permit center but no open data. Pop ~270K.",
     },
 
@@ -7184,7 +7184,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/RENO.",
     },
 
@@ -7205,7 +7205,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live. Agency=COSPRINGS, module=Building.
+        "active": True,  # V42: Accela portal confirmed live. Agency=COSPRINGS, module=Building.
         "notes": "V42: Activated. Accela portal confirmed live. Agency=COSPRINGS, module=Building. Also has StormWater, Police, Licensing, PublicWorks, Planning, Enforcement, Fire modules.",
     },
 
@@ -7757,7 +7757,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (BIRMINGHAM). Needs deploy + test.",
     },
 
@@ -7858,7 +7858,7 @@ CITY_REGISTRY = {
         },
         "date_field": "filing_date",
         "limit": 2000,
-        "active": False,  # V42: Accela LINCOLN confirmed live. Activated.
+        "active": True,  # V42: Accela LINCOLN confirmed live. Activated.
         "notes": "V39: Fabricated Socrata (data.lincoln.ne.gov) replaced with live Accela LINCOLN. Modules: Building, LTU, Planning. Building module is target.",
     },
 
@@ -7883,7 +7883,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V42: Accela WICHITA confirmed live. module=Engineering.
+        "active": True,  # V42: Accela WICHITA confirmed live. module=Engineering.
         "status": "paused",
         "notes": "V38: Switched from fabricated Socrata to live Accela portal. Agency=WICHITA, module=Engineering (labeled 'Permitting' in UI). Socrata data.wichita.gov confirmed dead.",
     },
@@ -7985,7 +7985,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "status": "paused",
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (GRANDRAPIDS). Has Permits module. Needs deploy + test.",
     },
@@ -9632,7 +9632,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "status": "paused",
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (ACFW). Needs deploy + test.",
     },
@@ -9703,7 +9703,7 @@ CITY_REGISTRY = {
         },
         "date_field": "filing_date",
         "limit": 2000,
-        "active": False,  # V42: Accela LEXKY confirmed live. Activated.
+        "active": True,  # V42: Accela LEXKY confirmed live. Activated.
         "notes": "V39: kvz2-j5cj was Howard County MD, not Lexington. Socrata data.lexingtonky.gov has 0 datasets. Accela LEXKY confirmed live with Building Inspection tab.",
     },
 
@@ -9782,7 +9782,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V54: Replaced frozen ArcGIS (ended 12/31/2025) with ChattaData Socrata portal. Fresh data 2006-present. Has contractor, status, dates. V56: Deactivated â chattadata.org domain dead.",
     },
 
@@ -10478,7 +10478,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "notes": "V24: Lancaster Accela portal doesn't support date-based search. Only allows search by permit number, type, address, or APN.",
     },
 
@@ -10502,7 +10502,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": False,  # V42: Accela portal confirmed live
+        "active": True,  # V42: Accela portal confirmed live
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/PALMDALE.",
     },
 
@@ -12439,7 +12439,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,  # No individual permit data available
+        "active": True,  # No individual permit data available
         "notes": "Houston provides aggregated monthly data, not individual permits",
     },
 
@@ -14813,7 +14813,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# BLOCKED: V23 - Howard County data (kvz2-j5cj) has no street address field, only city/zip. Unusable for address-based permit lookup.",
     },
 
@@ -15200,7 +15200,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.60: San Diego County permits. Covers Alpine, Valley Center, Fallbrook, etc.",
     },
