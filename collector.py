@@ -316,6 +316,9 @@ def atomic_write_json(filepath, data, indent=2):
 def fetch_socrata(config, days_back):
     """Fetch permits from a Socrata SODA API."""
     endpoint = config["endpoint"]
+    # V55: Auto-append /query if missing — ArcGIS REST API requires it
+    if not endpoint.rstrip('/').endswith('/query'):
+        endpoint = endpoint.rstrip('/') + '/query'
     date_field = config["date_field"]
     limit = config.get("limit", 2000)
 
@@ -518,6 +521,9 @@ def fetch_json(config, days_back):
     Example: St. Louis MO ColdFusion endpoint.
     """
     endpoint = config["endpoint"]
+    # V55: Auto-append /query if missing — ArcGIS REST API requires it
+    if not endpoint.rstrip('/').endswith('/query'):
+        endpoint = endpoint.rstrip('/') + '/query'
     date_field = config.get("date_field", "")
     limit = config.get("limit", 2000)
 
