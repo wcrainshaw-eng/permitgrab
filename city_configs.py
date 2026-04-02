@@ -539,7 +539,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applieddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V18: Replaced fabricated Socrata ID with real ntw8-aacc — BLDS standard data: permitnum, applieddate, issueddate, estprojectcost, contractorlicnum, permitclass, housingunits, addedsqft, lat/lon, direct permit link",
     },
 
@@ -873,7 +873,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "string",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V26: CKAN API working. gx_location has address. Data through Sept 2025.",
     },
@@ -1731,7 +1731,7 @@ CITY_REGISTRY = {
         "date_field": "IssueDate",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.32: Verified live — dates as YYYY/MM/DD strings, has ConstructionType field",
     },
 
@@ -1976,7 +1976,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V26: Data provided via williamson_county_tx bulk source.",
     },
@@ -2097,7 +2097,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V26: Data provided via prince_georges_county_md bulk source.",
     },
 
@@ -3373,7 +3373,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V26: Data provided via sonoma_county bulk source.",
     },
@@ -3425,7 +3425,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live. Has situs address, contractor, value.
+        "active": False,  # V43: Activated — endpoint confirmed live. Has situs address, contractor, value.
         "notes": "V43: Activated. Summit County UT Socrata — confirmed working.",
     },
 
@@ -4859,7 +4859,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.8: Fixed date_field typo but dataset ends June 2025 - no longer updated",
     },
 
@@ -4993,7 +4993,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applicationdate",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "clarkston": {
@@ -12439,7 +12439,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": True,  # No individual permit data available
+        "active": False,  # No individual permit data available
         "notes": "Houston provides aggregated monthly data, not individual permits",
     },
 
@@ -15200,7 +15200,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V12.60: San Diego County permits. Covers Alpine, Valley Center, Fallbrook, etc.",
     },
