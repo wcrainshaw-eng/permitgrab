@@ -480,7 +480,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: DCRA FeatureServer layer 4 (Last 30 Days rolling feed). date_format=none because epoch WHERE fails. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, lat/lon. Backfilled 2,000 permits 2026-03-31.",
     },
@@ -1574,7 +1574,7 @@ CITY_REGISTRY = {
         "date_field": "StartDate",
         "date_format": "none",
         "limit": 2000,
-        "active": True,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
+        "active": False,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
         "notes": "V43: Activated. Lynchburg VA permits via ArcGIS MapServer. Fresh data Mar 2026. Pop ~79K.",
     },
 
@@ -2115,7 +2115,7 @@ CITY_REGISTRY = {
         },
         "date_field": "yrmo",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "# V23 BLOCKED: NJ state dataset w9se-dmra has NO address fields - only block/lot numbers. Cannot match to properties.",
     },
 
@@ -3297,7 +3297,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_ENTERED",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.9: New — Alpharetta GA ArcGIS permits. Pop ~67K. No orderByFields support.",
     },
 
@@ -3321,7 +3321,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedDate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.9: New — Pierce County WA ArcGIS permits. Covers Lakewood, Tacoma unincorp, etc.",
     },
 
@@ -5083,7 +5083,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "nola_blds": {
@@ -5967,7 +5967,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V35: Contra Costa County CA Accela portal. Agency code CCC, module=Building.",
     },
@@ -7599,7 +7599,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUE_DATE",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "columbia_sc": {
@@ -8186,7 +8186,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.7: New — Johns Creek permits via ArcGIS FeatureServer (DataHub). Data current Dec 2025. Includes fire, plumbing, ROW, building permits. Pop ~82K.",
     },
 
@@ -9248,7 +9248,7 @@ CITY_REGISTRY = {
         "date_field": "INDATE",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.7: New — Volusia County AMANDA permits via ArcGIS. County-wide (includes Deltona, DeLand, Orange City, etc). FOLDERNAME contains address+city. FOLDERTYPE: RES/COM/etc. Data current Feb 2026. Pop ~94K.",
     },
 
@@ -11234,7 +11234,7 @@ CITY_REGISTRY = {
         "date_field": "Issued_Date",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
+        "active": False,
     },
 
     "santa_fe": {
@@ -13066,7 +13066,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "SILVER SPRING"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13090,7 +13090,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "city_filter": {"field": "city", "value": "BETHESDA"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13997,7 +13997,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "POINT REYES STATION"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14199,7 +14199,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "FOREST KNOLLS"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -15561,7 +15561,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,
         "notes": "V12.60: Pierce County WA Socrata permits. Covers Tacoma unincorp, Lakewood, etc.",
     },
 
@@ -16087,7 +16087,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": True,
+        "active": False,
         "status": "paused",
         "notes": "V12.39: Fixed date_field to 'issued', cost to 'jobvalue'",
     },
