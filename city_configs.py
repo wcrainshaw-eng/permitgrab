@@ -16815,20 +16815,6 @@ BULK_SOURCES = {
         "description": "Building Permits 2018-present (data.nola.gov)",
         "active": True,
     },
-}
-    # --- Miami FL (ArcGIS) ---
-    "miami_fl": {
-        "city": "Miami",
-        "state": "FL",
-        "slug": "miami",
-        "lat": 25.762,
-        "lon": -80.192,
-        "platform": "arcgis",
-        "endpoint": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
-        "date_field": "ISSUE_DATE",
-        "active": True,
-    },
-    # --- Janesville WI (Socrata) ---
     "janesville_wi": {
         "city": "Janesville",
         "state": "WI",
@@ -16840,7 +16826,6 @@ BULK_SOURCES = {
         "date_field": "issue_date",
         "active": True,
     },
-    # --- Forsyth County GA (ArcGIS) ---
     "forsyth_county_ga": {
         "city": "Forsyth County",
         "state": "GA",
@@ -16852,6 +16837,8 @@ BULK_SOURCES = {
         "date_field": "ISSUED_DATE",
         "active": True,
     },
+}
+
 
 # ============================================================================
 # HELPER FUNCTIONS
