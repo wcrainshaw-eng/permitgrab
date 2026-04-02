@@ -16756,6 +16756,55 @@ BULK_SOURCES = {
             "issue_date": "certificatedate"
         }
     },
+
+    "saint_paul_mn": {
+        "city": "Saint Paul",
+        "state": "MN",
+        "slug": "saint-paul",
+        "lat": 44.954,
+        "lon": -93.090,
+        "platform": "arcgis",
+        "endpoint": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Building_Permits_/FeatureServer/0",
+        "date_field": "ISSUEDATE",
+        "description": "Building Permits Dataset (City of Saint Paul ArcGIS)",
+        "active": True,
+    },
+    "johns_creek_ga": {
+        "city": "Johns Creek",
+        "state": "GA",
+        "slug": "johns-creek",
+        "lat": 34.029,
+        "lon": -84.198,
+        "platform": "arcgis",
+        "endpoint": "https://services1.arcgis.com/bqfNVPUK3HOnCFmA/arcgis/rest/services/Building_Permits_Issued/FeatureServer/0",
+        "date_field": "ISSUE_DATE",
+        "description": "Building Permits Issued (Johns Creek GA ArcGIS)",
+        "active": True,
+    },
+    "bend_or": {
+        "city": "Bend",
+        "state": "OR",
+        "slug": "bend",
+        "lat": 44.058,
+        "lon": -121.315,
+        "platform": "arcgis",
+        "endpoint": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Permit_Applications_Point/FeatureServer/0",
+        "date_field": "IssueDate",
+        "description": "Permit Applications (City of Bend OR ArcGIS)",
+        "active": True,
+    },
+    "new_orleans_la": {
+        "city": "New Orleans",
+        "state": "LA",
+        "slug": "new-orleans",
+        "lat": 29.951,
+        "lon": -90.072,
+        "platform": "socrata",
+        "endpoint": "https://data.nola.gov/resource/nbcf-m6c2.json",
+        "date_field": "issuedate",
+        "description": "Building Permits 2018-present (data.nola.gov)",
+        "active": True,
+    },
 }
 
 # ============================================================================
