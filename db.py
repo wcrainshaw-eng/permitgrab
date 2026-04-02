@@ -1,6 +1,11 @@
 """
-PermitGrab V12.50 — SQLite database layer
-Replaces permits.json and permit_history.json with a single SQLite database.
+PermitGrab V62 — Database layer (PostgreSQL + SQLite fallback)
+
+V62: Uses db_engine for connection management. When DATABASE_URL is set,
+uses PostgreSQL connection pool (eliminates "database is locked" errors).
+Falls back to SQLite for local dev when DATABASE_URL is not set.
+
+Original: V12.50 — SQLite database layer
 """
 
 import sqlite3
@@ -9,6 +14,14 @@ import json
 import re
 import threading
 from datetime import datetime, timedelta
+
+# V62: Import db_engine for Postgres-aware connections
+try:
+    from db_engine import get_connection as _engine_get_connection, USE_POSTGRES, init_schema
+    _HAS_ENGINE = True
+except ImportError:
+    _HAS_ENGINE = False
+    USE_POSTGRES = False
 
 
 # V18: City name normalization to prevent duplicates like "Ft Lauderdale" vs "Fort Lauderdale"
@@ -218,13 +231,19 @@ _local = threading.local()
 
 
 def get_connection():
-    """Get a thread-local SQLite connection with WAL mode enabled.
+    """Get a database connection.
 
-    V12.51: Process-aware — resets connection after Gunicorn fork to avoid
-    sharing connections across worker processes.
-    V12.60: Validates connection is still open before returning. If a stale
-    conn.close() poisoned the thread-local, we detect it and reconnect.
+    V62: Delegates to db_engine when DATABASE_URL is set (PostgreSQL).
+    Falls back to thread-local SQLite for local dev.
+
+    V12.51: Process-aware — resets connection after Gunicorn fork.
+    V12.60: Validates connection is still open before returning.
     """
+    # V62: Use Postgres pool when available
+    if _HAS_ENGINE and USE_POSTGRES:
+        return _engine_get_connection()
+
+    # SQLite fallback (local dev)
     pid = os.getpid()
 
     # If we forked (Gunicorn worker), reset thread-local
@@ -255,7 +274,26 @@ def get_connection():
 
 
 def init_db():
-    """Create tables and indexes if they don't exist. Safe to call multiple times."""
+    """Create tables and indexes if they don't exist. Safe to call multiple times.
+
+    V62: When DATABASE_URL is set, uses db_engine.init_schema() for Postgres DDL.
+    """
+    # V62: Postgres path — use db_engine schema
+    if _HAS_ENGINE and USE_POSTGRES:
+        init_schema()
+        conn = get_connection()
+        # Still run migrations for data cleanup
+        _run_v18_migrations_pg(conn)
+        _run_v33_source_linking(conn)
+        _run_v34_data_cleanup(conn)
+        _deactivate_bulk_covered_cities(conn)
+        _fix_arcgis_date_formats(conn)
+        _sync_prod_city_counts(conn)
+        print(f"[DB] V62: PostgreSQL database initialized via db_engine")
+        conn.close()
+        return
+
+    # SQLite path (local dev)
     conn = get_connection()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS permits (
@@ -558,6 +596,40 @@ def init_db():
     _sync_prod_city_counts(conn)
 
     print(f"[DB] V35: Database initialized at {DB_PATH}")
+
+
+def _run_v18_migrations_pg(conn):
+    """V62: Postgres-compatible V18 migrations (no PRAGMA table_info)."""
+    try:
+        # Check existing columns using information_schema
+        cursor = conn.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'prod_cities'
+        """)
+        existing_cols = {row['column_name'] for row in cursor}
+
+        v18_columns = [
+            ("data_freshness", "TEXT DEFAULT 'fresh'"),
+            ("newest_permit_date", "TEXT"),
+            ("stale_since", "TIMESTAMP"),
+            ("pause_reason", "TEXT"),
+        ]
+
+        for col_name, col_def in v18_columns:
+            if col_name not in existing_cols:
+                try:
+                    conn.execute(f"ALTER TABLE prod_cities ADD COLUMN {col_name} {col_def}")
+                    print(f"[V18-PG] Added column: prod_cities.{col_name}")
+                except Exception:
+                    pass
+
+        conn.commit()
+    except Exception as e:
+        print(f"[V18-PG] Migration error (non-fatal): {e}")
+        try:
+            conn.rollback()
+        except:
+            pass
 
 
 def _run_v18_migrations(conn):

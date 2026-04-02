@@ -2,17 +2,31 @@
 # 1. Push this repo to GitHub
 # 2. Connect to Render.com
 # 3. It auto-deploys from this config
+#
+# V62: Migrated from SQLite to PostgreSQL to eliminate "database is locked"
+# errors caused by 5 daemon threads competing for write locks.
+# The persistent disk is kept for backwards compatibility during migration.
+
+databases:
+  - name: permitgrab-db
+    plan: starter  # 1GB, shared CPU — upgrade to standard for production
+    databaseName: permitgrab
+    user: permitgrab
 
 services:
   - type: web
     name: permitgrab
     runtime: python
     buildCommand: pip install -r requirements.txt && playwright install chromium --with-deps
-    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 1 --timeout 300
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-    # Persistent disk for user data (survives deploys)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: permitgrab-db
+          property: connectionString
+    # Keep disk during migration — remove after verifying Postgres data
     disk:
       name: permitgrab-data
       mountPath: /var/data
