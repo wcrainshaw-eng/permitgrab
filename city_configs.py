@@ -228,6 +228,7 @@ CITY_REGISTRY = {
         "lon": -122.332,
         "platform": "socrata",
         "endpoint": "https://cos-data.seattle.gov/resource/8tqq-u7ib.json",
+        "date_field": "issueddate",
         "dataset_id": "8tqq-u7ib",
         "description": "Issued Building Permits",
         "field_map": {
@@ -16602,6 +16603,158 @@ BULK_SOURCES = {
         "limit": 5000,
         "active": True,
         "notes": "V33: Riverside County GIS Open Data. Covers 20+ cities including Riverside (pop 314K), Moreno Valley (212K), Temecula (110K), Murrieta (111K), Menifee (103K), Jurupa Valley (105K). Fields: PERMIT_ID, CASE_TYPE, ADDRESS, PERMIT_STATUS, DESCRIPTION, UNIT_COUNT.",
+    },
+    "somerville_ma": {
+        "name": "Somerville",
+        "state": "MA",
+        "slug": "somerville-ma",
+        "lat": 42.3876,
+        "lon": -71.0995,
+        "platform": "socrata",
+        "endpoint": "https://data.somervillema.gov/resource/vxgw-vmky.json",
+        "dataset_id": "vxgw-vmky",
+        "description": "Permits (data.somervillema.gov)",
+        "date_field": "issue_date",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "issue_date"
+        }
+    },
+    "roseville_ca": {
+        "name": "Roseville",
+        "state": "CA",
+        "slug": "roseville-ca",
+        "lat": 38.7521,
+        "lon": -121.2880,
+        "platform": "socrata",
+        "endpoint": "https://data.roseville.ca.us/resource/buxi-gsvq.json",
+        "dataset_id": "buxi-gsvq",
+        "description": "Building Permits Issued (data.roseville.ca.us)",
+        "date_field": "issued_date",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "issued_date"
+        }
+    },
+    "sonoma_county_ca": {
+        "name": "Sonoma County",
+        "state": "CA",
+        "slug": "sonoma-county-ca",
+        "lat": 38.5110,
+        "lon": -122.8474,
+        "platform": "socrata",
+        "endpoint": "https://data.sonomacounty.ca.gov/resource/652y-5ihx.json",
+        "dataset_id": "652y-5ihx",
+        "description": "Rebuilding Permits (data.sonomacounty.ca.gov)",
+        "date_field": "date_opened",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "date_opened"
+        }
+    },
+    "frederick_md": {
+        "name": "Frederick",
+        "state": "MD",
+        "slug": "frederick-md",
+        "lat": 39.4143,
+        "lon": -77.4105,
+        "platform": "socrata",
+        "endpoint": "https://opendata.maryland.gov/resource/xrz3-9xhj.json",
+        "dataset_id": "xrz3-9xhj",
+        "description": "City of Frederick Issued Permits (opendata.maryland.gov)",
+        "date_field": "issue_date",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "issue_date"
+        }
+    },
+    "dumfries_va": {
+        "name": "Dumfries",
+        "state": "VA",
+        "slug": "dumfries-va",
+        "lat": 38.5676,
+        "lon": -77.3283,
+        "platform": "socrata",
+        "endpoint": "https://data.dumfriesva.gov/resource/76tz-5d55.json",
+        "dataset_id": "76tz-5d55",
+        "description": "Town Permit Processing Time (data.dumfriesva.gov)",
+        "date_field": "issued_date",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "issued_date"
+        }
+    },
+    "oxnard_ca": {
+        "name": "Oxnard",
+        "state": "CA",
+        "slug": "oxnard-ca",
+        "lat": 34.1975,
+        "lon": -119.1771,
+        "platform": "socrata",
+        "endpoint": "https://data.oxnard.org/resource/vmzx-48vx.json",
+        "dataset_id": "vmzx-48vx",
+        "description": "Building Permits (data.oxnard.org)",
+        "date_field": "permitissuedate",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "permitissuedate"
+        }
+    },
+    "albany_ny": {
+        "name": "Albany",
+        "state": "NY",
+        "slug": "albany-ny",
+        "lat": 42.6526,
+        "lon": -73.7562,
+        "platform": "socrata",
+        "endpoint": "https://data.ny.gov/resource/kb9s-4gzd.json",
+        "dataset_id": "kb9s-4gzd",
+        "description": "City of Albany Building Permits Issued (data.ny.gov)",
+        "date_field": "date",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "date"
+        }
+    },
+    "miami_fl": {
+        "name": "Miami",
+        "state": "FL",
+        "slug": "miami-fl",
+        "lat": 25.7617,
+        "lon": -80.1918,
+        "platform": "socrata",
+        "endpoint": "https://data.miamigov.com/resource/7ey5-m434.json",
+        "dataset_id": "7ey5-m434",
+        "description": "Building Permits Issued By City Of Miami (data.miamigov.com)",
+        "date_field": "certificatedate",
+        "active": True,
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "address": "address",
+            "issue_date": "certificatedate"
+        }
     },
 }
 
