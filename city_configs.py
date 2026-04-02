@@ -17095,5 +17095,63 @@ def get_all_bulk_sources_info():
             "platform": config["platform"],
             "city_field": config.get("city_field", ""),
             "active": config.get("active", False),
-        })
+        
+    # ── Chicago, IL (Socrata) ──────────────────────────────────────────
+    "chicago_il": {
+        "name": "Chicago, IL",
+        "platform": "socrata",
+        "state": "IL",
+        "active": True,
+        "domain": "data.cityofchicago.org",
+        "dataset": "ydr8-5enu",
+        "date_field": "issue_date",
+    },
+    # ── Los Angeles, CA (Socrata) ──────────────────────────────────────
+    "los_angeles_ca": {
+        "name": "Los Angeles, CA",
+        "platform": "socrata",
+        "state": "CA",
+        "active": True,
+        "domain": "data.lacity.org",
+        "dataset": "pi9x-tg5x",
+        "date_field": "issue_date",
+    },
+    # ── New Orleans, LA (Socrata) ──────────────────────────────────────
+    "new_orleans_la": {
+        "name": "New Orleans, LA",
+        "platform": "socrata",
+        "state": "LA",
+        "active": True,
+        "domain": "data.nola.gov",
+        "dataset": "nbcf-m6c2",
+        "date_field": "issuedate",
+    },
+    # ── St. Paul, MN (ArcGIS) ─────────────────────────────────────────
+    "st_paul_mn": {
+        "name": "St. Paul, MN",
+        "platform": "arcgis",
+        "state": "MN",
+        "active": True,
+        "endpoint": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Building_Permits_/FeatureServer/0",
+        "date_field": "ISSUEDATE",
+    },
+    # ── Raleigh, NC (ArcGIS) ──────────────────────────────────────────
+    "raleigh_nc": {
+        "name": "Raleigh, NC",
+        "platform": "arcgis",
+        "state": "NC",
+        "active": True,
+        "endpoint": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Building_Permits/FeatureServer/0",
+        "date_field": "issueddate",
+    },
+    # ── Boise, ID (ArcGIS) ────────────────────────────────────────────
+    "boise_id": {
+        "name": "Boise, ID",
+        "platform": "arcgis",
+        "state": "ID",
+        "active": True,
+        "endpoint": "https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/PDS_BuildingPermits_HighImpact/FeatureServer/0",
+        "date_field": "IssuedDate",
+    },
+})
     return sorted(sources, key=lambda x: x["name"])
