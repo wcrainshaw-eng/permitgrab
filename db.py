@@ -282,13 +282,26 @@ def init_db():
     if _HAS_ENGINE and USE_POSTGRES:
         init_schema()
         conn = get_connection()
-        # Still run migrations for data cleanup
-        _run_v18_migrations_pg(conn)
-        _run_v33_source_linking(conn)
-        _run_v34_data_cleanup(conn)
-        _deactivate_bulk_covered_cities(conn)
-        _fix_arcgis_date_formats(conn)
-        _sync_prod_city_counts(conn)
+        # Run each migration step with isolated error handling
+        # so one failure doesn't cascade and kill the worker
+        _migrations = [
+            ("V18 migrations", lambda: _run_v18_migrations_pg(conn)),
+            ("V33 source linking", lambda: _run_v33_source_linking(conn)),
+            ("V34 data cleanup", lambda: _run_v34_data_cleanup(conn)),
+            ("Bulk city deactivation", lambda: _deactivate_bulk_covered_cities(conn)),
+            ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
+            ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
+        ]
+        for name, fn in _migrations:
+            try:
+                fn()
+                conn.commit()
+            except Exception as e:
+                print(f"[DB] {name} error (non-fatal): {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
         print(f"[DB] V62: PostgreSQL database initialized via db_engine")
         conn.close()
         return
@@ -1086,6 +1099,10 @@ def _run_v34_data_cleanup(conn):
         print(f"[V34] Data cleanup error: {e}")
         import traceback
         traceback.print_exc()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         return 0
 
 

@@ -82,14 +82,16 @@ class PgConnection:
 
     def execute(self, sql, params=None):
         import psycopg2.extras
+        translated = _translate_sql(sql)
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(sql, params)
+        cur.execute(translated, params)
         return PgCursor(cur)
 
     def executemany(self, sql, params_list):
         import psycopg2.extras
+        translated = _translate_sql(sql)
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.executemany(sql, params_list)
+        cur.executemany(translated, params_list)
         return PgCursor(cur)
 
     def commit(self):
