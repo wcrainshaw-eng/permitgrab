@@ -9754,10 +9754,10 @@ CITY_REGISTRY = {
             "land_use": "LANDUSE",
         },
         "date_field": "DATEISSUED",
-        "date_format": "epoch",
+        "date_format": "date",
         "limit": 2000,
         "active": True,
-        "notes": "V54: Switched from LDTM_Permits (stale Jan 2025) to BuildingPermits_KNO. Epoch dates, fresh 2026 data. OWNER, CONTRACTOR, PERMITVALUE.",
+        "notes": "V54: Switched from LDTM_Permits (stale Jan 2025) to BuildingPermits_KNO. Epoch dates, fresh 2026 data. OWNER, CONTRACTOR, PERMITVALUE. V56: date_format epoch->date (server rejects epoch in where clause).",
     },
 
     "chattanooga": {
@@ -9782,8 +9782,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
-        "notes": "V54: Replaced frozen ArcGIS (ended 12/31/2025) with ChattaData Socrata portal. Fresh data 2006-present. Has contractor, status, dates.",
+        "active": False,
+        "notes": "V54: Replaced frozen ArcGIS (ended 12/31/2025) with ChattaData Socrata portal. Fresh data 2006-present. Has contractor, status, dates. V56: Deactivated — chattadata.org domain dead.",
     },
 
     "huntsville": {
