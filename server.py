@@ -7876,6 +7876,20 @@ def sitemap_cities():
                 'lastmod': lastmod
             }
 
+    # V58: Also include ALL active CITY_REGISTRY cities for SEO (even without data yet)
+    for key, config in CITY_REGISTRY.items():
+        if not config.get('active'):
+            continue
+        slug = config.get('slug', key.replace('_', '-'))
+        loc = f"{SITE_URL}/permits/{slug}"
+        if loc not in url_map and slug not in state_slugs:
+            url_map[loc] = {
+                'loc': loc,
+                'changefreq': 'weekly',
+                'priority': '0.6',
+                'lastmod': today
+            }
+
     return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
 
 
