@@ -2336,6 +2336,97 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
             time.sleep(RATE_LIMIT_DELAY)
 
+
+        # V59: Phase 3 - Catch-all for CITY_REGISTRY cities missed by Phase 1 & 2
+        from city_configs import CITY_REGISTRY
+        collected_keys = set(stats.keys()) | cities_from_bulk | bulk_sources_collected
+        for _ic in individual_cities:
+            collected_keys.add(_ic.get('source_id', ''))
+
+        missed_cities = []
+        for city_key, cfg in CITY_REGISTRY.items():
+            if not cfg.get('active', False):
+                continue
+            if city_key in collected_keys:
+                continue
+            # Skip accela (requires browser automation)
+            if cfg.get('platform') == 'accela':
+                continue
+            missed_cities.append((city_key, cfg))
+
+        if missed_cities:
+            print(f"\n  [V59] Phase 3: Catch-all for {len(missed_cities)} missed CITY_REGISTRY cities")
+            for city_key, cfg in missed_cities:
+                city_name = cfg.get('city_name', city_key)
+                state = cfg.get('state', '')
+                start_time = time.time()
+
+                try:
+                    raw, fetch_status = fetch_permits(city_key, days_back)
+                    city_permits = []
+
+                    for record in raw:
+                        try:
+                            normalized = normalize_permit(record, city_key)
+                            if normalized and normalized.get("permit_number"):
+                                city_permits.append(normalized)
+                        except Exception:
+                            continue
+
+                    all_permits.extend(city_permits)
+                    permit_count = len(city_permits)
+
+                    stats[city_key] = {
+                        "raw": len(raw),
+                        "normalized": permit_count,
+                        "city_name": city_name,
+                        "status": fetch_status,
+                    }
+
+                    if fetch_status == "success":
+                        print(f"    \u2713 {city_name}: {permit_count} permits")
+                        if permit_count > 0:
+                            try:
+                                record_collection(city_key, permit_count)
+                                reset_failure(city_key)
+                            except Exception:
+                                pass
+                    else:
+                        print(f"    \u2717 {city_name}: {fetch_status}")
+                        try:
+                            increment_failure(city_key, fetch_status)
+                        except Exception:
+                            pass
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    _log_v15_collection(
+                        city_key=city_key,
+                        city_name=city_name,
+                        state=state,
+                        permits_found=permit_count,
+                        permits_inserted=permit_count,
+                        status='success' if fetch_status == 'success' and permit_count > 0 else ('no_new' if fetch_status == 'success' else ('skip' if fetch_status.startswith('skip') else 'error')),
+                        error_message=None if fetch_status == 'success' else fetch_status,
+                        duration_ms=duration_ms
+                    )
+
+                except Exception as e:
+                    print(f"    \u2717 {city_name}: {str(e)[:100]}")
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    _log_v15_collection(
+                        city_key=city_key,
+                        city_name=city_name,
+                        state=state,
+                        permits_found=0,
+                        permits_inserted=0,
+                        status='error',
+                        error_message=str(e)[:200],
+                        duration_ms=duration_ms
+                    )
+
+                time.sleep(RATE_LIMIT_DELAY)
+
+            print(f"  [V59] Phase 3 complete: {len(missed_cities)} cities processed")
+
         print(f"\n  V15 collection complete: {len(all_permits)} permits from {len(prod_cities_list)} sources")
         # Return early - don't run legacy collection
         return all_permits, {**stats, **bulk_stats}
