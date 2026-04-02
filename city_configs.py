@@ -902,7 +902,7 @@ CITY_REGISTRY = {
         },
         "date_field": "Date",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela with field_map. Agency=SANDIEGO, module=DSD. Top-10 city.",
     },
 
@@ -1085,7 +1085,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/CHARLOTTE.",
     },
 
@@ -1267,7 +1267,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela — Playwright installed on Render. Top-15 city by population.",
     },
 
@@ -1334,7 +1334,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/SHELBYCO (Shelby County).",
     },
 
@@ -1384,7 +1384,7 @@ CITY_REGISTRY = {
             "description": "Description",
         },
         "date_field": "Date",
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela — Playwright confirmed working on Render. Top-30 city.",
     },
 
@@ -1409,7 +1409,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela — Playwright confirmed working on Render.",
     },
 
@@ -1434,7 +1434,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela — uses custom domain access.okc.gov. Playwright confirmed working on Render.",
     },
 
@@ -1458,7 +1458,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live. Agency=OMAHA, module=Permits.
+        "active": False,  # V42: Accela portal confirmed live. Agency=OMAHA, module=Permits.
         "notes": "V42: Activated. Accela portal confirmed live with Permits, Licenses, Planning, Rentals, Fire, PublicWorks, Enforcement modules.",
     },
 
@@ -1484,7 +1484,7 @@ CITY_REGISTRY = {
         },
         "date_field": "APPLICATIONDATE",
         "limit": 2000,
-        "active": true,  # V50: Activated with new JSON platform handler
+        "active": True,  # V50: Activated with new JSON platform handler
         "notes": "V50: Activated! Custom JSON API returns 30-day rolling window. Pop ~300K.",
     },
 
@@ -1580,7 +1580,7 @@ CITY_REGISTRY = {
         "date_field": "StartDate",
         "date_format": "none",
         "limit": 2000,
-        "active": true,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
+        "active": True,  # V43: Activated — endpoint confirmed live with fresh data (Mar 2026). Has address, permit_number, job_value.
         "notes": "V43: Activated. Lynchburg VA permits via ArcGIS MapServer. Fresh data Mar 2026. Pop ~79K.",
     },
 
@@ -1595,7 +1595,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,  # V50: BLOCKED - No public API, Liferay portal only
+        "active": False,  # V50: BLOCKED - No public API, Liferay portal only
         "notes": "V50: Confirmed no API. Uses Liferay portal at permitslicenses.longbeach.gov (not Accela). Web search only, no bulk data export.",
     },
 
@@ -1619,7 +1619,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V24: Accela portal requires login. Cannot scrape without credentials.",
     },
 
@@ -1647,7 +1647,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": true,  # V43/V50: Activated — FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
+        "active": True,  # V43/V50: Activated — FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
         "notes": "V50: Verified live. Las Vegas ArcGIS FeatureServer confirmed working. Fresh 2026 data.",
     },
 
@@ -1759,7 +1759,7 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": true,  # V50: ArcGIS stale (April 2024), CSV-only alt
+        "active": True,  # V50: ArcGIS stale (April 2024), CSV-only alt
         "notes": "V50: ArcGIS confirmed stale (April 2024). CSV available at data.cabq.gov/business/buildingpermits/ but no live API. Pop ~560K.",
     },
 
@@ -1951,7 +1951,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "notes": "V26: Data provided via montgomery_county_md bulk source.",
     },
@@ -1976,7 +1976,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "notes": "V26: Data provided via williamson_county_tx bulk source.",
     },
@@ -2003,7 +2003,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela — Socrata endpoint (dallas_tx) dead since 2019. Playwright installed on Render.",
     },
 
@@ -2053,7 +2053,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — data ends 2017, no recent permits.",
     },
 
@@ -2077,7 +2077,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — frozen dataset, historical data 2009-2013 only.",
     },
 
@@ -2152,7 +2152,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "BAYONNE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "# V23 BLOCKED: NJ state data has no addresses. V12.7: New — Bayonne permits via NJ State Socrata. Filtered from statewide dataset. Pop ~71K.",
     },
 
@@ -2177,7 +2177,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "PASSAIC"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Passaic permits via NJ State Socrata. Filtered from statewide dataset. Pop ~70K.",
     },
 
@@ -2202,7 +2202,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "EAST ORANGE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — East Orange permits via NJ State Socrata. Filtered from statewide dataset. Pop ~69K.",
     },
 
@@ -2227,7 +2227,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "UNION CITY"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Union City permits via NJ State Socrata. Filtered from statewide dataset. Pop ~68K.",
     },
 
@@ -2252,7 +2252,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "VINELAND"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Vineland permits via NJ State Socrata. Filtered from statewide dataset. Pop ~60K.",
     },
 
@@ -2277,7 +2277,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "HOBOKEN"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Hoboken permits via NJ State Socrata. Filtered from statewide dataset. Pop ~60K.",
     },
 
@@ -2302,7 +2302,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "PERTH AMBOY"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Perth Amboy permits via NJ State Socrata. Filtered from statewide dataset. Pop ~55K.",
     },
 
@@ -2327,7 +2327,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "PLAINFIELD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Plainfield permits via NJ State Socrata. Filtered from statewide dataset. Pop ~54K.",
     },
 
@@ -2352,7 +2352,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "WEST NEW YORK"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — West New York permits via NJ State Socrata. Filtered from statewide dataset. Pop ~52K.",
     },
 
@@ -2377,7 +2377,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "HACKENSACK"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Hackensack permits via NJ State Socrata. Filtered from statewide dataset. Pop ~46K.",
     },
 
@@ -2396,7 +2396,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2415,7 +2415,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2440,7 +2440,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "KEARNY"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Kearny permits via NJ State Socrata. Filtered from statewide dataset. Pop ~41K.",
     },
 
@@ -2465,7 +2465,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "FORT LEE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Fort Lee permits via NJ State Socrata. Filtered from statewide dataset. Pop ~40K.",
     },
 
@@ -2484,7 +2484,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2509,7 +2509,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "FAIR LAWN"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Fair Lawn permits via NJ State Socrata. Filtered from statewide dataset. Pop ~34K.",
     },
 
@@ -2527,7 +2527,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "# BLOCKED: V23 - NJ state data (data.nj.gov/w9se-dmra) has no street addresses, only block/lot numbers. Unusable for address-based permit lookup.",
     },
 
@@ -2552,7 +2552,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "LONG BRANCH"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Long Branch permits via NJ State Socrata. Filtered from statewide dataset. Pop ~31K.",
     },
 
@@ -2577,7 +2577,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "WESTFIELD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Westfield permits via NJ State Socrata. Filtered from statewide dataset. Pop ~31K.",
     },
 
@@ -2602,7 +2602,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "RAHWAY"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Rahway permits via NJ State Socrata. Filtered from statewide dataset. Pop ~29K.",
     },
 
@@ -2627,7 +2627,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "ENGLEWOOD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Englewood permits via NJ State Socrata. Filtered from statewide dataset. Pop ~29K.",
     },
 
@@ -2652,7 +2652,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "BERGENFIELD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Bergenfield permits via NJ State Socrata. Filtered from statewide dataset. Pop ~28K.",
     },
 
@@ -2677,7 +2677,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "MILLVILLE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Millville permits via NJ State Socrata. Filtered from statewide dataset. Pop ~27K.",
     },
 
@@ -2702,7 +2702,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "BRIDGETON"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Bridgeton permits via NJ State Socrata. Filtered from statewide dataset. Pop ~27K.",
     },
 
@@ -2727,7 +2727,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "PARAMUS"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Paramus permits via NJ State Socrata. Filtered from statewide dataset. Pop ~26K.",
     },
 
@@ -2752,7 +2752,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "LODI"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Lodi permits via NJ State Socrata. Filtered from statewide dataset. Pop ~26K.",
     },
 
@@ -2777,7 +2777,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "RIDGEWOOD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Ridgewood permits via NJ State Socrata. Filtered from statewide dataset. Pop ~25K.",
     },
 
@@ -2802,7 +2802,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "CLIFFSIDE PARK"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Cliffside Park permits via NJ State Socrata. Filtered from statewide dataset. Pop ~25K.",
     },
 
@@ -2827,7 +2827,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "CARTERET"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Carteret permits via NJ State Socrata. Filtered from statewide dataset. Pop ~25K.",
     },
 
@@ -2852,7 +2852,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "SOUTH PLAINFIELD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — South Plainfield permits via NJ State Socrata. Filtered from statewide dataset. Pop ~24K.",
     },
 
@@ -2877,7 +2877,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "GLASSBORO"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Glassboro permits via NJ State Socrata. Filtered from statewide dataset. Pop ~23K.",
     },
 
@@ -2902,7 +2902,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "NORTH PLAINFIELD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — North Plainfield permits via NJ State Socrata. Filtered from statewide dataset. Pop ~22K.",
     },
 
@@ -2927,7 +2927,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "SUMMIT"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Summit permits via NJ State Socrata. Filtered from statewide dataset. Pop ~22K.",
     },
 
@@ -2952,7 +2952,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "ROSELLE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Roselle permits via NJ State Socrata. Filtered from statewide dataset. Pop ~22K.",
     },
 
@@ -2977,7 +2977,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "SECAUCUS"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Secaucus permits via NJ State Socrata. Filtered from statewide dataset. Pop ~22K.",
     },
 
@@ -3002,7 +3002,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "LINDENWOLD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Lindenwold permits via NJ State Socrata. Filtered from statewide dataset. Pop ~21K.",
     },
 
@@ -3027,7 +3027,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "ELMWOOD PARK"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Elmwood Park permits via NJ State Socrata. Filtered from statewide dataset. Pop ~21K.",
     },
 
@@ -3052,7 +3052,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "PLEASANTVILLE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Pleasantville permits via NJ State Socrata. Filtered from statewide dataset. Pop ~20K.",
     },
 
@@ -3077,7 +3077,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "PALISADES PARK"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Palisades Park permits via NJ State Socrata. Filtered from statewide dataset. Pop ~20K.",
     },
 
@@ -3102,7 +3102,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "MORRISTOWN"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Morristown permits via NJ State Socrata. Filtered from statewide dataset. Pop ~20K.",
     },
 
@@ -3127,7 +3127,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "HAWTHORNE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Hawthorne permits via NJ State Socrata. Filtered from statewide dataset. Pop ~19K.",
     },
 
@@ -3152,7 +3152,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "TINTON FALLS"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Tinton Falls permits via NJ State Socrata. Filtered from statewide dataset. Pop ~19K.",
     },
 
@@ -3177,7 +3177,7 @@ CITY_REGISTRY = {
         "date_field": "processdate",
         "city_filter": {"field": "muniname", "value": "RUTHERFORD"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Rutherford permits via NJ State Socrata. Filtered from statewide dataset. Pop ~18K.",
     },
 
@@ -3203,7 +3203,7 @@ CITY_REGISTRY = {
         "date_format": "none",
         "city_filter": {"field": "CITY", "value": "NOBLESVILLE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Hamilton County IN ArcGIS. No date field; uses OBJECTID for ordering. Pop ~70K.",
     },
 
@@ -3229,7 +3229,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Collin County TX via data.texas.gov Socrata. Countywide dataset.",
     },
     "allen_tx": {
@@ -3254,7 +3254,7 @@ CITY_REGISTRY = {
         "date_field": "permitissueddate",
         "city_filter": {"field": "situscity", "value": "ALLEN"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Allen permits via Collin County Socrata. Pop ~105K.",
     },
     "wylie_tx": {
@@ -3279,7 +3279,7 @@ CITY_REGISTRY = {
         "date_field": "permitissueddate",
         "city_filter": {"field": "situscity", "value": "WYLIE"},
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Wylie permits via Collin County Socrata. Pop ~58K.",
     },
 
@@ -3303,7 +3303,7 @@ CITY_REGISTRY = {
         "date_field": "DATE_ENTERED",
         "date_format": "none",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.9: New — Alpharetta GA ArcGIS permits. Pop ~67K. No orderByFields support.",
     },
 
@@ -3327,7 +3327,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedDate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.9: New — Pierce County WA ArcGIS permits. Covers Lakewood, Tacoma unincorp, etc.",
     },
 
@@ -3373,7 +3373,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date_opened",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "notes": "V26: Data provided via sonoma_county bulk source.",
     },
@@ -3477,7 +3477,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — data stale since Oct 2023, no recent permits.",
     },
 
@@ -3653,7 +3653,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SCHAUMBURG"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Schaumburg permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~79K.",
     },
 
@@ -3680,7 +3680,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF EVANSTON"},
         "limit": 2000,
-        "active": false,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Evanston permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -3707,7 +3707,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ARLINGTON HEIGHTS"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Arlington Heights permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~78K.",
     },
 
@@ -3737,7 +3737,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF PALATINE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Palatine permits via Cook County Socrata. Pop ~67K.",
     },
 
@@ -3764,7 +3764,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SKOKIE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Skokie permits via Cook County Socrata. Pop ~67K.",
     },
 
@@ -3791,7 +3791,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF DES PLAINES"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Des Plaines permits via Cook County Socrata. Pop ~60K.",
     },
 
@@ -3818,7 +3818,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ORLAND PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Orland Park permits via Cook County Socrata. Pop ~58K.",
     },
 
@@ -3845,7 +3845,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF OAK LAWN"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Lawn permits via Cook County Socrata. Pop ~58K.",
     },
 
@@ -3872,7 +3872,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BERWYN"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Berwyn permits via Cook County Socrata. Pop ~57K.",
     },
 
@@ -3899,7 +3899,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MT PROSPECT"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Mount Prospect permits via Cook County Socrata. Pop ~56K.",
     },
 
@@ -3926,7 +3926,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF TINLEY PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Tinley Park permits via Cook County Socrata. Pop ~55K.",
     },
 
@@ -3953,7 +3953,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF OAK PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Park permits via Cook County Socrata. Pop ~54K.",
     },
 
@@ -3980,7 +3980,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HOFFMAN ESTATES"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Hoffman Estates permits via Cook County Socrata. Pop ~52K.",
     },
 
@@ -4007,7 +4007,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF GLENVIEW"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Glenview permits via Cook County Socrata. Pop ~48K.",
     },
 
@@ -4034,7 +4034,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BUFFALO GROVE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Buffalo Grove permits via Cook County Socrata. Pop ~43K.",
     },
 
@@ -4061,7 +4061,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BARTLETT"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Bartlett permits via Cook County Socrata. Pop ~41K.",
     },
 
@@ -4088,7 +4088,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF PARK RIDGE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Park Ridge permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4115,7 +4115,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF STREAMWOOD"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Streamwood permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4142,7 +4142,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF WHEELING"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Wheeling permits via Cook County Socrata. Pop ~39K.",
     },
 
@@ -4169,7 +4169,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HANOVER PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Hanover Park permits via Cook County Socrata. Pop ~37K.",
     },
 
@@ -4196,7 +4196,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF CALUMET CITY"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Calumet City permits via Cook County Socrata. Pop ~36K.",
     },
 
@@ -4223,7 +4223,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF NORTHBROOK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Northbrook permits via Cook County Socrata. Pop ~35K.",
     },
 
@@ -4250,7 +4250,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ELK GROVE VILLAGE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Elk Grove Village permits via Cook County Socrata. Pop ~32K.",
     },
 
@@ -4277,7 +4277,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF NILES"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Niles permits via Cook County Socrata. Pop ~30K.",
     },
 
@@ -4304,7 +4304,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BURBANK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Burbank permits via Cook County Socrata. Pop ~29K.",
     },
 
@@ -4331,7 +4331,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF WILMETTE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Wilmette permits via Cook County Socrata. Pop ~28K.",
     },
 
@@ -4358,7 +4358,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF CHICAGO HEIGHTS"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Chicago Heights permits via Cook County Socrata. Pop ~27K.",
     },
 
@@ -4385,7 +4385,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF OAK FOREST"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Oak Forest permits via Cook County Socrata. Pop ~27K.",
     },
 
@@ -4412,7 +4412,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MORTON GROVE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Morton Grove permits via Cook County Socrata. Pop ~25K.",
     },
 
@@ -4439,7 +4439,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MELROSE PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Melrose Park permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4466,7 +4466,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ELMWOOD PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Elmwood Park permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4493,7 +4493,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF ROLLING MEADOWS"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Rolling Meadows permits via Cook County Socrata. Pop ~24K.",
     },
 
@@ -4520,7 +4520,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ROSELLE"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Roselle permits via Cook County Socrata. Pop ~22K.",
     },
 
@@ -4547,7 +4547,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF BLUE ISLAND"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Blue Island permits via Cook County Socrata. Pop ~22K.",
     },
 
@@ -4574,7 +4574,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF PARK FOREST"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Park Forest permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4601,7 +4601,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF SOUTH HOLLAND"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — South Holland permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4628,7 +4628,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF DOLTON"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Dolton permits via Cook County Socrata. Pop ~21K.",
     },
 
@@ -4655,7 +4655,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF EVERGREEN PARK"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Evergreen Park permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4682,7 +4682,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF BROOKFIELD"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Brookfield permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4709,7 +4709,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF HOMEWOOD"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Homewood permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4736,7 +4736,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF MATTESON"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Matteson permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4763,7 +4763,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "VILLAGE OF ALSIP"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Alsip permits via Cook County Socrata. Pop ~19K.",
     },
 
@@ -4790,7 +4790,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "CITY OF PALOS HILLS"},
         "limit": 2000,
-        "active": true,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.8: New — Palos Hills permits via Cook County Socrata. Pop ~18K.",
     },
 
@@ -4859,7 +4859,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.8: Fixed date_field typo but dataset ends June 2025 - no longer updated",
     },
 
@@ -4965,7 +4965,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "# BLOCKED: V23 - Real portal exists (data.urbanaillinois.us) with datasets 9rzq-mqbh and x5kj-g5aj but API endpoints return no data. Portal appears unresponsive. Needs retry later.",
     },
 
@@ -5041,7 +5041,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.6: Reactivated — Socrata domain confirmed working. Data through Feb 2025.",
     },
 
@@ -5166,7 +5166,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -5217,7 +5217,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -5241,7 +5241,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/STOCKTON.",
     },
 
@@ -5266,7 +5266,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -5281,7 +5281,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,  # V42: Switched from fabricated Socrata to real Accela. Agency=CHULAVISTA, module=Building.
+        "active": False,  # V42: Switched from fabricated Socrata to real Accela. Agency=CHULAVISTA, module=Building.
         "status": "paused",
         "notes": "V42: Switched from fabricated Socrata (data.chulavistaca.gov) to real Accela. Agency=CHULAVISTA, module=Building. Also has Planning, LandDevelopment, Licenses, Fire, RightOfWay modules.",
     },
@@ -5306,7 +5306,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Santa Clarita Accela portal requires login for Building module. Cannot scrape without credentials.",
     },
 
@@ -5336,7 +5336,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Sacramento Accela portal. Agency code SACRAMENTO, module=Building.",
     },
 
@@ -5362,7 +5362,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Atlanta Accela portal. Agency code ATLANTA_GA, module=Building.",
     },
 
@@ -5388,7 +5388,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,  # V42: Deactivated — portal has NO Building/Permits module. Only Enforcement, Planning, Zoning.
+        "active": False,  # V42: Deactivated — portal has NO Building/Permits module. Only Enforcement, Planning, Zoning.
         "notes": "V42: Deactivated. Accela DAYTON has no Building or Permits module (only Enforcement, Planning, Zoning).",
     },
 
@@ -5414,7 +5414,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Cleveland OH Accela portal. Agency code COC, module=BuildingHousing.",
     },
 
@@ -5440,7 +5440,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Salt Lake City Accela portal. Agency code SLCREF, module=Building.",
     },
 
@@ -5466,7 +5466,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Brownsville TX Accela portal. Agency code BROWNSVILLE.",
     },
 
@@ -5492,7 +5492,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V35: Evanston IL Accela portal. Agency code EVANSTON, module=Building.",
     },
 
@@ -5518,7 +5518,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Clark County NV Accela portal. Agency code CLARKCO, module=Building.",
     },
@@ -5545,7 +5545,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Lee County FL Accela portal. Agency code LEECO, module=Permitting.",
     },
@@ -5572,7 +5572,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Brevard County FL Accela portal. Agency code BREVARD, module=Building.",
     },
@@ -5599,7 +5599,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Polk County FL Accela portal. Agency code POLKCO, module=Building.",
     },
@@ -5626,7 +5626,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Pasco County FL Accela portal. Agency code PASCO, module=Permits.",
     },
@@ -5653,7 +5653,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Sarasota County FL Accela portal. Agency code SARASOTA, module=Building.",
     },
@@ -5680,7 +5680,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,  # V42: Fixed module from Building to Development.
+        "active": False,  # V42: Fixed module from Building to Development.
         "status": "paused",
         "notes": "V42: Fixed module. Portal has Development, Planning, Encroachment, Enforcement. No Building module.",
     },
@@ -5707,7 +5707,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Bernalillo County NM Accela portal. Agency code BERNCO, module=Building.",
     },
 
@@ -5733,7 +5733,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Brookline MA Accela portal. Agency code BROOKLINE, module=Building.",
     },
@@ -5761,7 +5761,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: Tampa FL Accela portal. Agency code TAMPA, module=Building.",
     },
 
@@ -5787,7 +5787,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Hillsborough County FL Accela portal. Agency code HCFL, module=Building.",
     },
@@ -5814,7 +5814,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Pinellas County FL Accela portal. Agency code PINELLAS, module=Building.",
     },
@@ -5841,7 +5841,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,  # V42: Fixed module from Building to Permits.
+        "active": False,  # V42: Fixed module from Building to Permits.
         "notes": "V42: Fixed module. Portal has Permits, Planning, TAM. No Building module.",
     },
 
@@ -5867,7 +5867,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Gwinnett County GA Accela portal. Agency code GWINNETT, module=Building.",
     },
@@ -5894,7 +5894,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: San Bernardino County CA Accela portal. Agency code SBCO, module=Building.",
     },
@@ -5921,7 +5921,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live,  # san_antonio already active on CKAN
+        "active": False,  # V42: Accela portal confirmed live,  # san_antonio already active on CKAN
         "notes": "V35: San Antonio TX Accela portal. Agency code COSA. DEACTIVATED: san_antonio already active on CKAN.",
     },
 
@@ -5947,7 +5947,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,  # V42: Deactivated — denver already active on ArcGIS with 77K records.
+        "active": False,  # V42: Deactivated — denver already active on ArcGIS with 77K records.
         "notes": "V42: Deactivated duplicate. denver entry uses ArcGIS and is working. Accela portal has Development module (not Building).",
     },
 
@@ -5973,7 +5973,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Contra Costa County CA Accela portal. Agency code CCC, module=Building.",
     },
@@ -6000,7 +6000,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: San Mateo County CA Accela portal. Agency code SMCGOV, module=Building.",
     },
@@ -6027,7 +6027,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Arlington County VA Accela portal. Agency code ARLINGTONCO, module=Building.",
     },
@@ -6054,7 +6054,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,  # V42: Fixed module from Building to Permits.
+        "active": False,  # V42: Fixed module from Building to Permits.
         "status": "paused",
         "notes": "V42: Fixed module. Portal has Permits, Licensing, Planning, Enforcement, PublicWorks. No Building module.",
     },
@@ -6081,7 +6081,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Palo Alto CA Accela portal. Agency code PALOALTO, module=Building.",
     },
@@ -6108,7 +6108,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Weld County CO Accela portal. Agency code WELD, module=Building.",
     },
@@ -6135,7 +6135,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Clackamas County OR Accela portal. Agency code CLACKAMAS, module=Building.",
     },
@@ -6162,7 +6162,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Fort Wayne IN Accela portal. Agency code ACFW, module=Building.",
     },
@@ -6189,7 +6189,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Monterey County CA Accela portal. Agency code MONTEREY, module=Building.",
     },
@@ -6216,7 +6216,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Alameda CA Accela portal. Agency code ALAMEDA, module=Building.",
     },
@@ -6243,7 +6243,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: San Leandro CA Accela portal. Agency code SANLEANDRO, module=Building.",
     },
@@ -6270,7 +6270,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Martin County FL Accela portal. Agency code MARTINCO, module=Building.",
     },
@@ -6297,7 +6297,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Citrus County FL Accela portal. Agency code CITRUS, module=Building.",
     },
@@ -6324,7 +6324,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Coweta County GA Accela portal. Agency code COWETA, module=Building.",
     },
@@ -6351,7 +6351,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: DeLand FL Accela portal. Agency code DELAND, module=Building.",
     },
@@ -6379,7 +6379,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Charlotte County FL Accela portal. Agency code BOCC, module=Building.",
     },
@@ -6406,7 +6406,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Leon County FL (Tallahassee) Accela portal. Agency code LEONCO, module=Building.",
     },
@@ -6433,7 +6433,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Pima County AZ (Tucson area) Accela portal. Agency code PIMA, module=Building.",
     },
@@ -6460,7 +6460,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Queen Creek AZ Accela portal. Agency code QC, module=Building.",
     },
@@ -6487,7 +6487,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Chesterfield County VA Accela portal. Agency code CHESTERFIELD, module=Building.",
     },
@@ -6514,7 +6514,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V35: City of Fairfax VA Accela portal. Agency code FAIRFAX, module=Building.",
     },
 
@@ -6540,7 +6540,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "status": "paused",
         "notes": "V35: Loveland CO Accela portal. Agency code LOVELAND, module=Building.",
     },
@@ -6566,7 +6566,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6591,7 +6591,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6616,7 +6616,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6641,7 +6641,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6666,7 +6666,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6691,7 +6691,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6712,7 +6712,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Reactivated Accela — old Socrata domain DNS dead. Playwright installed on Render. Agency=ELPASO, module=Building.",
     },
 
@@ -6787,7 +6787,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
+        "active": True,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6812,7 +6812,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6837,7 +6837,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
+        "active": True,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6862,7 +6862,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6887,7 +6887,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -6912,7 +6912,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7014,7 +7014,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/CHANDLER. 169 permits tested.",
     },
 
@@ -7041,7 +7041,7 @@ CITY_REGISTRY = {
         },
         "date_field": "IssuedDate",
         "limit": 2000,
-        "active": true,
+        "active": True,
     },
 
     "tempe": {
@@ -7092,7 +7092,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7143,7 +7143,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "Duplicate of henderson_nv — fabricated Socrata domain",
     },
 
@@ -7158,7 +7158,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,  # V50: BLOCKED - No public API available
+        "active": False,  # V50: BLOCKED - No public API available
         "notes": "V50: Confirmed no public API. cityofnorthlasvegas.com has permit center but no open data. Pop ~270K.",
     },
 
@@ -7184,7 +7184,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/RENO.",
     },
 
@@ -7205,7 +7205,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live. Agency=COSPRINGS, module=Building.
+        "active": False,  # V42: Accela portal confirmed live. Agency=COSPRINGS, module=Building.
         "notes": "V42: Activated. Accela portal confirmed live. Agency=COSPRINGS, module=Building. Also has StormWater, Police, Licensing, PublicWorks, Planning, Enforcement, Fire modules.",
     },
 
@@ -7263,7 +7263,7 @@ CITY_REGISTRY = {
         "date_field": "APPLICATIONYEAR",
         "date_format": "custom_yy",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V26: ArcGIS MapServer working. 46K 2025 permits, 6K 2026 permits. Date format YYMMDD.",
     },
 
@@ -7314,7 +7314,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7454,7 +7454,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain. Manual research: Uses Energov (Tyler Technologies) web portal only, no public API.",
     },
 
@@ -7479,7 +7479,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7504,7 +7504,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7529,7 +7529,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7554,7 +7554,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7579,7 +7579,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7605,7 +7605,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUE_DATE",
         "limit": 2000,
-        "active": true,
+        "active": True,
     },
 
     "columbia_sc": {
@@ -7629,7 +7629,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7675,7 +7675,7 @@ CITY_REGISTRY = {
         "date_field": "A_ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V19: Replaced fabricated Socrata with real ArcGIS MapServer from Open.Data_DurhamNC. Rich data: 5 separate cost estimates (building/electrical/plumbing/mechanical/other), structure type, activity, dwelling units, sqft land/floor, parking, occupancy code, project name/type. Comments field often contains contractor contact info. Verified Mar 2026.",
     },
 
@@ -7731,7 +7731,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7757,7 +7757,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (BIRMINGHAM). Needs deploy + test.",
     },
 
@@ -7782,7 +7782,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7807,7 +7807,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7832,7 +7832,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7858,7 +7858,7 @@ CITY_REGISTRY = {
         },
         "date_field": "filing_date",
         "limit": 2000,
-        "active": false,  # V42: Accela LINCOLN confirmed live. Activated.
+        "active": False,  # V42: Accela LINCOLN confirmed live. Activated.
         "notes": "V39: Fabricated Socrata (data.lincoln.ne.gov) replaced with live Accela LINCOLN. Modules: Building, LTU, Planning. Building module is target.",
     },
 
@@ -7883,7 +7883,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": false,  # V42: Accela WICHITA confirmed live. module=Engineering.
+        "active": False,  # V42: Accela WICHITA confirmed live. module=Engineering.
         "status": "paused",
         "notes": "V38: Switched from fabricated Socrata to live Accela portal. Agency=WICHITA, module=Engineering (labeled 'Permitting' in UI). Socrata data.wichita.gov confirmed dead.",
     },
@@ -7909,7 +7909,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7934,7 +7934,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7959,7 +7959,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -7985,7 +7985,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "status": "paused",
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (GRANDRAPIDS). Has Permits module. Needs deploy + test.",
     },
@@ -8011,7 +8011,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8036,7 +8036,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8061,7 +8061,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8086,7 +8086,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8111,7 +8111,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8136,7 +8136,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8167,7 +8167,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -8192,7 +8192,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "none",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Johns Creek permits via ArcGIS FeatureServer (DataHub). Data current Dec 2025. Includes fire, plumbing, ROW, building permits. Pop ~82K.",
     },
 
@@ -8217,7 +8217,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -8242,7 +8242,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -8292,7 +8292,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8317,7 +8317,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8342,7 +8342,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8368,7 +8368,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8393,7 +8393,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8418,7 +8418,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8443,7 +8443,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8469,7 +8469,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8494,7 +8494,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8519,7 +8519,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8544,7 +8544,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8569,7 +8569,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8594,7 +8594,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8619,7 +8619,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8731,7 +8731,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8756,7 +8756,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -8831,7 +8831,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
@@ -8857,7 +8857,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
     },
 
@@ -8883,7 +8883,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -8908,7 +8908,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "missoula": {
@@ -8932,7 +8932,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -8957,7 +8957,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -9014,7 +9014,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "status": "paused",
     },
 
@@ -9066,7 +9066,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "notes": "V46: Paused — data.townofcary.org unreachable (DNS/SSL failure). Need replacement endpoint.",
     },
@@ -9126,7 +9126,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "greenville_sc": {
@@ -9150,7 +9150,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "myrtle_beach": {
@@ -9176,7 +9176,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ISSUEDATE",
         "limit": 1000,
-        "active": true,
+        "active": True,
         "notes": "V12.6: Reactivated — switched from fabricated Socrata to Horry County ArcGIS. County-wide data includes Myrtle Beach permits.",
     },
 
@@ -9254,7 +9254,7 @@ CITY_REGISTRY = {
         "date_field": "INDATE",
         "date_format": "none",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.7: New — Volusia County AMANDA permits via ArcGIS. County-wide (includes Deltona, DeLand, Orange City, etc). FOLDERNAME contains address+city. FOLDERTYPE: RES/COM/etc. Data current Feb 2026. Pop ~94K.",
     },
 
@@ -9307,7 +9307,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — dataset 7rnz-5kxm returns 404. No replacement found on data.richmondgov.com.",
     },
 
@@ -9358,7 +9358,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
     },
 
@@ -9383,7 +9383,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "alexandria_va": {
@@ -9407,7 +9407,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "annapolis": {
@@ -9431,7 +9431,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "rockville": {
@@ -9483,7 +9483,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "erie": {
@@ -9507,7 +9507,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "scranton": {
@@ -9531,7 +9531,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "wilmington_de": {
@@ -9555,7 +9555,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "dover": {
@@ -9579,7 +9579,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "charleston_wv": {
@@ -9603,7 +9603,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -9632,7 +9632,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "status": "paused",
         "notes": "V40: Switched from fabricated Socrata to real Accela portal (ACFW). Needs deploy + test.",
     },
@@ -9658,7 +9658,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "south_bend": {
@@ -9682,7 +9682,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "lexington_ky": {
@@ -9703,7 +9703,7 @@ CITY_REGISTRY = {
         },
         "date_field": "filing_date",
         "limit": 2000,
-        "active": false,  # V42: Accela LEXKY confirmed live. Activated.
+        "active": False,  # V42: Accela LEXKY confirmed live. Activated.
         "notes": "V39: kvz2-j5cj was Howard County MD, not Lexington. Socrata data.lexingtonky.gov has 0 datasets. Accela LEXKY confirmed live with Building Inspection tab.",
     },
 
@@ -9728,7 +9728,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "knoxville": {
@@ -9782,7 +9782,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "V54: Replaced frozen ArcGIS (ended 12/31/2025) with ChattaData Socrata portal. Fresh data 2006-present. Has contractor, status, dates. V56: Deactivated — chattadata.org domain dead.",
     },
 
@@ -9807,7 +9807,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "jackson_ms": {
@@ -9831,7 +9831,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "gulfport": {
@@ -9855,7 +9855,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -9883,7 +9883,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
+        "active": True,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
     },
 
     "lafayette_la": {
@@ -9907,7 +9907,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "fayetteville_ar": {
@@ -9931,7 +9931,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V26: Data provided via little_rock_ar bulk source.",
     },
 
@@ -9958,7 +9958,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V26: All API sources dead. Socrata (data.tulsaok.gov) error page. ArcGIS Hub (gis2-cityoftulsa.opendata.arcgis.com) alive but zero permit datasets (29 items, none permits). SmartGov removed. Tyler portal (tulsaok-energovweb.tylerhost.net) alive but web-only, no public API, exports capped at 1000 records. City developing online permit map (expected late 2025). Only option is Tyler EnerGov scraper or FOIA.",
     },
 
@@ -9983,7 +9983,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "kansas_city_mo": {
@@ -10009,7 +10009,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "kansas_city_ks": {
@@ -10033,7 +10033,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "overland_park": {
@@ -10057,7 +10057,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "topeka": {
@@ -10081,7 +10081,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "minneapolis": {
@@ -10160,7 +10160,7 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "epoch",
         "limit": 2000,
-        "active": true,  # V50: Stale data - last update Jun 2025
+        "active": True,  # V50: Stale data - last update Jun 2025
         "notes": "V19: Full 21-field map — contractor name+address. STALE: Last data Jun 2025.",
     },
 
@@ -10185,7 +10185,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "duluth": {
@@ -10209,7 +10209,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -10237,7 +10237,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "athens_ga": {
@@ -10261,7 +10261,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -10289,7 +10289,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — dead URL, domain unreachable.",
     },
 
@@ -10314,7 +10314,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "sunnyvale": {
@@ -10338,7 +10338,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
+        "active": True,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
     },
 
     "pasadena": {
@@ -10358,7 +10358,7 @@ CITY_REGISTRY = {
         },
         "date_field": "ESRI_OID",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "Limited fields: no date, status, or cost. Only active permits snapshot.",
     },
 
@@ -10383,7 +10383,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pomona": {
@@ -10407,7 +10407,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "escondido": {
@@ -10431,7 +10431,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "salinas": {
@@ -10455,7 +10455,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "lancaster_ca": {
@@ -10478,7 +10478,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Lancaster Accela portal doesn't support date-based search. Only allows search by permit number, type, address, or APN.",
     },
 
@@ -10502,7 +10502,7 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": false,  # V42: Accela portal confirmed live
+        "active": False,  # V42: Accela portal confirmed live
         "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/PALMDALE.",
     },
 
@@ -10527,7 +10527,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "victorville": {
@@ -10551,7 +10551,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "concord": {
@@ -10575,7 +10575,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "vallejo": {
@@ -10599,7 +10599,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "berkeley": {
@@ -10623,7 +10623,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "daly_city": {
@@ -10647,7 +10647,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "el_monte": {
@@ -10671,7 +10671,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "downey": {
@@ -10695,7 +10695,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -10723,7 +10723,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "midland": {
@@ -10747,7 +10747,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "odessa": {
@@ -10771,7 +10771,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "beaumont": {
@@ -10795,7 +10795,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "abilene": {
@@ -10819,7 +10819,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "waco": {
@@ -10843,7 +10843,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "tyler": {
@@ -10867,7 +10867,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "round_rock": {
@@ -10890,7 +10890,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
     },
 
     "pearland": {
@@ -10914,7 +10914,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -10942,7 +10942,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "gainesville_fl": {
@@ -10966,7 +10966,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "lehigh_acres": {
@@ -10990,7 +10990,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "palm_bay": {
@@ -11014,7 +11014,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "lakeland": {
@@ -11038,7 +11038,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -11066,7 +11066,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "avondale": {
@@ -11090,7 +11090,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "goodyear": {
@@ -11114,7 +11114,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "buckeye": {
@@ -11138,7 +11138,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "casa_grande": {
@@ -11162,7 +11162,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "sparks": {
@@ -11186,7 +11186,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "rio_rancho": {
@@ -11210,7 +11210,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "las_cruces": {
@@ -11237,7 +11237,7 @@ CITY_REGISTRY = {
         "date_field": "Issued_Date",
         "date_format": "none",
         "limit": 2000,
-        "active": true,
+        "active": True,
     },
 
     "santa_fe": {
@@ -11261,7 +11261,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -11289,7 +11289,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "kenosha": {
@@ -11313,7 +11313,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "racine": {
@@ -11337,7 +11337,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
+        "active": True,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
     },
 
     "appleton": {
@@ -11361,7 +11361,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "davenport": {
@@ -11385,7 +11385,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "sioux_city": {
@@ -11409,7 +11409,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "iowa_city": {
@@ -11433,7 +11433,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "council_bluffs": {
@@ -11457,7 +11457,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "grand_island": {
@@ -11481,7 +11481,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "kearney": {
@@ -11505,7 +11505,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -11533,7 +11533,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -11559,7 +11559,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "# BLOCKED: V12.32 - Covered by nj_statewide bulk source, using state-level data instead",
     },
 
@@ -11584,7 +11584,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -11609,7 +11609,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -11634,7 +11634,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.32: Covered by nj_statewide bulk source
+        "active": True,  # V12.32: Covered by nj_statewide bulk source
         "notes": "V12.32: Deactivated — covered by nj_statewide bulk source",
     },
 
@@ -11659,7 +11659,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — duplicate of 'cambridge' which has richer field map.",
     },
 
@@ -11684,7 +11684,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "status": "paused",
     },
 
@@ -11709,7 +11709,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "waterbury": {
@@ -11733,7 +11733,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "danbury": {
@@ -11757,7 +11757,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "norwalk": {
@@ -11781,7 +11781,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "meriden": {
@@ -11805,7 +11805,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -11833,7 +11833,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "utica": {
@@ -11881,7 +11881,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "troy": {
@@ -11905,7 +11905,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "newport_beach_ca": {
@@ -11955,7 +11955,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "mount_vernon": {
@@ -11979,7 +11979,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "white_plains": {
@@ -12003,7 +12003,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "cranston": {
@@ -12027,7 +12027,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "warwick_ri": {
@@ -12051,7 +12051,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pawtucket": {
@@ -12075,7 +12075,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     # =========================================================================
@@ -12127,7 +12127,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "thornton": {
@@ -12151,7 +12151,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "westminster_co": {
@@ -12175,7 +12175,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "arvada": {
@@ -12199,7 +12199,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pueblo": {
@@ -12223,7 +12223,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "boulder": {
@@ -12274,7 +12274,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "layton": {
@@ -12298,7 +12298,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "st_george": {
@@ -12322,7 +12322,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "meridian": {
@@ -12346,7 +12346,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
     },
 
     "nampa": {
@@ -12370,7 +12370,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "idaho_falls": {
@@ -12394,7 +12394,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
     },
 
     "pocatello": {
@@ -12418,7 +12418,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Error parsing response,
+        "active": True,  # V12.31 Deactivated: Error parsing response,
         "notes": "V12.3: Deactivated — fabricated dataset_id, needs research",
     },
 
@@ -12439,7 +12439,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": true,  # No individual permit data available
+        "active": True,  # No individual permit data available
         "notes": "Houston provides aggregated monthly data, not individual permits",
     },
 
@@ -12509,7 +12509,7 @@ CITY_REGISTRY = {
         "date_field": "COIssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": true,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
         "status": "paused",
         "notes": "V12.8: Deactivated - MapServer service not found",
     },
@@ -12534,7 +12534,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "ALLEN"},
         "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
@@ -12582,7 +12582,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "WYLIE"},
         "notes": "V26: Data provided via collin_county_tx bulk source.",
     },
@@ -12707,7 +12707,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "MURPHY"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12732,7 +12732,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "LAVON"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12833,7 +12833,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "NEVADA"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12863,7 +12863,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "ROYSE CITY"},
         "notes": "V23: Fixed field_map - permitnum, situsconcat (full address), situszip, propownername. Data updated Mar 2026.",
     },
@@ -12888,7 +12888,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "FAIRVIEW"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12913,7 +12913,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "SACHSE"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12938,7 +12938,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "situscity", "value": "JOSEPHINE"},
         "notes": "V12.8: City-filtered from Collin County TX",
@@ -12964,7 +12964,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "BLUE RIDGE"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -12989,7 +12989,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "VAN ALSTYNE"},
         "notes": "V12.8: City-filtered from Collin County TX",
     },
@@ -13019,7 +13019,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "situscity", "value": "ROCKWALL"},
         "notes": "V23: Fixed field_map - permitnum, situsconcat (full address), situszip, propownername. Data updated Mar 2026.",
     },
@@ -13044,7 +13044,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitissueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "situscity", "value": "LEONARD"},
         "notes": "V12.8: City-filtered from Collin County TX",
@@ -13093,7 +13093,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "BETHESDA"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13453,7 +13453,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "SANDY SPRING"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13477,7 +13477,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "CABIN JOHN"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13501,7 +13501,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "DICKERSON"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13549,7 +13549,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "GARRETT PARK"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
@@ -13574,7 +13574,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "WASHINGTON GROVE"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
@@ -13599,7 +13599,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "SPENCERVILLE"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
@@ -13624,7 +13624,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "WHEATON"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
@@ -13649,7 +13649,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "BRINKLOW"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
@@ -13674,7 +13674,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "BEALLSVILLE"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13698,7 +13698,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "GLEN ECHO"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13722,7 +13722,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "MOUNT AIRY"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13746,7 +13746,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "BARNESVILLE"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -13949,7 +13949,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "TIBURON"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14000,7 +14000,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "POINT REYES STATION"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14051,7 +14051,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "FAIRFAX"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14076,7 +14076,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "BOLINAS"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14126,7 +14126,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "WOODACRE"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14151,7 +14151,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "NICASIO"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14177,7 +14177,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "SAN GERONIMO"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14202,7 +14202,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "FOREST KNOLLS"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14228,7 +14228,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "LAGUNITAS"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14254,7 +14254,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "PETALUMA"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14279,7 +14279,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "TOMALES"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14305,7 +14305,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "MARSHALL"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14330,7 +14330,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city_town", "value": "MUIR BEACH"},
         "notes": "V12.8: City-filtered from Marin County CA",
@@ -14356,7 +14356,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "SAN QUENTIN"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14381,7 +14381,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "OLEMA"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14406,7 +14406,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "MARIN CITY"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14431,7 +14431,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city_town", "value": "CORTE MADERA"},
         "notes": "V12.8: City-filtered from Marin County CA",
     },
@@ -14451,7 +14451,7 @@ CITY_REGISTRY = {
         "field_map": {"permit_number": "permitnumber", "permit_type": "permittypedescription", "work_type": "comment", "address": "situsaddress", "filing_date": "issuedate", "status": "permitstatusdescription", "estimated_cost": "value", "description": "comment"},
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF ROUND ROCK"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14476,7 +14476,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF CEDAR PARK"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14501,7 +14501,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF GEORGETOWN"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14526,7 +14526,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF LEANDER"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14551,7 +14551,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF TAYLOR"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14576,7 +14576,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF HUTTO"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14601,7 +14601,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF PFLUGERVILLE"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14626,7 +14626,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF LIBERTY HILL"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14651,7 +14651,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF JARRELL"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14676,7 +14676,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF FLORENCE"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14701,7 +14701,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF GRANGER"},
         "notes": "V12.14: City-filtered from Williamson County TX",
     },
@@ -14726,7 +14726,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "issuingagencydescription", "value": "CITY OF THRALL"},
         "notes": "V12.14: City-filtered from Williamson County TX",
@@ -14752,7 +14752,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "COLUMBIA"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14773,7 +14773,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "ELLICOTT CITY"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14794,7 +14794,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "ELKRIDGE"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14813,7 +14813,7 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": false,
+        "active": False,
         "notes": "# BLOCKED: V23 - Howard County data (kvz2-j5cj) has no street address field, only city/zip. Unusable for address-based permit lookup.",
     },
 
@@ -14833,7 +14833,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "CLARKSVILLE"},
         "notes": "V12.14: City-filtered from Howard County MD",
@@ -14855,7 +14855,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "HIGHLAND"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14876,7 +14876,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "city_filter": {"field": "city", "value": "FULTON"},
         "notes": "V12.14: City-filtered from Howard County MD",
@@ -14898,7 +14898,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "WEST FRIENDSHIP"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14919,7 +14919,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "WOODSTOCK"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14940,7 +14940,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "GLENWOOD"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14961,7 +14961,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "SAVAGE"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -14982,7 +14982,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "city", "value": "JESSUP"},
         "notes": "V12.14: City-filtered from Howard County MD",
     },
@@ -15058,7 +15058,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V54: Deactivated — data ends 12/31/2019. Confirmed dead via API test.",
     },
 
@@ -15247,7 +15247,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V26: Data provided via gainesville endpoint.",
     },
 
@@ -15295,7 +15295,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.60: Fort Worth TX development permits. Pop ~978K. 25 fields.",
     },
 
@@ -15319,7 +15319,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V26: Data provided via framingham endpoint.",
     },
 
@@ -15365,7 +15365,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "BAYONNE CITY"},
         "notes": "V12.60: Bayonne NJ from NJ statewide. Pop ~71K.",
     },
@@ -15389,7 +15389,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "HACKENSACK CITY"},
         "notes": "V12.60: Hackensack NJ from NJ statewide. Pop ~46K. Bergen County seat.",
     },
@@ -15415,7 +15415,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "ASBURY PARK CITY"},
         "notes": "V12.60: Asbury Park NJ from NJ statewide. Pop ~16K. Active redevelopment.",
     },
@@ -15441,7 +15441,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "MONTCLAIR TOWNSHIP"},
         "notes": "V12.60: Montclair NJ from NJ statewide. Pop ~40K.",
     },
@@ -15465,7 +15465,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "WEST NEW YORK TOWN"},
         "notes": "V12.60: West New York NJ from NJ statewide. Pop ~54K.",
     },
@@ -15489,7 +15489,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "UNION CITY"},
         "notes": "V12.60: Union City NJ from NJ statewide. Pop ~73K.",
     },
@@ -15515,7 +15515,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "NORTH BERGEN TOWNSHIP"},
         "notes": "V12.60: North Bergen NJ from NJ statewide. Pop ~63K.",
     },
@@ -15539,7 +15539,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "EAST ORANGE CITY"},
         "notes": "V12.60: East Orange NJ from NJ statewide. Pop ~65K.",
     },
@@ -15564,7 +15564,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.60: Pierce County WA Socrata permits. Covers Tacoma unincorp, Lakewood, etc.",
     },
 
@@ -15589,7 +15589,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "NEWARK CITY"},
         "notes": "V12.60: Newark NJ from NJ statewide dataset. Pop ~311K. Largest NJ city.",
     },
@@ -15615,7 +15615,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "JERSEY CITY"},
         "notes": "V12.60: Jersey City NJ from NJ statewide. Pop ~292K.",
     },
@@ -15641,7 +15641,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "PATERSON CITY"},
         "notes": "V12.60: Paterson NJ from NJ statewide. Pop ~159K.",
     },
@@ -15667,7 +15667,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "ELIZABETH CITY"},
         "notes": "V12.60: Elizabeth NJ from NJ statewide. Pop ~137K.",
     },
@@ -15693,7 +15693,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "TRENTON CITY"},
         "notes": "V12.60: Trenton NJ from NJ statewide. Pop ~90K. State capital.",
     },
@@ -15717,7 +15717,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "HOBOKEN CITY"},
         "notes": "V12.60: Hoboken NJ from NJ statewide. Pop ~60K. Hot construction market.",
     },
@@ -15743,7 +15743,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "NEW BRUNSWICK CITY"},
         "notes": "V12.60: New Brunswick NJ from NJ statewide. Pop ~58K. Rutgers University.",
     },
@@ -15767,7 +15767,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "ATLANTIC CITY"},
         "notes": "V12.60: Atlantic City NJ from NJ statewide. Pop ~38K. Casino/resort construction.",
     },
@@ -15793,7 +15793,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "CAMDEN CITY"},
         "notes": "V12.60: Camden NJ from NJ statewide. Pop ~73K. Major redevelopment activity.",
     },
@@ -15817,7 +15817,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "MORRISTOWN TOWN"},
         "notes": "V12.60: Morristown NJ from NJ statewide. Pop ~19K. County seat.",
     },
@@ -15843,7 +15843,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "city_filter": {"field": "muniname", "value": "PRINCETON"},
         "notes": "V12.60: Princeton NJ from NJ statewide. Pop ~31K. Princeton University.",
     },
@@ -15870,7 +15870,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V12.60: Oxnard CA building permits. Pop ~210K.",
     },
 
@@ -15909,7 +15909,7 @@ BULK_SOURCES = {
         },
         "date_field": "processdate",
         "limit": 50000,  # Per-page limit for bulk fetch
-        "active": true,
+        "active": True,
         "notes": "V31: Reactivated. Statewide dataset covering all 550 NJ municipalities. Uses processdate (permitdate has bad data).",
     },
 
@@ -15937,7 +15937,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "notes": "V28: Switched from internal to public endpoint. Covers San Diego, Carlsbad, Oceanside, etc.",
     },
@@ -15987,7 +15987,7 @@ BULK_SOURCES = {
         "date_field": "ISSUDATE",
         "date_format": "epoch_ms",
         "limit": 2000,
-        "active": true,
+        "active": True,
         "notes": "V15: County-wide permits (no city breakdown). ArcGIS endpoint. ID is numeric.",
     },
 
@@ -16038,7 +16038,7 @@ BULK_SOURCES = {
         },
         "date_field": "permit_issuance_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V12.35: Discovery - Bowie, Hyattsville, Largo, etc.",
     },
 
@@ -16138,7 +16138,7 @@ BULK_SOURCES = {
         },
         "date_field": "issue_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V12.39: Columbia, Ellicott City, Elkridge, Clarksville, Fulton, etc. 46K+ permits",
     },
 
@@ -16163,7 +16163,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V12.39: Kentfield, Mill Valley, San Rafael, Novato, Fairfax, etc. 30K+ permits",
     },
 
@@ -16191,7 +16191,7 @@ BULK_SOURCES = {
         },
         "date_field": "date_issued",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V12.60: Cook County IL assessor permits. 130+ municipalities incl Evanston, Skokie, Oak Park, Cicero.",
     },
 
@@ -16239,7 +16239,7 @@ BULK_SOURCES = {
         },
         "date_field": "open_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "status": "paused",
         "notes": "V31: Fixed date_field to open_date (issued_date doesn't exist). Data stale as of 2023 — keep inactive until freshness confirmed.",
     },
@@ -16265,7 +16265,7 @@ BULK_SOURCES = {
         },
         "date_field": "appdate",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V12.60: Little Rock AR permits. First AR bulk source. Includes sq ft, workclass.",
     },
 
@@ -16289,7 +16289,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026.",
     },
 
@@ -16337,7 +16337,7 @@ BULK_SOURCES = {
         },
         "date_field": "permit_application_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. All wards covered.",
     },
 
@@ -16385,7 +16385,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued_date",
         "limit": 50000,
-        "active": true,
+        "active": True,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. 34 fields, includes sq ft and fees.",
     },
 
@@ -16433,7 +16433,7 @@ BULK_SOURCES = {
         "date_field": "File_Date",
         "date_format": "epoch_ms",
         "limit": 1000,
-        "active": true,
+        "active": True,
         "notes": "V15: ArcGIS endpoint. File_Date is epoch_ms. Address needs assembly from parts. Pop ~978K.",
     },
 
@@ -16484,7 +16484,7 @@ BULK_SOURCES = {
         "date_field": "applicationdate",
         "limit": 50000,
         "where_filter": "applicationtype IN('Construction Residential','Construction Commercial','Residential Site Development','Site Dev Residential','Site Development','Residential Demolition')",
-        "active": true,
+        "active": True,
         "notes": "V31: Reactivated + filtered. Pierce County WA Socrata permits. Filtered to construction/building types only (excludes mechanical/plumbing/sewer/alarms/signs). Tacoma, Lakewood, etc.",
     },
 
@@ -16540,7 +16540,7 @@ BULK_SOURCES = {
         "date_field": "Status_Date",
         "date_format": "string",
         "limit": 5000,
-        "active": true,
+        "active": True,
         "notes": "V33: City of Sacramento ArcGIS Hub. 2,627 records (current year). Fields: Application, Type, Sub_Type, Category, Address, ZIP, Valuation, Contractor, Work_Desc, Project_Sq_Ft. Covers Sacramento city only.",
     },
 
@@ -16575,7 +16575,7 @@ BULK_SOURCES = {
         "date_field": "issueddate",
         "date_format": "epoch",
         "limit": 5000,
-        "active": true,
+        "active": True,
         "notes": "V33: Wake County NC via Open Data Raleigh ArcGIS Hub. 182K records. INCREDIBLE fields: contractor name/email/phone/license, est cost, sqft, housing units, fees, jurisdiction. Covers Raleigh, Cary, Apex, Holly Springs, Wake Forest, Garner, Knightdale, etc.",
     },
 
@@ -16600,7 +16600,7 @@ BULK_SOURCES = {
         "date_field": "APPROVAL_DATE",
         "date_format": "epoch",
         "limit": 5000,
-        "active": true,
+        "active": True,
         "notes": "V33: Riverside County GIS Open Data. Covers 20+ cities including Riverside (pop 314K), Moreno Valley (212K), Temecula (110K), Murrieta (111K), Menifee (103K), Jurupa Valley (105K). Fields: PERMIT_ID, CASE_TYPE, ADDRESS, PERMIT_STATUS, DESCRIPTION, UNIT_COUNT.",
     },
 }
@@ -16644,7 +16644,7 @@ def get_all_cities_info():
                 "state": config["state"],
                 "slug": config["slug"],
                 "platform": config["platform"],
-                "active": true,
+                "active": True,
             })
     return sorted(cities, key=lambda x: x["name"])
 
