@@ -67,6 +67,14 @@ def _get_source_config(source_id):
         config['_source_type'] = 'bulk'
         return config
 
+    # V61: Fallback to CITY_REGISTRY for cities not yet in city_sources
+    from city_configs import CITY_REGISTRY
+    if source_id in CITY_REGISTRY:
+        config = CITY_REGISTRY[source_id].copy()
+        config['_source_type'] = 'city'
+        config['active'] = True
+        return config
+
     return None
 
 
@@ -1111,8 +1119,15 @@ def fetch_permits(city_key, days_back=30):
 
     config = get_city_config(city_key)
     if not config:
-        print(f"  [SKIP] Unknown city: {city_key}")
-        return [], "skip"
+        # V61: Fallback to CITY_REGISTRY for cities not yet in city_sources
+        from city_configs import CITY_REGISTRY
+        if city_key in CITY_REGISTRY:
+            config = CITY_REGISTRY[city_key].copy()
+            config['active'] = True
+            print(f"  [V61] {city_key}: Using CITY_REGISTRY config (no city_sources row)")
+        else:
+            print(f"  [SKIP] Unknown city: {city_key}")
+            return [], "skip"
 
     if not config.get("active", False):
         print(f"  [SKIP] Inactive city: {city_key}")
