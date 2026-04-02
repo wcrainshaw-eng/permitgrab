@@ -380,7 +380,7 @@ CITY_REGISTRY = {
         "date_field": "applieddate",
         "date_format": "iso",
         "limit": 1000,
-        "active": False,
+        "active": True,
         "notes": "V35: Socrata Trakit Permits. Fresh daily. Has BUILDING, MECHANICAL, ELECTRICAL, PLUMBING, COMPLAINT types.",
     },
 
@@ -439,7 +439,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applicant_submit_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V24: Switched to qu2z-8suj (Addition/Alteration permits). Fresh data verified Mar 2026.",
     },
 
@@ -1236,7 +1236,7 @@ CITY_REGISTRY = {
         },
         "date_field": "createddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Static snapshot ending June 30, 2025 — updated ~every 6 months. No real-time API exists. POSSE system (dppweb.honolulu.gov) has live data but no public API. New HNL Build (Salesforce) launched Aug 2025 also has no API. This Socrata dataset is the only programmatic source. Check for updates periodically.",
     },
 
@@ -1839,7 +1839,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live with extremely fresh data (Mar 30 2026). Full field map with address, zip, city.
+        "active": True,  # V43: Activated — endpoint confirmed live with extremely fresh data (Mar 30 2026). Full field map with address, zip, city.
         "notes": "V43: Activated. Marin County Socrata — daily-fresh data, full address fields.",
     },
 
@@ -1861,7 +1861,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V34: Deactivated — duplicate of 'gainesville_fl' which has richer field map.",
     },
 
@@ -2023,7 +2023,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applied",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live with data. Has address, permit, type, cost.
+        "active": True,  # V43: Activated — endpoint confirmed live with data. Has address, permit, type, cost.
         "notes": "V43: Activated. Framingham MA Socrata — confirmed working.",
     },
 
@@ -2047,7 +2047,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live with data. Has address, cost, status.
+        "active": True,  # V43: Activated — endpoint confirmed live with data. Has address, cost, status.
         "notes": "V43: Activated. Parker CO Socrata — confirmed working.",
     },
 
@@ -2071,7 +2071,7 @@ CITY_REGISTRY = {
         },
         "date_field": "date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "Historical data 2009-2013",
     },
 
@@ -2091,7 +2091,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via prince_georges_county_md bulk source.",
     },
 
@@ -2115,7 +2115,7 @@ CITY_REGISTRY = {
         },
         "date_field": "yrmo",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "# V23 BLOCKED: NJ state dataset w9se-dmra has NO address fields - only block/lot numbers. Cannot match to properties.",
     },
 
@@ -3346,7 +3346,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via howard_county_md bulk source.",
     },
 
@@ -3419,7 +3419,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live. Has situs address, contractor, value.
+        "active": True,  # V43: Activated — endpoint confirmed live. Has situs address, contractor, value.
         "notes": "V43: Activated. Summit County UT Socrata — confirmed working.",
     },
 
@@ -3471,7 +3471,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live. Has address, type, amount, work description.
+        "active": True,  # V43: Activated — endpoint confirmed live. Has address, type, amount, work description.
         "notes": "V43: Activated. Somerville MA Socrata — confirmed working with address data.",
     },
 
@@ -3545,7 +3545,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,  # V43: Activated — endpoint confirmed live. Has location_1 (address), valuation, owner.
+        "active": True,  # V43: Activated — endpoint confirmed live. Has location_1 (address), valuation, owner.
         "notes": "V43: Activated. Frederick MD via Maryland open data — confirmed working.",
     },
 
@@ -3620,7 +3620,7 @@ CITY_REGISTRY = {
         "date_field": "date_issued",
         "city_filter": {"field": "municipality", "value": "TOWN OF CICERO"},
         "limit": 2000,
-        "active": False,  # V43: Cook County Socrata — 660K records, addresses confirmed
+        "active": True,  # V43: Cook County Socrata — 660K records, addresses confirmed
         "notes": "V12.7: New — Cicero permits via Cook County Socrata. Data current Dec 2025. Filtered from county-wide dataset. Pop ~81K.",
     },
 
@@ -4804,7 +4804,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4826,7 +4826,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.6: Deactivated — fabricated Socrata domain",
     },
 
@@ -4875,7 +4875,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via new_orleans endpoint.",
     },
 
@@ -4899,7 +4899,7 @@ CITY_REGISTRY = {
         },
         "date_field": "year",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "Historical data 2000-2009",
     },
 
@@ -4987,7 +4987,7 @@ CITY_REGISTRY = {
         },
         "date_field": "applicationdate",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "clarkston": {
@@ -5009,7 +5009,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "auburn_wa": {
@@ -5060,7 +5060,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "pierce_county": {
@@ -5083,7 +5083,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
     },
 
     "nola_blds": {
@@ -5104,7 +5104,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.8: Deactivated - duplicate slug with new_orleans",
     },
 
@@ -11656,7 +11656,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V34: Deactivated — duplicate of 'cambridge' which has richer field map.",
     },
 
@@ -12460,7 +12460,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.7: Discovered via Socrata sweep",
     },
 
@@ -13066,7 +13066,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "city_filter": {"field": "city", "value": "SILVER SPRING"},
         "notes": "V12.8: City-filtered from Montgomery County MD",
     },
@@ -15032,7 +15032,7 @@ CITY_REGISTRY = {
         },
         "date_field": "permit_application_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via norfolk endpoint.",
     },
 
@@ -15055,7 +15055,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.60: Dallas TX building permits. Includes contractor info.",
     },
 
@@ -15150,7 +15150,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,  # V28: Consolidated — use mesa_new instead
+        "active": True,  # V28: Consolidated — use mesa_new instead
         "notes": "V28: DUPLICATE — mesa_new has fuller field_map.",
     },
 
@@ -15197,7 +15197,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.60: San Diego County permits. Covers Alpine, Valley Center, Fallbrook, etc.",
     },
@@ -15221,7 +15221,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V26: Data provided via college_station endpoint.",
     },
 
@@ -15268,7 +15268,7 @@ CITY_REGISTRY = {
         },
         "date_field": "appdate",
         "limit": 2000,
-        "active": False,  # V28: Consolidated — use little_rock instead (22-field map)
+        "active": True,  # V28: Consolidated — use little_rock instead (22-field map)
         "notes": "V28: DUPLICATE — little_rock entry has 22-field map with contractor_trade, sqft, fees.",
     },
 
@@ -15339,7 +15339,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": False,
+        "active": True,
         "notes": "V12.60: Auburn WA permits. Pop ~87K.",
     },
 
@@ -15958,7 +15958,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.31: County dataset covering Santa Rosa, Petaluma, etc.",
     },
@@ -16010,7 +16010,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.35: Discovery - Bethesda, Rockville, Silver Spring, etc.",
     },
@@ -16061,7 +16061,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.35: Discovery - Baton Rouge parish permits",
     },
@@ -16087,7 +16087,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.39: Fixed date_field to 'issued', cost to 'jobvalue'",
     },
@@ -16112,7 +16112,7 @@ BULK_SOURCES = {
         },
         "date_field": "permitissueddate",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "notes": "V12.39: McKinney, Allen, Frisco, Celina, Wylie, Prosper, etc. 94K+ permits",
     },
 
@@ -16211,7 +16211,7 @@ BULK_SOURCES = {
         },
         "date_field": "issuedate",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "status": "paused",
         "notes": "V12.60: Williamson County TX permits. Round Rock, Georgetown, Cedar Park, Leander, etc.",
     },
@@ -16310,7 +16310,7 @@ BULK_SOURCES = {
         },
         "date_field": "processed_date",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. Covers all neighborhoods/districts.",
     },
 
@@ -16358,7 +16358,7 @@ BULK_SOURCES = {
         },
         "date_field": "issueddate",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "notes": "V12.60: Cincinnati OH building permits. Updated daily.",
     },
 
@@ -16406,7 +16406,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. Includes applied, approved, issued dates.",
     },
 
@@ -16456,7 +16456,7 @@ BULK_SOURCES = {
         "date_field": "issue_date",
         "limit": 50000,
         "where_filter": "permit_type_desc='Building Permit'",
-        "active": False,
+        "active": True,
         "notes": "V31: Reactivated + filtered. Austin TX datahub permits. Filtered to Building Permits only (excludes electrical/plumbing/mechanical/driveway). Fresh data confirmed 2026-03-30.",
     },
 
@@ -16503,7 +16503,7 @@ BULK_SOURCES = {
         },
         "date_field": "issued",
         "limit": 50000,
-        "active": False,
+        "active": True,
         "notes": "V12.60: Buffalo NY building permits. Includes applicant, license info.",
     },
 
