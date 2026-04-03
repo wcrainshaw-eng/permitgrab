@@ -870,6 +870,7 @@ def _fix_arcgis_date_formats(conn):
 
 
 def _run_v34_data_cleanup(conn):
+    return  # DISABLED - causes startup hang on large Postgres tables
     """V34: Comprehensive data cleanup for known data quality issues.
 
     Fixes:
