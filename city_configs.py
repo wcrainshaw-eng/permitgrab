@@ -482,7 +482,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "date",
         "limit": 2000,
-        "active": True,        "notes": "V35: DCRA FeatureServer layer 4 (Last 30 Days rolling feed). date_format=none because epoch WHERE fails. Rich data: PERMIT_APPLICANT, OWNER_NAME, FEES_PAID, DESC_OF_WORK, WARD, ANC, ZONING, lat/lon. Backfilled 2,000 permits 2026-03-31.",
+        "active": False,  # V63: Deactivated - endpoint returning HTML/errors instead of JSON
+        "notes": "V63: Deactivated - ArcGIS layer 4 returning HTML instead of JSON (22 consecutive errors). DC uses per-year layers. Need to find working endpoint.",
     },
 
     # V23 AUDIT: 2026-03-28 - NO_DATA - CKAN endpoint needs verification
@@ -768,6 +769,31 @@ CITY_REGISTRY = {
         "limit": 2000,
         "active": True,
         "notes": "V19: Replaced dead MD_OpenData/MapServer with ArcGIS FeatureServer miamidade_permit_data. SUPERB data: ContractorName/Phone/Address, OwnerName, EstimatedValue, SquareFootage, ArchitectName, ApplicationTypeDescription, ProposedUseDescription. Verified Mar 2026 with permits issued 3/22/2026.",
+    },
+
+    "miami_fl": {
+        "name": "Miami",
+        "state": "FL",
+        "slug": "miami-fl",
+        "lat": 25.7617,
+        "lon": -80.1918,
+        "platform": "arcgis",
+        "endpoint": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0/query",
+        "description": "Building Permits Since 2014",
+        "date_field": "IssuedDate",
+        "date_format": "epoch",
+        "active": True,
+        "field_map": {
+            "permit_number": "PermitNumber",
+            "permit_type": "PropertyType",
+            "address": "DeliveryAddress",
+            "description": "ScopeofWork",
+            "estimated_cost": "TotalCost",
+            "issued_date": "IssuedDate",
+            "date": "IssuedDate",
+            "status": "BuildingPermitStatusDescription",
+        },
+        "notes": "V63: City of Miami ArcGIS endpoint. Separate from miami_dade (county). Has IssuedDate with epoch format.",
     },
 
     "raleigh": {
@@ -1621,8 +1647,8 @@ CITY_REGISTRY = {
             "status": "Status"
         },
         "limit": 2000,
-        "active": True,
-        "notes": "V24: Accela portal requires login. Cannot scrape without credentials.",
+        "active": False,  # V63: Deactivated - Accela portal requires login
+        "notes": "V63: Deactivated - Accela portal requires login. Cannot scrape without credentials.",
     },
 
     # =========================================================================
@@ -1647,10 +1673,10 @@ CITY_REGISTRY = {
             "description": "Descriptio",
         },
         "date_field": "IssuedDate",
-        "date_format": "epoch",
+        "date_format": "date",
         "limit": 2000,
         "active": True,  # V43/V50: Activated â FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
-        "notes": "V50: Verified live. Las Vegas ArcGIS FeatureServer confirmed working. Fresh 2026 data.",
+        "notes": "V63: Changed date_format from epoch to date to fix query errors. IssuedDate is esriFieldTypeDate.",
     },
 
     "orlando": {
@@ -1762,8 +1788,8 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V50: ArcGIS stale (April 2024), CSV-only alt
-        "notes": "V50: ArcGIS confirmed stale (April 2024). CSV available at data.cabq.gov/business/buildingpermits/ but no live API. Pop ~560K.",
+        "active": False,  # V63: Deactivated - ArcGIS stale since April 2024
+        "notes": "V63: Deactivated - ArcGIS confirmed stale (April 2024). No live API alternative.",
     },
 
     "cleveland": {
@@ -1985,32 +2011,32 @@ CITY_REGISTRY = {
         "notes": "V26: Data provided via williamson_county_tx bulk source.",
     },
 
-    "dallas": {
+        "dallas": {
         "name": "Dallas",
         "state": "TX",
         "slug": "dallas",
         "lat": 32.78,
         "lon": -96.8,
-        "platform": "accela",
-        "agency_code": "DALLASTX",
-        "_accela_city_key": "dallas",
-        "endpoint": "https://aca-prod.accela.com/DALLASTX/Cap/CapHome.aspx?module=Building&TabName=Building",
-        "description": "Building Permits",
-        "date_field": "Date",
+        "platform": "arcgis",
+        "endpoint": "https://services2.arcgis.com/rwnOSbfKSwyTBcwN/arcgis/rest/services/T_BU_Permits_FY2023_24/FeatureServer/0/query",
+        "description": "Building Permits FY2023-24",
+        "date_field": "ISSUE_DATE",
+        "date_format": "string",
         "field_map": {
-            "permit_number": "Record Number",
-            "permit_type": "Record Type",
-            "address": "Address",
-            "description": "Description",
-            "issued_date": "Date",
-            "date": "Date",
-            "status": "Status"
+            "permit_number": "PERMIT_No",
+            "permit_type": "PERMIT_TYPE",
+            "address": "ADDRESS",
+            "description": "ACTIVITY",
+            "estimated_cost": "VALUE",
+            "issued_date": "ISSUE_DATE",
+            "date": "ISSUE_DATE",
+            "zip": "ZIP_CODE",
+            "contractor_name": "CONTRACTOR_NAME",
         },
         "limit": 2000,
         "active": True,
-        "notes": "V54: Reactivated Accela â Socrata endpoint (dallas_tx) dead since 2019. Playwright installed on Render.",
+        "notes": "V63: Switched from dead Accela to ArcGIS FY2023-24 dataset. ISSUE_DATE is string format.",
     },
-
     "framingham": {
         "name": "Framingham",
         "state": "MA",
@@ -32064,26 +32090,6 @@ BULK_SOURCES = {
             "issue_date": "date"
         }
     },
-    "miami_fl": {
-        "name": "Miami",
-        "state": "FL",
-        "slug": "miami-fl",
-        "lat": 25.7617,
-        "lon": -80.1918,
-        "platform": "socrata",
-        "endpoint": "https://data.miamigov.com/resource/7ey5-m434.json",
-        "dataset_id": "7ey5-m434",
-        "description": "Building Permits Issued By City Of Miami (data.miamigov.com)",
-        "date_field": "certificatedate",
-        "active": True,
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "address": "address",
-            "issue_date": "certificatedate"
-        }
-    },
-
     "saint_paul_mn": {
         "city": "Saint Paul",
         "state": "MN",
