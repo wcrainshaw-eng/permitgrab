@@ -243,6 +243,8 @@ def _translate_sql(sql):
         translated
     )
 
+    # NOT GLOB → !~ (Postgres negated regex match) — must come before GLOB
+    translated = translated.replace(" NOT GLOB ", " !~ ")
     # GLOB → ~ (Postgres regex match)
     translated = translated.replace(" GLOB ", " ~ ")
 

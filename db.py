@@ -1505,35 +1505,42 @@ def cleanup_invalid_dates():
     conn = get_connection()
     fixed = {}
 
-    for field in ['filing_date', 'issued_date', 'date']:
-        # Find and fix records where date field doesn't start with digit
-        cursor = conn.execute(f"""
+    try:
+        for field in ['filing_date', 'issued_date', 'date']:
+            # Find and fix records where date field doesn't start with digit
+            cursor = conn.execute(f"""
+                UPDATE permits
+                SET {field} = NULL
+                WHERE {field} IS NOT NULL
+                  AND {field} != ''
+                  AND SUBSTR({field}, 1, 1) NOT GLOB '[0-9]'
+            """)
+            conn.commit()
+            fixed[field] = cursor.rowcount
+            if cursor.rowcount > 0:
+                print(f"[DB] V13.2: Cleaned {cursor.rowcount} invalid {field} values")
+
+        total = sum(fixed.values())
+        if total > 0:
+            print(f"[DB] V13.2: Total date cleanup: {total} records fixed")
+
+        # V13.2: Also clean up suspicious cost values (exact $50M or $100M = likely placeholders)
+        cost_cursor = conn.execute("""
             UPDATE permits
-            SET {field} = NULL
-            WHERE {field} IS NOT NULL
-              AND {field} != ''
-              AND SUBSTR({field}, 1, 1) NOT GLOB '[0-9]'
+            SET estimated_cost = NULL
+            WHERE estimated_cost IN (50000000, 100000000)
         """)
         conn.commit()
-        fixed[field] = cursor.rowcount
-        if cursor.rowcount > 0:
-            print(f"[DB] V13.2: Cleaned {cursor.rowcount} invalid {field} values")
-
-    total = sum(fixed.values())
-    if total > 0:
-        print(f"[DB] V13.2: Total date cleanup: {total} records fixed")
-
-    # V13.2: Also clean up suspicious cost values (exact $50M or $100M = likely placeholders)
-    cost_cursor = conn.execute("""
-        UPDATE permits
-        SET estimated_cost = NULL
-        WHERE estimated_cost IN (50000000, 100000000)
-    """)
-    conn.commit()
-    cost_fixed = cost_cursor.rowcount
-    if cost_fixed > 0:
-        print(f"[DB] V13.2: Cleaned {cost_fixed} suspicious cost values ($50M/$100M placeholders)")
-        fixed['estimated_cost'] = cost_fixed
+        cost_fixed = cost_cursor.rowcount
+        if cost_fixed > 0:
+            print(f"[DB] V13.2: Cleaned {cost_fixed} suspicious cost values ($50M/$100M placeholders)")
+            fixed['estimated_cost'] = cost_fixed
+    except Exception as e:
+        print(f"[DB] V13.2: Date cleanup error (non-fatal): {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
     return fixed
 
