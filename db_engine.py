@@ -268,7 +268,7 @@ def _translate_sql(sql):
 # Public API — drop-in replacement for get_connection()
 # --------------------------------------------------------------------------
 
-def get_connection(max_retries=3, retry_delay=0.5, background=None):
+def get_connection(max_retries=10, retry_delay=1.0, background=None):
     """Get a database connection (Postgres pool or SQLite thread-local).
 
     Returns a connection object that supports:
@@ -279,10 +279,11 @@ def get_connection(max_retries=3, retry_delay=0.5, background=None):
     For Postgres, SQL is auto-translated from SQLite syntax.
 
     V65: Added retry logic for pool exhaustion and rate-limiting for background threads.
+    V67: Increased retries to 10 with exponential backoff up to 30s max.
 
     Args:
-        max_retries: Number of times to retry on pool exhaustion (default 3)
-        retry_delay: Seconds to wait between retries (default 0.5)
+        max_retries: Number of times to retry on pool exhaustion (default 10, was 3)
+        retry_delay: Base seconds to wait between retries (default 1.0, was 0.5)
         background: If True, use background semaphore. If None, auto-detect from thread name.
     """
     if USE_POSTGRES:
@@ -300,7 +301,7 @@ def get_connection(max_retries=3, retry_delay=0.5, background=None):
         try:
             pool = _get_pg_pool()
 
-            # V65: Retry logic for pool exhaustion
+            # V67: Retry logic with exponential backoff (up to 30s max wait per retry)
             last_error = None
             for attempt in range(max_retries):
                 try:
@@ -309,10 +310,12 @@ def get_connection(max_retries=3, retry_delay=0.5, background=None):
                 except psycopg2.pool.PoolError as e:
                     last_error = e
                     if attempt < max_retries - 1:
-                        print(f"[DB_ENGINE] Pool exhausted, retry {attempt + 1}/{max_retries} in {retry_delay}s...")
-                        time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                        # V67: Exponential backoff capped at 30 seconds
+                        wait_time = min(retry_delay * (2 ** attempt), 30)
+                        print(f"[DB_ENGINE] Pool exhausted, retry {attempt + 1}/{max_retries} in {wait_time:.1f}s...")
+                        time.sleep(wait_time)
                     else:
-                        print(f"[DB_ENGINE] Pool exhausted after {max_retries} retries")
+                        print(f"[DB_ENGINE] Pool exhausted after {max_retries} retries (~{sum(min(retry_delay * (2**i), 30) for i in range(max_retries-1)):.0f}s total wait)")
                         raise
 
             # Should not reach here, but just in case

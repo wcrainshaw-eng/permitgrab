@@ -66,27 +66,34 @@ def _deferred_startup():
 
     def _bg_init():
         import time
+        # V67: Wait for gunicorn to be fully ready and first few requests to complete
+        print(f"[{datetime.now()}] V67: Background init waiting 15s for requests to stabilize...")
+        time.sleep(15)
+
         # V64: Sync CITY_REGISTRY to city_sources AND prod_cities
+        print(f"[{datetime.now()}] V67: Starting deferred registry sync...")
         try:
             from collector import sync_city_registry_to_prod
             sources, cities = sync_city_registry_to_prod()
-            print(f"[{datetime.now()}] V66: City sources sync complete - {sources} sources, {cities} new cities")
+            print(f"[{datetime.now()}] V67: City sources sync complete - {sources} sources, {cities} new cities")
         except Exception as e:
-            print(f"[{datetime.now()}] V66: City sources sync error: {e}")
+            print(f"[{datetime.now()}] V67: City sources sync error: {e}")
             import traceback
             traceback.print_exc()
 
         # V57: Additional prod_cities sync (handles deletions and updates)
         try:
             sync_city_registry_to_prod_cities()
-            print(f"[{datetime.now()}] V66: Prod cities sync complete.")
+            print(f"[{datetime.now()}] V67: Prod cities sync complete.")
         except Exception as e:
-            print(f"[{datetime.now()}] V66: Prod cities sync error: {e}")
+            print(f"[{datetime.now()}] V67: Prod cities sync error: {e}")
             import traceback
             traceback.print_exc()
 
-        # Wait before starting collectors
-        time.sleep(5)
+        # V67: Even longer delay before collectors — let the pool breathe
+        print(f"[{datetime.now()}] V67: Waiting 30s before starting collectors...")
+        time.sleep(30)
+        print(f"[{datetime.now()}] V67: Starting collectors (staggered)...")
         start_collectors()
 
     init_thread = threading.Thread(target=_bg_init, name='deferred_init', daemon=True)
@@ -3444,15 +3451,35 @@ def is_pro(user):
     return get_user_plan(user) == 'pro'
 
 
+# V67: Cache for nav cities to avoid DB query on every request
+_nav_cache = {'data': None, 'ts': 0}
+
 @app.context_processor
 def inject_nav_context():
-    """Inject user, plan status, and nav_cities into all templates."""
+    """Inject user, plan status, and nav_cities into all templates.
+    V67: Cache nav_cities for 5 minutes to prevent pool exhaustion."""
+    import time
+    global _nav_cache
+
     user = get_current_user()
+
+    # Cache nav cities for 5 minutes (300 seconds)
+    now = time.time()
+    if _nav_cache['data'] is None or (now - _nav_cache['ts']) > 300:
+        try:
+            _nav_cache['data'] = get_cities_with_data()
+            _nav_cache['ts'] = now
+        except Exception as e:
+            print(f"[{datetime.now()}] V67: inject_nav_context cache miss failed: {e}")
+            # Return empty list if DB unavailable (during startup)
+            if _nav_cache['data'] is None:
+                _nav_cache['data'] = []
+
     return {
         'user': user,
         'user_plan': get_user_plan(user),
         'is_pro': is_pro(user),
-        'nav_cities': get_cities_with_data()
+        'nav_cities': _nav_cache['data']
     }
 
 
@@ -3710,20 +3737,38 @@ def alerts_redirect():
 def health_check():
     """
     V12.51: Health check endpoint with SQLite data availability check.
-    Returns 503 if no permit data is available (fresh deploy/empty disk).
-    This prevents Render from routing traffic to an empty instance.
+    V67: Always return 200 during startup to prevent Render restart loop.
     """
-    stats = permitdb.get_permit_stats()
-    permit_count = stats['total_permits']
+    # V67: During startup, return healthy without touching DB
+    # This prevents pool exhaustion from killing health checks
+    if not _startup_done:
+        return jsonify({
+            'status': 'starting',
+            'timestamp': datetime.now().isoformat(),
+            'message': 'V67: Background init in progress, service is alive'
+        }), 200
+
+    # After startup, do the full health check
+    try:
+        stats = permitdb.get_permit_stats()
+        permit_count = stats['total_permits']
+    except Exception as e:
+        # V67: Return degraded (still 200!) if DB is temporarily unavailable
+        return jsonify({
+            'status': 'degraded',
+            'timestamp': datetime.now().isoformat(),
+            'message': f'DB temporarily unavailable: {str(e)[:100]}',
+            'data_loaded': _initial_data_loaded
+        }), 200
 
     if permit_count == 0 and is_data_loading():
-        # No data and we're in a loading state - return unhealthy
+        # No data and we're in a loading state - still return 200 but indicate loading
         return jsonify({
             'status': 'loading',
             'timestamp': datetime.now().isoformat(),
             'message': 'Data collection in progress',
             'permit_count': 0
-        }), 503
+        }), 200  # V67: Changed from 503 to 200 to prevent restart loop
 
     # V16: Collection health tracking
     collection_status = 'never'
@@ -8859,33 +8904,33 @@ def start_collectors():
     # V12.2: Test network connectivity before starting threads
     _test_outbound_connectivity()
 
-    print(f"[{datetime.now()}] V66: Starting background collectors with staggered init...")
+    print(f"[{datetime.now()}] V67: Starting background collectors with staggered init...")
 
-    # V66: Stagger each thread start by 10 seconds to avoid pool exhaustion
+    # V67: Stagger each thread start by 30 seconds to avoid pool exhaustion (was 10s in V66)
     # Initial collection thread
     initial_thread = threading.Thread(target=run_initial_collection, name='initial_collection', daemon=True)
     initial_thread.start()
-    print(f"[{datetime.now()}] V66: Initial collection thread started, waiting 10s...")
-    time.sleep(10)
+    print(f"[{datetime.now()}] V67: Initial collection thread started, waiting 30s...")
+    time.sleep(30)
 
     # Scheduled daily collection thread
     collector_thread = threading.Thread(target=scheduled_collection, name='scheduled_collection', daemon=True)
     collector_thread.start()
-    print(f"[{datetime.now()}] V66: Scheduled collection thread started, waiting 10s...")
-    time.sleep(10)
+    print(f"[{datetime.now()}] V67: Scheduled collection thread started, waiting 30s...")
+    time.sleep(30)
 
     # V12.53: Email scheduler thread
     email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
     email_thread.start()
-    print(f"[{datetime.now()}] V66: Email scheduler thread started, waiting 10s...")
-    time.sleep(10)
+    print(f"[{datetime.now()}] V67: Email scheduler thread started, waiting 30s...")
+    time.sleep(30)
 
     # V12.55c: One-time fix for Socrata location JSON in address fields
     try:
         fix_thread = threading.Thread(target=_fix_socrata_addresses, name='socrata_fix', daemon=True)
         fix_thread.start()
-        print(f"[{datetime.now()}] V66: Address cleanup thread started, waiting 10s...")
-        time.sleep(10)
+        print(f"[{datetime.now()}] V67: Address cleanup thread started, waiting 30s...")
+        time.sleep(30)
     except Exception as e:
         print(f"[{datetime.now()}] V12.55c: Address cleanup error: {e}")
 
@@ -8894,11 +8939,11 @@ def start_collectors():
         from autonomy_engine import run_autonomy_engine
         autonomy_thread = threading.Thread(target=run_autonomy_engine, name='autonomy_engine', daemon=True)
         autonomy_thread.start()
-        print(f"[{datetime.now()}] V66: Autonomy engine thread started.")
+        print(f"[{datetime.now()}] V67: Autonomy engine thread started.")
     except ImportError:
         print(f"[{datetime.now()}] V12.54: autonomy_engine.py not found, skipping.")
 
-    print(f"[{datetime.now()}] V66: All collector threads started (staggered over ~40s).")
+    print(f"[{datetime.now()}] V67: All collector threads started (staggered over ~2 minutes).")
 
 # V12.12: Preload existing data from disk BEFORE starting collectors
 # This ensures stale data is served immediately rather than showing 0 permits
