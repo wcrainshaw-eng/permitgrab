@@ -193,8 +193,8 @@ else:
     DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Rate limiting: 1 second between city pulls
-RATE_LIMIT_DELAY = 1.0
+# V68: Rate limiting — 2 seconds between city pulls (was 1s, increased to prevent pool exhaustion)
+RATE_LIMIT_DELAY = 2.0
 
 # V12.29: Batch processing to prevent server overload
 BATCH_SIZE = 50

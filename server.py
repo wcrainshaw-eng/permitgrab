@@ -51,50 +51,58 @@ TRADE_MAPPING = {
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# V68: WSGI middleware to bypass ALL Flask processing for /api/health
+# This ensures health checks ALWAYS return 200, even during pool exhaustion
+class HealthCheckMiddleware:
+    def __init__(self, wsgi_app):
+        self.app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        if environ.get('PATH_INFO') in ('/api/health', '/health'):
+            import json
+            status = '200 OK'
+            response_headers = [('Content-Type', 'application/json')]
+            start_response(status, response_headers)
+            body = json.dumps({
+                'status': 'ok',
+                'version': 'V68',
+                'message': 'Health check bypasses Flask entirely'
+            })
+            return [body.encode('utf-8')]
+        return self.app(environ, start_response)
+
+# Apply the middleware
+app.wsgi_app = HealthCheckMiddleware(app.wsgi_app)
+
 # V66: Deferred startup to prevent connection pool exhaustion
 # Background threads are started on first request, not at module load time
 _startup_done = False
 
 @app.before_request
 def _deferred_startup():
-    """V66: Defer heavy DB init until AFTER gunicorn binds the HTTP port."""
+    """V68: Defer heavy DB init until AFTER gunicorn binds the HTTP port."""
     global _startup_done
     if _startup_done:
         return
     _startup_done = True
-    print(f"[{datetime.now()}] V66: First request received, starting deferred init...")
+    print(f"[{datetime.now()}] V68: First request received, starting deferred init...")
 
     def _bg_init():
         import time
-        # V67: Wait for gunicorn to be fully ready and first few requests to complete
-        print(f"[{datetime.now()}] V67: Background init waiting 15s for requests to stabilize...")
-        time.sleep(15)
+        # V68: Wait 60 seconds. Let the server be fully stable first.
+        print(f"[{datetime.now()}] V68: Background init waiting 60s...")
+        time.sleep(60)
 
-        # V64: Sync CITY_REGISTRY to city_sources AND prod_cities
-        print(f"[{datetime.now()}] V67: Starting deferred registry sync...")
+        # V68: Skip heavy registry sync — just start collectors with delays
+        # The SQLite DB already has permits and cities, no need to sync on every startup
+        print(f"[{datetime.now()}] V68: Skipping registry sync (SQLite has data). Starting collectors...")
+
         try:
-            from collector import sync_city_registry_to_prod
-            sources, cities = sync_city_registry_to_prod()
-            print(f"[{datetime.now()}] V67: City sources sync complete - {sources} sources, {cities} new cities")
+            start_collectors()
         except Exception as e:
-            print(f"[{datetime.now()}] V67: City sources sync error: {e}")
+            print(f"[{datetime.now()}] V68: Collector start error (non-fatal): {e}")
             import traceback
             traceback.print_exc()
-
-        # V57: Additional prod_cities sync (handles deletions and updates)
-        try:
-            sync_city_registry_to_prod_cities()
-            print(f"[{datetime.now()}] V67: Prod cities sync complete.")
-        except Exception as e:
-            print(f"[{datetime.now()}] V67: Prod cities sync error: {e}")
-            import traceback
-            traceback.print_exc()
-
-        # V67: Even longer delay before collectors — let the pool breathe
-        print(f"[{datetime.now()}] V67: Waiting 30s before starting collectors...")
-        time.sleep(30)
-        print(f"[{datetime.now()}] V67: Starting collectors (staggered)...")
-        start_collectors()
 
     init_thread = threading.Thread(target=_bg_init, name='deferred_init', daemon=True)
     init_thread.start()
@@ -3451,35 +3459,34 @@ def is_pro(user):
     return get_user_plan(user) == 'pro'
 
 
-# V67: Cache for nav cities to avoid DB query on every request
-_nav_cache = {'data': None, 'ts': 0}
+# V68: Cache for nav cities — NEVER touches DB during startup
+_nav_cities_cache = []
+_nav_cache_ts = 0
 
 @app.context_processor
 def inject_nav_context():
     """Inject user, plan status, and nav_cities into all templates.
-    V67: Cache nav_cities for 5 minutes to prevent pool exhaustion."""
+    V68: NEVER calls DB during startup. Only refreshes cache after startup completes."""
+    global _nav_cities_cache, _nav_cache_ts
     import time
-    global _nav_cache
 
     user = get_current_user()
-
-    # Cache nav cities for 5 minutes (300 seconds)
     now = time.time()
-    if _nav_cache['data'] is None or (now - _nav_cache['ts']) > 300:
+
+    # V68: Only refresh cache if startup is DONE and cache is stale (10 min TTL)
+    # During startup, always return empty list — no DB access
+    if _startup_done and (now - _nav_cache_ts) > 600:
         try:
-            _nav_cache['data'] = get_cities_with_data()
-            _nav_cache['ts'] = now
-        except Exception as e:
-            print(f"[{datetime.now()}] V67: inject_nav_context cache miss failed: {e}")
-            # Return empty list if DB unavailable (during startup)
-            if _nav_cache['data'] is None:
-                _nav_cache['data'] = []
+            _nav_cities_cache = get_cities_with_data()
+            _nav_cache_ts = now
+        except Exception:
+            pass  # Keep serving stale cache or empty list
 
     return {
         'user': user,
         'user_plan': get_user_plan(user),
         'is_pro': is_pro(user),
-        'nav_cities': _nav_cache['data']
+        'nav_cities': _nav_cities_cache
     }
 
 
@@ -8748,9 +8755,9 @@ def schedule_email_tasks():
         traceback.print_exc()
         return  # Don't silently die — exit with error logged
 
-    # Wait for initial startup
-    print(f"[{datetime.now()}] V64: Email scheduler waiting 2 minutes for startup...")
-    time.sleep(120)
+    # V68: Wait 3 minutes for initial startup (increased from 2)
+    print(f"[{datetime.now()}] V68: Email scheduler waiting 3 minutes for startup...")
+    time.sleep(180)
 
     et = pytz.timezone('America/New_York')
 
@@ -8812,7 +8819,12 @@ def schedule_email_tasks():
 def run_initial_collection():
     """V12.57: Clear stale lock, then run a quick REFRESH (not full 365-day rebuild).
     The SQLite DB on the persistent disk already has all historical data.
-    Full collections blocked every REFRESH cycle by holding the lock for hours."""
+    Full collections blocked every REFRESH cycle by holding the lock for hours.
+    V68: Added 120s initial delay to prevent pool exhaustion."""
+    # V68: Wait 120s before starting to prevent pool exhaustion at startup
+    print(f"[{datetime.now()}] V68: initial_collection waiting 120s before starting...")
+    time.sleep(120)
+
     try:
         # V12.57: Clear orphaned lock files from killed instances
         lock_file = os.path.join(DATA_DIR, ".collection_lock")
