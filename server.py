@@ -1729,6 +1729,116 @@ def admin_new_cities():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/tracker')
+def admin_tracker():
+    """V64: Master city tracker — 20K rows, one per US city with coverage and freshness.
+
+    Query params:
+      state=TX — filter by state
+      status=active — filter by coverage status (active/no_source)
+      stale=true — only show stale/no_data cities
+      limit=500 — limit rows (default 500, max 5000)
+      offset=0 — pagination offset
+      sort=population — sort field (population, last_permit_date, city)
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    state = request.args.get('state')
+    status = request.args.get('status')
+    stale_only = request.args.get('stale') == 'true'
+    limit = min(int(request.args.get('limit', 500)), 5000)
+    offset = int(request.args.get('offset', 0))
+    sort = request.args.get('sort', 'population')
+
+    conn = permitdb.get_connection()
+    try:
+        # Build the tracker query
+        # Join us_cities with prod_cities and scraper_runs for comprehensive view
+        query = """
+            SELECT
+                uc.city_name,
+                uc.state,
+                uc.population,
+                uc.slug as city_slug,
+                uc.county,
+                uc.covered_by_source,
+                uc.status as discovery_status,
+                -- Coverage info from prod_cities
+                pc.status as coverage_status,
+                pc.source_id,
+                pc.source_type as platform,
+                pc.source_scope,
+                -- Freshness from prod_cities
+                pc.newest_permit_date as last_permit_date,
+                pc.last_collection as last_pull_date,
+                pc.total_permits,
+                pc.data_freshness,
+                pc.consecutive_failures,
+                pc.last_error
+            FROM us_cities uc
+            LEFT JOIN prod_cities pc ON (
+                pc.city_slug = uc.slug
+                OR pc.city_slug = REPLACE(uc.slug, '-', '_')
+                OR pc.source_id = REPLACE(uc.slug, '-', '_')
+            )
+        """
+
+        # Add WHERE clauses
+        conditions = []
+        params = []
+        if state:
+            conditions.append("uc.state = ?")
+            params.append(state)
+        if status == 'active':
+            conditions.append("pc.status = 'active'")
+        elif status == 'no_source':
+            conditions.append("pc.city_slug IS NULL")
+        if stale_only:
+            conditions.append("(pc.data_freshness IN ('stale', 'very_stale', 'no_data') OR pc.city_slug IS NULL)")
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        # Sort
+        sort_map = {
+            'population': 'uc.population DESC',
+            'last_permit_date': 'pc.newest_permit_date DESC',
+            'city': 'uc.city_name ASC',
+        }
+        query += f" ORDER BY {sort_map.get(sort, 'uc.population DESC')}"
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = conn.execute(query, params).fetchall()
+
+        # Get total count for pagination
+        count_query = "SELECT COUNT(*) FROM us_cities uc"
+        if conditions:
+            count_query += " LEFT JOIN prod_cities pc ON pc.city_slug = uc.slug OR pc.city_slug = REPLACE(uc.slug, '-', '_')"
+            count_query += " WHERE " + " AND ".join(conditions)
+        total = conn.execute(count_query, params[:-2] if len(params) > 2 else []).fetchone()[0]
+
+        # Summary stats
+        summary = {
+            'total_us_cities': conn.execute("SELECT COUNT(*) FROM us_cities").fetchone()[0],
+            'active_in_prod': conn.execute("SELECT COUNT(*) FROM prod_cities WHERE status='active'").fetchone()[0],
+            'with_permits': conn.execute("SELECT COUNT(DISTINCT city) FROM permits WHERE city IS NOT NULL").fetchone()[0],
+            'stale_count': conn.execute("SELECT COUNT(*) FROM prod_cities WHERE data_freshness IN ('stale', 'very_stale')").fetchone()[0],
+        }
+
+        return jsonify({
+            'summary': summary,
+            'tracker': [dict(row) for row in rows],
+            'pagination': {'limit': limit, 'offset': offset, 'total': total}
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
