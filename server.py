@@ -1563,6 +1563,23 @@ def admin_email_status():
         return jsonify({'error': f'Email status check failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/sync-registry', methods=['POST'])
+def admin_sync_registry():
+    """V64: Manually sync CITY_REGISTRY to city_sources and prod_cities."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from collector import sync_city_registry_to_prod
+        sources, cities = sync_city_registry_to_prod()
+        return jsonify({
+            'sources_synced': sources,
+            'new_cities_added': cities
+        })
+    except Exception as e:
+        return jsonify({'error': f'Sync failed: {str(e)}'}), 500
+
+
 # ===========================
 # V12.54: AUTONOMY ENGINE ADMIN ROUTES
 # ===========================
@@ -8629,7 +8646,18 @@ def start_collectors():
 # This ensures stale data is served immediately rather than showing 0 permits
 preload_data_from_disk()
 
-# V44: Ensure all active CITY_REGISTRY entries are in prod_cities for collection
+# V64: Sync CITY_REGISTRY to city_sources AND prod_cities
+print(f"[{datetime.now()}] V64: Syncing city registry to production tables...")
+try:
+    from collector import sync_city_registry_to_prod
+    sources, cities = sync_city_registry_to_prod()
+    print(f"[{datetime.now()}] V64: Sync complete - {sources} sources, {cities} new cities")
+except Exception as e:
+    print(f"[{datetime.now()}] V64: Sync failed: {e}")
+    import traceback
+    traceback.print_exc()
+
+# V44/V57: Additional prod_cities sync (handles deletions and updates)
 sync_city_registry_to_prod_cities()
 
 # Start collectors when module is loaded (works with gunicorn --preload)

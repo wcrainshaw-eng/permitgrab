@@ -1809,6 +1809,138 @@ def _flush_history_batch(batch):
 
 
 # ---------------------------------------------------------------------------
+# V64: City Registry Sync Pipeline
+# ---------------------------------------------------------------------------
+
+def sync_city_registry_to_prod():
+    """V64: Ensure all active CITY_REGISTRY entries are in city_sources and prod_cities.
+
+    This closes the gap where cities are added to city_configs.py but never
+    make it to the tables that drive collection.
+
+    Returns:
+        (synced_sources, synced_prod) tuple with counts
+    """
+    from city_configs import CITY_REGISTRY, BULK_SOURCES
+    from city_source_db import upsert_city_source
+
+    synced_sources = 0
+    synced_prod = 0
+    errors = 0
+
+    print(f"[V64] Starting city registry sync...")
+
+    # Phase 1: Sync CITY_REGISTRY → city_sources
+    for key, config in CITY_REGISTRY.items():
+        if not config.get('active', False):
+            continue
+        try:
+            upsert_city_source({
+                'source_key': key,
+                'name': config.get('name', key),
+                'state': config.get('state', ''),
+                'platform': config.get('platform', ''),
+                'mode': 'city',
+                'endpoint': config.get('endpoint', ''),
+                'dataset_id': config.get('dataset_id', ''),
+                'field_map': config.get('field_map', {}),
+                'date_field': config.get('date_field', ''),
+                'city_field': config.get('city_field', ''),
+                'limit_per_page': config.get('limit', 2000),
+                'status': 'active'
+            })
+            synced_sources += 1
+        except Exception as e:
+            print(f"  [WARN] Failed to sync {key} to city_sources: {e}")
+            errors += 1
+
+    # Phase 2: Sync BULK_SOURCES → city_sources
+    for key, config in BULK_SOURCES.items():
+        if not config.get('active', False):
+            continue
+        try:
+            upsert_city_source({
+                'source_key': key,
+                'name': config.get('name', key),
+                'state': config.get('state', ''),
+                'platform': config.get('platform', ''),
+                'mode': 'bulk',
+                'endpoint': config.get('endpoint', ''),
+                'dataset_id': config.get('dataset_id', ''),
+                'field_map': config.get('field_map', {}),
+                'date_field': config.get('date_field', ''),
+                'city_field': config.get('city_field', ''),
+                'limit_per_page': config.get('limit', 50000),
+                'status': 'active'
+            })
+            synced_sources += 1
+        except Exception as e:
+            print(f"  [WARN] Failed to sync {key} to city_sources: {e}")
+            errors += 1
+
+    print(f"  Phase 1-2 complete: {synced_sources} sources synced to city_sources ({errors} errors)")
+
+    # Phase 3: Ensure all active city sources have prod_cities entries
+    conn = permitdb.get_connection()
+    try:
+        # Get existing prod_cities entries
+        existing = {}
+        for row in conn.execute("SELECT city_slug, source_id FROM prod_cities"):
+            existing[row['source_id']] = row['city_slug']
+            existing[row['city_slug']] = row['source_id']
+
+        for key, config in CITY_REGISTRY.items():
+            if not config.get('active', False):
+                continue
+
+            city_name = config.get('name', '')
+            state = config.get('state', '')
+            slug = config.get('slug', key)
+
+            if not city_name or not state:
+                continue
+
+            # Skip if already in prod_cities (by source_id)
+            if key in existing:
+                continue
+
+            # Skip if slug already exists (avoid duplicates)
+            try:
+                normalized_slug = permitdb.normalize_city_slug(city_name)
+            except Exception:
+                normalized_slug = slug
+
+            if normalized_slug in existing:
+                continue
+
+            try:
+                permitdb.upsert_prod_city(
+                    city=city_name,
+                    state=state,
+                    city_slug=normalized_slug,
+                    source_type=config.get('platform', ''),
+                    source_id=key,
+                    source_scope='city',
+                    status='active',
+                    added_by='v64_sync',
+                    notes='V64: Auto-synced from CITY_REGISTRY'
+                )
+                synced_prod += 1
+                print(f"  [V64] Added {key} ({city_name}, {state}) to prod_cities")
+            except Exception as e:
+                print(f"  [WARN] Failed to add {key} to prod_cities: {e}")
+
+        conn.commit()
+    except Exception as e:
+        print(f"  [ERROR] Phase 3 failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+    print(f"[V64] Sync complete: {synced_sources} sources, {synced_prod} new prod_cities")
+    return synced_sources, synced_prod
+
+
+# ---------------------------------------------------------------------------
 # V17: Auto-activation of pending cities
 # ---------------------------------------------------------------------------
 
