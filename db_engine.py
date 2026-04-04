@@ -70,12 +70,14 @@ def _get_pg_pool():
                 if db_url.startswith('postgres://'):
                     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 
+                # V69: Reduced pool size to prevent exhaustion with 2 gunicorn workers
+                # 2 workers x 20 max = 40 total, well under Render's limit
                 _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=5,
-                    maxconn=35,
+                    minconn=2,
+                    maxconn=20,
                     dsn=db_url,
                 )
-                print(f"[DB_ENGINE] PostgreSQL pool initialized (5-35 connections)")
+                print(f"[DB_ENGINE] V69: PostgreSQL pool initialized (min=2, max=20)")
     return _pg_pool
 
 

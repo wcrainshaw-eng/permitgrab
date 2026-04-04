@@ -18,7 +18,8 @@ services:
     name: permitgrab
     runtime: python
     buildCommand: pip install -r requirements.txt && playwright install chromium --with-deps
-    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300
+    # V69: Increased timeout from 300 to 600 to prevent worker kills during pool retries
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 600
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"

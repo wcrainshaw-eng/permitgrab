@@ -65,7 +65,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V68',
+                'version': 'V69',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -74,38 +74,21 @@ class HealthCheckMiddleware:
 # Apply the middleware
 app.wsgi_app = HealthCheckMiddleware(app.wsgi_app)
 
-# V66: Deferred startup to prevent connection pool exhaustion
-# Background threads are started on first request, not at module load time
+# V69: SCORCHED EARTH — ALL background work DISABLED until server is stable
+# The server can serve ALL web requests from SQLite alone.
 _startup_done = False
+_collectors_manually_started = False
 
 @app.before_request
 def _deferred_startup():
-    """V68: Defer heavy DB init until AFTER gunicorn binds the HTTP port."""
+    """V69: Mark startup done but DO NOT start any background threads."""
     global _startup_done
     if _startup_done:
         return
     _startup_done = True
-    print(f"[{datetime.now()}] V68: First request received, starting deferred init...")
-
-    def _bg_init():
-        import time
-        # V68: Wait 60 seconds. Let the server be fully stable first.
-        print(f"[{datetime.now()}] V68: Background init waiting 60s...")
-        time.sleep(60)
-
-        # V68: Skip heavy registry sync — just start collectors with delays
-        # The SQLite DB already has permits and cities, no need to sync on every startup
-        print(f"[{datetime.now()}] V68: Skipping registry sync (SQLite has data). Starting collectors...")
-
-        try:
-            start_collectors()
-        except Exception as e:
-            print(f"[{datetime.now()}] V68: Collector start error (non-fatal): {e}")
-            import traceback
-            traceback.print_exc()
-
-    init_thread = threading.Thread(target=_bg_init, name='deferred_init', daemon=True)
-    init_thread.start()
+    # V69: NO background threads. NO registry sync. NO collectors. Just serve requests.
+    print(f"[{datetime.now()}] V69: Server starting in MINIMAL mode - NO background threads")
+    print(f"[{datetime.now()}] V69: Use POST /api/admin/start-collectors to manually start when ready")
 
 
 # V13.1: Jinja filter for human-readable date formatting
@@ -456,6 +439,42 @@ def admin_collection_status():
         })
     except Exception as e:
         return jsonify({'error': f'Failed to read stats: {str(e)}'}), 500
+
+
+@app.route('/api/admin/start-collectors', methods=['POST'])
+def admin_start_collectors():
+    """V69: Manually start background threads after server is stable.
+
+    Since V69 disables all automatic background threads on startup,
+    use this endpoint to manually trigger them when ready.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    global _collectors_manually_started
+
+    try:
+        if _collectors_manually_started:
+            return jsonify({'status': 'already_running', 'message': 'Collectors already started'}), 200
+
+        import threading
+
+        def _run_collectors():
+            print(f"[{datetime.now()}] V69: Manual start_collectors triggered via API")
+            start_collectors()
+
+        t = threading.Thread(target=_run_collectors, daemon=True)
+        t.start()
+        _collectors_manually_started = True
+
+        return jsonify({
+            'status': 'started',
+            'message': 'Background collectors started in separate thread'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/admin/validation-results')
@@ -3459,34 +3478,15 @@ def is_pro(user):
     return get_user_plan(user) == 'pro'
 
 
-# V68: Cache for nav cities — NEVER touches DB during startup
-_nav_cities_cache = []
-_nav_cache_ts = 0
-
+# V69: COMPLETELY STATIC nav context — NO database access whatsoever
 @app.context_processor
 def inject_nav_context():
-    """Inject user, plan status, and nav_cities into all templates.
-    V68: NEVER calls DB during startup. Only refreshes cache after startup completes."""
-    global _nav_cities_cache, _nav_cache_ts
-    import time
-
-    user = get_current_user()
-    now = time.time()
-
-    # V68: Only refresh cache if startup is DONE and cache is stale (10 min TTL)
-    # During startup, always return empty list — no DB access
-    if _startup_done and (now - _nav_cache_ts) > 600:
-        try:
-            _nav_cities_cache = get_cities_with_data()
-            _nav_cache_ts = now
-        except Exception:
-            pass  # Keep serving stale cache or empty list
-
+    """V69: Return static empty data. NO DB calls until server is stable."""
     return {
-        'user': user,
-        'user_plan': get_user_plan(user),
-        'is_pro': is_pro(user),
-        'nav_cities': _nav_cities_cache
+        'user': None,
+        'user_plan': 'anonymous',
+        'is_pro': False,
+        'nav_cities': []
     }
 
 
