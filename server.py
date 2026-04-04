@@ -238,27 +238,65 @@ def _fix_socrata_addresses():
 
 @app.route('/api/admin/force-collection', methods=['POST'])
 def admin_force_collection():
-    """V12.50: Trigger REFRESH collection (upserts to SQLite)."""
+    """V64: Force collection — runs ALL platforms, supports filtering.
+
+    JSON body:
+      days_back: int (default 7, max 90)
+      platform: str (optional — filter to one platform: socrata, arcgis, ckan, carto, accela)
+      city_slug: str (optional — run a single city only)
+      include_scrapers: bool (default false — run Accela/Playwright scrapers too)
+    """
     valid, error = check_admin_key()
     if not valid:
         return error
 
-    def run_collection():
+    data = request.json or {}
+    days_back = min(int(data.get('days_back', 7)), 90)
+    platform_filter = data.get('platform')
+    city_slug = data.get('city_slug')
+    include_scrapers = data.get('include_scrapers', False)
+
+    if city_slug:
+        # Synchronous single-city mode (fast enough)
         try:
-            from collector import collect_refresh
-            print("[Admin] Starting REFRESH collection...")
-            collect_refresh(days_back=7)
-            print("[Admin] Refresh collection complete.")
+            from collector import collect_single_city
+            result = collect_single_city(city_slug, days_back=days_back)
+            return jsonify({
+                'mode': 'single_city',
+                'city_slug': city_slug,
+                'days_back': days_back,
+                'result': result
+            })
         except Exception as e:
-            print(f"[Admin] Collection error: {e}")
+            return jsonify({'error': str(e)}), 500
+    else:
+        # Background thread for full/filtered collection
+        def run_collection():
+            try:
+                from collector import collect_refresh
+                print(f"[Admin] Starting REFRESH collection (platform={platform_filter}, scrapers={include_scrapers})...")
+                collect_refresh(
+                    days_back=days_back,
+                    platform_filter=platform_filter,
+                    include_scrapers=include_scrapers
+                )
+                print("[Admin] Refresh collection complete.")
+            except Exception as e:
+                print(f"[Admin] Collection error: {e}")
+                import traceback
+                traceback.print_exc()
 
-    thread = threading.Thread(target=run_collection, daemon=True)
-    thread.start()
+        thread = threading.Thread(target=run_collection, daemon=True)
+        thread.start()
 
-    return jsonify({
-        'message': 'REFRESH collection started',
-        'note': 'V12.50: Data written directly to SQLite'
-    })
+        return jsonify({
+            'message': 'REFRESH collection started',
+            'mode': 'background',
+            'days_back': days_back,
+            'platform_filter': platform_filter,
+            'include_scrapers': include_scrapers,
+            'note': 'V64: Supports all platforms, check logs for progress'
+        })
 
 
 @app.route('/api/admin/full-collection', methods=['POST'])

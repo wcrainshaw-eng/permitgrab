@@ -2061,10 +2061,107 @@ def activate_pending_cities():
     return activated, failed
 
 
-def collect_refresh(days_back=7):
+def collect_single_city(city_slug, days_back=7):
+    """V64: Force-collect a single city by slug.
+
+    Looks up config from prod_cities → CITY_REGISTRY fallback chain.
+    Returns result dict with permits_fetched, status, etc.
+    """
+    from city_configs import CITY_REGISTRY
+
+    config = None
+    source_id = city_slug
+
+    # Try prod_cities first
+    conn = permitdb.get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM prod_cities WHERE city_slug = ? OR source_id = ?",
+            (city_slug, city_slug)
+        ).fetchone()
+        if row:
+            source_id = row['source_id'] or city_slug
+    except Exception as e:
+        print(f"  [V64] prod_cities lookup error: {e}")
+
+    # Try CITY_REGISTRY with various slug formats
+    for slug_variant in [source_id, city_slug, city_slug.replace('-', '_'), city_slug.replace('_', '-')]:
+        if slug_variant in CITY_REGISTRY:
+            config = CITY_REGISTRY[slug_variant]
+            source_id = slug_variant
+            break
+
+    if not config:
+        return {
+            'city': city_slug,
+            'error': f'City not found: {city_slug}',
+            'searched': [city_slug, city_slug.replace('-', '_'), city_slug.replace('_', '-')],
+            'status': 'not_found'
+        }
+
+    if not config.get('active', False):
+        return {
+            'city': city_slug,
+            'source_id': source_id,
+            'error': 'City config exists but is inactive',
+            'status': 'inactive'
+        }
+
+    # Run collection for this single city
+    platform = config.get('platform', '')
+    print(f"[V64] Collecting {city_slug} via {platform}...")
+
+    try:
+        raw, fetch_status = fetch_permits(source_id, days_back)
+
+        if fetch_status.startswith('skip'):
+            return {
+                'city': city_slug,
+                'source_id': source_id,
+                'platform': platform,
+                'permits_fetched': 0,
+                'status': fetch_status
+            }
+
+        # Normalize and save permits
+        normalized = []
+        for record in raw:
+            try:
+                n = normalize_permit(record, source_id)
+                if n and n.get('permit_number'):
+                    normalized.append(n)
+            except Exception:
+                continue
+
+        if normalized:
+            new_count, updated_count = permitdb.upsert_permits(normalized)
+            print(f"[V64] {city_slug}: {new_count} new, {updated_count} updated")
+
+        return {
+            'city': city_slug,
+            'source_id': source_id,
+            'platform': platform,
+            'permits_fetched': len(raw),
+            'permits_normalized': len(normalized),
+            'status': 'success'
+        }
+    except Exception as e:
+        print(f"[V64] {city_slug} collection error: {e}")
+        return {
+            'city': city_slug,
+            'source_id': source_id,
+            'platform': platform,
+            'error': str(e),
+            'status': 'error'
+        }
+
+
+def collect_refresh(days_back=7, platform_filter=None, include_scrapers=False):
     """
     V12.50: Delta collection. Fetch recent permits and upsert into SQLite.
     No risk of data loss — INSERT OR REPLACE only touches rows we're updating.
+
+    V64: Added platform_filter and include_scrapers parameters.
     """
     if not _acquire_lock():
         return [], {}
@@ -2074,12 +2171,22 @@ def collect_refresh(days_back=7):
         reset_failure_tracking()
 
         print("=" * 60)
-        print("PermitGrab V12.50 - REFRESH Collection (Delta Mode)")
+        print("PermitGrab V64 - REFRESH Collection (Delta Mode)")
         print(f"Fetching permits from last {days_back} days")
+        if platform_filter:
+            print(f"Platform filter: {platform_filter}")
+        if include_scrapers:
+            print("Including Accela/Playwright scrapers")
         print("=" * 60)
 
         # Collect new permits from all active sources
-        new_permits, stats = _collect_all_inner(days_back, additive_mode=True)
+        # V64: Pass platform_filter and include_scrapers
+        new_permits, stats = _collect_all_inner(
+            days_back,
+            additive_mode=True,
+            platform_filter=platform_filter,
+            include_scrapers=include_scrapers
+        )
 
         # Process each permit (reclassify, validate, etc.) before saving
         for permit in new_permits:
@@ -2281,7 +2388,7 @@ def _find_registry_config_for_city(city_name, state):
     return None
 
 
-def _collect_all_inner(days_back=30, additive_mode=True):
+def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, include_scrapers=False):
     """Inner implementation of collect_all (called with lock held).
 
     V12.33: additive_mode controls whether we save incrementally:
@@ -2290,11 +2397,27 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
     V15: If prod_cities table exists and has data, use it to drive collection.
          Otherwise fall back to CITY_REGISTRY + BULK_SOURCES.
+
+    V64: Added platform_filter and include_scrapers parameters.
+      - platform_filter: Only collect from sources matching this platform
+      - include_scrapers: If True, include Accela/Playwright sources (default False)
     """
     all_permits = []
     stats = {}
     bulk_stats = {}
     cities_from_bulk = set()  # Track cities covered by bulk sources
+
+    # V64: Helper to check if platform matches filter
+    def platform_matches(source_platform):
+        if not platform_filter:
+            return True
+        return source_platform == platform_filter
+
+    # V64: Helper to check if we should skip scrapers
+    def should_skip_scraper(source_platform):
+        if source_platform == 'accela' and not include_scrapers:
+            return True
+        return False
 
     # V15: Check if we should use prod_cities mode
     use_prod_cities = False
@@ -2305,8 +2428,10 @@ def _collect_all_inner(days_back=30, additive_mode=True):
             if prod_cities_list:
                 use_prod_cities = True
                 print("=" * 60)
-                print("PermitGrab - V15 PROD_CITIES Collection Mode")
+                print("PermitGrab - V64 PROD_CITIES Collection Mode")
                 print(f"Collecting from {len(prod_cities_list)} verified cities")
+                if platform_filter:
+                    print(f"Platform filter: {platform_filter}")
                 print("=" * 60)
     except Exception as e:
         print(f"[V15] Error checking prod_cities: {e}, falling back to legacy mode")
@@ -2315,7 +2440,7 @@ def _collect_all_inner(days_back=30, additive_mode=True):
     if use_prod_cities:
         # V16 PHASE 1: Collect from ALL bulk sources ONCE each
         # This covers harvested cities (source_id='bulk_harvest') efficiently
-        print("\n  [V16] Phase 1: Bulk source collection (one request per source)")
+        print("\n  [V64] Phase 1: Bulk source collection (one request per source)")
         bulk_sources_collected = set()
         active_bulk_sources = get_active_bulk_sources()
 
@@ -2326,6 +2451,13 @@ def _collect_all_inner(days_back=30, additive_mode=True):
                 from city_configs import BULK_SOURCES
                 config = BULK_SOURCES.get(source_key)
             if not config:
+                continue
+
+            # V64: Platform filter check
+            source_platform = config.get('platform', '')
+            if not platform_matches(source_platform):
+                continue
+            if should_skip_scraper(source_platform):
                 continue
 
             start_time = time.time()
@@ -2411,6 +2543,14 @@ def _collect_all_inner(days_back=30, additive_mode=True):
 
             # Skip if this is actually a bulk source (already collected)
             if config.get('_source_type') == 'bulk':
+                continue
+
+            # V64: Platform filter check
+            source_platform = config.get('platform', '')
+            if not platform_matches(source_platform):
+                continue
+            if should_skip_scraper(source_platform):
+                print(f"    ⏭ {city_name}: Skipping Accela (include_scrapers=False)")
                 continue
 
             start_time = time.time()
