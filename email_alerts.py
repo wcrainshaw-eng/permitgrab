@@ -76,7 +76,8 @@ SITE_URL = os.environ.get('SITE_URL', 'https://permitgrab.com')
 def send_email(to_email, subject, html_body, text_body=None):
     """Send an email via SendGrid SMTP."""
     if not SMTP_PASS:
-        print(f"  [DRY RUN] Would send to {to_email}: {subject}")
+        # V64: Make dry-run mode more alarming so it's noticed in logs
+        print(f"  [CRITICAL] SMTP_PASS not set! Email to {to_email} NOT sent (dry-run mode)")
         return True
 
     msg = MIMEMultipart('alternative')
@@ -646,10 +647,16 @@ def send_daily_digest_to_user(user):
 
 def send_daily_digest():
     """Send daily digest to all eligible subscribers.
-    V22: Reads from subscribers.json instead of users table."""
+    V22: Reads from subscribers.json instead of users table.
+    V64: Added configuration logging for debugging."""
     print(f"\n{'='*60}")
     print(f"PermitGrab Daily Digest - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*60}")
+
+    # V64: Log configuration for debugging silent failures
+    print(f"  Subscribers file: {SUBSCRIBERS_FILE}")
+    print(f"  File exists: {SUBSCRIBERS_FILE.exists()}")
+    print(f"  SMTP configured: {'YES' if SMTP_PASS else 'NO - DRY RUN MODE'}")
 
     subscribers = load_subscribers()
     print(f"Found {len(subscribers)} active subscribers")

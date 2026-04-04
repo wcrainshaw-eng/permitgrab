@@ -1546,6 +1546,23 @@ def admin_email_stats():
         return jsonify({'error': f'Stats failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/email-status')
+def admin_email_status():
+    """V64: Check email system health — SMTP, subscribers file, active count."""
+    try:
+        from email_alerts import SMTP_PASS, SUBSCRIBERS_FILE, load_subscribers
+        subs = load_subscribers()
+        return jsonify({
+            'smtp_configured': bool(SMTP_PASS),
+            'subscribers_file': str(SUBSCRIBERS_FILE),
+            'subscribers_file_exists': SUBSCRIBERS_FILE.exists(),
+            'active_subscribers': len(subs),
+            'subscriber_emails': [s.get('email', '?')[:3] + '***' for s in subs]
+        })
+    except Exception as e:
+        return jsonify({'error': f'Email status check failed: {str(e)}'}), 500
+
+
 # ===========================
 # V12.54: AUTONOMY ENGINE ADMIN ROUTES
 # ===========================
@@ -8409,12 +8426,21 @@ def schedule_email_tasks():
     - Daily digest: 7 AM ET (12:00 UTC)
     - Trial lifecycle check: 8 AM ET (13:00 UTC)
     - Onboarding nudges: 9 AM ET (14:00 UTC)
+
+    V64: Added robust error logging, heartbeat, and crash recovery.
     """
-    import pytz
-    from email_alerts import send_daily_digest, check_trial_lifecycle, check_onboarding_nudges
+    # V64: Wrap imports in try/except to catch missing dependencies
+    try:
+        import pytz
+        from email_alerts import send_daily_digest, check_trial_lifecycle, check_onboarding_nudges
+    except ImportError as e:
+        print(f"[{datetime.now()}] [CRITICAL] Email scheduler failed to import: {e}")
+        import traceback
+        traceback.print_exc()
+        return  # Don't silently die — exit with error logged
 
     # Wait for initial startup
-    print(f"[{datetime.now()}] V12.53: Email scheduler waiting 2 minutes for startup...")
+    print(f"[{datetime.now()}] V64: Email scheduler waiting 2 minutes for startup...")
     time.sleep(120)
 
     et = pytz.timezone('America/New_York')
@@ -8424,37 +8450,51 @@ def schedule_email_tasks():
             now_utc = datetime.utcnow()
             now_et = datetime.now(et)
 
+            # V64: Heartbeat every cycle so we can verify thread is alive in Render logs
+            print(f"[{datetime.now()}] V64: Email scheduler heartbeat: {now_et.strftime('%I:%M %p ET')}")
+
             # Check if it's time for daily tasks (7-9 AM ET window)
             if 7 <= now_et.hour <= 9:
                 # Daily digest at 7 AM ET
                 if now_et.hour == 7 and now_et.minute < 30:
-                    print(f"[{datetime.now()}] V12.53: Running daily digest...")
+                    print(f"[{datetime.now()}] V64: Running daily digest...")
                     try:
                         sent, failed = send_daily_digest()
-                        print(f"[{datetime.now()}] V12.53: Daily digest complete - {sent} sent, {failed} failed")
+                        print(f"[{datetime.now()}] V64: Daily digest complete - {sent} sent, {failed} failed")
                     except Exception as e:
-                        print(f"[{datetime.now()}] V12.53: Daily digest error: {e}")
+                        print(f"[{datetime.now()}] [ERROR] Daily digest failed: {e}")
+                        import traceback
+                        traceback.print_exc()
 
                 # Trial lifecycle at 8 AM ET
                 if now_et.hour == 8 and now_et.minute < 30:
-                    print(f"[{datetime.now()}] V12.53: Checking trial lifecycle...")
+                    print(f"[{datetime.now()}] V64: Checking trial lifecycle...")
                     try:
                         results = check_trial_lifecycle()
-                        print(f"[{datetime.now()}] V12.53: Trial lifecycle complete - {results}")
+                        print(f"[{datetime.now()}] V64: Trial lifecycle complete - {results}")
                     except Exception as e:
-                        print(f"[{datetime.now()}] V12.53: Trial lifecycle error: {e}")
+                        print(f"[{datetime.now()}] [ERROR] Trial lifecycle failed: {e}")
+                        import traceback
+                        traceback.print_exc()
 
                 # Onboarding nudges at 9 AM ET
                 if now_et.hour == 9 and now_et.minute < 30:
-                    print(f"[{datetime.now()}] V12.53: Checking onboarding nudges...")
+                    print(f"[{datetime.now()}] V64: Checking onboarding nudges...")
                     try:
                         sent = check_onboarding_nudges()
-                        print(f"[{datetime.now()}] V12.53: Onboarding nudges complete - {sent} sent")
+                        print(f"[{datetime.now()}] V64: Onboarding nudges complete - {sent} sent")
                     except Exception as e:
-                        print(f"[{datetime.now()}] V12.53: Onboarding nudges error: {e}")
+                        print(f"[{datetime.now()}] [ERROR] Onboarding nudges failed: {e}")
+                        import traceback
+                        traceback.print_exc()
 
         except Exception as e:
-            print(f"[{datetime.now()}] V12.53: Email scheduler error: {e}")
+            print(f"[{datetime.now()}] [ERROR] Email scheduler error: {e}")
+            import traceback
+            traceback.print_exc()
+            # V64: Wait 5 min on error before retrying, don't die
+            time.sleep(300)
+            continue
 
         # Check every 30 minutes
         time.sleep(1800)
