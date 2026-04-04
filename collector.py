@@ -1881,6 +1881,7 @@ def sync_city_registry_to_prod():
     print(f"  Phase 1-2 complete: {synced_sources} sources synced to city_sources ({errors} errors)")
 
     # Phase 3: Ensure all active city sources have prod_cities entries
+    # V66: Fixed connection leak — now properly closed in finally block
     conn = permitdb.get_connection()
     try:
         # Get existing prod_cities entries
@@ -1935,6 +1936,12 @@ def sync_city_registry_to_prod():
         print(f"  [ERROR] Phase 3 failed: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # V66: Always release connection back to pool
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     print(f"[V64] Sync complete: {synced_sources} sources, {synced_prod} new prod_cities")
     return synced_sources, synced_prod

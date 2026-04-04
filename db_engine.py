@@ -326,6 +326,36 @@ def get_connection(max_retries=3, retry_delay=0.5, background=None):
         return _get_sqlite_conn()
 
 
+@contextmanager
+def connection(background=None):
+    """V66: Context manager that guarantees connection return to pool.
+
+    Usage:
+        with connection() as conn:
+            conn.execute("SELECT ...")
+            conn.commit()
+        # connection automatically returned to pool
+
+    Args:
+        background: If True, use background semaphore. If None, auto-detect.
+    """
+    conn = get_connection(background=background)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def execute(sql, params=None):
     """Execute a query with auto-translation."""
     conn = get_connection()

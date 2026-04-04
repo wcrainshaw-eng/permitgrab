@@ -10,54 +10,41 @@ import db as permitdb
 
 def get_active_cities():
     """Return list of active city-level sources as dicts.
-    Falls back to city_configs.py if city_sources table is empty."""
+    Falls back to city_configs.py if city_sources table is empty.
+    V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    rows = conn.execute(
-        "SELECT * FROM city_sources WHERE status='active' AND mode='city'"
-    ).fetchall()
-    if rows:
-        results = []
-        for r in rows:
-            d = dict(r)
-            # Parse field_map from JSON string back to dict
-            if d.get('field_map'):
-                try:
-                    d['field_map'] = json.loads(d['field_map'])
-                except (json.JSONDecodeError, TypeError):
-                    d['field_map'] = {}
-            # V13.4: Bridge status/active key mismatch
-            if 'active' not in d and d.get('status') == 'active':
-                d['active'] = True
-            results.append(d)
-        return results
-    # Fallback: city_configs.py
-    from city_configs import get_active_cities as _legacy_get
-    return _legacy_get()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM city_sources WHERE status='active' AND mode='city'"
+        ).fetchall()
+        if rows:
+            results = []
+            for r in rows:
+                d = dict(r)
+                # Parse field_map from JSON string back to dict
+                if d.get('field_map'):
+                    try:
+                        d['field_map'] = json.loads(d['field_map'])
+                    except (json.JSONDecodeError, TypeError):
+                        d['field_map'] = {}
+                # V13.4: Bridge status/active key mismatch
+                if 'active' not in d and d.get('status') == 'active':
+                    d['active'] = True
+                results.append(d)
+            return results
+        # Fallback: city_configs.py
+        from city_configs import get_active_cities as _legacy_get
+        return _legacy_get()
+    finally:
+        conn.close()
 
 
 def get_city_config(source_key):
-    """Get a single source config by key. Returns dict or None."""
+    """Get a single source config by key. Returns dict or None. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    row = conn.execute(
-        "SELECT * FROM city_sources WHERE source_key = ?", (source_key,)
-    ).fetchone()
-    if row:
-        d = dict(row)
-        if d.get('field_map'):
-            try:
-                d['field_map'] = json.loads(d['field_map'])
-            except (json.JSONDecodeError, TypeError):
-                d['field_map'] = {}
-        # V13.4: Bridge status/active key mismatch — DB uses "status"
-        # but fetch_permits/city_health check config.get("active", False)
-        if 'active' not in d and d.get('status') == 'active':
-            d['active'] = True
-        return d
-
-    # V17: Check discovered_sources table
     try:
         row = conn.execute(
-            "SELECT * FROM discovered_sources WHERE source_key = ?", (source_key,)
+            "SELECT * FROM city_sources WHERE source_key = ?", (source_key,)
         ).fetchone()
         if row:
             d = dict(row)
@@ -66,50 +53,74 @@ def get_city_config(source_key):
                     d['field_map'] = json.loads(d['field_map'])
                 except (json.JSONDecodeError, TypeError):
                     d['field_map'] = {}
+            # V13.4: Bridge status/active key mismatch — DB uses "status"
+            # but fetch_permits/city_health check config.get("active", False)
             if 'active' not in d and d.get('status') == 'active':
                 d['active'] = True
             return d
-    except:
-        pass  # Table may not exist yet
 
-    # Fallback to legacy dict
-    from city_configs import get_city_config as _legacy_get
-    return _legacy_get(source_key)
+        # V17: Check discovered_sources table
+        try:
+            row = conn.execute(
+                "SELECT * FROM discovered_sources WHERE source_key = ?", (source_key,)
+            ).fetchone()
+            if row:
+                d = dict(row)
+                if d.get('field_map'):
+                    try:
+                        d['field_map'] = json.loads(d['field_map'])
+                    except (json.JSONDecodeError, TypeError):
+                        d['field_map'] = {}
+                if 'active' not in d and d.get('status') == 'active':
+                    d['active'] = True
+                return d
+        except:
+            pass  # Table may not exist yet
+
+        # Fallback to legacy dict
+        from city_configs import get_city_config as _legacy_get
+        return _legacy_get(source_key)
+    finally:
+        conn.close()
 
 
 def get_active_bulk_sources():
     """Return list of active bulk source keys.
     V17: Also includes sources from discovered_sources table.
     V33: Always merges DB sources with BULK_SOURCES dict so new entries
-    added to city_configs.py are picked up immediately."""
+    added to city_configs.py are picked up immediately.
+    V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    source_keys = set()
-
-    # Check city_sources table
-    rows = conn.execute(
-        "SELECT source_key FROM city_sources WHERE status='active' AND mode='bulk'"
-    ).fetchall()
-    for r in rows:
-        source_keys.add(r['source_key'])
-
-    # V17: Also check discovered_sources table
     try:
+        source_keys = set()
+
+        # Check city_sources table
         rows = conn.execute(
-            "SELECT source_key FROM discovered_sources WHERE status='active' AND mode='bulk'"
+            "SELECT source_key FROM city_sources WHERE status='active' AND mode='bulk'"
         ).fetchall()
         for r in rows:
             source_keys.add(r['source_key'])
-    except:
-        pass  # Table may not exist yet
 
-    # V33: Always merge with BULK_SOURCES dict (don't just fallback)
-    # This ensures new entries added to city_configs.py are picked up
-    # even when the DB already has some bulk sources
-    from city_configs import get_active_bulk_sources as _legacy_get
-    for key in _legacy_get():
-        source_keys.add(key)
+        # V17: Also check discovered_sources table
+        try:
+            rows = conn.execute(
+                "SELECT source_key FROM discovered_sources WHERE status='active' AND mode='bulk'"
+            ).fetchall()
+            for r in rows:
+                source_keys.add(r['source_key'])
+        except:
+            pass  # Table may not exist yet
 
-    return list(source_keys)
+        # V33: Always merge with BULK_SOURCES dict (don't just fallback)
+        # This ensures new entries added to city_configs.py are picked up
+        # even when the DB already has some bulk sources
+        from city_configs import get_active_bulk_sources as _legacy_get
+        for key in _legacy_get():
+            source_keys.add(key)
+
+        return list(source_keys)
+    finally:
+        conn.close()
 
 
 def get_bulk_source_config(source_key):
@@ -118,154 +129,193 @@ def get_bulk_source_config(source_key):
 
 
 def upsert_city_source(source_dict):
-    """Insert or update a city_sources row."""
+    """Insert or update a city_sources row. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    field_map = source_dict.get('field_map')
-    if isinstance(field_map, dict):
-        field_map = json.dumps(field_map)
-    conn.execute("""
-        INSERT INTO city_sources (
-            source_key, name, state, platform, mode, endpoint, dataset_id,
-            field_map, date_field, city_field, limit_per_page, status,
-            discovery_score, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(source_key) DO UPDATE SET
-            name=excluded.name, endpoint=excluded.endpoint,
-            field_map=excluded.field_map, date_field=excluded.date_field,
-            status=excluded.status, discovery_score=excluded.discovery_score,
-            updated_at=datetime('now')
-    """, (
-        source_dict['source_key'], source_dict['name'], source_dict.get('state'),
-        source_dict['platform'], source_dict.get('mode', 'city'),
-        source_dict['endpoint'], source_dict.get('dataset_id'),
-        field_map, source_dict.get('date_field'), source_dict.get('city_field'),
-        source_dict.get('limit_per_page', 2000), source_dict.get('status', 'active'),
-        source_dict.get('discovery_score', 0)
-    ))
-    conn.commit()
+    try:
+        field_map = source_dict.get('field_map')
+        if isinstance(field_map, dict):
+            field_map = json.dumps(field_map)
+        conn.execute("""
+            INSERT INTO city_sources (
+                source_key, name, state, platform, mode, endpoint, dataset_id,
+                field_map, date_field, city_field, limit_per_page, status,
+                discovery_score, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(source_key) DO UPDATE SET
+                name=excluded.name, endpoint=excluded.endpoint,
+                field_map=excluded.field_map, date_field=excluded.date_field,
+                status=excluded.status, discovery_score=excluded.discovery_score,
+                updated_at=datetime('now')
+        """, (
+            source_dict['source_key'], source_dict['name'], source_dict.get('state'),
+            source_dict['platform'], source_dict.get('mode', 'city'),
+            source_dict['endpoint'], source_dict.get('dataset_id'),
+            field_map, source_dict.get('date_field'), source_dict.get('city_field'),
+            source_dict.get('limit_per_page', 2000), source_dict.get('status', 'active'),
+            source_dict.get('discovery_score', 0)
+        ))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def update_source_status(source_key, status, reason=None):
-    """Update a source's status."""
+    """Update a source's status. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute(
-        "UPDATE city_sources SET status=?, last_failure_reason=?, updated_at=datetime('now') WHERE source_key=?",
-        (status, reason, source_key)
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "UPDATE city_sources SET status=?, last_failure_reason=?, updated_at=datetime('now') WHERE source_key=?",
+            (status, reason, source_key)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def increment_failure(source_key, reason):
-    """Bump consecutive_failures counter."""
+    """Bump consecutive_failures counter. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute("""
-        UPDATE city_sources
-        SET consecutive_failures = consecutive_failures + 1,
-            last_failure_reason = ?,
-            updated_at = datetime('now')
-        WHERE source_key = ?
-    """, (reason, source_key))
-    conn.commit()
+    try:
+        conn.execute("""
+            UPDATE city_sources
+            SET consecutive_failures = consecutive_failures + 1,
+                last_failure_reason = ?,
+                updated_at = datetime('now')
+            WHERE source_key = ?
+        """, (reason, source_key))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def reset_failure(source_key):
-    """Reset failure counter after successful collection."""
+    """Reset failure counter after successful collection. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute(
-        "UPDATE city_sources SET consecutive_failures=0, last_failure_reason=NULL, updated_at=datetime('now') WHERE source_key=?",
-        (source_key,)
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "UPDATE city_sources SET consecutive_failures=0, last_failure_reason=NULL, updated_at=datetime('now') WHERE source_key=?",
+            (source_key,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def record_collection(source_key, permit_count):
-    """Record a successful collection."""
+    """Record a successful collection. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute("""
-        UPDATE city_sources
-        SET last_collected_at = datetime('now'),
-            total_permits_collected = total_permits_collected + ?,
-            updated_at = datetime('now')
-        WHERE source_key = ?
-    """, (permit_count, source_key))
-    conn.commit()
+    try:
+        conn.execute("""
+            UPDATE city_sources
+            SET last_collected_at = datetime('now'),
+                total_permits_collected = total_permits_collected + ?,
+                updated_at = datetime('now')
+            WHERE source_key = ?
+        """, (permit_count, source_key))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_next_unsearched_county():
-    """Get the highest-priority unsearched county."""
+    """Get the highest-priority unsearched county. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    row = conn.execute(
-        "SELECT * FROM us_counties WHERE status='not_started' ORDER BY priority ASC LIMIT 1"
-    ).fetchone()
-    return dict(row) if row else None
+    try:
+        row = conn.execute(
+            "SELECT * FROM us_counties WHERE status='not_started' ORDER BY priority ASC LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def get_next_unsearched_city():
-    """Get the highest-priority unsearched city (not covered by county)."""
+    """Get the highest-priority unsearched city (not covered by county). V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    row = conn.execute("""
-        SELECT * FROM us_cities
-        WHERE status='not_started'
-        ORDER BY priority ASC
-        LIMIT 1
-    """).fetchone()
-    return dict(row) if row else None
+    try:
+        row = conn.execute("""
+            SELECT * FROM us_cities
+            WHERE status='not_started'
+            ORDER BY priority ASC
+            LIMIT 1
+        """).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def update_city_status(slug, status, reason=None):
-    """Update a city's search status."""
+    """Update a city's search status. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute(
-        "UPDATE us_cities SET status=?, status_reason=?, last_searched_at=datetime('now') WHERE slug=?",
-        (status, reason, slug)
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "UPDATE us_cities SET status=?, status_reason=?, last_searched_at=datetime('now') WHERE slug=?",
+            (status, reason, slug)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def update_county_status(fips, status, reason=None):
-    """Update a county's search status."""
+    """Update a county's search status. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute(
-        "UPDATE us_counties SET status=?, status_reason=?, last_searched_at=datetime('now') WHERE fips=?",
-        (status, reason, fips)
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "UPDATE us_counties SET status=?, status_reason=?, last_searched_at=datetime('now') WHERE fips=?",
+            (status, reason, fips)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def mark_county_cities_covered(county_fips, source_key):
-    """Mark all cities in a county as covered_by_county. Returns count updated."""
+    """Mark all cities in a county as covered_by_county. Returns count updated. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    cursor = conn.execute("""
-        UPDATE us_cities
-        SET status='covered_by_county', covered_by_source=?
-        WHERE county_fips=? AND status IN ('not_started', 'no_data_available')
-    """, (source_key, county_fips))
-    conn.commit()
-    return cursor.rowcount
+    try:
+        cursor = conn.execute("""
+            UPDATE us_cities
+            SET status='covered_by_county', covered_by_source=?
+            WHERE county_fips=? AND status IN ('not_started', 'no_data_available')
+        """, (source_key, county_fips))
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        conn.close()
 
 
 def increment_search_attempts(slug):
-    """Bump search_attempts counter for a city."""
+    """Bump search_attempts counter for a city. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    conn.execute(
-        "UPDATE us_cities SET search_attempts = search_attempts + 1 WHERE slug=?",
-        (slug,)
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "UPDATE us_cities SET search_attempts = search_attempts + 1 WHERE slug=?",
+            (slug,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def count_unsearched_counties():
-    """How many counties haven't been searched yet."""
+    """How many counties haven't been searched yet. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    row = conn.execute("SELECT COUNT(*) as cnt FROM us_counties WHERE status='not_started'").fetchone()
-    return row['cnt'] if row else 0
+    try:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM us_counties WHERE status='not_started'").fetchone()
+        return row['cnt'] if row else 0
+    finally:
+        conn.close()
 
 
 def count_unsearched_cities():
-    """How many cities haven't been searched yet."""
+    """How many cities haven't been searched yet. V66: Fixed connection leak."""
     conn = permitdb.get_connection()
-    row = conn.execute("SELECT COUNT(*) as cnt FROM us_cities WHERE status='not_started'").fetchone()
-    return row['cnt'] if row else 0
+    try:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM us_cities WHERE status='not_started'").fetchone()
+        return row['cnt'] if row else 0
+    finally:
+        conn.close()
 
 
 def log_discovery_run(run_type, stats):

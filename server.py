@@ -51,6 +51,47 @@ TRADE_MAPPING = {
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# V66: Deferred startup to prevent connection pool exhaustion
+# Background threads are started on first request, not at module load time
+_startup_done = False
+
+@app.before_request
+def _deferred_startup():
+    """V66: Defer heavy DB init until AFTER gunicorn binds the HTTP port."""
+    global _startup_done
+    if _startup_done:
+        return
+    _startup_done = True
+    print(f"[{datetime.now()}] V66: First request received, starting deferred init...")
+
+    def _bg_init():
+        import time
+        # V64: Sync CITY_REGISTRY to city_sources AND prod_cities
+        try:
+            from collector import sync_city_registry_to_prod
+            sources, cities = sync_city_registry_to_prod()
+            print(f"[{datetime.now()}] V66: City sources sync complete - {sources} sources, {cities} new cities")
+        except Exception as e:
+            print(f"[{datetime.now()}] V66: City sources sync error: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # V57: Additional prod_cities sync (handles deletions and updates)
+        try:
+            sync_city_registry_to_prod_cities()
+            print(f"[{datetime.now()}] V66: Prod cities sync complete.")
+        except Exception as e:
+            print(f"[{datetime.now()}] V66: Prod cities sync error: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # Wait before starting collectors
+        time.sleep(5)
+        start_collectors()
+
+    init_thread = threading.Thread(target=_bg_init, name='deferred_init', daemon=True)
+    init_thread.start()
+
 
 # V13.1: Jinja filter for human-readable date formatting
 @app.template_filter('format_date')
@@ -1271,17 +1312,27 @@ def admin_query():
         sql = data.get('sql', '').strip()
         limit = min(data.get('limit', 100), 1000)
 
-        # Safety: only allow SELECT
-        if not sql.upper().startswith('SELECT'):
+        # V66: Safety check — only allow SELECT queries
+        # Use word boundaries to avoid false positives on column names like 'last_update'
+        import re
+        sql_upper = sql.upper()
+        if not sql_upper.startswith('SELECT'):
             return jsonify({'error': 'Only SELECT queries allowed'}), 400
-        for forbidden in ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'ATTACH']:
-            if forbidden in sql.upper().split('SELECT', 1)[-1]:
+
+        # Check for forbidden keywords as standalone words (not within column names)
+        forbidden_keywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'ATTACH', 'TRUNCATE']
+        for forbidden in forbidden_keywords:
+            # \b = word boundary — won't match 'last_update' for 'UPDATE'
+            if re.search(rf'\b{forbidden}\b', sql_upper):
                 return jsonify({'error': f'Forbidden keyword: {forbidden}'}), 400
 
         conn = permitdb.get_connection()
-        rows = conn.execute(sql).fetchmany(limit)
-        result = [dict(r) for r in rows]
-        return jsonify({'rows': result, 'count': len(result)})
+        try:
+            rows = conn.execute(sql).fetchmany(limit)
+            result = [dict(r) for r in rows]
+            return jsonify({'rows': result, 'count': len(result)})
+        finally:
+            conn.close()  # V66: Fix connection leak
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2437,12 +2488,15 @@ def sync_city_registry_to_prod_cities():
     - source_type is always updated to match the current config
     - Orphan rows (source_id not in ANY CITY_REGISTRY key) are deleted
     - No more 'paused' status — you pull or you don't exist in the tracker
+
+    V66: Fixed connection leak — connection is now properly released in finally block.
     """
     from city_configs import CITY_REGISTRY
 
     added = 0
     updated = 0
     deleted = 0
+    conn = None  # V66: Initialize to None for finally block
 
     try:
         conn = permitdb.get_connection()
@@ -2541,6 +2595,18 @@ def sync_city_registry_to_prod_cities():
         print(f"[V57] Sync error: {e}")
         import traceback
         traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        # V66: Always release connection back to pool
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 # ===========================
@@ -8779,7 +8845,10 @@ def _test_outbound_connectivity():
 
 
 def start_collectors():
-    """Start background data collection threads. Safe to call multiple times."""
+    """Start background data collection threads. Safe to call multiple times.
+
+    V66: Stagger thread starts to prevent connection pool stampede.
+    """
     global _collector_started
     if _collector_started:
         return
@@ -8790,59 +8859,56 @@ def start_collectors():
     # V12.2: Test network connectivity before starting threads
     _test_outbound_connectivity()
 
-    print(f"[{datetime.now()}] Starting background data collectors...")
+    print(f"[{datetime.now()}] V66: Starting background collectors with staggered init...")
 
+    # V66: Stagger each thread start by 10 seconds to avoid pool exhaustion
     # Initial collection thread
-    initial_thread = threading.Thread(target=run_initial_collection, daemon=True)
+    initial_thread = threading.Thread(target=run_initial_collection, name='initial_collection', daemon=True)
     initial_thread.start()
+    print(f"[{datetime.now()}] V66: Initial collection thread started, waiting 10s...")
+    time.sleep(10)
 
     # Scheduled daily collection thread
-    collector_thread = threading.Thread(target=scheduled_collection, daemon=True)
+    collector_thread = threading.Thread(target=scheduled_collection, name='scheduled_collection', daemon=True)
     collector_thread.start()
+    print(f"[{datetime.now()}] V66: Scheduled collection thread started, waiting 10s...")
+    time.sleep(10)
 
     # V12.53: Email scheduler thread
-    email_thread = threading.Thread(target=schedule_email_tasks, daemon=True)
+    email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
     email_thread.start()
+    print(f"[{datetime.now()}] V66: Email scheduler thread started, waiting 10s...")
+    time.sleep(10)
 
     # V12.55c: One-time fix for Socrata location JSON in address fields
     try:
-        fix_thread = threading.Thread(target=_fix_socrata_addresses, daemon=True)
+        fix_thread = threading.Thread(target=_fix_socrata_addresses, name='socrata_fix', daemon=True)
         fix_thread.start()
-        print(f"[{datetime.now()}] V12.55c: Address cleanup thread started.")
+        print(f"[{datetime.now()}] V66: Address cleanup thread started, waiting 10s...")
+        time.sleep(10)
     except Exception as e:
         print(f"[{datetime.now()}] V12.55c: Address cleanup error: {e}")
 
     # V12.54: Autonomous city discovery engine
     try:
         from autonomy_engine import run_autonomy_engine
-        autonomy_thread = threading.Thread(target=run_autonomy_engine, daemon=True)
+        autonomy_thread = threading.Thread(target=run_autonomy_engine, name='autonomy_engine', daemon=True)
         autonomy_thread.start()
-        print(f"[{datetime.now()}] V12.54: Autonomy engine thread started.")
+        print(f"[{datetime.now()}] V66: Autonomy engine thread started.")
     except ImportError:
         print(f"[{datetime.now()}] V12.54: autonomy_engine.py not found, skipping.")
 
-    print(f"[{datetime.now()}] Collector and email threads started.")
+    print(f"[{datetime.now()}] V66: All collector threads started (staggered over ~40s).")
 
 # V12.12: Preload existing data from disk BEFORE starting collectors
 # This ensures stale data is served immediately rather than showing 0 permits
 preload_data_from_disk()
 
-# V64: Sync CITY_REGISTRY to city_sources AND prod_cities
-print(f"[{datetime.now()}] V64: Syncing city registry to production tables...")
-try:
-    from collector import sync_city_registry_to_prod
-    sources, cities = sync_city_registry_to_prod()
-    print(f"[{datetime.now()}] V64: Sync complete - {sources} sources, {cities} new cities")
-except Exception as e:
-    print(f"[{datetime.now()}] V64: Sync failed: {e}")
-    import traceback
-    traceback.print_exc()
-
-# V44/V57: Additional prod_cities sync (handles deletions and updates)
-sync_city_registry_to_prod_cities()
-
-# Start collectors when module is loaded (works with gunicorn --preload)
-start_collectors()
+# V66: Removed module-level DB init — now deferred to first request via _deferred_startup()
+# This prevents connection pool exhaustion during gunicorn startup.
+# The sync_city_registry_to_prod(), sync_city_registry_to_prod_cities(), and
+# start_collectors() are all called from _deferred_startup() on first HTTP request.
+print(f"[{datetime.now()}] V66: Module loaded. DB init deferred to first request.")
 
 
 # ===========================
