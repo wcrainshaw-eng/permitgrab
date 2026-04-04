@@ -23,6 +23,7 @@ Environment:
 """
 
 import os
+import time
 import threading
 import sqlite3
 from contextlib import contextmanager
@@ -48,6 +49,11 @@ USE_POSTGRES = bool(DATABASE_URL)
 _pg_pool = None
 _pg_lock = threading.Lock()
 
+# V65: Rate-limit background thread connection usage to prevent API starvation
+# Background threads (collection, sync, discovery) share this semaphore
+_bg_conn_semaphore = threading.Semaphore(10)  # Max 10 concurrent background connections
+_bg_thread_names = {'scheduled_collection', 'email_scheduler', 'city_sync', 'discovery'}
+
 
 def _get_pg_pool():
     """Lazy-init a threaded connection pool."""
@@ -65,20 +71,21 @@ def _get_pg_pool():
                     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 
                 _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=2,
-                    maxconn=10,
+                    minconn=5,
+                    maxconn=35,
                     dsn=db_url,
                 )
-                print(f"[DB_ENGINE] PostgreSQL pool initialized (2-10 connections)")
+                print(f"[DB_ENGINE] PostgreSQL pool initialized (5-35 connections)")
     return _pg_pool
 
 
 class PgConnection:
     """Wrapper around psycopg2 connection to provide sqlite3.Row-like interface."""
 
-    def __init__(self, conn):
+    def __init__(self, conn, is_background=False):
         self._conn = conn
         self._conn.autocommit = False
+        self._is_background = is_background  # V65: Track for semaphore release
 
     def execute(self, sql, params=None):
         import psycopg2.extras
@@ -103,6 +110,9 @@ class PgConnection:
     def close(self):
         pool = _get_pg_pool()
         pool.putconn(self._conn)
+        # V65: Release background semaphore if this was a background connection
+        if self._is_background:
+            _bg_conn_semaphore.release()
 
     @property
     def rowcount(self):
@@ -258,7 +268,7 @@ def _translate_sql(sql):
 # Public API — drop-in replacement for get_connection()
 # --------------------------------------------------------------------------
 
-def get_connection():
+def get_connection(max_retries=3, retry_delay=0.5, background=None):
     """Get a database connection (Postgres pool or SQLite thread-local).
 
     Returns a connection object that supports:
@@ -267,11 +277,51 @@ def get_connection():
         .fetchone() / .fetchall() on cursor results
 
     For Postgres, SQL is auto-translated from SQLite syntax.
+
+    V65: Added retry logic for pool exhaustion and rate-limiting for background threads.
+
+    Args:
+        max_retries: Number of times to retry on pool exhaustion (default 3)
+        retry_delay: Seconds to wait between retries (default 0.5)
+        background: If True, use background semaphore. If None, auto-detect from thread name.
     """
     if USE_POSTGRES:
-        pool = _get_pg_pool()
-        conn = pool.getconn()
-        return PgConnection(conn)
+        import psycopg2.pool
+
+        # V65: Auto-detect if this is a background thread
+        if background is None:
+            thread_name = threading.current_thread().name.lower()
+            background = any(bg in thread_name for bg in _bg_thread_names)
+
+        # V65: Rate-limit background threads to prevent API starvation
+        if background:
+            _bg_conn_semaphore.acquire()
+
+        try:
+            pool = _get_pg_pool()
+
+            # V65: Retry logic for pool exhaustion
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    conn = pool.getconn()
+                    return PgConnection(conn, is_background=background)
+                except psycopg2.pool.PoolError as e:
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        print(f"[DB_ENGINE] Pool exhausted, retry {attempt + 1}/{max_retries} in {retry_delay}s...")
+                        time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                    else:
+                        print(f"[DB_ENGINE] Pool exhausted after {max_retries} retries")
+                        raise
+
+            # Should not reach here, but just in case
+            raise last_error
+        except:
+            # Release semaphore if we failed to get a connection
+            if background:
+                _bg_conn_semaphore.release()
+            raise
     else:
         return _get_sqlite_conn()
 
