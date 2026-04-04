@@ -3262,5 +3262,74 @@ def staleness_check():
     return stats
 
 
+def classify_city_freshness():
+    """V64: Classify every active city's data freshness.
+
+    Classification logic:
+      fresh:      last_permit_date within 7 days
+      aging:      last_permit_date 7-14 days old AND consecutive_no_new < 5
+      stale:      last_permit_date 14-30 days old OR consecutive_no_new >= 5
+      very_stale: last_permit_date > 30 days old OR consecutive_no_new >= 10
+      no_data:    no permits ever collected
+      error:      last 3+ runs all failed
+
+    Returns dict with counts per category and list of cities needing attention.
+    """
+    conn = permitdb.get_connection()
+    try:
+        # Update data_freshness for all active prod_cities
+        conn.execute("""
+            UPDATE prod_cities SET data_freshness = CASE
+                WHEN newest_permit_date IS NULL THEN 'no_data'
+                WHEN last_run_status IN ('error', 'failed')
+                     AND COALESCE(consecutive_no_new, 0) >= 3 THEN 'error'
+                WHEN newest_permit_date > datetime('now', '-7 days') THEN 'fresh'
+                WHEN newest_permit_date > datetime('now', '-14 days')
+                     AND COALESCE(consecutive_no_new, 0) < 5 THEN 'aging'
+                WHEN newest_permit_date > datetime('now', '-30 days')
+                     OR COALESCE(consecutive_no_new, 0) >= 5 THEN 'stale'
+                ELSE 'very_stale'
+            END
+            WHERE status = 'active'
+        """)
+        conn.commit()
+
+        # Get summary counts
+        rows = conn.execute("""
+            SELECT data_freshness, COUNT(*) as cnt
+            FROM prod_cities
+            WHERE status = 'active'
+            GROUP BY data_freshness
+        """).fetchall()
+
+        summary = {row['data_freshness']: row['cnt'] for row in rows}
+
+        # Get cities needing attention (stale, very_stale, error, no_data)
+        attention = conn.execute("""
+            SELECT city_slug, city, state, source_type, data_freshness,
+                   consecutive_no_new, newest_permit_date, last_collection,
+                   last_run_status, last_error
+            FROM prod_cities
+            WHERE status = 'active'
+              AND data_freshness IN ('stale', 'very_stale', 'error', 'no_data')
+            ORDER BY
+                CASE data_freshness
+                    WHEN 'error' THEN 1
+                    WHEN 'very_stale' THEN 2
+                    WHEN 'stale' THEN 3
+                    WHEN 'no_data' THEN 4
+                END,
+                COALESCE(consecutive_no_new, 0) DESC
+        """).fetchall()
+
+        return {
+            'summary': summary,
+            'needs_attention': [dict(row) for row in attention],
+            'total_needing_attention': len(attention)
+        }
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     permits, stats = collect_all(days_back=365)

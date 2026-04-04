@@ -291,6 +291,7 @@ def init_db():
             ("Bulk city deactivation", lambda: _deactivate_bulk_covered_cities(conn)),
             ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
             ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
+            ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
         ]
         for name, fn in _migrations:
             try:
@@ -492,10 +493,13 @@ def init_db():
             added_at TEXT DEFAULT (datetime('now')),
             notes TEXT,
             -- V18: Staleness detection columns
-            data_freshness TEXT DEFAULT 'fresh' CHECK (data_freshness IN ('fresh', 'stale', 'very_stale', 'no_data')),
+            data_freshness TEXT DEFAULT 'fresh' CHECK (data_freshness IN ('fresh', 'aging', 'stale', 'very_stale', 'no_data', 'error', 'unknown')),
             newest_permit_date TEXT,
             stale_since TEXT,
             pause_reason TEXT,
+            -- V64: Enhanced staleness tracking
+            consecutive_no_new INTEGER DEFAULT 0,
+            last_run_status TEXT,
             UNIQUE(city, state)
         );
         CREATE INDEX IF NOT EXISTS idx_prod_cities_status ON prod_cities(status);
@@ -608,7 +612,10 @@ def init_db():
     # V34: Sync prod_cities.total_permits with actual permit counts in DB
     _sync_prod_city_counts(conn)
 
-    print(f"[DB] V35: Database initialized at {DB_PATH}")
+    # V64: Add enhanced staleness tracking columns
+    _run_v64_staleness_columns(conn)
+
+    print(f"[DB] V64: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations_pg(conn):
@@ -692,6 +699,40 @@ def _run_v18_migrations(conn):
             UNIQUE(city, state)
         )
     """)
+    conn.commit()
+
+
+def _run_v64_staleness_columns(conn):
+    """V64: Add enhanced staleness tracking columns."""
+    # Check which columns exist
+    try:
+        cursor = conn.execute("PRAGMA table_info(prod_cities)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+    except Exception:
+        # Postgres path
+        try:
+            cursor = conn.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'prod_cities'
+            """)
+            existing_cols = {row[0] if isinstance(row, tuple) else row['column_name'] for row in cursor}
+        except Exception:
+            existing_cols = set()
+
+    # Add missing V64 columns
+    v64_columns = [
+        ("consecutive_no_new", "INTEGER DEFAULT 0"),
+        ("last_run_status", "TEXT"),
+    ]
+
+    for col_name, col_def in v64_columns:
+        if col_name not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE prod_cities ADD COLUMN {col_name} {col_def}")
+                print(f"[V64] Added column: prod_cities.{col_name}")
+            except Exception:
+                pass  # Column may already exist
+
     conn.commit()
 
 
@@ -1933,16 +1974,20 @@ def upsert_prod_city(city, state, city_slug, source_type=None, source_id=None,
 
 
 def update_prod_city_collection(city_slug, permits_found=0, last_permit_date=None, error=None):
-    """V15: Update prod city after a collection run."""
+    """V15/V64: Update prod city after a collection run.
+
+    V64: Also tracks consecutive_no_new and last_run_status for staleness detection.
+    """
     conn = get_connection()
 
     if error:
-        # Increment failure count
+        # Increment failure count, track error status
         conn.execute("""
             UPDATE prod_cities SET
                 consecutive_failures = consecutive_failures + 1,
                 last_error = ?,
-                last_collection = datetime('now')
+                last_collection = datetime('now'),
+                last_run_status = 'error'
             WHERE city_slug = ?
         """, (error, city_slug))
 
@@ -1953,25 +1998,40 @@ def update_prod_city_collection(city_slug, permits_found=0, last_permit_date=Non
         ).fetchone()
         if row and row['consecutive_failures'] >= 3:
             conn.execute(
-                "UPDATE prod_cities SET status = 'paused' WHERE city_slug = ?",
+                "UPDATE prod_cities SET status = 'paused', data_freshness = 'error' WHERE city_slug = ?",
                 (city_slug,)
             )
-    else:
-        # Success - reset failures, update stats
+    elif permits_found > 0:
+        # Success with new permits - reset both failure counters, update freshness
         conn.execute("""
             UPDATE prod_cities SET
                 consecutive_failures = 0,
+                consecutive_no_new = 0,
                 last_error = NULL,
                 last_collection = datetime('now'),
                 last_permit_date = COALESCE(?, last_permit_date),
-                total_permits = total_permits + ?
+                newest_permit_date = COALESCE(?, newest_permit_date),
+                total_permits = total_permits + ?,
+                last_run_status = 'success',
+                data_freshness = 'fresh'
             WHERE city_slug = ?
-        """, (last_permit_date, permits_found, city_slug))
+        """, (last_permit_date, last_permit_date, permits_found, city_slug))
 
         # Reactivate if was paused
         conn.execute("""
             UPDATE prod_cities SET status = 'active'
             WHERE city_slug = ? AND status = 'paused'
+        """, (city_slug,))
+    else:
+        # V64: No new permits (permits_found == 0) - increment no_new counter
+        conn.execute("""
+            UPDATE prod_cities SET
+                consecutive_failures = 0,
+                consecutive_no_new = COALESCE(consecutive_no_new, 0) + 1,
+                last_error = NULL,
+                last_collection = datetime('now'),
+                last_run_status = 'no_new'
+            WHERE city_slug = ?
         """, (city_slug,))
 
     conn.commit()

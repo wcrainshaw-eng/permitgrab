@@ -1877,6 +1877,26 @@ def admin_tracker():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/freshness')
+def admin_freshness():
+    """V64: Run freshness classification and return results.
+
+    Shows which cities are fresh, stale, broken, or have no data.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    from collector import classify_city_freshness
+    try:
+        result = classify_city_freshness()
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
@@ -8572,6 +8592,19 @@ def scheduled_collection():
             print(f"[{datetime.now()}] V18: Staleness check done - {staleness_stats.get('paused', 0)} paused, {staleness_stats.get('stale', 0)} stale")
         except Exception as e:
             print(f"[{datetime.now()}] V18: Staleness check error: {e}")
+
+        # V64: Run freshness classification
+        print(f"[{datetime.now()}] V64: Running freshness classification...")
+        try:
+            from collector import classify_city_freshness
+            freshness = classify_city_freshness()
+            summary = freshness.get('summary', {})
+            attention_count = freshness.get('total_needing_attention', 0)
+            print(f"[{datetime.now()}] V64: Freshness: {summary}")
+            if attention_count > 0:
+                print(f"[{datetime.now()}] V64: WARNING: {attention_count} cities need attention")
+        except Exception as e:
+            print(f"[{datetime.now()}] V64: Freshness classification failed: {e}")
 
         # V16: Track last successful collection run
         global _last_collection_run
