@@ -1510,7 +1510,7 @@ CITY_REGISTRY = {
         },
         "date_field": "APPLICATIONDATE",
         "limit": 2000,
-        "active": True,  # V50: Activated with new JSON platform handler
+        "active": False,  # V73: JSON endpoint returns 404
         "notes": "V50: Activated! Custom JSON API returns 30-day rolling window. Pop ~300K.",
     },
 
@@ -2123,7 +2123,7 @@ CITY_REGISTRY = {
             "estimated_cost": "expected_construction_cost",
             "filing_date": "permit_issuance_date",
         },
-        "date_field": "permit_issued_date",
+        "date_field": "permit_issuance_date",
         "limit": 2000,
         "active": True,
         "notes": "V26: Data provided via prince_georges_county_md bulk source.",
@@ -2147,7 +2147,7 @@ CITY_REGISTRY = {
             "description": "permitstatusdesc",
             "status": "status",
         },
-        "date_field": "yrmo",
+        "date_field": "permitdate",
         "limit": 2000,
         "active": True,
         "notes": "# V23 BLOCKED: NJ state dataset w9se-dmra has NO address fields - only block/lot numbers. Cannot match to properties.",
@@ -3541,8 +3541,8 @@ CITY_REGISTRY = {
         "lat": 36.85,
         "lon": -76.286,
         "platform": "socrata",
-        "endpoint": "https://data.norfolk.gov/resource/bnrb-u445.json",
-        "dataset_id": "bnrb-u445",
+        "endpoint": "https://data.norfolk.gov/resource/fahm-yuh4.json",
+        "dataset_id": "fahm-yuh4",
         "description": "Permits and Inspections (data.norfolk.gov)",
         "field_map": {
             "permit_number": "ftpuser",
@@ -3579,7 +3579,7 @@ CITY_REGISTRY = {
             "latitude": "geocoded_column",
             "contact_name": "permit_use_class",
         },
-        "date_field": "permit_application_date",
+        "date_field": "application_date",
         "limit": 2000,
         "active": True,  # V43: Activated â endpoint confirmed live. Has permit_address, 32 fields. Pop 238K.
         "notes": "V43: Activated. Norfolk VA Socrata â 97K+ records with full address and inspection data.",
@@ -4863,7 +4863,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V73: No date fields in dataset,
         "notes": "V12.6: Deactivated â fabricated Socrata domain",
     },
 
@@ -4883,7 +4883,7 @@ CITY_REGISTRY = {
             "description": "projectdescription",
             "contractor_name": "contractor",
         },
-        "date_field": "issueddate",
+        "date_field": "dateissued",
         "limit": 2000,
         "active": True,
         "notes": "V12.6: Deactivated â fabricated Socrata domain",
@@ -4932,7 +4932,7 @@ CITY_REGISTRY = {
             "contractor_name": "contractors",
             "status": "currentstatus",
         },
-        "date_field": "issueddate",
+        "date_field": "issuedate",
         "limit": 2000,
         "active": True,
         "notes": "V26: Data provided via new_orleans endpoint.",
@@ -4997,7 +4997,7 @@ CITY_REGISTRY = {
             "status": "permitstatus",
             "contact_name": "contractor",
         },
-        "date_field": "permitissuedate",
+        "date_field": "appdate",
         "limit": 2000,
         "active": True,
         "notes": "V19: Full 22-field map â contractor name + trade, building use code/desc, work class, milestone, sqft, declared valuation, fee amount + desc, issue/expire/modified dates. Data through Mar 20, 2026. Verified.",
@@ -6708,7 +6708,7 @@ CITY_REGISTRY = {
         "endpoint": "https://engage.huntingtonbeachca.gov/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Home",
         "_accela_city_key": "huntington_beach",
         "description": "Building Permits via Accela Citizen Access",
-        "active": True,  # V72: Converted to Accela scraper
+        "active": False,  # V73: Accela portal returns HTTP 403
         "notes": "V72: Custom Accela domain engage.huntingtonbeachca.gov. Previously deactivated â fabricated Socrata domain",
     },
 
@@ -6879,7 +6879,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Timeout, endpoint unresponsive,
+        "active": False,  # V73: Endpoint consistently timing out
         "notes": "V12.6: Deactivated â fabricated Socrata domain",
     },
 
@@ -9408,8 +9408,8 @@ CITY_REGISTRY = {
         "state": "VA",
         "slug": "norfolk",
         "platform": "socrata",
-        "endpoint": "https://data.norfolk.gov/resource/bnrb-u445.json",
-        "dataset_id": "bnrb-u445",
+        "endpoint": "https://data.norfolk.gov/resource/fahm-yuh4.json",
+        "dataset_id": "fahm-yuh4",
         "description": "Permits and Inspections - City of Norfolk Open Data (Socrata)",
         "field_map": {
             "permit_number": "ftpuser",
@@ -9422,7 +9422,7 @@ CITY_REGISTRY = {
             "estimated_cost": "permit_project_cost",
             "description": "permit_use_class",
         },
-        "date_field": "permit_issue_date",
+        "date_field": "issue_date",
         "default_filter": "$where=permit_type='Building'",
         "limit": 2000,
         "active": True,
@@ -9450,7 +9450,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Error parsing response,
+        "active": False,  # V73: Domain unreachable
         "status": "paused",
     },
 
@@ -9874,7 +9874,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issueddate",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V73: Portal decommissioned,
         "notes": "V54: Replaced frozen ArcGIS (ended 12/31/2025) with ChattaData Socrata portal. Fresh data 2006-present. Has contractor, status, dates. V56: Deactivated â chattadata.org domain dead.",
     },
 
@@ -12605,7 +12605,7 @@ CITY_REGISTRY = {
         "date_field": "COIssuedDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": False,  # V73: ArcGIS service removed from server
         "status": "paused",
         "notes": "V12.8: Deactivated - MapServer service not found",
     },
@@ -15117,8 +15117,8 @@ CITY_REGISTRY = {
         "state": "VA",
         "slug": "norfolk-va",
         "platform": "socrata",
-        "endpoint": "https://data.norfolk.gov/resource/bnrb-u445.json",
-        "dataset_id": "bnrb-u445",
+        "endpoint": "https://data.norfolk.gov/resource/fahm-yuh4.json",
+        "dataset_id": "fahm-yuh4",
         "description": "Norfolk VA Permits and Inspections",
         "field_map": {
             "permit_number": "ftpuser",
@@ -15129,7 +15129,7 @@ CITY_REGISTRY = {
             "address": "permit_address",
             "estimated_cost": "permit_project_cost",
         },
-        "date_field": "permit_application_date",
+        "date_field": "application_date",
         "limit": 2000,
         "active": True,
         "notes": "V26: Data provided via norfolk endpoint.",
@@ -15758,7 +15758,7 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
+        "active": False,  # V73: Portal returns empty response,
         "notes": "V72: Oxnard via Ventura County Accela",
     },
     "thousand_oaks_ca": {
@@ -17793,7 +17793,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V73: Redirects to ArcGIS Hub legacy,
         "notes": "V12.60: Fort Worth TX development permits. Pop ~978K. 25 fields.",
     },
 
@@ -17816,34 +17816,12 @@ CITY_REGISTRY = {
             "address": "address",
             "estimated_cost": "cost",
         },
-        "date_field": "issued_date",
         "limit": 2000,
         "active": True,
-        "notes": "V26: Data provided via framingham endpoint.",
+        "notes": "V26: Data provided via framingham endpoint. date_field is applied (not issued_date).",
     },
 
-    # --- Auburn WA ---
-    "auburn_wa": {
-        "name": "Auburn",
-        "state": "WA",
-        "slug": "auburn-wa",
-        "platform": "socrata",
-        "endpoint": "https://data.auburnwa.gov/resource/fted-8bve.json",
-        "dataset_id": "fted-8bve",
-        "description": "Auburn WA Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "description": "description",
-            "status": "status",
-            "filing_date": "issued_date",
-            "address": "address",
-        },
-        "date_field": "issued_date",
-        "limit": 2000,
-        "active": True,
-        "notes": "V12.60: Auburn WA permits. Pop ~87K.",
-    },
+    # --- Auburn WA --- V73: Duplicate removed - primary entry at line ~5074 has correct date_field: issued
 
     # --- Bayonne NJ ---
     "bayonne_nj": {
@@ -18370,7 +18348,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V73: Portal dead,
         "notes": "V12.60: Oxnard CA building permits. Pop ~210K.",
     },
 
@@ -34117,8 +34095,8 @@ BULK_SOURCES = {
         "state": "VA",
         "platform": "socrata",
         "mode": "bulk",
-        "endpoint": "https://data.norfolk.gov/resource/bnrb-u445.json",
-        "dataset_id": "bnrb-u445",
+        "endpoint": "https://data.norfolk.gov/resource/fahm-yuh4.json",
+        "dataset_id": "fahm-yuh4",
         "description": "Norfolk VA Permits and Inspections",
         "city_field": "ward",
         "field_map": {
@@ -34130,7 +34108,7 @@ BULK_SOURCES = {
             "address": "permit_address",
             "estimated_cost": "permit_project_cost",
         },
-        "date_field": "permit_application_date",
+        "date_field": "application_date",
         "limit": 50000,
         "active": True,
         "notes": "V15: Reactivated - endpoint verified working Mar 27 2026. All wards covered.",
@@ -34504,7 +34482,7 @@ BULK_SOURCES = {
         "dataset_id": "vmzx-48vx",
         "description": "Building Permits (data.oxnard.org)",
         "date_field": "permitissuedate",
-        "active": True,
+        "active": False,  # V73: Portal returns empty response
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "permit_type",
