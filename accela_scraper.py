@@ -1005,6 +1005,108 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V72 Batch 8: More CO and GA cities/counties
+    "boulder_county_co": {
+        "agency_code": "BOCO",
+        "module": "Planning",
+        "tab_name": "Planning",
+        "search_url_path": "Cap/CapHome.aspx?module=Planning&TabName=Planning",
+        "base_url": "https://accelapublic.bouldercounty.org/CitizenAccess",
+    },
+    "longmont_co": {
+        "agency_code": "LONGMONT",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://aca.longmontcolorado.gov/CitizenAccess",
+    },
+    "fort_collins_co": {
+        "agency_code": "FTCOLLINS",
+        "module": "Planning",
+        "tab_name": "Planning",
+        "search_url_path": "Cap/CapHome.aspx?module=Planning&TabName=Planning",
+        "base_url": "https://accela-aca.fcgov.com/CitizenAccess",
+    },
+    "clayton_county_ga": {
+        "agency_code": "CLAYTON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "cobb_county_ga": {
+        "agency_code": "COBB",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "fulton_county_ga": {
+        "agency_code": "FULTON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "dekalb_county_ga": {
+        "agency_code": "DEKALB",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "jackson_county_or": {
+        "agency_code": "JACKSON_CO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://aca-oregon.accela.com/jackson_co",
+    },
+    "tigard_or": {
+        "agency_code": "TIGARD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "albany_or": {
+        "agency_code": "ALBANY_OR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # More SC and NC counties
+    "greenville_county_sc": {
+        "agency_code": "GREENVILLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "charleston_county_sc": {
+        "agency_code": "CHARLESTON_SC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "wake_county_nc": {
+        "agency_code": "WAKE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "mecklenburg_county_nc": {
+        "agency_code": "MECKLENBURG",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "guilford_county_nc": {
+        "agency_code": "GUILFORD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "forsyth_county_nc": {
+        "agency_code": "FORSYTH",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
