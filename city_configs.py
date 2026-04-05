@@ -35079,6 +35079,63 @@ CITY_REGISTRY = {
         "notes": "V73: New Accela county. Pop ~602K.",
     },
 
+    # V73: Additional Accela cities (batch 14)
+    "arapahoe_county_co_accela": {
+        "name": "Arapahoe County",
+        "state": "CO",
+        "slug": "arapahoe-county-co",
+        "lat": 39.65,
+        "lon": -104.34,
+        "platform": "accela",
+        "_accela_city_key": "arapahoe",
+        "endpoint": "https://aca-prod.accela.com/ARAPAHOE/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,
+        "notes": "V73: New Accela county. Pop ~656K.",
+    },
+
+    "clearwater_fl_accela": {
+        "name": "Clearwater",
+        "state": "FL",
+        "slug": "clearwater-fl",
+        "lat": 27.97,
+        "lon": -82.80,
+        "platform": "accela",
+        "_accela_city_key": "clearwater",
+        "endpoint": "https://aca-prod.accela.com/CLEARWATER/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,
+        "notes": "V73: New Accela city. Pop ~117K.",
+    },
+
+    "washoe_county_nv_accela": {
+        "name": "Washoe County",
+        "state": "NV",
+        "slug": "washoe-county-nv",
+        "lat": 39.53,
+        "lon": -119.81,
+        "platform": "accela",
+        "_accela_city_key": "washoe",
+        "endpoint": "https://aca-prod.accela.com/WASHOE/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,
+        "notes": "V73: New Accela county. Pop ~490K.",
+    },
+
+    "douglas_county_co_accela": {
+        "name": "Douglas County",
+        "state": "CO",
+        "slug": "douglas-county-co",
+        "lat": 39.33,
+        "lon": -104.93,
+        "platform": "accela",
+        "_accela_city_key": "douglas",
+        "endpoint": "https://aca-prod.accela.com/DOUGLAS/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,
+        "notes": "V73: New Accela county. Pop ~357K.",
+    },
+
 }
 
 # ============================================================================
