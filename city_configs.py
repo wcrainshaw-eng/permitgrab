@@ -415,7 +415,7 @@ CITY_REGISTRY = {
         "date_field": "Applied Date",
         "limit": 2000,
         "active": True,
-        "notes": "V35: CKAN datastore API. Fresh daily (updated 2026-03-31). Has Type, Workclass, Permit Valuation, Contact Company Name.",
+        "notes": "V73: CKAN API verified working (32K records). resource_id format required.",
     },
 
     "cambridge": {
@@ -486,7 +486,7 @@ CITY_REGISTRY = {
         "notes": "V72: Reactivated - ArcGIS FeatureServer/4 confirmed working. Returns PERMIT_ID, FULL_ADDRESS, ISSUE_DATE, DESC_OF_WORK.",
     },
 
-    # V23 AUDIT: 2026-03-28 - NO_DATA - CKAN endpoint needs verification
+    # San Antonio - CKAN API working (104K records)
     "san_antonio": {
         "name": "San Antonio",
         "state": "TX",
@@ -510,7 +510,7 @@ CITY_REGISTRY = {
         "date_field": "DATE ISSUED",
         "limit": 2000,
         "active": True,
-        "notes": "V54: Reactivated. 102K records through Mar 2026. Fixed dataset_id key (was resource_id).",
+        "notes": "V73: CKAN API verified working (104K records). resource_id format required.",
     },
 
     "kansas_city": {
@@ -8561,7 +8561,7 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": False,  # V73: DEAD - redirects to ArcGIS. Use hartford_ct Accela instead.
         "notes": "V12.6: Deactivated â fabricated Socrata domain",
     },
 
