@@ -1863,27 +1863,37 @@ def _flush_history_batch(batch):
 # ---------------------------------------------------------------------------
 
 def sync_city_registry_to_prod():
-    """V64: Ensure all active CITY_REGISTRY entries are in city_sources and prod_cities.
+    """V73: Batched sync — CITY_REGISTRY to city_sources and prod_cities.
 
-    This closes the gap where cities are added to city_configs.py but never
-    make it to the tables that drive collection.
+    V73 improvements:
+    - Batch size of 50 cities per commit to avoid OOM/timeout
+    - Skip existing cities that haven't changed
+    - Progress logging every batch
+    - Detailed return dict with added/updated/skipped/errors counts
 
     Returns:
-        (synced_sources, synced_prod) tuple with counts
+        dict with keys: added, updated, skipped, errors, sources_synced
     """
     from city_configs import CITY_REGISTRY, BULK_SOURCES
     from city_source_db import upsert_city_source
 
-    synced_sources = 0
-    synced_prod = 0
-    errors = 0
+    BATCH_SIZE = 50
+    result = {
+        'added': 0,
+        'updated': 0,
+        'skipped': 0,
+        'errors': 0,
+        'sources_synced': 0
+    }
 
-    print(f"[V64] Starting city registry sync...")
+    print(f"[V73] Starting batched city registry sync...")
 
-    # Phase 1: Sync CITY_REGISTRY → city_sources
+    # Phase 1: Sync CITY_REGISTRY → city_sources (quick, no batching needed)
+    active_keys = []
     for key, config in CITY_REGISTRY.items():
         if not config.get('active', False):
             continue
+        active_keys.append(key)
         try:
             upsert_city_source({
                 'source_key': key,
@@ -1899,10 +1909,10 @@ def sync_city_registry_to_prod():
                 'limit_per_page': config.get('limit', 2000),
                 'status': 'active'
             })
-            synced_sources += 1
+            result['sources_synced'] += 1
         except Exception as e:
             print(f"  [WARN] Failed to sync {key} to city_sources: {e}")
-            errors += 1
+            result['errors'] += 1
 
     # Phase 2: Sync BULK_SOURCES → city_sources
     for key, config in BULK_SOURCES.items():
@@ -1923,78 +1933,119 @@ def sync_city_registry_to_prod():
                 'limit_per_page': config.get('limit', 50000),
                 'status': 'active'
             })
-            synced_sources += 1
+            result['sources_synced'] += 1
         except Exception as e:
             print(f"  [WARN] Failed to sync {key} to city_sources: {e}")
-            errors += 1
+            result['errors'] += 1
 
-    print(f"  Phase 1-2 complete: {synced_sources} sources synced to city_sources ({errors} errors)")
+    print(f"  Phase 1-2 complete: {result['sources_synced']} sources synced")
 
-    # Phase 3: Ensure all active city sources have prod_cities entries
-    # V66: Fixed connection leak — now properly closed in finally block
+    # Phase 3: Batched sync to prod_cities
+    total_active = len(active_keys)
+    total_batches = (total_active + BATCH_SIZE - 1) // BATCH_SIZE
+    print(f"  Phase 3: Syncing {total_active} cities in {total_batches} batches of {BATCH_SIZE}")
+
     conn = permitdb.get_connection()
     try:
-        # Get existing prod_cities entries
-        existing = {}
-        for row in conn.execute("SELECT city_slug, source_id FROM prod_cities"):
-            existing[row['source_id']] = row['city_slug']
-            existing[row['city_slug']] = row['source_id']
+        # Get existing prod_cities entries (source_id -> row data)
+        existing_by_source = {}
+        existing_by_slug = set()
+        for row in conn.execute("SELECT city_slug, source_id, source_type, status FROM prod_cities"):
+            existing_by_source[row['source_id']] = {
+                'slug': row['city_slug'],
+                'source_type': row['source_type'],
+                'status': row['status']
+            }
+            existing_by_slug.add(row['city_slug'])
 
-        for key, config in CITY_REGISTRY.items():
-            if not config.get('active', False):
-                continue
+        # Process in batches
+        for batch_num in range(total_batches):
+            batch_start = batch_num * BATCH_SIZE
+            batch_end = min(batch_start + BATCH_SIZE, total_active)
+            batch_keys = active_keys[batch_start:batch_end]
 
-            city_name = config.get('name', '')
-            state = config.get('state', '')
-            slug = config.get('slug', key)
+            batch_added = 0
+            batch_updated = 0
+            batch_skipped = 0
 
-            if not city_name or not state:
-                continue
+            for key in batch_keys:
+                config = CITY_REGISTRY[key]
+                city_name = config.get('name', '')
+                state = config.get('state', '')
+                platform = config.get('platform', '')
+                slug = config.get('slug', key)
 
-            # Skip if already in prod_cities (by source_id)
-            if key in existing:
-                continue
+                if not city_name or not state:
+                    result['errors'] += 1
+                    continue
 
-            # Skip if slug already exists (avoid duplicates)
-            try:
-                normalized_slug = permitdb.normalize_city_slug(city_name)
-            except Exception:
-                normalized_slug = slug
+                try:
+                    normalized_slug = permitdb.normalize_city_slug(city_name)
+                except Exception:
+                    normalized_slug = slug
 
-            if normalized_slug in existing:
-                continue
+                # Check if already exists
+                if key in existing_by_source:
+                    existing = existing_by_source[key]
+                    # Check if needs update
+                    if existing['status'] != 'active' or existing['source_type'] != platform:
+                        try:
+                            conn.execute("""
+                                UPDATE prod_cities SET status = 'active', source_type = ?,
+                                    notes = 'V73: Synced — active in CITY_REGISTRY'
+                                WHERE source_id = ?
+                            """, (platform, key))
+                            batch_updated += 1
+                        except Exception as e:
+                            print(f"    [ERROR] Update {key}: {e}")
+                            result['errors'] += 1
+                    else:
+                        batch_skipped += 1
+                elif normalized_slug in existing_by_slug:
+                    # Slug exists but different source — skip to avoid duplicates
+                    batch_skipped += 1
+                else:
+                    # New city — insert
+                    try:
+                        permitdb.upsert_prod_city(
+                            city=city_name,
+                            state=state,
+                            city_slug=normalized_slug,
+                            source_type=platform,
+                            source_id=key,
+                            source_scope='city',
+                            status='active',
+                            added_by='v73_sync',
+                            notes='V73: Batched sync from CITY_REGISTRY'
+                        )
+                        batch_added += 1
+                        existing_by_slug.add(normalized_slug)
+                        existing_by_source[key] = {'slug': normalized_slug, 'source_type': platform, 'status': 'active'}
+                    except Exception as e:
+                        print(f"    [ERROR] Add {key}: {e}")
+                        result['errors'] += 1
 
-            try:
-                permitdb.upsert_prod_city(
-                    city=city_name,
-                    state=state,
-                    city_slug=normalized_slug,
-                    source_type=config.get('platform', ''),
-                    source_id=key,
-                    source_scope='city',
-                    status='active',
-                    added_by='v64_sync',
-                    notes='V64: Auto-synced from CITY_REGISTRY'
-                )
-                synced_prod += 1
-                print(f"  [V64] Added {key} ({city_name}, {state}) to prod_cities")
-            except Exception as e:
-                print(f"  [WARN] Failed to add {key} to prod_cities: {e}")
+            # Commit this batch
+            conn.commit()
+            result['added'] += batch_added
+            result['updated'] += batch_updated
+            result['skipped'] += batch_skipped
 
-        conn.commit()
+            print(f"  Synced batch {batch_num + 1}/{total_batches} ({batch_end}/{total_active} cities) — +{batch_added} added, ~{batch_updated} updated, ={batch_skipped} skipped")
+
     except Exception as e:
         print(f"  [ERROR] Phase 3 failed: {e}")
         import traceback
         traceback.print_exc()
+        result['errors'] += 1
     finally:
-        # V66: Always release connection back to pool
         try:
             conn.close()
         except Exception:
             pass
 
-    print(f"[V64] Sync complete: {synced_sources} sources, {synced_prod} new prod_cities")
-    return synced_sources, synced_prod
+    print(f"[V73] Sync complete: {result['added']} added, {result['updated']} updated, {result['skipped']} skipped, {result['errors']} errors")
+    return result
 
 
 # ---------------------------------------------------------------------------

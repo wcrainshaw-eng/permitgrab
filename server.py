@@ -1728,18 +1728,32 @@ def admin_email_status():
 
 @app.route('/api/admin/sync-registry', methods=['POST'])
 def admin_sync_registry():
-    """V64: Manually sync CITY_REGISTRY to city_sources and prod_cities."""
+    """V73: Batched sync CITY_REGISTRY to city_sources and prod_cities.
+
+    Returns JSON with: added, updated, skipped, errors, sources_synced
+    """
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
         from collector import sync_city_registry_to_prod
-        sources, cities = sync_city_registry_to_prod()
-        return jsonify({
-            'sources_synced': sources,
-            'new_cities_added': cities
-        })
+        result = sync_city_registry_to_prod()
+        # V73: Result is now a dict, not tuple
+        if isinstance(result, dict):
+            return jsonify(result)
+        else:
+            # Backwards compat if somehow old version runs
+            sources, cities = result
+            return jsonify({
+                'sources_synced': sources,
+                'added': cities,
+                'updated': 0,
+                'skipped': 0,
+                'errors': 0
+            })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Sync failed: {str(e)}'}), 500
 
 
