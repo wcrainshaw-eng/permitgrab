@@ -35140,6 +35140,50 @@ CITY_REGISTRY = {
         "notes": "V73: New Accela county. Pop ~357K.",
     },
 
+    # V73: New Socrata cities (batch 15)
+    "janesville_wi": {
+        "name": "Janesville",
+        "state": "WI",
+        "slug": "janesville-wi",
+        "lat": 42.683,
+        "lon": -89.019,
+        "platform": "socrata",
+        "endpoint": "https://performance.ci.janesville.wi.us/resource/3fcg-j7bi.json",
+        "dataset_id": "3fcg-j7bi",
+        "description": "Residential Building Permits",
+        "field_map": {
+            "year": "year",
+            "new_permits": "new_residential_permits",
+            "additions": "residential_addition_remodel",
+        },
+        "date_field": "year",
+        "limit": 2000,
+        "active": True,
+        "notes": "V73: New Socrata city. Pop ~65K.",
+    },
+
+    "rockford_il": {
+        "name": "Rockford",
+        "state": "IL",
+        "slug": "rockford-il",
+        "lat": 42.271,
+        "lon": -89.094,
+        "platform": "socrata",
+        "endpoint": "https://illinois-edp.data.socrata.com/resource/3k8p-pkx8.json",
+        "dataset_id": "3k8p-pkx8",
+        "description": "Building Permits",
+        "field_map": {
+            "permit_number": "permitno",
+            "permit_type": "permittype",
+            "work_type": "worktype",
+            "filing_date": "dateissued1",
+        },
+        "date_field": "dateissued1",
+        "limit": 2000,
+        "active": True,
+        "notes": "V73: New Socrata city. Pop ~147K.",
+    },
+
 }
 
 # ============================================================================
