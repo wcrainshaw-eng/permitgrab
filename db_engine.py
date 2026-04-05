@@ -47,6 +47,7 @@ USE_POSTGRES = bool(DATABASE_URL)
 # --------------------------------------------------------------------------
 
 _pg_pool = None
+_pg_pool_enabled = False  # V70: Pool DISABLED by default — must be manually enabled
 _pg_lock = threading.Lock()
 
 # V65: Rate-limit background thread connection usage to prevent API starvation
@@ -55,30 +56,45 @@ _bg_conn_semaphore = threading.Semaphore(10)  # Max 10 concurrent background con
 _bg_thread_names = {'scheduled_collection', 'email_scheduler', 'city_sync', 'discovery'}
 
 
+def enable_pg_pool():
+    """V70: Manually enable Postgres pool. Call from admin endpoint only."""
+    global _pg_pool, _pg_pool_enabled
+    if _pg_pool is not None:
+        print("[DB_ENGINE] V70: Pool already exists")
+        return True
+    try:
+        import psycopg2
+        import psycopg2.pool
+
+        # Fix Render's postgres:// → postgresql:// URL scheme
+        db_url = DATABASE_URL
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+
+        _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=db_url,
+        )
+        _pg_pool_enabled = True
+        print(f"[DB_ENGINE] V70: Postgres pool created (min=1, max=10)")
+        return True
+    except Exception as e:
+        print(f"[DB_ENGINE] V70: Failed to create pool: {e}")
+        return False
+
+
 def _get_pg_pool():
-    """Lazy-init a threaded connection pool."""
+    """V70: Returns pool ONLY if explicitly enabled. Does NOT auto-create."""
     global _pg_pool
     if _pg_pool is None:
-        with _pg_lock:
-            if _pg_pool is None:
-                import psycopg2
-                import psycopg2.pool
-                import psycopg2.extras
-
-                # Fix Render's postgres:// → postgresql:// URL scheme
-                db_url = DATABASE_URL
-                if db_url.startswith('postgres://'):
-                    db_url = db_url.replace('postgres://', 'postgresql://', 1)
-
-                # V69: Reduced pool size to prevent exhaustion with 2 gunicorn workers
-                # 2 workers x 20 max = 40 total, well under Render's limit
-                _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=2,
-                    maxconn=20,
-                    dsn=db_url,
-                )
-                print(f"[DB_ENGINE] V69: PostgreSQL pool initialized (min=2, max=20)")
+        raise RuntimeError("[DB_ENGINE] V70: Postgres pool not initialized. POST /api/admin/enable-postgres first.")
     return _pg_pool
+
+
+def is_pg_pool_enabled():
+    """V70: Check if Postgres pool is available."""
+    return _pg_pool is not None and _pg_pool_enabled
 
 
 class PgConnection:
@@ -282,6 +298,7 @@ def get_connection(max_retries=10, retry_delay=1.0, background=None):
 
     V65: Added retry logic for pool exhaustion and rate-limiting for background threads.
     V67: Increased retries to 10 with exponential backoff up to 30s max.
+    V70: Raises RuntimeError if Postgres pool not enabled.
 
     Args:
         max_retries: Number of times to retry on pool exhaustion (default 10, was 3)
@@ -290,6 +307,10 @@ def get_connection(max_retries=10, retry_delay=1.0, background=None):
     """
     if USE_POSTGRES:
         import psycopg2.pool
+
+        # V70: Check if pool is enabled before proceeding
+        if not is_pg_pool_enabled():
+            raise RuntimeError("[DB_ENGINE] V70: Postgres pool not initialized. POST /api/admin/enable-postgres first.")
 
         # V65: Auto-detect if this is a background thread
         if background is None:

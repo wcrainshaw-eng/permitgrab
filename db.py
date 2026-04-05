@@ -235,15 +235,24 @@ def get_connection():
 
     V62: Delegates to db_engine when DATABASE_URL is set (PostgreSQL).
     Falls back to thread-local SQLite for local dev.
+    V70: Falls back to SQLite if Postgres pool not initialized.
 
     V12.51: Process-aware — resets connection after Gunicorn fork.
     V12.60: Validates connection is still open before returning.
     """
     # V62: Use Postgres pool when available
+    # V70: TRY Postgres, but fall back to SQLite if pool not enabled
     if _HAS_ENGINE and USE_POSTGRES:
-        return _engine_get_connection()
+        try:
+            return _engine_get_connection()
+        except RuntimeError as e:
+            # V70: Pool not initialized — fall back to SQLite
+            if "not initialized" in str(e):
+                pass  # Fall through to SQLite
+            else:
+                raise
 
-    # SQLite fallback (local dev)
+    # SQLite fallback (local dev or V70: Postgres unavailable)
     pid = os.getpid()
 
     # If we forked (Gunicorn worker), reset thread-local
@@ -277,35 +286,46 @@ def init_db():
     """Create tables and indexes if they don't exist. Safe to call multiple times.
 
     V62: When DATABASE_URL is set, uses db_engine.init_schema() for Postgres DDL.
+    V70: Skips Postgres init if pool not enabled — falls through to SQLite.
     """
     # V62: Postgres path — use db_engine schema
+    # V70: Skip if pool not enabled
     if _HAS_ENGINE and USE_POSTGRES:
-        init_schema()
-        conn = get_connection()
-        # Run each migration step with isolated error handling
-        # so one failure doesn't cascade and kill the worker
-        _migrations = [
-            ("V18 migrations", lambda: _run_v18_migrations_pg(conn)),
-            ("V33 source linking", lambda: _run_v33_source_linking(conn)),
-            ("V34 data cleanup", lambda: _run_v34_data_cleanup(conn)),
-            ("Bulk city deactivation", lambda: _deactivate_bulk_covered_cities(conn)),
-            ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
-            ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
-            ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
-        ]
-        for name, fn in _migrations:
-            try:
-                fn()
-                conn.commit()
-            except Exception as e:
-                print(f"[DB] {name} error (non-fatal): {e}")
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-        print(f"[DB] V62: PostgreSQL database initialized via db_engine")
-        conn.close()
-        return
+        try:
+            from db_engine import is_pg_pool_enabled
+            if not is_pg_pool_enabled():
+                print(f"[DB] V70: Postgres pool not enabled, using SQLite only")
+                # Fall through to SQLite path below
+            else:
+                init_schema()
+                conn = get_connection()
+                # Run each migration step with isolated error handling
+                # so one failure doesn't cascade and kill the worker
+                _migrations = [
+                    ("V18 migrations", lambda: _run_v18_migrations_pg(conn)),
+                    ("V33 source linking", lambda: _run_v33_source_linking(conn)),
+                    ("V34 data cleanup", lambda: _run_v34_data_cleanup(conn)),
+                    ("Bulk city deactivation", lambda: _deactivate_bulk_covered_cities(conn)),
+                    ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
+                    ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
+                    ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
+                ]
+                for name, fn in _migrations:
+                    try:
+                        fn()
+                        conn.commit()
+                    except Exception as e:
+                        print(f"[DB] {name} error (non-fatal): {e}")
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                print(f"[DB] V62: PostgreSQL database initialized via db_engine")
+                conn.close()
+                return
+        except Exception as e:
+            print(f"[DB] V70: Postgres init failed (non-fatal): {e}")
+            # Fall through to SQLite
 
     # SQLite path (local dev)
     conn = get_connection()
@@ -1506,15 +1526,20 @@ def get_permit_stats():
 
 
 def get_cities_with_permits():
-    """Get list of cities that have permit data. Replaces get_cities_with_data()."""
-    conn = get_connection()
-    cursor = conn.execute("""
-        SELECT DISTINCT city, state, COUNT(*) as permit_count
-        FROM permits
-        GROUP BY city, state
-        ORDER BY city
-    """)
-    return [dict(row) for row in cursor]
+    """Get list of cities that have permit data. Replaces get_cities_with_data().
+    V70: Returns empty list if database unavailable."""
+    try:
+        conn = get_connection()
+        cursor = conn.execute("""
+            SELECT DISTINCT city, state, COUNT(*) as permit_count
+            FROM permits
+            GROUP BY city, state
+            ORDER BY city
+        """)
+        return [dict(row) for row in cursor]
+    except Exception:
+        # V70: Any error → return empty list
+        return []
 
 
 def delete_old_permits(days=90):
@@ -1745,12 +1770,17 @@ def get_prod_city_count():
     V34: Only counts active cities where total_permits > 0.
     The total_permits column is synced with actual DB counts
     during startup via _sync_prod_city_counts().
+    V70: Returns 0 if Postgres unavailable.
     """
-    conn = get_connection()
-    row = conn.execute(
-        "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active' AND total_permits > 0"
-    ).fetchone()
-    return row['cnt'] if row else 0
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active' AND total_permits > 0"
+        ).fetchone()
+        return row['cnt'] if row else 0
+    except Exception:
+        # V70: Pool not initialized → return 0
+        return 0
 
 
 def get_verified_city_count():
@@ -2119,14 +2149,16 @@ def get_recent_scraper_runs(city_slug=None, limit=50):
 
 
 def prod_cities_table_exists():
-    """V15: Check if prod_cities table exists and has data."""
-    conn = get_connection()
+    """V15: Check if prod_cities table exists and has data.
+    V70: Returns False if Postgres unavailable."""
     try:
+        conn = get_connection()
         row = conn.execute(
             "SELECT COUNT(*) as cnt FROM prod_cities"
         ).fetchone()
         return row['cnt'] > 0
-    except sqlite3.OperationalError:
+    except Exception:
+        # V70: Any error (including pool not initialized) → return False
         return False
 
 

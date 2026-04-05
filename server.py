@@ -65,7 +65,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V69',
+                'version': 'V70',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -86,9 +86,10 @@ def _deferred_startup():
     if _startup_done:
         return
     _startup_done = True
-    # V69: NO background threads. NO registry sync. NO collectors. Just serve requests.
-    print(f"[{datetime.now()}] V69: Server starting in MINIMAL mode - NO background threads")
-    print(f"[{datetime.now()}] V69: Use POST /api/admin/start-collectors to manually start when ready")
+    # V70: NO background threads. NO Postgres pool. SQLite only. Just serve requests.
+    print(f"[{datetime.now()}] V70: Server starting — Postgres DISABLED, SQLite only")
+    print(f"[{datetime.now()}] V70: POST /api/admin/enable-postgres to enable Postgres pool")
+    print(f"[{datetime.now()}] V70: POST /api/admin/start-collectors to start background threads")
 
 
 # V13.1: Jinja filter for human-readable date formatting
@@ -473,6 +474,45 @@ def admin_start_collectors():
             'message': 'Background collectors started in separate thread'
         }), 200
 
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/enable-postgres', methods=['POST'])
+def admin_enable_postgres():
+    """V70: Manually enable Postgres pool after server is confirmed stable."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from db_engine import enable_pg_pool, is_pg_pool_enabled
+        if is_pg_pool_enabled():
+            return jsonify({'status': 'already_enabled', 'message': 'Postgres pool already active'}), 200
+
+        success = enable_pg_pool()
+        if success:
+            return jsonify({'status': 'enabled', 'message': 'Postgres pool created'}), 200
+        else:
+            return jsonify({'status': 'failed', 'message': 'Failed to create pool - check logs'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/pg-status')
+def admin_pg_status():
+    """V70: Check if Postgres pool is active."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from db_engine import _pg_pool, _pg_pool_enabled, is_pg_pool_enabled
+        return jsonify({
+            'pool_enabled': is_pg_pool_enabled(),
+            'pool_exists': _pg_pool is not None,
+            '_pg_pool_enabled_flag': _pg_pool_enabled,
+        }), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -8965,7 +9005,7 @@ preload_data_from_disk()
 # This prevents connection pool exhaustion during gunicorn startup.
 # The sync_city_registry_to_prod(), sync_city_registry_to_prod_cities(), and
 # start_collectors() are all called from _deferred_startup() on first HTTP request.
-print(f"[{datetime.now()}] V66: Module loaded. DB init deferred to first request.")
+print(f"[{datetime.now()}] V70: Module loaded — Postgres pool DISABLED, SQLite only mode")
 
 
 # ===========================
