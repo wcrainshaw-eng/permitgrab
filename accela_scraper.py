@@ -701,6 +701,99 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
         "base_url": "https://permits.springfieldcityhall.com/citizenaccess",
     },
+    # V72 Batch 5: More Accela portals
+    "fairfax_va": {
+        "agency_code": "FAIRFAX",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "mcallen_tx": {
+        "agency_code": "MCALLEN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "manatee_county_fl": {
+        "agency_code": "MANATEE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "osceola_county_fl": {
+        "agency_code": "OSCEOLA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://permits.osceola.org",
+    },
+    "citrus_county_fl": {
+        "agency_code": "CITRUS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "merced_county_ca": {
+        "agency_code": "MERCED",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "chesterfield_county_va": {
+        "agency_code": "CHESTERFIELD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "torrance_ca": {
+        "agency_code": "TORRANCE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "deland_fl": {
+        "agency_code": "DELAND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "oregon_state": {
+        "agency_code": "OREGON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://aca-oregon.accela.com/OREGON",
+    },
+    "el_paso_tx": {
+        "agency_code": "ELPASO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "culver_city_ca": {
+        "agency_code": "CULVERCITY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "san_joaquin_county_ca": {
+        "agency_code": "SANJOAQUIN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "pima_county_az": {
+        "agency_code": "PIMA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "baltimore_county_md": {
+        "agency_code": "BALTCO",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
