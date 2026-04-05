@@ -686,6 +686,21 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Permitting&TabName=Home",
         "base_url": "https://elam.cityofmadison.com/CitizenAccess",
     },
+    # V72: Kentucky cities with Accela
+    "louisville_ky": {
+        "agency_code": "LJCMG",
+        "module": "Building",
+        "tab_name": "Home",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Home",
+    },
+    # V72: Massachusetts cities with Accela
+    "springfield_ma": {
+        "agency_code": "SPRINGFIELD_MA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://permits.springfieldcityhall.com/citizenaccess",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"

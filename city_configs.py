@@ -16421,6 +16421,60 @@ CITY_REGISTRY = {
         "notes": "V72: Madison WI Accela - state capital",
     },
 
+    # V72: Kentucky cities with Accela
+    "louisville_ky": {
+        "name": "Louisville",
+        "state": "KY",
+        "slug": "louisville-ky",
+        "lat": 38.254,
+        "lon": -85.759,
+        "platform": "accela",
+        "agency_code": "LJCMG",
+        "_accela_city_key": "louisville_ky",
+        "endpoint": "https://aca-prod.accela.com/LJCMG/Cap/CapHome.aspx?module=Building&TabName=Home",
+        "description": "Building Permits via Accela (pop. 625k)",
+        "date_field": "Date",
+        "field_map": {
+            "permit_number": "Record Number",
+            "permit_type": "Record Type",
+            "address": "Address",
+            "description": "Description",
+            "issued_date": "Date",
+            "date": "Date",
+            "status": "Status",
+        },
+        "limit": 2000,
+        "active": True,
+        "notes": "V72: Louisville KY Accela - largest city in KY",
+    },
+
+    # V72: Massachusetts cities with Accela
+    "springfield_ma": {
+        "name": "Springfield",
+        "state": "MA",
+        "slug": "springfield-ma",
+        "lat": 42.101,
+        "lon": -72.589,
+        "platform": "accela",
+        "agency_code": "SPRINGFIELD_MA",
+        "_accela_city_key": "springfield_ma",
+        "endpoint": "https://permits.springfieldcityhall.com/citizenaccess/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela (pop. 155k)",
+        "date_field": "Date",
+        "field_map": {
+            "permit_number": "Record Number",
+            "permit_type": "Record Type",
+            "address": "Address",
+            "description": "Description",
+            "issued_date": "Date",
+            "date": "Date",
+            "status": "Status",
+        },
+        "limit": 2000,
+        "active": True,
+        "notes": "V72: Springfield MA Accela - 3rd largest city in MA",
+    },
+
     # --- College Station TX ---
     "college_station_tx": {
         "name": "College Station",
