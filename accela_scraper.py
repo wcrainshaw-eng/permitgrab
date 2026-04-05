@@ -540,6 +540,123 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V72: More county/city Accela portals
+    "kern_county_ca": {
+        "agency_code": "KERNCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://accela.kerncounty.com/CitizenAccess",
+    },
+    "ventura_county_ca": {
+        "agency_code": "VENTURA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://vcca.ventura.org",
+    },
+    "pharr_tx": {
+        "agency_code": "PHARR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lexington_ky": {
+        "agency_code": "LEXKY",
+        "module": "Building",
+        "tab_name": "Home",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Home",
+    },
+    "charlotte_county_fl": {
+        "agency_code": "CHARLOTTECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: Ohio cities with Accela
+    "toledo_oh": {
+        "agency_code": "TOLEDO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://citizenaccess.toledo.oh.gov/CitizenAccess",
+    },
+    "columbus_oh": {
+        "agency_code": "COLUMBUS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://portal.columbus.gov/permits",
+    },
+    "cincinnati_oh": {
+        "agency_code": "CINCINNATI",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: NC cities with Accela
+    "high_point_nc": {
+        "agency_code": "COHP",
+        "module": "Construction",
+        "tab_name": "Construction",
+        "search_url_path": "Cap/CapHome.aspx?module=Construction&TabName=Construction",
+    },
+    "cabarrus_county_nc": {
+        "agency_code": "CABARRUS",
+        "module": "Permits",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=HOME",
+        "base_url": "https://citizenaccess.cabarruscounty.us/CitizenAccess",
+    },
+    # V72: Tennessee cities with Accela
+    "knoxville_tn": {
+        "agency_code": "KNOXVILLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: Virginia cities with Accela
+    "richmond_va": {
+        "agency_code": "RICHMOND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: Washington state cities with Accela
+    "tacoma_wa": {
+        "agency_code": "TACOMA",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "spokane_wa": {
+        "agency_code": "SPOKANE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://aca.spokanepermits.org/CitizenAccess",
+    },
+    # V72: Minnesota cities with Accela
+    "rochester_mn": {
+        "agency_code": "ROCHESTER",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "olmsted_county_mn": {
+        "agency_code": "OLMSTED",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: Alabama counties with Accela
+    "jefferson_county_al": {
+        "agency_code": "JCCAL",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://permits.jccal.org/citizenaccess",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
