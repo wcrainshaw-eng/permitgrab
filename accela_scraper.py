@@ -1729,6 +1729,31 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V73: Fix missing configs
+    "cosprings": {
+        "agency_code": "COSPRINGS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "chulavista": {
+        "agency_code": "CHULAVISTA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lincoln": {
+        "agency_code": "LINCOLN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "wichita": {
+        "agency_code": "WICHITA",
+        "module": "Engineering",
+        "tab_name": "Engineering",
+        "search_url_path": "Cap/CapHome.aspx?module=Engineering&TabName=Engineering",
+    },
     # V73: Batch 14 - new counties
     "arapahoe": {
         "agency_code": "ARAPAHOE",
