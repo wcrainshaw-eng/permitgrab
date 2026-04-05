@@ -503,6 +503,43 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
         "base_url": "https://permits.washingtoncountyor.gov/CitizenAccess",
     },
+    # V72: More CA cities with Accela
+    "rancho_cucamonga": {
+        "agency_code": "cityofrc",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "garden_grove": {
+        "agency_code": "GG",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "corona": {
+        "agency_code": "CORONA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "fontana": {
+        "agency_code": "FONTANA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "ontario_ca": {
+        "agency_code": "ONTARIOCA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "moreno_valley": {
+        "agency_code": "MOVAL",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
