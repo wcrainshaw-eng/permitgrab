@@ -35184,6 +35184,35 @@ CITY_REGISTRY = {
         "notes": "V73: New Socrata city. Pop ~147K.",
     },
 
+    # V73: New Accela cities (batch 16)
+    "fremont_ca_accela": {
+        "name": "Fremont",
+        "state": "CA",
+        "slug": "fremont-ca-accela",
+        "lat": 37.548,
+        "lon": -121.989,
+        "platform": "accela",
+        "_accela_city_key": "cof",
+        "endpoint": "https://aca-prod.accela.com/COF/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,
+        "notes": "V73: New Accela city. Pop ~230K. Agency code COF.",
+    },
+
+    "riverside_ca_accela": {
+        "name": "Riverside",
+        "state": "CA",
+        "slug": "riverside-ca-accela",
+        "lat": 33.953,
+        "lon": -117.396,
+        "platform": "accela",
+        "_accela_city_key": "cor",
+        "endpoint": "https://aca-prod.accela.com/COR/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,
+        "notes": "V73: New Accela city. Pop ~314K. Agency code COR.",
+    },
+
 }
 
 # ============================================================================

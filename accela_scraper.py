@@ -1779,6 +1779,19 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V73: Batch 16 - new cities
+    "cof": {
+        "agency_code": "COF",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "cor": {
+        "agency_code": "COR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 
 }
 
