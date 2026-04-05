@@ -81,7 +81,12 @@ def _get_source_config(source_id):
 # V15: Helper function for logging collection runs to scraper_runs table
 def _log_v15_collection(city_key, city_name, state, permits_found, permits_inserted,
                         status, error_message=None, duration_ms=None):
-    """V15: Log collection run to scraper_runs and update prod_cities if exists."""
+    """V15: Log collection run to scraper_runs and update prod_cities if exists.
+
+    V71: ALWAYS recalculate newest_permit_date from actual permits, even when
+    permits_found=0 (no_new case). This fixes the bug where 431 cities showed
+    'no_data' despite having real permits.
+    """
     try:
         # Generate city slug
         city_slug = city_name.lower().replace(' ', '-').replace(',', '') if city_name else city_key
@@ -105,16 +110,61 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
         is_prod, _ = permitdb.is_prod_city(city_slug)
         if is_prod:
             if status in ('success', 'no_new'):
-                # Get newest permit date
+                # V71: ALWAYS recalculate newest_permit_date from actual permits
+                # even when permits_found=0 (no_new). This fixes freshness tracking.
+                from datetime import datetime, timedelta
+                thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+                conn = permitdb.get_connection()
                 newest_date = None
-                if permits_found > 0:
-                    conn = permitdb.get_connection()
+                recent_count = 0
+
+                # Try source_city_key match first (primary strategy)
+                if city_key:
                     row = conn.execute(
-                        "SELECT MAX(filing_date) as newest FROM permits WHERE city = ?",
-                        (city_name,)
+                        "SELECT MAX(date) as newest, COUNT(CASE WHEN date >= ? THEN 1 END) as recent "
+                        "FROM permits WHERE source_city_key = ?",
+                        (thirty_days_ago, city_key)
                     ).fetchone()
-                    if row and row['newest']:
-                        newest_date = row['newest']
+                    if row:
+                        newest_date = row['newest'] if isinstance(row, dict) else row[0]
+                        recent_count = (row['recent'] if isinstance(row, dict) else row[1]) or 0
+
+                # Fallback: try city name match
+                if not newest_date and city_name:
+                    row = conn.execute(
+                        "SELECT MAX(date) as newest, COUNT(CASE WHEN date >= ? THEN 1 END) as recent "
+                        "FROM permits WHERE city = ?",
+                        (thirty_days_ago, city_name)
+                    ).fetchone()
+                    if row:
+                        newest_date = row['newest'] if isinstance(row, dict) else row[0]
+                        recent_count = (row['recent'] if isinstance(row, dict) else row[1]) or 0
+
+                # V71: Calculate data_freshness from newest_permit_date
+                if newest_date:
+                    try:
+                        days_old = (datetime.now() - datetime.strptime(newest_date, '%Y-%m-%d')).days
+                        if days_old <= 14:
+                            freshness = 'fresh'
+                        elif days_old <= 30:
+                            freshness = 'aging'
+                        elif days_old <= 90:
+                            freshness = 'stale'
+                        else:
+                            freshness = 'no_data'
+                    except Exception:
+                        freshness = 'no_data'
+                else:
+                    freshness = 'no_data'
+
+                # V71: Update prod_cities with freshness data
+                conn.execute(
+                    "UPDATE prod_cities SET newest_permit_date=?, permits_last_30d=?, data_freshness=? "
+                    "WHERE city_slug=?",
+                    (newest_date, recent_count, freshness, city_slug)
+                )
+                conn.commit()
 
                 permitdb.update_prod_city_collection(
                     city_slug,

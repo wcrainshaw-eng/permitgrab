@@ -2022,6 +2022,147 @@ def admin_freshness():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/refresh-freshness', methods=['POST'])
+def admin_refresh_freshness():
+    """V71: Recalculate prod_cities freshness from actual permits table.
+
+    Fixes the issue where 431 cities show 'no_data' despite having real permits.
+    The root cause is that newest_permit_date was never populated for these cities.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    from datetime import datetime, timedelta
+
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+        conn = permitdb.get_connection()
+
+        # Get all active prod_cities
+        cities = conn.execute(
+            "SELECT city_slug, source_id, city FROM prod_cities WHERE status='active'"
+        ).fetchall()
+
+        updated = 0
+        freshness_counts = {'fresh': 0, 'aging': 0, 'stale': 0, 'no_data': 0}
+
+        for row in cities:
+            city_slug = row['city_slug'] if isinstance(row, dict) else row[0]
+            source_id = row['source_id'] if isinstance(row, dict) else row[1]
+            city_name = row['city'] if isinstance(row, dict) else row[2]
+
+            newest = None
+            recent = 0
+
+            # Try source_city_key match first (primary join strategy)
+            if source_id:
+                result = conn.execute(
+                    "SELECT MAX(date) as newest, COUNT(CASE WHEN date >= ? THEN 1 END) as recent "
+                    "FROM permits WHERE source_city_key = ?",
+                    (thirty_days_ago, source_id)
+                ).fetchone()
+                if result:
+                    newest = result['newest'] if isinstance(result, dict) else result[0]
+                    recent = (result['recent'] if isinstance(result, dict) else result[1]) or 0
+
+            # Fallback: try city name match
+            if not newest and city_name:
+                result = conn.execute(
+                    "SELECT MAX(date) as newest, COUNT(CASE WHEN date >= ? THEN 1 END) as recent "
+                    "FROM permits WHERE city = ?",
+                    (thirty_days_ago, city_name)
+                ).fetchone()
+                if result:
+                    newest = result['newest'] if isinstance(result, dict) else result[0]
+                    recent = (result['recent'] if isinstance(result, dict) else result[1]) or 0
+
+            # Calculate freshness
+            if newest:
+                try:
+                    days_old = (datetime.now() - datetime.strptime(newest, '%Y-%m-%d')).days
+                    if days_old <= 14:
+                        freshness = 'fresh'
+                    elif days_old <= 30:
+                        freshness = 'aging'
+                    elif days_old <= 90:
+                        freshness = 'stale'
+                    else:
+                        freshness = 'no_data'
+                except Exception:
+                    freshness = 'no_data'
+            else:
+                freshness = 'no_data'
+
+            # Update prod_cities
+            conn.execute(
+                "UPDATE prod_cities SET newest_permit_date=?, permits_last_30d=?, data_freshness=? "
+                "WHERE city_slug=?",
+                (newest, recent, freshness, city_slug)
+            )
+
+            freshness_counts[freshness] = freshness_counts.get(freshness, 0) + 1
+            updated += 1
+
+        conn.commit()
+
+        return jsonify({
+            'status': 'success',
+            'updated': updated,
+            'freshness': freshness_counts
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/activate-city-sources', methods=['POST'])
+def admin_activate_city_sources():
+    """V71: Activate all inactive city_sources that have matching active prod_cities entries.
+
+    Fixes the issue where 329 city_sources are 'inactive' despite having active prod_cities.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        conn = permitdb.get_connection()
+
+        # First: activate city_sources where there's a matching active prod_city
+        conn.execute("""
+            UPDATE city_sources SET status='active'
+            WHERE status='inactive'
+            AND source_key IN (SELECT source_id FROM prod_cities WHERE status='active')
+        """)
+        # Can't get rowcount reliably from all db backends, so we'll count after
+
+        # Count how many are now active vs inactive
+        active_result = conn.execute("SELECT COUNT(*) as cnt FROM city_sources WHERE status='active'").fetchone()
+        inactive_result = conn.execute("SELECT COUNT(*) as cnt FROM city_sources WHERE status='inactive'").fetchone()
+
+        active_count = active_result['cnt'] if isinstance(active_result, dict) else active_result[0]
+        inactive_count = inactive_result['cnt'] if isinstance(inactive_result, dict) else inactive_result[0]
+
+        conn.commit()
+
+        return jsonify({
+            'status': 'success',
+            'city_sources_active': active_count,
+            'city_sources_inactive': inactive_count,
+            'message': 'Activated city_sources matching active prod_cities'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
