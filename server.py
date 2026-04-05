@@ -1519,26 +1519,69 @@ def admin_fix_prod_cities():
 @app.route('/api/admin/send-digest', methods=['POST'])
 @app.route('/api/admin/test-digest', methods=['POST'])  # V12.58: Route alias
 def admin_send_digest():
-    """V12.53: Manually trigger daily digest for testing."""
+    """V73: Manually trigger daily digest with diagnostics."""
     valid, error = check_admin_key()
     if not valid:
         return error
 
     # V12.58: Read email from both query string and request body
     email = request.args.get('email') or (request.json or {}).get('email', '')
+    diagnose = request.args.get('diagnose', '').lower() == 'true'
+
+    diagnostics = {}
+
+    # V73: Always run diagnostics if requested
+    if diagnose or not email:
+        try:
+            # Check SMTP config
+            smtp_pass = os.environ.get('SMTP_PASS', '')
+            diagnostics['smtp_configured'] = bool(smtp_pass)
+            diagnostics['smtp_host'] = os.environ.get('SMTP_HOST', 'smtp.sendgrid.net')
+
+            # Check subscribers file
+            from pathlib import Path
+            subscribers_path = Path("/var/data/subscribers.json")
+            if not subscribers_path.exists():
+                subscribers_path = Path(os.path.dirname(__file__)) / "data" / "subscribers.json"
+
+            diagnostics['subscribers_path'] = str(subscribers_path)
+            diagnostics['subscribers_exists'] = subscribers_path.exists()
+
+            if subscribers_path.exists():
+                import json
+                with open(subscribers_path) as f:
+                    subs = json.load(f)
+                diagnostics['total_subscribers'] = len(subs)
+                diagnostics['active_subscribers'] = len([s for s in subs if s.get('active', False)])
+
+            # Check email_alerts import
+            try:
+                from email_alerts import send_daily_digest, send_test_digest, load_subscribers
+                diagnostics['email_alerts_import'] = 'OK'
+                diagnostics['loaded_subscribers'] = len(load_subscribers())
+            except ImportError as e:
+                diagnostics['email_alerts_import'] = f'FAILED: {e}'
+
+        except Exception as e:
+            diagnostics['diagnostic_error'] = str(e)
 
     try:
         from email_alerts import send_daily_digest, send_test_digest
         if email:
             # Send to specific email for testing
             result = send_test_digest(email)
-            return jsonify({'status': 'sent', 'to': email, 'result': result})
+            return jsonify({'status': 'sent', 'to': email, 'result': result, 'diagnostics': diagnostics})
         else:
             # Send to all subscribers
             sent, failed = send_daily_digest()
-            return jsonify({'status': 'done', 'sent': sent, 'failed': failed})
+            return jsonify({'status': 'done', 'sent': sent, 'failed': failed, 'diagnostics': diagnostics})
     except Exception as e:
-        return jsonify({'error': f'Digest failed: {str(e)}'}), 500
+        import traceback
+        return jsonify({
+            'error': f'Digest failed: {str(e)}',
+            'traceback': traceback.format_exc(),
+            'diagnostics': diagnostics
+        }), 500
 
 
 @app.route('/api/admin/data-freshness', methods=['GET'])
@@ -1711,19 +1754,72 @@ def admin_email_stats():
 
 @app.route('/api/admin/email-status')
 def admin_email_status():
-    """V64: Check email system health — SMTP, subscribers file, active count."""
+    """V73: Comprehensive email system health check."""
+    diagnostics = {
+        'timestamp': datetime.now().isoformat(),
+        'checks': {}
+    }
+
+    # Check 1: SMTP environment variables
     try:
-        from email_alerts import SMTP_PASS, SUBSCRIBERS_FILE, load_subscribers
-        subs = load_subscribers()
-        return jsonify({
-            'smtp_configured': bool(SMTP_PASS),
-            'subscribers_file': str(SUBSCRIBERS_FILE),
-            'subscribers_file_exists': SUBSCRIBERS_FILE.exists(),
-            'active_subscribers': len(subs),
-            'subscriber_emails': [s.get('email', '?')[:3] + '***' for s in subs]
-        })
+        smtp_pass = os.environ.get('SMTP_PASS', '')
+        smtp_host = os.environ.get('SMTP_HOST', 'smtp.sendgrid.net')
+        smtp_port = os.environ.get('SMTP_PORT', '587')
+        diagnostics['checks']['smtp'] = {
+            'pass_configured': bool(smtp_pass),
+            'pass_length': len(smtp_pass) if smtp_pass else 0,
+            'host': smtp_host,
+            'port': smtp_port,
+            'status': 'OK' if smtp_pass else 'MISSING SMTP_PASS'
+        }
     except Exception as e:
-        return jsonify({'error': f'Email status check failed: {str(e)}'}), 500
+        diagnostics['checks']['smtp'] = {'status': 'ERROR', 'error': str(e)}
+
+    # Check 2: email_alerts.py import
+    try:
+        from email_alerts import SMTP_PASS, SUBSCRIBERS_FILE, load_subscribers, send_email
+        diagnostics['checks']['email_alerts_import'] = {
+            'status': 'OK',
+            'smtp_pass_in_module': bool(SMTP_PASS)
+        }
+    except ImportError as e:
+        diagnostics['checks']['email_alerts_import'] = {'status': 'FAILED', 'error': str(e)}
+        return jsonify(diagnostics), 500
+
+    # Check 3: Subscribers file
+    try:
+        diagnostics['checks']['subscribers_file'] = {
+            'path': str(SUBSCRIBERS_FILE),
+            'exists': SUBSCRIBERS_FILE.exists(),
+            'status': 'OK' if SUBSCRIBERS_FILE.exists() else 'MISSING'
+        }
+        if SUBSCRIBERS_FILE.exists():
+            import json
+            with open(SUBSCRIBERS_FILE) as f:
+                raw_subs = json.load(f)
+            diagnostics['checks']['subscribers_file']['total'] = len(raw_subs)
+    except Exception as e:
+        diagnostics['checks']['subscribers_file'] = {'status': 'ERROR', 'error': str(e)}
+
+    # Check 4: Load subscribers function
+    try:
+        subs = load_subscribers()
+        diagnostics['checks']['load_subscribers'] = {
+            'status': 'OK',
+            'active_count': len(subs),
+            'sample_emails': [s.get('email', '?')[:3] + '***' for s in subs[:5]]
+        }
+    except Exception as e:
+        diagnostics['checks']['load_subscribers'] = {'status': 'ERROR', 'error': str(e)}
+
+    # Overall status
+    all_ok = all(
+        c.get('status') == 'OK'
+        for c in diagnostics['checks'].values()
+    )
+    diagnostics['overall_status'] = 'HEALTHY' if all_ok else 'ISSUES_FOUND'
+
+    return jsonify(diagnostics)
 
 
 @app.route('/api/admin/sync-registry', methods=['POST'])
@@ -9171,10 +9267,16 @@ def start_collectors():
     time.sleep(30)
 
     # V12.53: Email scheduler thread
-    email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
-    email_thread.start()
-    print(f"[{datetime.now()}] V67: Email scheduler thread started, waiting 30s...")
-    time.sleep(30)
+    # V73: Added try/except to log startup failures
+    try:
+        email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
+        email_thread.start()
+        print(f"[{datetime.now()}] V73: Email scheduler thread started, waiting 30s...")
+        time.sleep(30)
+    except Exception as e:
+        print(f"[{datetime.now()}] [CRITICAL] Email scheduler thread failed to start: {e}")
+        import traceback
+        traceback.print_exc()
 
     # V12.55c: One-time fix for Socrata location JSON in address fields
     try:
