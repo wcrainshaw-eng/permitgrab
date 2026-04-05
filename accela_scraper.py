@@ -1107,6 +1107,75 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V72 Batch 9: More CA Bay Area cities
+    "walnut_creek_ca": {
+        "agency_code": "WC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "concord_ca": {
+        "agency_code": "CONCORD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "santa_clara_city_ca": {
+        "agency_code": "SANTACLARA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Home",
+    },
+    "pittsburg_ca": {
+        "agency_code": "PITTSBURG",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lincoln_ne": {
+        "agency_code": "LINCOLN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://permits.lincoln.ne.gov/CitizenAccess",
+    },
+    "shelby_county_tn": {
+        "agency_code": "SHELBYCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "st_louis_county_mo": {
+        "agency_code": "SLC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "sahuarita_az": {
+        "agency_code": "SAHUARITA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "queen_creek_az": {
+        "agency_code": "QC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "peoria_az": {
+        "agency_code": "PEORIA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://devservices.peoriaaz.gov/devservices",
+    },
+    "goodyear_az": {
+        "agency_code": "GOODYEAR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
