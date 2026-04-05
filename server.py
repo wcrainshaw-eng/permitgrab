@@ -8826,11 +8826,11 @@ def scheduled_collection():
         print(f"[{datetime.now()}] V12.50: Starting scheduled collection cycle...")
 
         # V13.3: Each task has its own try/except so one failure doesn't block others
-        # Permit collection - V72: include_scrapers=True to collect Accela cities
+        # Permit collection - V72.1: Disabled include_scrapers to prevent memory crash
         try:
             from collector import collect_refresh, collect_permit_history
-            collect_refresh(days_back=7, include_scrapers=True)
-            print(f"[{datetime.now()}] Refresh collection complete (including Accela scrapers).")
+            collect_refresh(days_back=7)
+            print(f"[{datetime.now()}] Refresh collection complete.")
         except Exception as e:
             print(f"[{datetime.now()}] Permit collection error: {e}")
             import traceback
@@ -9059,12 +9059,12 @@ def run_initial_collection():
             except Exception as e:
                 print(f"[{datetime.now()}] V12.57: Could not clear lock: {e}")
 
-        print(f"[{datetime.now()}] V72: Running initial REFRESH collection (7 days, including Accela)...")
+        print(f"[{datetime.now()}] V72.1: Running initial REFRESH collection (7 days)...")
 
         # V12.57: Quick 7-day refresh instead of 365-day full rebuild
-        # V72: include_scrapers=True to collect Accela cities (Indianapolis, OKC, Milwaukee, etc.)
+        # V72.1: Disabled include_scrapers to prevent memory crash on Render
         from collector import collect_refresh
-        collect_refresh(days_back=7, include_scrapers=True)
+        collect_refresh(days_back=7)
 
         # Violation collection
         try:
