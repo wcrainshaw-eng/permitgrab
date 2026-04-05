@@ -489,6 +489,20 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V72: New county Accela portals
+    "placer_county_ca": {
+        "agency_code": "PLACERCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "washington_county_or": {
+        "agency_code": "WASHCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://permits.washingtoncountyor.gov/CitizenAccess",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
