@@ -886,6 +886,125 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V72 Batch 7: More NY and other state cities
+    "rochester_ny": {
+        "agency_code": "ROCHESTER_NY",
+        "module": "Building",
+        "tab_name": "HOME",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=HOME",
+    },
+    "nyc_dob": {
+        "agency_code": "NYCDOB",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://a810-lmpaca.nyc.gov/citizenaccessbuildings",
+    },
+    "westchester_county_ny": {
+        "agency_code": "WESTCHESTER",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "nassau_county_ny": {
+        "agency_code": "NASSAU",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "suffolk_county_ny": {
+        "agency_code": "SUFFOLK",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # PA cities
+    "philadelphia_pa": {
+        "agency_code": "PHILA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "pittsburgh_pa": {
+        "agency_code": "PGHPA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "bucks_county_pa": {
+        "agency_code": "BUCKS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "montgomery_county_pa": {
+        "agency_code": "MONTCOPA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "delaware_county_pa": {
+        "agency_code": "DELCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # MI cities
+    "grand_rapids_mi": {
+        "agency_code": "GR",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "ann_arbor_mi": {
+        "agency_code": "ANNARBOR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "warren_mi": {
+        "agency_code": "WARREN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "sterling_heights_mi": {
+        "agency_code": "STERLING",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "wayne_county_mi": {
+        "agency_code": "WAYNECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "oakland_county_mi": {
+        "agency_code": "OAKLANDCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # More IN cities
+    "south_bend_in": {
+        "agency_code": "SBEND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "evansville_in": {
+        "agency_code": "EVANSVILLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "hamilton_county_in": {
+        "agency_code": "HAMILTONIN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
