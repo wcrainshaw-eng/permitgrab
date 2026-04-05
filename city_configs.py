@@ -482,8 +482,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUE_DATE",
         "date_format": "date",
         "limit": 2000,
-        "active": False,  # V63: Deactivated - endpoint returning HTML/errors instead of JSON
-        "notes": "V63: Deactivated - ArcGIS layer 4 returning HTML instead of JSON (22 consecutive errors). DC uses per-year layers. Need to find working endpoint.",
+        "active": True,  # V72: Reactivated - endpoint confirmed working (returns valid JSON with permits)
+        "notes": "V72: Reactivated - ArcGIS FeatureServer/4 confirmed working. Returns PERMIT_ID, FULL_ADDRESS, ISSUE_DATE, DESC_OF_WORK.",
     },
 
     # V23 AUDIT: 2026-03-28 - NO_DATA - CKAN endpoint needs verification
@@ -901,8 +901,7 @@ CITY_REGISTRY = {
         "date_format": "string",
         "limit": 2000,
         "active": True,
-        "status": "paused",
-        "notes": "V26: CKAN API working. gx_location has address. Data through Sept 2025.",
+        "notes": "V72: CKAN API working. gx_location has address. Source data may be stale (through Sept 2025).",
     },
 
     # V23 AUDIT: 2026-03-28 - STALE - County data from 2017, City portal access denied
@@ -10063,7 +10062,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V12.31 Deactivated: Dead URL, no public API found,
+        "active": False,  # V72: Duplicate of kansas_city - fabricated endpoint
+        "notes": "V72: Deactivated - duplicate of kansas_city entry with correct ntw8-aacc dataset",
     },
 
     "kansas_city_ks": {
