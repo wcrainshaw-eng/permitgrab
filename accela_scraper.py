@@ -148,6 +148,14 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V72: Huntington Beach uses custom Accela domain
+    "huntington_beach": {
+        "agency_code": "HUNTINGTON_BEACH",
+        "module": "Building",
+        "tab_name": "Home",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Home",
+        "base_url": "https://engage.huntingtonbeachca.gov/CitizenAccess",
+    },
     "virginia_beach": {
         "agency_code": "CVB",
         "module": "Permits",

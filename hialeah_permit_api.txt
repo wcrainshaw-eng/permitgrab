@@ -1,0 +1,137 @@
+================================================================================
+HIALEAH, FLORIDA BUILDING PERMIT DATA API
+Miami-Dade County ArcGIS REST Services
+================================================================================
+
+WORKING API ENDPOINT
+--------------------
+Base FeatureServer URL:
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer
+
+Layer 0 (Building Permits):
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer/0
+
+DATASET INFORMATION
+-------------------
+Name: Building Permits Issued By Miami-Dade County - 2 Previous Years to Present
+Dataset ID: 6db5f56e886446df88313ca279e59120
+Source: Miami-Dade County Open Data Hub
+Portal: https://gis-mdc.opendata.arcgis.com/
+Max Record Count per Query: 1000
+
+DATA VERIFICATION
+-----------------
+✓ CONFIRMED: Contains 2025 permit data
+✓ CONFIRMED: Contains 2026 permit data (tested up to March 27, 2026)
+✓ CONFIRMED: API is working and returns valid data
+
+Coverage Area:
+- Miami-Dade County (includes Hialeah area)
+- Note: Hialeah permits are included with City field = "MIAMI"
+- Use PropertyAddress filtering to target specific Hialeah locations
+
+FIELD NAMES (58 fields)
+------------------------
+1. PermitIssuedDate          - Date permit was issued
+2. ApplicationDate           - Date application was submitted (epoch timestamp)
+3. PermitNumber              - Unique permit identifier
+4. ProcessNumber             - Process tracking number
+5. MasterPermitNumber        - Master permit reference
+6. PermitType                - Type code (BLDG, ELEC, MBLD, etc.)
+7. ResidentialCommercial     - R=Residential, C=Commercial
+8. EstimatedValue            - Estimated project value
+9. ApplicationTypeCode       - Application type code
+10. ApplicationTypeDescription - Application type text
+11. ProposedUseCode          - Proposed use code
+12. ProposedUseDescription   - Proposed use text
+13. DetailDescriptionComments - Detailed description
+14. FolioNumber              - Property folio number
+15. OwnerName                - Property owner name
+16. LegalDescription1        - Legal description line 1
+17. LegalDescription2        - Legal description line 2
+18. PropertyAddress          - Street address
+19. ArchitectName            - Architect name
+20. ContractorNumber         - Licensed contractor number
+21. ContractorName           - Contractor name
+22. ContractorAddress        - Contractor address
+23. ContractorCity           - Contractor city
+24. ContractorState          - Contractor state
+25. ContractorZip            - Contractor ZIP code
+26. ContractorPhone          - Contractor phone
+27. SquareFootage            - Project square footage
+28. StructureUnits           - Number of units
+29. StructureFloors          - Number of floors
+30. Category1 through Category10 - Work category codes
+31. CategoryDescription1 through CategoryDescription10 - Work category descriptions
+32. LastInspectionDate       - Date of last inspection
+33. LastApprovedInspDate     - Date of last approved inspection
+34. CoCcDate                 - Certificate of Completion/Occupancy date
+35. PermitTotalFee           - Total permit fees
+36. Filler                   - (unused field)
+37. City                     - City name
+38. State                    - State (FL)
+39. ObjectId                 - Unique object identifier
+40. GlobalID                 - Global unique identifier
+
+EXAMPLE QUERIES
+---------------
+
+1. Get all 2026 permits (first 1000):
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer/0/query?where=PermitIssuedDate%20%3E%3D%20%272026-01-01%27&outFields=*&returnGeometry=true&f=json
+
+2. Get recent permits with specific fields:
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer/0/query?where=PermitIssuedDate%20%3E%3D%20%272025-01-01%27&outFields=PermitNumber,PermitIssuedDate,PropertyAddress,City,PermitType,EstimatedValue&returnGeometry=false&orderByFields=PermitIssuedDate%20DESC&f=json
+
+3. Search for Hialeah area permits (by address):
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer/0/query?where=PropertyAddress%20LIKE%20%27%25HIALEAH%25%27%20AND%20PermitIssuedDate%20%3E%3D%20%272026-01-01%27&outFields=*&returnGeometry=true&f=json
+
+4. Get permits by type:
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer/0/query?where=PermitType%20%3D%20%27BLDG%27%20AND%20PermitIssuedDate%20%3E%3D%20%272026-01-01%27&outFields=*&f=json
+
+5. Get high-value permits (over $1M):
+https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_permit_data/FeatureServer/0/query?where=EstimatedValue%20%3E%201000000%20AND%20PermitIssuedDate%20%3E%3D%20%272026-01-01%27&outFields=*&f=json
+
+QUERY PARAMETERS
+----------------
+- where: SQL-like WHERE clause for filtering
+- outFields: Comma-separated field names or * for all
+- returnGeometry: true/false to include spatial coordinates
+- resultRecordCount: Limit results (max 1000 per request)
+- orderByFields: Field name followed by ASC or DESC
+- f: Output format (json, geojson, pjson)
+
+PERMIT TYPE CODES
+-----------------
+- BLDG: Building permits
+- ELEC: Electrical permits
+- MBLD: Master building permits
+- MECH: Mechanical permits
+- PLUM: Plumbing permits
+- ROOF: Roofing permits
+
+SAMPLE 2026 DATA (VERIFIED)
+---------------------------
+Permit: 2026035345
+Date: 2026-03-27
+Address: 2121 NE 207 ST
+City: MIAMI
+Type: BLDG
+Value: $3,000
+
+IMPORTANT NOTES
+---------------
+1. Hialeah is part of Miami-Dade County, so permits appear with City="MIAMI"
+2. Use PropertyAddress field to filter for specific Hialeah locations
+3. Maximum 1000 records per query - use pagination for larger datasets
+4. Dates are in format: YYYY-MM-DD
+5. ApplicationDate uses epoch timestamp (milliseconds)
+6. EstimatedValue is stored as string, may need type conversion
+
+ADDITIONAL RESOURCES
+--------------------
+- Miami-Dade Open Data Hub: https://gis-mdc.opendata.arcgis.com/
+- Dataset Page: https://gis-mdc.opendata.arcgis.com/datasets/MDC::building-permit
+- ArcGIS REST API Documentation: https://developers.arcgis.com/rest/
+- City of Hialeah Permit Search: https://apps.hialeahfl.gov/building/
+
+================================================================================

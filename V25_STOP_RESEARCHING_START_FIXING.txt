@@ -1,0 +1,176 @@
+================================================================================
+V25 — STOP RESEARCHING. START FIXING. ACTUALLY CONFIGURE AND TEST CITIES.
+================================================================================
+
+YOU ARE NOT A RESEARCH ASSISTANT. YOU ARE A CODE AGENT.
+
+Your job is to MAKE CITIES WORK — not to write reports about which cities
+"could be configured" or "need config." If you found an endpoint, ADD THE
+CONFIG AND TEST IT. Right now. Not later. Not in a future step.
+
+================================================================================
+RULE #1: IF YOU FOUND AN ENDPOINT, CONFIGURE IT IMMEDIATELY
+================================================================================
+
+DO NOT write "APIs Found - Need Config" and move on.
+DO NOT write "ArcGIS endpoints that could be configured."
+DO NOT write "identified several cities with endpoints."
+
+INSTEAD: Add the config to city_configs.py, test it with a real HTTP request,
+verify data comes back, and mark it ACTIVE or BROKEN. That is your entire job.
+
+Example of what you SHOULD do when you find an ArcGIS endpoint:
+
+    1. Test it:
+       curl "https://services.arcgis.com/XXXXX/query?where=1=1&outFields=*&resultRecordCount=3&f=json"
+
+    2. Look at the response fields. Identify:
+       - date field (e.g., "IssueDate", "PERMIT_DATE", "Opened")
+       - address field (e.g., "Address", "SITE_ADDR", "Location")
+       - permit number field (e.g., "PermitNum", "PERMIT_NO")
+       - permit type field (e.g., "PermitType", "TYPE")
+       - description field (e.g., "Description", "WORK_DESC")
+
+    3. Add the config to city_configs.py:
+       "raleigh": {
+           "name": "Raleigh",
+           "state": "NC",
+           "platform": "arcgis",
+           "endpoint": "https://services.arcgis.com/XXXXX/query",
+           "date_field": "IssueDate",
+           "date_format": "epoch",
+           "field_map": {
+               "permit_number": "PermitNum",
+               "permit_type": "PermitType",
+               "address": "Address",
+               "description": "Description",
+               "issued_date": "IssueDate",
+               "status": "Status"
+           },
+           "active": True,
+       },
+
+    4. Test via fetch_permits:
+       python -c "from collector import fetch_permits; data, status = fetch_permits('raleigh', 30); print(f'{len(data)} permits, status: {status}')"
+
+    5. If it works → commit. If it doesn't → fix it or mark inactive with a
+       specific reason (not just "needs config").
+
+================================================================================
+RULE #2: TEST THE UNTESTED ACCELA CITIES
+================================================================================
+
+There is a working Accela scraper at accela_scraper.py. It already works for
+5 cities (Dallas, Reno, Oakland, Palmdale, Stockton). You have 4 CONFIGURED
+BUT UNTESTED Accela cities:
+
+    - Indianapolis IN (INDY)
+    - Memphis TN (SHELBYCO)
+    - Omaha NE (OMAHA)
+    - Oklahoma City OK (OKIE)
+
+TEST EACH ONE:
+
+    python -c "
+    from accela_scraper import fetch_accela
+    config = {'agency_code': 'INDY', '_accela_city_key': 'indianapolis'}
+    results = fetch_accela(config, days_back=7)
+    print(f'Indianapolis: {len(results)} permits')
+    if results: print(f'Sample: {results[0]}')
+    "
+
+Do this for each city. Fix any issues (wrong module name, different form
+layout, etc.). The scraper has debug screenshot capability — use it.
+
+Also fix Charlotte (the status said "needs HTML parsing fix"). Actually fix it.
+
+================================================================================
+RULE #3: WORK THE "FOUND BUT NOT CONFIGURED" LIST
+================================================================================
+
+The previous audit found these endpoints but DID NOT configure them.
+Configure them now. Test them. Make them active or document exactly why not.
+
+ArcGIS cities to configure NOW:
+    - Raleigh NC
+    - Greensboro NC
+    - Asheville NC
+    - Fayetteville NC
+    - Gilbert AZ
+    - Scottsdale AZ
+    - Tempe AZ
+    - Tacoma WA
+    - Bellevue WA
+    - Spokane WA
+    - Boise ID
+
+For each: find the endpoint URL (you already found it!), test with curl,
+read the response fields, add config, test with fetch_permits, commit.
+
+================================================================================
+RULE #4: STATUS REPORTS MUST SHOW ACTUAL RESULTS
+================================================================================
+
+BAD status report:
+    "APIs Found - Need Config: Raleigh, Greensboro, Asheville"
+
+GOOD status report:
+    "Raleigh NC: ACTIVE - ArcGIS endpoint working, 47 permits in last 7 days
+     Greensboro NC: ACTIVE - ArcGIS, 23 permits, committed as abc1234
+     Asheville NC: BROKEN - endpoint returns 403, marked inactive"
+
+Every city in your report should have one of:
+    ✅ ACTIVE — X permits in last N days (committed as HASH)
+    ❌ BROKEN — specific reason (404, empty data, no address field, etc.)
+    🔐 LOGIN_REQUIRED — portal requires authentication
+    ⏭️ SKIPPED — specific reason (no known data source)
+
+NOT acceptable:
+    "Need Config" "Needs investigation" "Could be configured" "Identified"
+
+================================================================================
+PRIORITY ORDER
+================================================================================
+
+Do these in this exact order. Do not skip ahead. Do not move to step 2
+until step 1 is committed.
+
+BATCH 1 — Accela untested cities (you already have the scraper):
+    1. Indianapolis IN (test + fix)
+    2. Memphis TN (test + fix)
+    3. Omaha NE (test + fix)
+    4. Oklahoma City OK (test + fix)
+    5. Charlotte NC (fix HTML parsing issue)
+    → COMMIT after each working city
+
+BATCH 2 — ArcGIS cities found but not configured:
+    6. Raleigh NC
+    7. Greensboro NC
+    8. Scottsdale AZ
+    9. Gilbert AZ
+    10. Tempe AZ
+    11. Tacoma WA
+    12. Bellevue WA
+    13. Spokane WA
+    14. Boise ID
+    15. Asheville NC
+    16. Fayetteville NC
+    → COMMIT after each batch of 3-4 working cities
+
+BATCH 3 — Resume V23 audit chunks (cities not yet looked at)
+    → Continue through the 1,898 city worklist
+    → For each city: search for endpoint, configure, test, commit or mark dead
+    → Status report after every 25 cities
+
+================================================================================
+REMEMBER
+================================================================================
+
+- You have REAL HTTP access. Use it. Test every endpoint.
+- You have a WORKING Accela scraper. Use it.
+- "Found an endpoint" is 20% of the job. CONFIGURING and TESTING is the other 80%.
+- Do not write research reports. Write code. Test code. Commit code.
+
+================================================================================
+END
+================================================================================

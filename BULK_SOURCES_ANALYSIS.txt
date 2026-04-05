@@ -1,0 +1,252 @@
+====================================================================================================
+BULK_SOURCES DETAILED ANALYSIS
+====================================================================================================
+
+Total BULK_SOURCES entries: 25
+
+Active: 21
+Inactive: 4
+
+====================================================================================================
+ACTIVE BULK SOURCES
+====================================================================================================
+
+little_rock_ar_bulk
+  Name:        Little Rock AR Metro
+  State:       AR
+  Platform:    socrata
+  Mode:        bulk
+  Description: Little Rock AR Planning & Development Permits
+  City Field:  propertycity
+  Endpoint:    https://data.littlerock.gov/resource/mkfu-qap3.json
+  Fields:      8 mapped
+
+mesa_az_bulk
+  Name:        Mesa AZ
+  State:       AZ
+  Platform:    socrata
+  Mode:        bulk
+  Description: Mesa AZ Building Permits
+  City Field:  council_district
+  Endpoint:    https://citydata.mesaaz.gov/resource/dzpk-hxfb.json
+  Fields:      7 mapped
+
+san_diego_county
+  Name:        San Diego County
+  State:       CA
+  Platform:    socrata
+  Mode:        bulk
+  Description: San Diego County Building Permits - 18 cities
+  City Field:  city
+  Endpoint:    https://internal-sandiegocounty.data.socrata.com/resource/im3c-szc4.json
+  Fields:      7 mapped
+
+sonoma_county
+  Name:        Sonoma County
+  State:       CA
+  Platform:    socrata
+  Mode:        bulk
+  Description: Sonoma County Building Permits - 9 cities
+  City Field:  jurisdiction
+  Endpoint:    https://data.sonomacounty.ca.gov/resource/88ms-k5e7.json
+  Fields:      6 mapped
+
+contra_costa_county_ca
+  Name:        Contra Costa County CA
+  State:       CA
+  Platform:    socrata
+  Mode:        bulk
+  Description: Contra Costa County Building Permits (Richmond area)
+  City Field:  site_city
+  Endpoint:    https://www.transparentrichmond.org/resource/tkbh-qmdj.json
+  Fields:      8 mapped
+
+marin_county_ca
+  Name:        Marin County CA
+  State:       CA
+  Platform:    socrata
+  Mode:        bulk
+  Description: Marin County Building Permits (30 cities)
+  City Field:  city_town
+  Endpoint:    https://data.marincounty.gov/resource/mkbn-caye.json
+  Fields:      8 mapped
+
+corona_ca_bulk
+  Name:        Corona CA
+  State:       CA
+  Platform:    socrata
+  Mode:        bulk
+  Description: Corona CA Building Permits
+  City Field:  site_city
+  Endpoint:    https://corstat.coronaca.gov/resource/2agx-camz.json
+  Fields:      7 mapped
+
+miami_dade_county
+  Name:        Miami-Dade County
+  State:       FL
+  Platform:    arcgis
+  Mode:        N/A
+  Description: Miami-Dade County Building Permits
+  Endpoint:    https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/ArcGIS/rest/services/BuildingPermit
+  Fields:      8 mapped
+
+orlando_fl_bulk
+  Name:        Orlando FL Metro
+  State:       FL
+  Platform:    socrata
+  Mode:        bulk
+  Description: Orlando FL Permit Applications
+  City Field:  neighborhood
+  Endpoint:    https://data.cityoforlando.net/resource/ryhf-m453.json
+  Fields:      7 mapped
+
+cook_county_il
+  Name:        Cook County IL
+  State:       IL
+  Platform:    socrata
+  Mode:        bulk
+  Description: Cook County IL Assessor Building Permits (130+ municipalities)
+  City Field:  municipality
+  Endpoint:    https://datacatalog.cookcountyil.gov/resource/6yjf-dfxs.json
+  Fields:      7 mapped
+
+baton_rouge_la
+  Name:        East Baton Rouge Parish
+  State:       LA
+  Platform:    socrata
+  Mode:        bulk
+  Description: East Baton Rouge Parish Building Permits
+  City Field:  city1
+  Endpoint:    https://data.brla.gov/resource/7fq7-8j7r.json
+  Fields:      9 mapped
+
+montgomery_county_md
+  Name:        Montgomery County MD
+  State:       MD
+  Platform:    socrata
+  Mode:        bulk
+  Description: Montgomery County MD Residential Permits - 43 cities
+  City Field:  city
+  Endpoint:    https://data.montgomerycountymd.gov/resource/m88u-pqki.json
+  Fields:      8 mapped
+
+prince_georges_county_md
+  Name:        Prince George's County MD
+  State:       MD
+  Platform:    socrata
+  Mode:        bulk
+  Description: Prince George's County MD Permits - 100+ cities
+  City Field:  city
+  Endpoint:    https://data.princegeorgescountymd.gov/resource/weik-ttee.json
+  Fields:      7 mapped
+
+howard_county_md
+  Name:        Howard County MD
+  State:       MD
+  Platform:    socrata
+  Mode:        bulk
+  Description: Howard County Building Permits (20 cities)
+  City Field:  city
+  Endpoint:    https://opendata.howardcountymd.gov/resource/kvz2-j5cj.json
+  Fields:      6 mapped
+
+buffalo_ny_bulk
+  Name:        Buffalo NY
+  State:       NY
+  Platform:    socrata
+  Mode:        bulk
+  Description: Buffalo NY Building Permits
+  City Field:  city
+  Endpoint:    https://data.buffalony.gov/resource/9p2d-f3yt.json
+  Fields:      5 mapped
+
+cincinnati_oh_bulk
+  Name:        Cincinnati OH Metro
+  State:       OH
+  Platform:    socrata
+  Mode:        bulk
+  Description: Cincinnati OH Building Permits
+  City Field:  originalcity
+  Endpoint:    https://data.cincinnati-oh.gov/resource/uhjb-xac9.json
+  Fields:      7 mapped
+
+collin_county_tx
+  Name:        Collin County TX
+  State:       TX
+  Platform:    socrata
+  Mode:        bulk
+  Description: Collin CAD Building Permits (30 cities)
+  City Field:  situscity
+  Endpoint:    https://data.texas.gov/resource/82ee-gbj5.json
+  Fields:      7 mapped
+
+williamson_county_tx
+  Name:        Williamson County TX
+  State:       TX
+  Platform:    socrata
+  Mode:        bulk
+  Description: Williamson County TX Building Permits (20+ cities)
+  City Field:  situscity
+  Endpoint:    https://data.wcad.org/resource/fqhf-gyjx.json
+  Fields:      6 mapped
+
+dallas_tx_bulk
+  Name:        Dallas TX
+  State:       TX
+  Platform:    socrata
+  Mode:        bulk
+  Description: Dallas TX Building Permits
+  City Field:  zip_code
+  Endpoint:    https://www.dallasopendata.com/resource/e7gq-4sah.json
+  Fields:      7 mapped
+
+fort_worth_tx_bulk
+  Name:        Fort Worth
+  State:       TX
+  Platform:    arcgis
+  Mode:        N/A
+  Description: Fort Worth TX Development Permits
+  Endpoint:    https://services5.arcgis.com/3ddLCBXe1bRt7mzj/ArcGIS/rest/services/CFW_Open_Data
+  Fields:      7 mapped
+
+norfolk_va_bulk
+  Name:        Norfolk VA
+  State:       VA
+  Platform:    socrata
+  Mode:        bulk
+  Description: Norfolk VA Permits and Inspections
+  City Field:  ward
+  Endpoint:    https://data.norfolk.gov/resource/bnrb-u445.json
+  Fields:      7 mapped
+
+====================================================================================================
+INACTIVE BULK SOURCES (Review Candidates)
+====================================================================================================
+
+san_diego_county_v2
+  Name:        San Diego County (Public)
+  State:       CA
+  Platform:    socrata
+  Description: San Diego County Building Permits (public endpoint)
+  Reason:      Check notes for reactivation eligibility
+
+nj_statewide
+  Name:        New Jersey Statewide
+  State:       NJ
+  Platform:    socrata
+  Description: NJ Uniform Construction Code Building Permits - all 550 municipalities
+  Reason:      Check notes for reactivation eligibility
+
+austin_tx_datahub_bulk
+  Name:        Austin TX (Datahub)
+  State:       TX
+  Platform:    socrata
+  Description: Austin TX Issued Construction Permits (datahub)
+  Reason:      Check notes for reactivation eligibility
+
+pierce_county_wa_socrata_bulk
+  Name:        Pierce County WA
+  State:       WA
+  Platform:    socrata
+  Description: Pierce County WA Permits (Tacoma unincorp, Lakewood, etc.)
+  Reason:      Check notes for reactivation eligibility

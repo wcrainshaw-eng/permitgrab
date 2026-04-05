@@ -1,0 +1,400 @@
+PERMITGRAB V17 — AUTO-DISCOVERY → ACTIVATION → SEO PIPELINE
+=============================================================
+Date: March 27, 2026
+Context: V16 landed 678 active cities. Discovery engine finds sources
+         but adds them as 'pending' and nothing ever activates them.
+         No notification exists for new cities. Discovery only runs
+         when manually kicked off.
+
+GOAL: Close the loop so that new cities flow from discovery →
+      auto-tested → auto-activated → collecting → on site →
+      owner notified for SEO content creation.
+
+⚠️  GUARDRAILS:
+  - Do NOT create blog posts or modify blog content
+  - Do NOT change SEO, schemas, or templates (beyond what's specified)
+  - Do NOT spawn Claude agents to search for data sources
+  - Stay focused on the pipeline automation only
+  - Commit after each step
+
+
+===================================================================
+THE PIPELINE WE'RE BUILDING:
+===================================================================
+
+  ┌─────────────┐     ┌──────────────┐     ┌────────────┐
+  │  Discovery   │────→│  Auto-Test   │────→│  Activate  │
+  │  (scheduled) │     │  (pending)   │     │  (active)  │
+  └─────────────┘     └──────────────┘     └────────────┘
+                                                  │
+                        ┌─────────────┐           │
+                        │  SEO Alert  │←──────────┘
+                        │  (email)    │
+                        └─────────────┘
+                                                  │
+                        ┌─────────────┐           │
+                        │  Collector   │←──────────┘
+                        │  (6hr cycle) │
+                        └─────────────┘
+                                                  │
+                        ┌─────────────┐           │
+                        │  Site Live   │←──────────┘
+                        │  (auto page) │
+                        └─────────────┘
+
+Every piece already exists EXCEPT:
+  1. Scheduled discovery runs
+  2. Auto-test + auto-activate for pending cities
+  3. SEO notification email
+
+
+===================================================================
+STEP 1: SCHEDULED DISCOVERY (15 min)
+===================================================================
+
+Add discovery as part of the scheduled_collection() thread in server.py.
+Discovery should run ONCE PER DAY (not every 6 hours — no need to
+hammer external APIs that often).
+
+In scheduled_collection(), AFTER the permit refresh, add:
+
+  # Run source discovery once daily
+  if should_run_daily('discovery'):
+      try:
+          from discovery import run_state_discovery, run_county_discovery
+          print("Starting daily source discovery...")
+          run_state_discovery()    # Check state portals
+          run_county_discovery()   # Check county portals (if implemented)
+          mark_daily_complete('discovery')
+      except Exception as e:
+          print(f"Discovery error: {e}")
+
+Implement should_run_daily() and mark_daily_complete() using a simple
+key-value store in SQLite:
+
+  CREATE TABLE IF NOT EXISTS system_state (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  should_run_daily('discovery'):
+    SELECT value FROM system_state WHERE key='last_discovery_run'
+    → If NULL or >24 hours ago, return True
+
+  mark_daily_complete('discovery'):
+    INSERT OR REPLACE INTO system_state (key, value)
+    VALUES ('last_discovery_run', datetime('now'))
+
+This way discovery runs daily on the same Render process —
+no separate cron job, no manual kicking off on the shell.
+
+
+===================================================================
+STEP 2: AUTO-TEST PENDING CITIES (20 min)
+===================================================================
+
+After discovery runs, there may be new 'pending' entries in prod_cities.
+Build a function that auto-tests them and activates the good ones.
+
+New function in collector.py:
+
+  def activate_pending_cities():
+      """
+      Test all pending prod_cities entries.
+      If we can successfully collect permits, flip to active.
+      If endpoint is dead/empty after 3 attempts, flip to failed.
+      """
+      pending = permitdb.get_prod_cities(status='pending')
+      activated = []
+      failed = []
+
+      for city in pending:
+          source_id = city['source_id']
+          config = _get_source_config(source_id)
+
+          if not config:
+              # No config found — try to build one from prod_cities metadata
+              # (source_endpoint, source_type fields)
+              config = _build_config_from_prod_city(city)
+
+          if not config:
+              failed.append(city['slug'])
+              continue
+
+          try:
+              # Try collecting last 30 days
+              if config.get('mode') == 'bulk':
+                  results = collect_bulk_source(source_id, config, days_back=30)
+                  permit_count = sum(len(v) for v in results.values())
+              else:
+                  permits = fetch_permits(source_id, days_back=30)
+                  permit_count = len(permits) if permits else 0
+
+              if permit_count > 0:
+                  # SUCCESS — activate this city
+                  permitdb.update_prod_city_status(
+                      city['slug'], 'active',
+                      notes=f'Auto-activated: {permit_count} permits found'
+                  )
+                  activated.append({
+                      'city': city['name'],
+                      'state': city['state'],
+                      'slug': city['slug'],
+                      'permits': permit_count
+                  })
+              else:
+                  # No permits but endpoint worked — increment attempts
+                  attempts = city.get('consecutive_failures', 0) + 1
+                  if attempts >= 3:
+                      permitdb.update_prod_city_status(
+                          city['slug'], 'failed',
+                          notes='Auto-failed: 3 attempts, 0 permits'
+                      )
+                      failed.append(city['slug'])
+                  else:
+                      # Leave as pending, try again tomorrow
+                      permitdb.increment_failure(city['slug'])
+
+          except Exception as e:
+              attempts = city.get('consecutive_failures', 0) + 1
+              if attempts >= 3:
+                  permitdb.update_prod_city_status(
+                      city['slug'], 'failed',
+                      notes=f'Auto-failed: {str(e)[:200]}'
+                  )
+                  failed.append(city['slug'])
+
+      return activated, failed
+
+Call this right after discovery in the daily schedule:
+
+  if should_run_daily('discovery'):
+      run_state_discovery()
+      run_county_discovery()
+      activated, failed = activate_pending_cities()
+      if activated:
+          send_new_cities_alert(activated)  # Step 3
+      mark_daily_complete('discovery')
+
+
+===================================================================
+STEP 3: SEO NOTIFICATION EMAIL (20 min)
+===================================================================
+
+When new cities get activated, send an email to the site owner
+so they know to create SEO content (blog posts, landing page copy,
+internal links, etc.)
+
+New function in email_alerts.py:
+
+  def send_new_cities_alert(activated_cities):
+      """
+      Send email to owner when new cities are auto-activated.
+      This is the trigger for SEO content creation.
+      """
+      if not activated_cities:
+          return
+
+      subject = f"PermitGrab: {len(activated_cities)} New Cities Activated"
+
+      # Build the email body
+      city_rows = []
+      for city in activated_cities:
+          city_rows.append(
+              f"  • {city['city']}, {city['state']} — "
+              f"{city['permits']} permits found — "
+              f"https://permitgrab.com/permits/{city['slug']}"
+          )
+
+      body = f"""
+New cities were automatically discovered and activated on PermitGrab.
+
+NEWLY ACTIVATED ({len(activated_cities)} cities):
+{chr(10).join(city_rows)}
+
+SEO ACTION ITEMS:
+  1. Review each city page for accuracy
+  2. Write a city-specific blog post for high-population cities
+  3. Add internal links from related state/trade pages
+  4. Check that permits are displaying correctly
+  5. Consider adding to Google Search Console for monitoring
+
+These cities are now:
+  ✓ Live on the site with auto-generated pages
+  ✓ Included in sitemap.xml
+  ✓ Set to index,follow (if permits > 0)
+  ✓ Collecting permits every 6 hours
+  ✓ Available for user subscriptions
+
+No action needed for the pages themselves — they're already live.
+The SEO content (blog posts, enhanced descriptions) is what adds value.
+"""
+
+      send_email(
+          to='wcrainshaw@gmail.com',
+          subject=subject,
+          body=body
+      )
+
+      # Also log to system_state for the /api/health endpoint
+      permitdb.set_system_state(
+          'last_cities_activated',
+          json.dumps({
+              'date': datetime.now().isoformat(),
+              'count': len(activated_cities),
+              'cities': [c['slug'] for c in activated_cities]
+          })
+      )
+
+
+===================================================================
+STEP 4: NEW CITIES DASHBOARD LOG (10 min)
+===================================================================
+
+In addition to email, maintain a running log in the database
+so we can always see what was recently added and when.
+
+New table:
+
+  CREATE TABLE IF NOT EXISTS city_activation_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      city_slug TEXT NOT NULL,
+      city_name TEXT NOT NULL,
+      state TEXT NOT NULL,
+      activated_at TEXT DEFAULT (datetime('now')),
+      source TEXT,              -- 'discovery_engine', 'manual', 'bulk_harvest'
+      initial_permits INTEGER,
+      seo_status TEXT DEFAULT 'needs_content',
+          -- 'needs_content', 'basic_page', 'blog_written', 'fully_optimized'
+      notes TEXT
+  );
+
+Add an API endpoint for checking recent activations:
+
+  GET /api/admin/new-cities?days=7
+
+  Returns:
+  {
+    "new_cities": [
+      {
+        "city": "Albany",
+        "state": "NY",
+        "slug": "albany-ny",
+        "activated_at": "2026-03-28T14:30:00",
+        "permits": 11837,
+        "seo_status": "needs_content",
+        "page_url": "https://permitgrab.com/permits/albany-ny"
+      }
+    ],
+    "total_active": 685,
+    "activated_this_week": 7
+  }
+
+This gives you a quick way to check what's new without
+digging through emails.
+
+
+===================================================================
+STEP 5: BULK SOURCE AUTO-REGISTRATION (15 min)
+===================================================================
+
+When discovery finds a new county or state source, it currently
+just adds one entry to prod_cities. But a county source covers
+MANY cities. We need to:
+
+  A) When a county/state source is discovered and tested:
+     1. Add the source config to BULK_SOURCES (or a new
+        bulk_sources table in SQLite)
+     2. Run an initial collection from it
+     3. Extract all unique cities from the city_field
+     4. For EACH city found in the data:
+        - Check if it exists in us_cities table
+        - If yes: add to prod_cities with source_scope='county'
+        - Update us_cities status to 'covered_by_county'
+
+  B) This means one county discovery could add 20-50 cities
+     to prod_cities in one shot.
+
+  C) The email alert should group these:
+     "Discovered: Cook County IL source → 130 new cities activated"
+
+  D) Store the bulk source config in the database (not just
+     city_configs.py) so discovery can add sources without
+     modifying Python files:
+
+     CREATE TABLE IF NOT EXISTS discovered_sources (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         source_key TEXT UNIQUE NOT NULL,
+         name TEXT NOT NULL,
+         state TEXT NOT NULL,
+         platform TEXT NOT NULL,     -- socrata, arcgis, ckan
+         mode TEXT DEFAULT 'bulk',
+         endpoint TEXT NOT NULL,
+         dataset_id TEXT,
+         city_field TEXT,
+         date_field TEXT,
+         field_map TEXT,             -- JSON string
+         scope TEXT,                 -- state, county, city
+         discovered_at TEXT DEFAULT (datetime('now')),
+         last_tested TEXT,
+         status TEXT DEFAULT 'active',
+         notes TEXT
+     );
+
+  The collector should check this table IN ADDITION to the
+  hardcoded BULK_SOURCES dict. This way discovery can add
+  new sources that immediately start collecting without
+  any code changes or deploys.
+
+
+===================================================================
+STEP 6: VERIFY END-TO-END FLOW (10 min)
+===================================================================
+
+Test the full pipeline manually:
+
+  A) Insert a fake 'pending' city into prod_cities:
+     INSERT INTO prod_cities (city, state, city_slug, source_type,
+       source_id, status, added_by)
+     VALUES ('Test City', 'TX', 'test-city-tx', 'socrata',
+       'san_marcos_tx', 'pending', 'test');
+
+  B) Run activate_pending_cities() manually
+  C) Verify it flips to 'active' (since san_marcos_tx has data)
+  D) Verify the email gets sent (check inbox)
+  E) Verify city_activation_log has the entry
+  F) Verify /api/admin/new-cities shows it
+  G) Clean up: DELETE FROM prod_cities WHERE city_slug='test-city-tx'
+
+  Then verify the scheduled pipeline:
+  H) Check that discovery is in the daily schedule
+  I) Check that activate_pending_cities runs after discovery
+  J) Check that the email function is wired up
+  K) Verify Render logs show the daily discovery run
+
+
+===================================================================
+VERIFICATION CHECKLIST
+===================================================================
+
+[ ] Discovery runs automatically once per day (in scheduled_collection)
+[ ] Pending cities get auto-tested and flipped to active
+[ ] Failed cities get marked after 3 attempts
+[ ] Email sent to wcrainshaw@gmail.com when new cities activate
+[ ] city_activation_log table tracks all activations
+[ ] /api/admin/new-cities endpoint works
+[ ] discovered_sources table exists for dynamic source storage
+[ ] Collector checks discovered_sources table + BULK_SOURCES dict
+[ ] County discoveries expand to all cities in the county
+[ ] End-to-end test passes (fake pending → active → email)
+[ ] All changes committed with descriptive messages
+[ ] Git pushed to main
+
+EXPECTED TIMELINE: ~1.5 hours
+  Step 1: 15 min (scheduled discovery)
+  Step 2: 20 min (auto-test pending)
+  Step 3: 20 min (SEO alert email)
+  Step 4: 10 min (activation log + API)
+  Step 5: 15 min (bulk source auto-registration)
+  Step 6: 10 min (end-to-end test)

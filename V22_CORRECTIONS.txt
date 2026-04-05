@@ -1,0 +1,531 @@
+V22 CORRECTIONS — Fix digest issues + add lat/lon to all cities
+================================================================
+
+V22 was partially implemented but several things were done wrong or
+diverged from the spec. This file corrects those issues.
+
+IMPORTANT: The "nearby city" section of the digest is being DEFERRED.
+Do NOT implement nearby city logic yet. But DO add lat/lon to every
+active city config entry (for future use).
+
+
+=== CORRECTION 1: Remove METRO_NEARBY map entirely ===
+
+In city_configs.py, DELETE the entire METRO_NEARBY section (lines ~14911-14956).
+This includes the comment block and the full dictionary. The user explicitly
+rejected this hardcoded approach — it will be replaced by lat/lon distance
+calculation in a future version.
+
+
+=== CORRECTION 2: Remove get_nearby_permits() and nearby city digest logic ===
+
+Since the nearby city feature is deferred, remove or disable these pieces
+in email_alerts.py:
+
+A) DELETE the function `get_nearby_permits()` (around line 366-400).
+
+B) DELETE the function `_get_same_state_permits()` (around line 403-427).
+
+C) In `send_daily_digest_to_user()` (around line 629), REMOVE the Section 2
+   nearby city logic. The function should look like this:
+
+def send_daily_digest_to_user(user):
+    """Send daily digest to a single user.
+    V22: Your city permits + market snapshot."""
+    cities = json.loads(user.digest_cities or '[]')
+
+    if not cities:
+        return False, "no_cities"
+
+    # Use last_digest_sent_at to avoid sending duplicate permits.
+    if hasattr(user, 'last_digest_sent_at') and user.last_digest_sent_at:
+        if isinstance(user.last_digest_sent_at, str):
+            since = user.last_digest_sent_at[:10]
+        else:
+            since = user.last_digest_sent_at.strftime('%Y-%m-%d')
+    else:
+        since = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+    is_pro = user.plan in ('professional', 'pro', 'enterprise')
+    limit = 50 if is_pro else 20
+
+    # Section 1: Subscriber's city permits
+    permits = get_permits_for_digest(cities, since, limit)
+
+    # Section 2: Market snapshot (always available)
+    snapshot = get_market_snapshot(days=7)
+
+    # Only reference cities that actually have permits
+    cities_with_permits = list(dict.fromkeys(
+        p.get('city', '') for p in permits if p.get('city')
+    ))
+    active_cities = cities_with_permits if cities_with_permits else cities
+
+    # Build HTML (no nearby section for now)
+    html = build_digest_html(
+        user, permits,
+        snapshot=snapshot,
+        is_pro=is_pro,
+        active_cities=active_cities
+    )
+
+    # Subject line
+    permit_count = len([p for p in permits if not p.get('_is_fallback')])
+    if permit_count > 0:
+        subject = f"{permit_count} new permits in {active_cities[0]} — {datetime.now().strftime('%b %d')}"
+    else:
+        subject = f"PermitGrab Daily Digest — {datetime.now().strftime('%b %d')}"
+
+    success = send_email(user.email, subject, html)
+
+    return success, permit_count
+
+
+D) In `build_digest_html()`, remove the nearby_permits/nearby_city/nearby_state
+   parameters and Section 2 HTML block. Keep snapshot (Section 3 becomes Section 2).
+   The function signature should be:
+
+def build_digest_html(user, permits, snapshot=None, is_pro=False, active_cities=None):
+
+   Remove all the section2_html code that references nearby_permits/nearby_city.
+   Keep the section3_html (market snapshot) but rename it to section2_html for clarity.
+
+
+=== CORRECTION 3: Fix Atlanta endpoint ===
+
+The V22 spec said to change Atlanta to use `test_building_permit/FeatureServer/0`
+with date_field "Opend". Code kept the OLD endpoint `Building_Permit_latest/FeatureServer/0`
+and changed date_field to "OrigOpened" which was NOT in the spec.
+
+In city_configs.py, change the atlanta entry to:
+
+    "atlanta": {
+        "name": "Atlanta",
+        "state": "GA",
+        "slug": "atlanta",
+        "lat": 33.749,
+        "lon": -84.388,
+        "platform": "arcgis",
+        "endpoint": "https://services5.arcgis.com/5RxyIIJ9boPdptdo/arcgis/rest/services/test_building_permit/FeatureServer/0/query",
+        "dataset_id": "test_building_permit",
+        "description": "Building Permits (via Accela sync, updated to Feb 2025)",
+        "field_map": {
+            "permit_number": "RecordID",
+            "permit_type": "TypeCombo",
+            "work_type": "Subtype",
+            "address": "Address",
+            "zip": "",
+            "filing_date": "Opend",
+            "status": "Status_1",
+            "estimated_cost": "JobValue",
+            "description": "Name",
+        },
+        "date_field": "Opend",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+    },
+
+
+=== CORRECTION 4: Fix send_test_digest() call in __main__ ===
+
+At the bottom of email_alerts.py (around line 1478), the __main__ block calls:
+    send_test_digest(email, [city])
+
+But the function signature is:
+    def send_test_digest(email):
+
+Fix the call to just:
+    send_test_digest(email)
+
+Also, the test digest hardcodes "Chicago" — that's fine for now since Chicago
+has data. But the test should use the subscriber's actual city when possible.
+Update send_test_digest to accept an optional city parameter:
+
+def send_test_digest(email, city=None):
+    """Send a test digest to a specific email (admin testing)."""
+    user = SubscriberProxy({
+        "email": email,
+        "name": "Test User",
+        "city": city or "Chicago",
+        "plan": "pro",
+        "active": True,
+        "unsubscribe_token": "test-token"
+    })
+    success, result = send_daily_digest_to_user(user)
+    return {'success': success, 'result': result}
+
+And in __main__:
+    elif cmd == 'test':
+        email = sys.argv[2] if len(sys.argv) > 2 else 'test@example.com'
+        city = sys.argv[3] if len(sys.argv) > 3 else None
+        send_test_digest(email, city)
+
+
+=== CORRECTION 5: Add lat/lon to ALL active city configs ===
+
+Add "lat" and "lon" keys to EVERY active city entry in CITY_REGISTRY.
+Place them right after "slug" in each entry (for consistency).
+
+Here are the coordinates for all 312 active cities (3 decimal places):
+
+    "albany": (42.653, -73.757),
+    "albuquerque": (35.084, -106.651),
+    "allen_tx": (33.103, -96.670),
+    "alpharetta_ga": (34.073, -84.294),
+    "alsip_il": (41.680, -87.746),
+    "anna": (33.107, -96.569),
+    "arlington": (32.735, -97.108),
+    "arlington_heights_il": (42.072, -87.985),
+    "asbury_park_nj": (40.222, -74.019),
+    "asheville_nc": (35.596, -82.554),
+    "ashton": (39.080, -77.482),
+    "atlanta": (33.749, -84.388),
+    "atlantic_city_nj": (39.364, -74.422),
+    "auburn_wa": (47.307, -122.215),
+    "aurora_co": (39.729, -104.802),
+    "austin": (30.267, -97.743),
+    "baltimore": (39.290, -76.610),
+    "barnesville": (39.133, -77.261),
+    "bartlett_il": (41.871, -88.182),
+    "baton_rouge": (30.458, -91.187),
+    "bayonne_nj": (40.664, -74.114),
+    "beallsville": (39.308, -77.618),
+    "bellevue": (47.610, -122.201),
+    "bellingham_wa": (48.752, -122.305),
+    "bergenfield_nj": (40.930, -73.967),
+    "berwyn_il": (41.817, -87.799),
+    "bethesda": (38.985, -77.101),
+    "blue_island_il": (41.659, -87.687),
+    "blue_ridge": (32.975, -97.268),
+    "boise": (43.615, -116.237),
+    "bolinas": (37.897, -122.685),
+    "boston": (42.358, -71.064),
+    "boulder": (40.015, -105.270),
+    "boyds": (39.156, -77.465),
+    "bridgeton_nj": (39.428, -75.230),
+    "brinklow": (39.216, -77.368),
+    "brookeville": (39.206, -77.242),
+    "brookfield_il": (41.840, -87.895),
+    "buffalo": (42.886, -78.878),
+    "buffalo_grove_il": (42.195, -87.979),
+    "burbank_il": (41.783, -87.791),
+    "burtonsville": (39.101, -77.031),
+    "cabin_john": (38.979, -77.196),
+    "calumet_city_il": (41.629, -87.533),
+    "camas": (45.586, -122.389),
+    "cambridge_ma": (42.364, -71.104),
+    "camden_nj": (39.926, -75.121),
+    "cape_coral": (26.562, -81.948),
+    "carteret_nj": (40.578, -74.221),
+    "cedar_park": (30.505, -97.821),
+    "celina": (33.294, -96.774),
+    "charleston": (32.775, -79.930),
+    "charlotte": (35.227, -80.843),
+    "chattanooga": (35.046, -85.309),
+    "chevy_chase": (38.973, -77.097),
+    "chicago": (41.878, -87.630),
+    "chicago_heights_il": (41.506, -87.639),
+    "cicero_il": (41.845, -87.746),
+    "cincinnati": (39.103, -84.512),
+    "clarksburg": (39.243, -77.246),
+    "clarkston": (33.799, -84.246),
+    "clarksville_md": (39.168, -76.903),
+    "cleveland": (41.499, -81.694),
+    "cliffside_park_nj": (40.822, -73.984),
+    "college_station": (30.597, -96.301),
+    "collin_county_tx": (33.198, -96.615),
+    "columbia_md": (39.203, -76.861),
+    "columbus": (39.961, -82.999),
+    "cook_county": (41.878, -87.630),
+    "corona": (33.873, -117.563),
+    "corte_madera": (37.921, -122.509),
+    "dallas": (32.780, -96.800),
+    "damascus": (39.288, -77.203),
+    "deltona_fl": (28.901, -81.219),
+    "denver": (39.742, -104.992),
+    "des_plaines_il": (42.033, -87.901),
+    "detroit": (42.331, -83.046),
+    "dickerson": (39.215, -77.371),
+    "dillon_beach": (38.245, -122.964),
+    "dolton_il": (41.629, -87.604),
+    "dumfries": (38.578, -77.328),
+    "durham": (35.997, -78.899),
+    "east_orange_nj": (40.768, -74.215),
+    "elizabeth_nj": (40.665, -74.217),
+    "elk_grove_village_il": (42.004, -87.996),
+    "elkridge": (39.193, -76.713),
+    "ellicott_city": (39.257, -76.801),
+    "elmwood_park_il": (41.926, -87.816),
+    "elmwood_park_nj": (40.900, -74.123),
+    "englewood_nj": (40.913, -73.972),
+    "evanston_il": (42.044, -87.683),
+    "evergreen_park_il": (41.722, -87.697),
+    "fair_lawn_nj": (40.937, -74.111),
+    "fairfax": (38.846, -77.306),
+    "fairview": (33.270, -96.615),
+    "farmersville": (33.163, -96.360),
+    "florence_tx": (30.862, -97.793),
+    "forest_knolls": (38.023, -122.684),
+    "fort_collins": (40.585, -105.083),
+    "fort_lauderdale": (26.125, -80.144),
+    "fort_lee_nj": (40.843, -73.970),
+    "fort_worth": (32.755, -97.331),
+    "framingham": (42.278, -71.416),
+    "frederick": (39.414, -77.410),
+    "frisco": (33.151, -96.824),
+    "fulton_md": (39.205, -76.930),
+    "gainesville": (29.651, -82.325),
+    "gaithersburg": (39.144, -77.204),
+    "garfield_nj": (40.881, -74.109),
+    "garrett_park": (39.065, -77.098),
+    "georgetown_tx": (30.633, -97.678),
+    "germantown": (39.174, -77.272),
+    "gilbert": (33.353, -111.789),
+    "glassboro_nj": (39.707, -75.109),
+    "glen_echo": (38.965, -77.130),
+    "glenview_il": (42.080, -87.780),
+    "glenwood_md": (39.214, -76.915),
+    "granger_tx": (30.717, -97.444),
+    "greenbrae": (37.952, -122.527),
+    "greensboro": (36.073, -79.792),
+    "hackensack_nj": (40.885, -74.048),
+    "hanover_park_il": (41.980, -88.140),
+    "hawthorne_nj": (40.957, -74.154),
+    "henderson_nv": (36.039, -114.982),
+    "highland_md": (39.174, -76.953),
+    "hoboken_nj": (40.749, -74.031),
+    "hoffman_estates_il": (42.068, -88.120),
+    "homewood_il": (41.556, -87.662),
+    "honolulu_verified": (21.307, -157.858),
+    "hutto": (30.548, -97.552),
+    "inverness": (37.997, -122.583),
+    "jarrell": (30.758, -97.606),
+    "jersey_city_nj": (40.728, -74.078),
+    "jessup_md": (39.148, -76.773),
+    "johns_creek_ga": (34.041, -84.192),
+    "josephine": (33.063, -96.305),
+    "kansas_city": (39.100, -94.581),
+    "kearny_nj": (40.755, -74.153),
+    "kensington": (39.037, -77.079),
+    "kentfield": (37.917, -122.528),
+    "knoxville": (35.961, -83.921),
+    "lagunitas": (38.009, -122.701),
+    "las_cruces": (32.320, -106.745),
+    "las_vegas": (36.172, -115.140),
+    "laurel_md": (39.105, -76.849),
+    "lavon": (33.028, -96.435),
+    "leander": (30.579, -97.852),
+    "leonard": (33.378, -96.247),
+    "liberty_hill": (30.672, -97.907),
+    "linden_nj": (40.622, -74.246),
+    "lindenwold_nj": (39.826, -75.003),
+    "little_rock": (34.748, -92.298),
+    "lodi_nj": (40.875, -74.073),
+    "long_branch_nj": (40.296, -73.992),
+    "longview_tx": (32.500, -94.740),
+    "los_angeles": (34.052, -118.244),
+    "louisville": (38.252, -85.760),
+    "lucas": (33.083, -96.577),
+    "lynchburg_va": (37.414, -79.142),
+    "marin_city": (37.888, -122.502),
+    "marshall": (32.543, -94.367),
+    "matteson_il": (41.508, -87.709),
+    "mckinney": (33.197, -96.639),
+    "melissa": (33.268, -96.551),
+    "melrose_park_il": (41.909, -87.855),
+    "mesa": (33.415, -111.831),
+    "mesa_new": (33.415, -111.831),
+    "miami_dade": (25.762, -80.192),
+    "mill_valley": (37.906, -122.546),
+    "millville_nj": (39.402, -75.034),
+    "milwaukee": (43.039, -87.906),
+    "minneapolis": (44.977, -93.265),
+    "montclair_nj": (40.825, -74.209),
+    "montgomery_village": (39.169, -77.195),
+    "morristown_nj": (40.797, -74.488),
+    "morton_grove_il": (42.040, -87.782),
+    "mount_airy": (39.389, -77.198),
+    "mount_prospect_il": (42.067, -87.937),
+    "muir_beach": (37.860, -122.575),
+    "murfreesboro_tn": (35.846, -86.390),
+    "murphy": (33.013, -96.608),
+    "myrtle_beach": (33.688, -78.886),
+    "nashville": (36.165, -86.784),
+    "nevada": (33.064, -96.620),
+    "new_brunswick_nj": (40.487, -74.443),
+    "new_jersey_state": (40.208, -74.756),
+    "new_orleans": (29.952, -90.071),
+    "new_york": (40.713, -74.006),
+    "newark_nj": (40.735, -74.172),
+    "newport_beach_ca": (33.616, -117.929),
+    "nicasio": (38.050, -122.697),
+    "niles_il": (42.018, -87.793),
+    "noblesville_in": (40.046, -86.009),
+    "norfolk_new": (36.850, -76.286),
+    "north_bergen_nj": (40.807, -74.012),
+    "north_plainfield_nj": (40.640, -74.427),
+    "northbrook_il": (42.129, -87.828),
+    "novato": (38.108, -122.559),
+    "oak_forest_il": (41.604, -87.751),
+    "oak_lawn_il": (41.718, -87.755),
+    "oak_park_il": (41.885, -87.793),
+    "olema": (38.053, -122.739),
+    "olney": (39.136, -77.089),
+    "orland_park_il": (41.630, -87.857),
+    "orlando": (28.538, -81.379),
+    "oxnard_ca": (34.198, -119.177),
+    "palatine_il": (42.110, -88.034),
+    "palisades_park_nj": (40.836, -73.987),
+    "palos_hills_il": (41.695, -87.829),
+    "paramus_nj": (40.944, -74.074),
+    "park_forest_il": (41.489, -87.678),
+    "park_ridge_il": (42.010, -87.837),
+    "parker": (39.519, -104.761),
+    "pasadena": (34.147, -118.142),
+    "passaic_nj": (40.861, -74.129),
+    "paterson_nj": (40.916, -74.171),
+    "peoria": (40.694, -89.588),
+    "perth_amboy_nj": (40.508, -74.268),
+    "petaluma": (38.246, -122.636),
+    "pflugerville": (30.439, -97.621),
+    "philadelphia": (39.953, -75.164),
+    "phoenix": (33.449, -112.074),
+    "pierce_county_wa": (47.050, -122.365),
+    "pittsburgh": (40.441, -79.996),
+    "plainfield_nj": (40.634, -74.411),
+    "plano": (33.020, -96.699),
+    "pleasantville_nj": (39.389, -74.512),
+    "point_reyes_station": (38.074, -122.802),
+    "poolesville": (39.143, -77.394),
+    "portland": (45.515, -122.679),
+    "potomac": (38.999, -77.186),
+    "princeton": (33.180, -96.499),
+    "princeton_nj": (40.357, -74.659),
+    "prosper": (33.234, -96.806),
+    "rahway_nj": (40.607, -74.274),
+    "raleigh": (35.780, -78.639),
+    "richardson": (32.948, -96.730),
+    "ridgewood_nj": (40.982, -74.112),
+    "rockville": (39.084, -77.154),
+    "rockwall": (32.926, -96.473),
+    "rolling_meadows_il": (42.084, -88.020),
+    "roselle_il": (41.980, -88.072),
+    "roselle_nj": (40.657, -74.261),
+    "roseville": (38.752, -121.288),
+    "round_rock": (30.509, -97.679),
+    "royse_city": (32.974, -96.332),
+    "rutherford_nj": (40.834, -74.107),
+    "sachse": (32.978, -96.592),
+    "sacramento": (38.582, -121.494),
+    "sacramento_county_ca": (38.582, -121.494),
+    "salem": (44.943, -123.035),
+    "salt_lake_city": (40.761, -111.891),
+    "san_anselmo": (37.974, -122.561),
+    "san_antonio": (29.424, -98.493),
+    "san_diego": (32.716, -117.161),
+    "san_francisco": (37.775, -122.418),
+    "san_geronimo": (38.031, -122.678),
+    "san_jose": (37.338, -121.886),
+    "san_marcos": (29.889, -97.940),
+    "san_quentin": (37.940, -122.456),
+    "san_rafael": (37.973, -122.531),
+    "sandy_spring": (39.125, -77.052),
+    "sausalito": (37.859, -122.485),
+    "savage_md": (39.140, -76.822),
+    "sayreville_nj": (40.467, -74.274),
+    "schaumburg_il": (42.032, -88.083),
+    "scottsdale": (33.494, -111.926),
+    "seattle": (47.606, -122.332),
+    "secaucus_nj": (40.787, -74.060),
+    "silver_spring": (39.005, -77.027),
+    "sioux_falls": (43.540, -96.731),
+    "skokie_il": (42.032, -87.733),
+    "somerville": (42.388, -71.100),
+    "south_holland_il": (41.600, -87.600),
+    "south_plainfield_nj": (40.571, -74.410),
+    "spencerville": (39.099, -77.049),
+    "spokane": (47.659, -117.425),
+    "st_paul": (44.954, -93.090),
+    "stinson_beach": (37.902, -122.639),
+    "streamwood_il": (42.026, -88.168),
+    "summit_county_ut": (40.740, -111.497),
+    "summit_nj": (40.716, -74.360),
+    "tacoma": (47.253, -122.444),
+    "takoma_park": (38.978, -76.985),
+    "tallahassee": (30.438, -84.281),
+    "tampa": (27.950, -82.458),
+    "taylor_tx": (30.571, -97.410),
+    "tempe": (33.426, -111.940),
+    "thrall": (30.790, -97.303),
+    "tiburon": (37.889, -122.447),
+    "tinley_park_il": (41.566, -87.785),
+    "tinton_falls_nj": (40.262, -74.099),
+    "tomales": (38.249, -122.886),
+    "trenton_nj": (40.217, -74.743),
+    "tucson": (32.222, -110.974),
+    "union_city_nj": (40.768, -74.034),
+    "van_alstyne": (33.423, -96.577),
+    "vineland_nj": (39.486, -75.025),
+    "virginia_beach": (36.855, -75.978),
+    "washington_dc": (38.907, -77.037),
+    "washington_grove": (39.184, -77.150),
+    "west_friendship": (39.239, -77.113),
+    "west_hollywood": (34.089, -118.361),
+    "west_new_york_nj": (40.801, -73.994),
+    "westfield_nj": (40.653, -74.353),
+    "wheaton": (39.025, -77.057),
+    "wheeling_il": (42.151, -87.917),
+    "wilmette_il": (42.074, -87.723),
+    "wilmington_nc": (34.205, -77.949),
+    "woodacre": (38.382, -122.650),
+    "woodstock_md": (39.197, -76.904),
+    "wylie_tx": (33.020, -96.550),
+
+For each city in CITY_REGISTRY that has "active": True, add "lat" and "lon"
+fields using the values above. Place them right after "slug" for consistency.
+
+Example — before:
+    "atlanta": {
+        "name": "Atlanta",
+        "state": "GA",
+        "slug": "atlanta",
+        "platform": "arcgis",
+        ...
+
+After:
+    "atlanta": {
+        "name": "Atlanta",
+        "state": "GA",
+        "slug": "atlanta",
+        "lat": 33.749,
+        "lon": -84.388,
+        "platform": "arcgis",
+        ...
+
+Do NOT add lat/lon to inactive city entries.
+
+
+=== DEPLOYMENT ORDER ===
+
+1. Make all changes in city_configs.py (remove METRO_NEARBY, add lat/lon, fix Atlanta)
+2. Make all changes in email_alerts.py (remove nearby logic, fix send_test_digest)
+3. Commit and push
+4. On Render shell, run: python email_alerts.py test wcrainshaw@gmail.com Atlanta
+5. Verify the email arrives and is NOT blank
+
+
+=== TESTING CHECKLIST ===
+
+[ ] METRO_NEARBY dict is gone from city_configs.py
+[ ] All 312 active cities have lat and lon fields
+[ ] Atlanta endpoint is test_building_permit/FeatureServer/0
+[ ] Atlanta date_field is "Opend"
+[ ] get_nearby_permits() is removed from email_alerts.py
+[ ] _get_same_state_permits() is removed from email_alerts.py
+[ ] build_digest_html() no longer takes nearby_permits params
+[ ] send_daily_digest_to_user() no longer calls get_nearby_permits()
+[ ] send_test_digest() accepts optional city parameter
+[ ] __main__ block calls send_test_digest(email, city) correctly
+[ ] Test digest email arrives and shows permits (not blank)
+[ ] Market snapshot section renders with stats

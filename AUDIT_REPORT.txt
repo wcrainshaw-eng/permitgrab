@@ -1,0 +1,200 @@
+================================================================================
+CITY_CONFIGS.PY COMPREHENSIVE AUDIT REPORT
+================================================================================
+File: /sessions/gracious-dazzling-carson/mnt/Documents/PermitGrab/city_configs.py
+Analysis Date: 2026-03-29
+
+================================================================================
+1. OVERALL STATISTICS
+================================================================================
+
+Total City Entries:             552
+  - Active (active: True):      293
+  - Inactive (active: False):   259
+
+Percentage Active:              53.1%
+
+================================================================================
+2. PLATFORM BREAKDOWN
+================================================================================
+
+Platform            Total Entries    Active Entries    Inactive Entries
+-------------------------------------------------------------------
+socrata             457              211               246
+arcgis              66               63                3
+accela              15               12                3
+ckan                6                5                 1
+carto               1                1                 0
+(empty/unknown)     7                1                 6
+
+KEY FINDINGS:
+  - Socrata is the dominant platform (457 entries, 82.6% of all configs)
+  - ArcGIS has a 95.5% activation rate (63/66 active)
+  - Accela has an 80% activation rate (12/15 active)
+  - CKAN has an 83.3% activation rate (5/6 active)
+  - One entry is missing the platform field and is marked active
+
+================================================================================
+3. ACTIVE CITIES BY STATE (35 UNIQUE STATES)
+================================================================================
+
+State    Count    State    Count    State    Count
+-----    -----    -----    -----    -----    -----
+TX       51       CA       46       IL       46
+MD       46       AZ       10       WA       9
+NC       7        VA       6        CO       6
+MA       6        TN       5        FL       12
+NY       4        AR       3        GA       3
+LA       3        OH       3        HI       2
+IN       2        MN       2        MO       1
+NE       1        NM       2        NV       2
+OK       1        OR       2        PA       2
+SC       2        SD       1        UT       2
+WI       1        DC       1        ID       1
+KY       1        MI       1
+
+Top States by Active Cities:
+  1. Texas (TX): 51 active cities
+  2. California (CA): 46 active cities
+  3. Illinois (IL): 46 active cities
+  4. Maryland (MD): 46 active cities
+
+================================================================================
+4. MISCONFIGURATION AUDIT
+================================================================================
+
+Active Cities with Configuration Issues: 1
+
+Issue Summary:
+  - MISSING_ENDPOINT: 1 city
+  - EMPTY_FIELD_MAP: 1 city
+
+Detailed Issues:
+
+  san_diego (San Diego County, CA)
+    Issues: MISSING_ENDPOINT, EMPTY_FIELD_MAP
+    Platform: (not specified)
+    Impact: Cannot be queried - missing both endpoint URL and field mappings
+
+
+================================================================================
+5. SUSPICIOUS ENDPOINT ANALYSIS
+================================================================================
+
+Suspicious Endpoint Categories Checked:
+  - localhost / 127.0.0.1 endpoints
+  - example.com / example.org domains
+  - .test / .local / .dev domain extensions
+  - Insecure HTTP endpoints (non-HTTPS)
+
+Result: NO SUSPICIOUS ENDPOINTS FOUND
+
+All 293 active cities have valid, properly-formatted endpoint URLs using
+appropriate domain names and HTTPS protocol.
+
+================================================================================
+6. FIELD MAPPING VALIDATION
+================================================================================
+
+Analysis of field_map entries across active cities:
+
+Observation: All active cities except san_diego have populated field_map entries.
+The field_map is essential for translating platform-specific field names to the
+standard PermitGrab schema.
+
+Sample Field Map (New York City):
+  permit_number -> job__
+  permit_type -> work_type
+  filing_date -> approved_date
+  issue_date -> issued_date
+  status -> permit_status
+  [... 18 total fields ...]
+
+================================================================================
+7. BULK_SOURCES REGISTRY
+================================================================================
+
+Total BULK_SOURCES Entries: 25
+
+Active Bulk Sources: 17
+  1. baton_rouge_la (LA) - Socrata
+  2. buffalo_ny_bulk (NY) - Socrata
+  3. cincinnati_oh_bulk (OH) - Socrata
+  4. collin_county_tx (TX) - Socrata - covers 30 cities
+  5. contra_costa_county_ca (CA) - Socrata
+  6. cook_county_il (IL) - Socrata - covers 130+ municipalities
+  7. corona_ca_bulk (CA) - Socrata
+  8. dallas_tx_bulk (TX) - Socrata
+  9. fort_worth_tx_bulk (TX) - ArcGIS
+  10. howard_county_md (MD) - Socrata - covers 20 cities
+  11. little_rock_ar_bulk (AR) - Socrata
+  12. marin_county_ca (CA) - Socrata - covers 30 cities
+  13. mesa_az_bulk (AZ) - Socrata
+  14. miami_dade_county (FL) - ArcGIS
+  15. montgomery_county_md (MD) - Socrata - covers 43 cities
+  16. orlando_fl_bulk (FL) - Socrata
+  17. prince_georges_county_md (MD) - Socrata - covers 100+ cities
+  18. san_diego_county (CA) - Socrata - covers 18 cities
+  19. sonoma_county (CA) - Socrata - covers 9 cities
+  20. williamson_county_tx (TX) - Socrata - covers 20+ cities
+
+Inactive Bulk Sources: 8
+  - austin_tx_datahub_bulk (TX) - Socrata
+  - nj_statewide (NJ) - Socrata - would cover all 550 municipalities
+  - pierce_county_wa_socrata_bulk (WA) - Socrata
+  - san_diego_county_v2 (CA) - Socrata
+  [4 more inactive bulk sources]
+
+BULK_SOURCES COVERAGE:
+  - State/County Level: Most bulk sources aggregate by county or state
+  - City Field: Each bulk source defines which field contains the city/municipality
+  - Population: Cook County IL (130+ municipalities), Prince Georges County MD (100+ cities)
+    are the largest bulk sources
+  - Platforms: 19 Socrata, 1 ArcGIS, 5 others (inactive)
+
+
+================================================================================
+8. DATA QUALITY SUMMARY
+================================================================================
+
+STRENGTHS:
+  OK 100% of active cities have endpoint URLs (except 1: san_diego)
+  OK No suspicious or test endpoints detected
+  OK All endpoints use secure HTTPS protocol (except not applicable for san_diego)
+  OK Good geographic coverage: 35 US states represented
+  OK Diverse platform support (Socrata, ArcGIS, CKAN, Accela, Carto)
+  OK Comprehensive bulk source support for major metro areas and counties
+
+WEAKNESSES:
+  ISSUE One active city (san_diego) is missing endpoint and field_map
+  ISSUE 259 inactive cities (47% of total) may indicate obsolete or deprecated sources
+  ISSUE Socrata dominance (82.6%) creates potential single-point-of-failure risk
+  ISSUE Some duplicate entries exist (e.g., 3 Mesa AZ configs, 2 Little Rock configs)
+
+CONFIGURATION COMPLETENESS:
+  - Active cities with endpoint: 292/293 (99.7%)
+  - Active cities with field_map: 292/293 (99.7%)
+  - Active cities with slug: 293/293 (100%)
+  - Active cities with platform specified: 292/293 (99.7%)
+
+
+================================================================================
+9. RECOMMENDATIONS
+================================================================================
+
+1. IMMEDIATE ACTIONS:
+   - Review and fix san_diego entry: either add endpoint/field_map or mark inactive
+   - Consider consolidating duplicate city entries (Mesa AZ, Little Rock, Corona CA)
+
+2. MEDIUM-TERM:
+   - Review the 259 inactive cities to determine if any should be re-activated
+   - Diversify platform dependency away from Socrata
+   - Add rate-limiting and fallback endpoints for critical bulk sources
+
+3. LONG-TERM:
+   - Implement automated endpoint validation on config load
+   - Create monitoring for endpoint health/availability
+   - Document deprecated entries before removal
+   - Consider version control tagging for config changes
+
+================================================================================

@@ -1,0 +1,254 @@
+===============================================================================
+V18: DATA STALENESS DETECTION & AUTOMATIC SOURCE RECOVERY
+===============================================================================
+Date: March 27, 2026
+Priority: HIGH — stale data actively shown as current is worse than no data
+
+
+PROBLEM
+===============================================================================
+
+Multiple major cities are showing stale permit data (30-60+ days old) as if
+it's current. The collector IS running, but the source portals have either
+stopped publishing new data or our query filters aren't capturing recent
+permits. Meanwhile, users see these cities listed with big permit counts,
+click through expecting fresh leads, and get 2-month-old data.
+
+Current stale cities (as of Mar 27, 2026):
+  - Atlanta GA:      newest permit Jan 28  (1,216 permits shown)
+  - Dallas TX:       newest permit Jan 27  (1,882 permits shown)
+  - Denver CO:       newest permit Jan 15  (2 permits)
+  - Detroit MI:      newest permit Feb 2   (3 permits)
+  - Minneapolis MN:  newest permit Jan 12  (2 permits)
+  - San Diego CA:    newest permit Feb 5   (9 permits)
+
+Major markets with ZERO data (no source found yet):
+  - Phoenix AZ, Baltimore MD, Las Vegas NV, Salt Lake City UT,
+    Sacramento CA, Indianapolis IN, Milwaukee WI, Oklahoma City OK
+
+Fresh cities working correctly (for reference):
+  - Houston (Mar 26), LA (Mar 20), SF (Mar 26), Austin (Mar 24),
+    Seattle (Mar 25), Nashville (Mar 26), NYC (Mar 25), Portland (Mar 20),
+    Raleigh (Mar 24), Fort Worth (Mar 23), Chicago (Mar 6), Tampa (Mar 26),
+    Jacksonville (Mar 24), Boston (Mar 26), Columbus (Mar 12)
+
+
+STEP 1: STALENESS DETECTION (automated)
+===============================================================================
+
+Add a staleness check that runs after every collection cycle (inside
+scheduled_collection() in server.py). This should:
+
+A) Query prod_cities joined with MAX(filing_date) from permits table:
+
+   SELECT pc.city, pc.state, pc.total_permits,
+          MAX(p.filing_date) as newest_permit,
+          julianday('now') - julianday(MAX(p.filing_date)) as days_stale
+   FROM prod_cities pc
+   LEFT JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
+                       AND LOWER(p.state) = LOWER(pc.state)
+   WHERE pc.status = 'active'
+   GROUP BY pc.city, pc.state
+   HAVING days_stale > 14 OR newest_permit IS NULL
+   ORDER BY days_stale DESC
+
+B) For each stale city (>14 days since newest permit):
+   - Set a new field on prod_cities: data_freshness = 'stale'
+   - Record stale_since date (first time it was detected as stale)
+   - Log it: "[Staleness] Atlanta GA: newest permit 58 days old"
+
+C) For each very stale city (>30 days):
+   - Set data_freshness = 'very_stale'
+   - Auto-pause the city: set status = 'paused' with pause_reason = 'stale_data'
+   - This removes it from the website until fresh data is found
+   - Log it: "[Staleness] PAUSED Atlanta GA: no new permits in 58 days"
+
+D) Store freshness results in a new table or update prod_cities:
+
+   ALTER TABLE prod_cities ADD COLUMN data_freshness TEXT DEFAULT 'fresh';
+   ALTER TABLE prod_cities ADD COLUMN newest_permit_date TEXT;
+   ALTER TABLE prod_cities ADD COLUMN stale_since TEXT;
+   ALTER TABLE prod_cities ADD COLUMN pause_reason TEXT;
+
+
+STEP 2: WEBSITE BEHAVIOR FOR STALE/PAUSED CITIES
+===============================================================================
+
+A) Paused cities (status='paused', pause_reason='stale_data'):
+   - Do NOT show on the cities browse page
+   - Do NOT include in sitemap.xml
+   - If someone hits the URL directly: show a message like
+     "We're updating our data source for Atlanta. Check back soon."
+   - Set robots to noindex
+
+B) Stale cities (14-30 days, still active):
+   - Show on website but add a subtle indicator:
+     "Last updated: Jan 28, 2026" near the permit listings
+   - This is honest — users can decide if the data is useful
+
+C) When a paused city gets fresh data again:
+   - Auto-reactivate: set status = 'active', data_freshness = 'fresh'
+   - Clear pause_reason
+   - City reappears on site automatically
+
+
+STEP 3: AUTOMATIC ALTERNATE SOURCE SEARCH
+===============================================================================
+
+When a city is detected as stale (>14 days), automatically trigger the
+discovery engine to search for an alternate source. This is a new function:
+
+  find_alternate_source(city, state)
+
+A) Search Socrata catalogs for the city:
+   - data.{city_slug}.gov (city's own portal if it exists)
+   - data.{state}.gov (state portal, filter by city)
+   - Search keywords: "building permits {city}", "construction permits {city}"
+
+B) Search ArcGIS Hub:
+   - "building permits {city} {state}"
+   - "{county} building permits" (look up the county for the city)
+
+C) Search the county portal:
+   - Many cities don't publish their own data, but the county does
+   - For Atlanta: look at Fulton County
+   - For Dallas: look at Dallas County
+   - For Denver: look at Denver County (same entity but may have different portal)
+
+D) Check if there's a different endpoint on the SAME source:
+   - Sometimes open data portals change their dataset IDs
+   - The old dataset may be archived while a new one exists
+   - Search the portal for alternative datasets
+
+E) If a new source is found:
+   - Add to discovered_sources table
+   - Test it via test_socrata_endpoint() or test_arcgis_endpoint()
+   - If it returns permits with recent dates:
+     * Update the city's source info in prod_cities
+     * Run a collection for that city
+     * Log: "[Recovery] Found alternate source for Atlanta GA: {url}"
+   - If no alternate found:
+     * Log: "[Recovery] No alternate source found for Atlanta GA"
+     * Add to a manual_review queue (see Step 5)
+
+
+STEP 4: EMAIL ALERT FOR STALE CITIES
+===============================================================================
+
+Send a weekly email (or on first detection) to wcrainshaw@gmail.com with:
+
+Subject: "PermitGrab: {N} cities have stale data"
+
+Body:
+  Cities auto-paused (no new permits in 30+ days):
+    - Atlanta GA: last permit Jan 28, source: aca-prod.accela.com
+    - Dallas TX: last permit Jan 27, source: data.dallasopendata.com
+
+  Cities going stale (14-30 days):
+    - San Diego CA: last permit Feb 5, source: ...
+
+  Alternate source search results:
+    - Atlanta GA: checked 3 portals, found 1 candidate: {url}
+    - Dallas TX: checked 3 portals, no alternatives found
+
+  Cities needing manual research:
+    - Denver CO: no automated source found, suggest checking Denver county
+    - Phoenix AZ: no data source ever found for this city
+
+This gives you the info to decide which ones to research manually.
+
+
+STEP 5: MANUAL REVIEW QUEUE (stale_cities_review table)
+===============================================================================
+
+For cities where no automated alternate source is found, track them in a
+new table so you know what still needs human research:
+
+  CREATE TABLE stale_cities_review (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    original_source TEXT,
+    last_permit_date TEXT,
+    stale_since TEXT,
+    auto_search_attempted BOOLEAN DEFAULT FALSE,
+    auto_search_result TEXT,     -- 'found_alternate' / 'no_alternate'
+    manual_notes TEXT,           -- for your notes when you research
+    alternate_source_url TEXT,   -- if you find one manually
+    status TEXT DEFAULT 'needs_review',  -- needs_review / in_progress / resolved / no_source
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+Add an admin endpoint: /api/admin/stale-cities that returns this queue.
+
+
+STEP 6: COUNTY-LEVEL SOURCE MAPPING
+===============================================================================
+
+Many stale cities may have data available through their county portal but
+we just haven't mapped city -> county correctly. Add a lookup:
+
+  CITY_TO_COUNTY = {
+    'Atlanta': ('Fulton County', 'GA'),
+    'Dallas': ('Dallas County', 'TX'),
+    'Denver': ('Denver County', 'CO'),   # city-county
+    'Detroit': ('Wayne County', 'MI'),
+    'Minneapolis': ('Hennepin County', 'MN'),
+    'San Diego': ('San Diego County', 'CA'),
+    'Phoenix': ('Maricopa County', 'AZ'),
+    'Baltimore': ('Baltimore City', 'MD'),  # independent city
+    'Las Vegas': ('Clark County', 'NV'),
+    'Salt Lake City': ('Salt Lake County', 'UT'),
+    'Sacramento': ('Sacramento County', 'CA'),
+    'Indianapolis': ('Marion County', 'IN'),
+    'Milwaukee': ('Milwaukee County', 'WI'),
+    'Oklahoma City': ('Oklahoma County', 'OK'),
+  }
+
+When searching for an alternate source, also search for the county portal.
+Some of these may already be in BULK_SOURCES but the city mapping is wrong.
+
+
+STEP 7: FRESHNESS THRESHOLDS
+===============================================================================
+
+  FRESHNESS_FRESH     = 0-14 days    -> status stays 'active', show normally
+  FRESHNESS_STALE     = 15-30 days   -> status stays 'active', show "last updated" date
+  FRESHNESS_VERY_STALE = 31+ days    -> auto-pause, remove from site, trigger alt search
+  FRESHNESS_NO_DATA   = NULL/0       -> never had data, keep in discovery queue
+
+These thresholds should be configurable via system_state table so you can
+adjust without code changes.
+
+
+IMPLEMENTATION ORDER
+===============================================================================
+
+1. Add columns to prod_cities (data_freshness, newest_permit_date, stale_since, pause_reason)
+2. Add staleness_check() function in collector.py that runs after each collection
+3. Add auto-pause logic for cities >30 days stale
+4. Update city page rendering to hide paused cities + show "last updated" for stale
+5. Update sitemap to exclude paused cities
+6. Add find_alternate_source() function in discovery.py
+7. Wire alternate source search into staleness_check() — when city goes stale, auto-search
+8. Add stale_cities_review table + /api/admin/stale-cities endpoint
+9. Add weekly email alert for stale cities (extend email_alerts.py)
+10. Add CITY_TO_COUNTY mapping and use in alternate source search
+11. Test end-to-end: manually mark a fresh city as stale, verify it gets paused,
+    verify alt search runs, verify email sends
+
+
+NOTES
+===============================================================================
+
+- The /api/admin/data-freshness endpoint already exists but is auth-protected.
+  The staleness check should use the same query logic but run server-side as
+  part of the collection cycle.
+
+- Don't delete permits from stale cities — just pause them. If/when a fresh
+  source is found, the old permits are still valid historical data.
+
+- For the county mapping: some of these counties may already be in BULK_SOURCES
+  (e.g. we have 104 bulk sources). Check if Dallas County, Fulton County etc.
+  are already configured but just not mapped to the city correctly.

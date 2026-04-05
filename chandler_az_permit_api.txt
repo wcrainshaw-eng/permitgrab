@@ -1,0 +1,107 @@
+CHANDLER, ARIZONA - PERMIT DATA API
+====================================
+
+WORKING API ENDPOINT
+--------------------
+Service: Accela Under Construction Projects
+Base URL: https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0
+
+Service Type: ArcGIS MapServer (Feature Layer)
+Geometry Type: Point (esriGeometryPoint)
+Spatial Reference: NAD_1983_HARN_StatePlane_Arizona_Central_FIPS_0202
+Total Records: 79 active construction projects
+
+DATA VERIFICATION
+-----------------
+✓ Contains 2025 permit data (confirmed: BLD25-xxxx permits)
+✓ Contains 2026 permit data (confirmed: BLD26-xxxx permits)
+✓ API is publicly accessible (no authentication required)
+✓ Returns JSON formatted data
+✓ Supports spatial queries with geometry
+
+FIELD NAMES AND TYPES
+----------------------
+1. OBJECTID (esriFieldTypeOID) - Unique row identifier
+2. PRETECH_PERMIT_NUMBER (String, 255) - Primary permit number (e.g., "PRE21-0023")
+3. PRETECH_PROJECT_NAME (String, 255) - Project name/title
+4. PRETECH_PROJECT_DESC (String, 2000) - Detailed project description
+5. PRETECH_ADDRESS_EID (String, 255) - Address entity ID
+6. PRETECH_FULL_ADDRESS (String, 255) - Full street address
+7. ISSUED_CHILD_PERMITS (String, 1073741822) - Related building permits (e.g., "BLD25-2152, BLD26-0117")
+8. FIRST_BLD_ADDR_EID (String, 255) - First building address entity ID
+9. FIRST_BLD_FULL_ADDR (String, 255) - First building full address
+10. GIS_ADDRESS_EID (Double) - GIS address identifier
+11. GIS_FULL_ADDRESS (String, 2000) - Complete GIS-formatted address
+12. SHAPE (esriFieldTypeGeometry) - Point geometry with X,Y coordinates
+
+QUERY EXAMPLES
+--------------
+
+1. Get all records (basic query):
+https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0/query?where=1%3D1&outFields=*&f=json
+
+2. Get records without geometry:
+https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0/query?where=1%3D1&outFields=*&returnGeometry=false&f=json
+
+3. Filter for 2025 permits:
+https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0/query?where=ISSUED_CHILD_PERMITS+LIKE+%27%25BLD25%25%27&outFields=*&f=json
+
+4. Filter for 2026 permits:
+https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0/query?where=ISSUED_CHILD_PERMITS+LIKE+%27%25BLD26%25%27&outFields=*&f=json
+
+5. Get specific fields only:
+https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0/query?where=1%3D1&outFields=PRETECH_PERMIT_NUMBER,PRETECH_PROJECT_NAME,PRETECH_FULL_ADDRESS,ISSUED_CHILD_PERMITS&f=json
+
+6. Get record count:
+https://gis.chandleraz.gov/appsanonymous/rest/services/DevelopmentServices/Accela_Under_Construction/MapServer/0/query?where=1%3D1&returnCountOnly=true&f=json
+
+SAMPLE DATA RECORD
+------------------
+{
+  "attributes": {
+    "OBJECTID": 7,
+    "PRETECH_PERMIT_NUMBER": "PRE21-0023",
+    "PRETECH_PROJECT_NAME": "HAZELWOOD / CHANDLER HEIGHTS & 124TH",
+    "PRETECH_PROJECT_DESC": "PROPOSED 23 LOT RESIDENTIAL SUBDIVISION WITH A PROPOSED DENSITY OF 2.66 DU/AC. CURRENTLY IS A COUNTY ISLAND AND REQUIRES ANNEXATION",
+    "PRETECH_ADDRESS_EID": "111258908",
+    "PRETECH_FULL_ADDRESS": "12447 E CHANDLER HEIGHTS RD",
+    "ISSUED_CHILD_PERMITS": "BLD25-2152, BLD26-0117",
+    "FIRST_BLD_ADDR_EID": "112139346",
+    "FIRST_BLD_FULL_ADDR": "1543 E CHERRYWOOD PL",
+    "GIS_ADDRESS_EID": 112139346.0,
+    "GIS_FULL_ADDRESS": "1543 E CHERRYWOOD PL"
+  },
+  "geometry": {
+    "x": 731252.9792499989,
+    "y": 812266.6969999969
+  }
+}
+
+QUERY PARAMETERS
+----------------
+Common ArcGIS REST API parameters:
+- where: SQL WHERE clause (e.g., "1=1" for all, "ISSUED_CHILD_PERMITS LIKE '%BLD25%'" for filtering)
+- outFields: Comma-separated field names or "*" for all fields
+- returnGeometry: true/false (default: true)
+- f: Output format (json, pjson, geojson, html)
+- resultRecordCount: Limit number of results returned
+- resultOffset: Offset for pagination
+- returnCountOnly: true/false - returns just the count
+- orderByFields: Field name(s) for sorting
+
+ADDITIONAL RESOURCES
+--------------------
+Open Data Portal: https://share-open-data-changis.hub.arcgis.com/
+GIS Services Directory: https://gis.chandleraz.gov/appsanonymous/rest/services/
+Development Services: https://www.chandleraz.gov/government/departments/development-services
+Accela Citizen Portal: https://aca-prod.accela.com/CHANDLER/
+Contact: 480-782-3000
+
+NOTES
+-----
+- This dataset shows "Under Construction" projects with associated building permits
+- ISSUED_CHILD_PERMITS field contains comma-separated list of related building permits
+- Permit numbers follow format: BLD25-xxxx (year 2025), BLD26-xxxx (year 2026)
+- Pre-tech permits (PRE##-xxxx) are the parent permits for construction projects
+- Maximum record count per query: 2000 (pagination required for larger datasets)
+- Service version: ArcGIS 11.5

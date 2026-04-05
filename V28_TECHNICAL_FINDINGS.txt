@@ -1,0 +1,375 @@
+================================================================================
+V28 TECHNICAL FINDINGS & CODE ANALYSIS
+================================================================================
+Date: 2026-03-29
+Analyst: Claude Code Agent
+
+================================================================================
+SECTION 1: GIT COMMIT VERIFICATION
+================================================================================
+
+Commit Hash: 4425035a445ef33154776288ddacbed087dea792
+Author: Wes Crainshaw <wcrainshaw@gmail.com>
+Date: Sun Mar 29 20:59:00 2026 -0500
+
+Files Modified:
+  - city_configs.py (48 insertions, 105 deletions)
+  - migrations/003_v28_sync_city_configs.py (NEW - 161 lines)
+  - server.py (257 insertions, 105 deletions)
+  - templates/cities_browse.html (1 change)
+  - templates/city_landing.html (21 insertions)
+  - templates/city_trade_landing.html (33 insertions)
+  - templates/dashboard.html (14 insertions)
+
+Scope: Data source fixes + SEO structured data improvements
+
+================================================================================
+SECTION 2: DATA SOURCE CHANGES DETAILED
+================================================================================
+
+1. SAN DIEGO COUNTY BULK SOURCE (VERIFIED IN CODE)
+   ================================================
+
+Location: city_configs.py, BULK_SOURCES dict, line ~14593
+
+Old Configuration:
+```python
+"san_diego_county": {
+    "name": "San Diego County",
+    "state": "CA",
+    "platform": "socrata",
+    "mode": "bulk",
+    "endpoint": "https://internal-sandiegocounty.data.socrata.com/resource/im3c-szc4.json",
+    "dataset_id": "im3c-szc4",
+    ...
+```
+
+New Configuration:
+```python
+"san_diego_county": {
+    "name": "San Diego County",
+    "state": "CA",
+    "platform": "socrata",
+    "mode": "bulk",
+    "endpoint": "https://data.sandiegocounty.gov/resource/dyzh-7eat.json",
+    "dataset_id": "dyzh-7eat",
+    ...
+```
+
+Key Changes:
+  - Domain: internal-sandiegocounty.data.socrata.com → data.sandiegocounty.gov
+  - Dataset: im3c-szc4 → dyzh-7eat
+  - Reason: Internal domain was VPN-only; public domain allows public access
+
+Field Mapping Changes:
+  Old Mapping → New Mapping
+  permit_number: permit_number → record_id
+  filing_date: issue_date → issued_date
+  permit_type: permit_type → record_category
+  description: description → use
+  address: site_address → full_address
+  status: status → record_status
+  estimated_cost: valuation → [REMOVED - not in new dataset]
+
+Technical Impact:
+  - Field names changed significantly
+  - Collector must use new field names
+  - Null handling needed for estimated_cost (not available in new source)
+  - CSV export/mapping needs validation
+
+Related Changes:
+  - "san_diego" city entry changed active=True → active=False
+  - Notes: "V28: Placeholder — data collected via san_diego_county bulk source."
+  - Individual city collection disabled; bulk source handles 18-city region
+
+
+2. MEMPHIS/SHELBY COUNTY ACCELA (ALREADY CORRECT IN V24)
+   ========================================================
+
+Location: city_configs.py, CITY_REGISTRY dict, line ~1216
+
+Current Configuration:
+```python
+"memphis": {
+    "name": "Memphis",
+    "state": "TN",
+    "slug": "memphis",
+    "platform": "accela",
+    "agency_code": "SHELBYCO",
+    "_accela_city_key": "memphis",
+    "endpoint": "https://aca-prod.accela.com/SHELBYCO/Cap/CapHome.aspx?module=Building&TabName=Building",
+    "active": True,
+    "notes": "V24: Accela Citizen Access scraper (Playwright). Uses aca-prod.accela.com/SHELBYCO (Shelby County).",
+```
+
+Technical Details:
+  - Collection Method: Playwright browser automation
+  - Requires: headless browser, JavaScript execution
+  - Auth: Public portal (no login required)
+  - Data Structure: HTML parsed by accela_scraper.py
+  - Rate Limiting: May be hitting scraper timeouts (V28 noted only 3 permits)
+
+Accela Scraper Config (accela_scraper.py):
+  - agency_code: "SHELBYCO"
+  - module: "Building" (could also try "Permits", "CapHome", etc.)
+  - Base URL: https://aca-prod.accela.com/SHELBYCO/Cap/CapHome.aspx
+
+V28 Notes Mention:
+  - "Data is 25 days stale"
+  - "Only 3 permits pulled"
+  - Likely cause: Playwright timeout, rate limiting, or module name incorrect
+
+Key Finding:
+  - This is NOT an API endpoint
+  - Web scraping approach may be fragile
+  - Module parameter critical (Building vs Permits vs others)
+
+
+3. BALTIMORE ARCGIS (NOT CHANGED IN V28, BUT FLAGGED AS BROKEN)
+   ===========================================================
+
+Location: city_configs.py, CITY_REGISTRY dict, line ~530
+
+Current Configuration:
+```python
+"baltimore": {
+    "name": "Baltimore",
+    "state": "MD",
+    "slug": "baltimore",
+    "platform": "arcgis",
+    "endpoint": "https://egisdata.baltimorecity.gov/egis/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3/query",
+    "dataset_id": "DHCD_Open_Baltimore_Datasets_3",
+    "date_field": "IssuedDate",
+    "date_format": "epoch",
+    "active": True,
+    ...
+```
+
+Data Status: ZERO PERMITS (V28 Audit Result)
+
+Possible Issues:
+  1. FeatureServer layer 3 no longer exists
+  2. Layer was moved to different URL structure
+  3. Field names changed (CaseNumber, ExistingUse, etc.)
+  4. Service requires additional authentication/parameters
+  5. Query format incompatible with current Baltimore service
+
+Field Mapping Expected:
+  "permit_number": "CaseNumber",
+  "permit_type": "ExistingUse",
+  "work_type": "ProposedUse",
+  "address": "Address",
+  "filing_date": "IssuedDate",
+  "estimated_cost": "Cost",
+  "description": "Description"
+
+Investigation Path:
+  1. Test: https://egisdata.baltimorecity.gov/egis/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3/query?f=json
+  2. If empty, list services: https://egisdata.baltimorecity.gov/egis/rest/services?f=json
+  3. Find correct layer ID and update endpoint URL
+  4. Verify field names in response match field_map
+
+
+4. MILWAUKEE CKAN (NOT CHANGED IN V28, BUT FLAGGED AS BROKEN)
+   ==========================================================
+
+Location: city_configs.py, CITY_REGISTRY dict, line ~1150
+
+Current Configuration:
+```python
+"milwaukee": {
+    "name": "Milwaukee",
+    "state": "WI",
+    "slug": "milwaukee",
+    "platform": "ckan",
+    "endpoint": "https://data.milwaukee.gov/api/3/action/datastore_search",
+    "dataset_id": "828e9630-d7cb-42e4-960e-964eae916397",
+    "date_field": "Date Issued",
+    "limit": 2000,
+    "active": True,
+    "notes": "V17h: Switched to CKAN datastore_search — verified endpoint with Record ID, Permit Type, Address, Date Issued, Construction Total Cost",
+```
+
+Data Status: ZERO PERMITS (V28 Audit Result)
+
+Possible Issues:
+  1. Dataset UUID (828e9630-d7cb-42e4-960e-964eae916397) no longer exists
+  2. Dataset was archived or moved
+  3. CKAN endpoint URL structure changed
+  4. Field names changed (Record ID, Permit Type, etc.)
+  5. Data filtering/query syntax issue
+
+Field Mapping Expected:
+  "permit_number": "Record ID",
+  "permit_type": "Permit Type",
+  "address": "Address",
+  "filing_date": "Date Issued",
+  "status": "Status",
+  "estimated_cost": "Construction Total Cost",
+  "description": "Use of Building"
+
+Investigation Path:
+  1. Test: https://data.milwaukee.gov/api/3/action/datastore_search?resource_id=828e9630-d7cb-42e4-960e-964eae916397&limit=5
+  2. Check response for errors ("error": true, "help": ...)
+  3. If error, list packages: https://data.milwaukee.gov/api/3/action/package_search
+  4. Search for building permit datasets
+  5. Extract correct resource_id from working dataset
+  6. Update city_configs.py with new UUID
+
+================================================================================
+SECTION 3: MIGRATION & DATABASE SYNC
+================================================================================
+
+New Migration File: migrations/003_v28_sync_city_configs.py
+
+Purpose: Sync all active cities from city_configs.py CITY_REGISTRY and BULK_SOURCES
+         to the prod_cities database table
+
+Key Functions:
+
+  sync_cities():
+    - Iterates CITY_REGISTRY
+    - Filters by config.get('active', False)
+    - Calls permitdb.upsert_prod_city() for each
+    - Status: 293 active cities in V28 audit
+
+  sync_bulk_sources():
+    - Iterates BULK_SOURCES
+    - Determines scope_type (county/state/bulk)
+    - Calls permitdb.upsert_prod_city() for each
+    - Scope mapping:
+      - 'county' in key/name → source_scope='county'
+      - 'state' in key/name → source_scope='state'
+      - else → source_scope='bulk'
+
+Migration Results (Expected):
+  CITY_REGISTRY: ~212 synced
+  BULK_SOURCES: ~N synced
+  Total cities in prod_cities: 795
+  Active: 775
+
+Execution:
+  Command: python migrations/003_v28_sync_city_configs.py
+  Status: PENDING (file created 2026-03-29 20:59:00)
+
+Database Impact:
+  - prod_cities table updated with new entries
+  - Duplicates handled by upsert (update if exists)
+  - source_scope field indicates type (city/bulk/county/state)
+
+================================================================================
+SECTION 4: COLLECTOR COMPATIBILITY ANALYSIS
+================================================================================
+
+For each modified source, collector.py must handle:
+
+SAN DIEGO (New dyzh-7eat):
+  - Check: field_map correctly maps new field names
+  - Verify: record_id, issued_date, record_category, use, full_address present
+  - Handle: estimated_cost missing (set null or 0)
+  - City extraction: uses city_field="city"
+
+MEMPHIS (Accela):
+  - Check: accela_scraper.py configured for SHELBYCO
+  - Verify: module="Building" parameter is correct
+  - Handle: Playwright timeout/rate limiting
+  - Authentication: Public access (no login needed)
+
+BALTIMORE (ArcGIS):
+  - Check: Layer 3 exists and returns data
+  - Verify: Field names (CaseNumber, IssuedDate, etc.) match response
+  - Handle: Epoch timestamp conversion (date_format: "epoch")
+  - Query: Ensure where=1=1 returns all records
+
+MILWAUKEE (CKAN):
+  - Check: Resource UUID exists in dataset
+  - Verify: Field names match (Record ID, Date Issued, etc.)
+  - Handle: CKAN API response structure (success, result, records)
+  - Query: Ensure resource_id parameter is correct
+
+================================================================================
+SECTION 5: CRITICAL ISSUES IDENTIFIED
+================================================================================
+
+ISSUE #1: San Diego Endpoint Change (RESOLVED IN V28)
+  Status: COMPLETED
+  Severity: CRITICAL (was blocking data collection)
+  Solution: Switch to public endpoint
+  Verification: Code change confirmed in git
+
+ISSUE #2: Memphis Low Data Volume
+  Status: PENDING INVESTIGATION
+  Severity: HIGH (only 3 permits, 25 days stale)
+  Root Cause: Unknown (scraper timeout? rate limit? module wrong?)
+  Solution: Test portal manually, verify scraper config
+
+ISSUE #3: Baltimore Zero Data
+  Status: PENDING INVESTIGATION
+  Severity: HIGH (0 permits, city rank #30)
+  Root Cause: Unknown (layer moved? service changed?)
+  Solution: Query service directory, find correct layer
+
+ISSUE #4: Milwaukee Zero Data
+  Status: PENDING INVESTIGATION
+  Severity: HIGH (0 permits, city rank #31)
+  Root Cause: Unknown (UUID changed? dataset archived?)
+  Solution: List datasets, find correct resource_id
+
+================================================================================
+SECTION 6: CODE QUALITY NOTES
+================================================================================
+
+Positive Findings:
+  - Config structure consistent across all sources
+  - Field mappings well-documented
+  - Active flags properly set
+  - Platform types clearly identified (socrata, arcgis, ckan, accela)
+  - Migration script properly handles both CITY_REGISTRY and BULK_SOURCES
+
+Areas for Improvement:
+  - Error handling in collector for zero-result responses
+  - Endpoint validation during startup (can test endpoints on app start)
+  - Logging level for failed data collection (useful for debugging)
+  - Automatic detection of endpoint availability/changes
+  - Field name validation (warn if expected field not in response)
+
+================================================================================
+SECTION 7: TESTING CHECKLIST
+================================================================================
+
+For Complete V28 Verification:
+
+[ ] San Diego County dyzh-7eat endpoint returns valid JSON
+[ ] San Diego data collection running successfully
+[ ] Memphis Accela scraper loads portal and returns permits
+[ ] Memphis permit count >50
+[ ] Baltimore FeatureServer layer 3 accessible
+[ ] Baltimore returns >50 permits
+[ ] Milwaukee CKAN datastore accessible with correct UUID
+[ ] Milwaukee returns >50 permits
+[ ] Migration 003 executed successfully
+[ ] prod_cities table contains 775+ active cities
+[ ] Collector runs without errors on all 4 cities
+[ ] No null/missing field errors in logs
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Code Analysis: ✅ All intended changes verified in git
+Config Verification: ✅ All configs syntactically correct
+External Testing: ❌ BLOCKED by network proxy restrictions
+
+Status Summary:
+  - San Diego: Code fix confirmed, endpoint test needed
+  - Memphis: Config correct, data stale (manual test needed)
+  - Baltimore: Flagged as broken, investigation needed
+  - Milwaukee: Flagged as broken, investigation needed
+
+Next Action Items (Priority Order):
+  1. Run migration 003 to sync cities to database
+  2. Test San Diego public endpoint from unrestricted network
+  3. Manually test Memphis Accela portal
+  4. Investigate Baltimore layer/dataset changes
+  5. Investigate Milwaukee UUID/resource changes
+  6. Run full collector test cycle on all 4 cities

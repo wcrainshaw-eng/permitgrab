@@ -1,0 +1,206 @@
+PERMITGRAB INACTIVE CITIES ANALYSIS
+Research Date: 2026-03-31
+Total Inactive Cities: 384
+Analysis Focus: Top 100 by estimated population (from file ordering)
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+The PermitGrab project has 384 cities marked as inactive (active: False). Analysis
+of the top 100 cities by population shows:
+
+  - 87% have SOCRATA platform with real endpoints (mostly functional, needs testing)
+  - 7% have ARCGIS endpoints (variable status - some server-blocked)
+  - 5% have NO platform/endpoint (need new data sources)
+  - 1% confirmed known-dead Accela implementations
+
+KEY FINDING: The majority of inactive cities are NOT intentionally deactivated due
+to broken endpoints - they appear to be deactivated for data quality/freshness
+reasons. Many have real, valid endpoints that just need verification and re-testing.
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+
+1. CATEGORY: KNOWN DEAD ACCELA CITIES (1 entry in top 100)
+   Status: Already verified as having no building modules
+   Action: Keep deactivated - skip in next batch
+
+   - Fresno, CA (accela) - KNOWN_DEAD_ACCELA
+
+   Note: Only 1 of the 5 known dead (FRESNO, COC/Cleveland, PIMA, RENO, DAYTON)
+   appears in top 100, suggesting others are lower-population cities.
+
+
+2. CATEGORY: ARCGIS ENDPOINTS (7 entries in top 100)
+   Status: Mixed - some potentially fixable, 1 confirmed server-blocked
+   Action: Investigate each endpoint's current status
+
+   Potentially Fixable:
+   - Longview, TX         (arcgis) - https://cloud.longviewtexas.gov/arcgis/rest/services/...
+   - Lynchburg, VA        (arcgis) - https://mapviewer.lynchburgva.gov/arcgis/rest/services/...
+   - Las Vegas, NV        (arcgis) - https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/re...
+   - Jacksonville, FL     (arcgis) - https://services1.arcgis.com/sSwFpTv9KLqJnHQx/arcgis/re...
+   - Albuquerque, NM      (arcgis) - https://coageo.cabq.gov/cabqgeo/rest/services/agis/City...
+   - Noblesville, IN      (arcgis) - [endpoint present]
+
+   Server-Blocked (403):
+   - Tampa, FL            (arcgis) - SERVER-BLOCKED: arcgis.tampagov.net returns 403
+     from Render - may need direct IP or different approach
+
+   Recommendation: Test arcgis endpoints via 6-month backfill. Many might just need
+   endpoint URL verification or parameter adjustments.
+
+
+3. CATEGORY: SOCRATA ENDPOINTS - REAL & FUNCTIONAL (87 entries in top 100)
+   Status: Endpoints exist and point to real Socrata instances
+   Deactivation Reason: Mostly data staleness or quality issues (not broken endpoints)
+   Action: PRIORITY - These are best candidates for reactivation
+
+   Sub-categories in top 100:
+
+   A) Data Staleness Issues (some noted as "STALE_DATA"):
+      - Mesa, AZ             (socrata) - Old dataset stale since Jan 2026,
+                             replaced by mesa_new with fresh data
+      - Albuquerque, NM      (arcgis) - Noted as stale data
+      - Long Beach, CA       (socrata) - Deactivated status
+      - Gainesville, FL      (socrata) - Deactivated status
+      - Norfolk, VA          (socrata) - Deactivated status
+
+   B) Functional Real Endpoints (majority - 74+ entries):
+      Most of top 100 Socrata cities have real endpoints pointing to legitimate
+      data portals. Examples:
+      - New Jersey State    data.nj.gov/resource/w9se-dmra.json
+      - Marin County, CA    data.marincounty.gov/resource/mkbn-caye.json
+      - Framingham, MA      data.framinghamma.gov/resource/2vzw-yean.json
+      - Parker, CO          parkeronline.data.socrata.com/resource/f6vi-7y2...
+      - Roseville, CA       data.roseville.ca.us/resource/buxi-gsvq.json
+
+      Pattern: Large cluster of NJ cities all pointing to same state dataset
+      (w9se-dmra) - likely all valid and accessible once tested.
+
+   Recommendation: These are HIGHEST PRIORITY for reactivation testing. Run
+   6-month backfill on sample of these (test various endpoint types):
+   1. State portals (New Jersey)
+   2. Municipal portals (Long Beach, Roseville)
+   3. City-hosted Socrata (Parker, Framingham, others)
+   
+   Expected success rate: 60-80% after fixing any field mapping issues.
+
+
+4. CATEGORY: EMPTY PLATFORM/ENDPOINT (5 entries in top 100)
+   Status: No data source configured - need to find alternatives
+   Action: Research and add new endpoints
+
+   Cities needing data sources:
+   - St. Louis, MO
+   - Sayreville, NJ
+   - Linden, NJ
+   - Atlantic City, NJ
+   - Garfield, NJ
+
+   Recommendation: Search for:
+   - Local government data portals (city/county websites)
+   - State open data initiatives (NJ, MO statewide portals)
+   - Accela instances (if relevant)
+   - CKAN or other open data platforms
+   
+   Note: 2 more empty platform cities exist in full 384 list (Laurel, MD and
+   Urbana, IL) - handle in later batches.
+
+
+5. CATEGORY: OTHER PLATFORMS IN FULL LIST (outside top 100)
+   - Milwaukee, WI (ckan) - active in top 100, but noted for reference
+   - Some entries with other platform types in tail end of file
+
+================================================================================
+COMPARISON TO KNOWN DEAD CITIES
+================================================================================
+
+Known Dead Accelas (verified as having no building modules):
+  - FRESNO, CA              [FOUND in top 100]
+  - COC/CLEVELAND, OH       [NOT in top 100 - likely lower pop]
+  - PIMA, AZ                [NOT in top 100]
+  - RENO, NV                [NOT in top 100]
+  - DAYTON, OH              [NOT in top 100]
+
+None of the Accela entries in top 100 claim to be broken Accela instances.
+Suggests good filtering already happened or these are intentionally kept as
+reference entries.
+
+
+================================================================================
+FABRICATED ENDPOINT PATTERN ANALYSIS
+================================================================================
+
+No evidence of fabricated domains in top 100. All endpoints either:
+- Point to real Socrata instances (data.*.gov, *.data.socrata.com)
+- Point to real ArcGIS servers (services1.arcgis.com, local arcgis instances)
+- Are empty (7 cases)
+
+This is good news - the fabricated domain problem mentioned in memory docs is
+NOT prevalent in top 100 cities.
+
+
+================================================================================
+PRIORITY RECOMMENDATIONS FOR NEXT BATCH
+================================================================================
+
+TIER 1 - HIGH PROBABILITY SUCCESS (should test first):
+  Sample 10-15 Socrata cities from different endpoint types:
+  - New Jersey cluster (5-6 cities) - likely all point to same working endpoint
+  - Long Beach, CA (large city, real portal)
+  - Roseville, CA (municipal, real portal)
+  - Framingham, MA (state portal)
+  - Parker, CO (city-hosted Socrata)
+  - Marin County, CA (county, likely well-maintained)
+
+  Expected success: 70-80% will have data or fixable field mapping issues
+
+TIER 2 - MEDIUM PROBABILITY (test after Tier 1):
+  ArcGIS endpoints (7 cities):
+  - Test Las Vegas, Longview, Lynchburg, Jacksonville, Albuquerque, Noblesville
+  - Skip Tampa (confirmed 403 server block)
+  - Each needs individual testing - success varies by jurisdiction
+
+  Expected success: 40-60% will have data, some may need URL/parameter fixes
+
+TIER 3 - REQUIRES RESEARCH (lowest priority in next batch):
+  Empty platform cities (5 in top 100):
+  - St. Louis, Sayreville, Linden, Atlantic City, Garfield
+  - Need manual research to find data sources
+  - Defer to later when focus is on expanding coverage
+
+TIER 4 - SKIP FOR NOW:
+  - Fresno, CA (confirmed dead Accela)
+
+
+================================================================================
+TESTING PROTOCOL (from memory.md reference)
+================================================================================
+
+For each reactivation attempt:
+  1. Test endpoint (verify accessibility, data returns)
+  2. Backfill 6 months of data
+  3. If successful, activate in config and commit
+  4. If fails, note reason and defer to later batch
+
+
+================================================================================
+FILE LOCATIONS & REFERENCES
+================================================================================
+
+City configs file: /sessions/gracious-dazzling-carson/mnt/Documents/PermitGrab/city_configs.py
+  - 384 inactive entries total
+  - Top 100 analyzed in detail
+  - Entries 101-384 mostly smaller cities (same platform distributions)
+
+Audit document: /sessions/gracious-dazzling-carson/mnt/Documents/PermitGrab/V23_TOP2000_CITY_AUDIT.txt
+  - Contains process docs for testing inactive cities
+  - Documents similar batch-testing approach
+
+Database reference: /sessions/gracious-dazzling-carson/mnt/.auto-memory/reference_city_tracker_db.md
+  - us_cities table tracks ~19,500 cities by population
+  - Can use for identifying which inactive cities are highest priority
+

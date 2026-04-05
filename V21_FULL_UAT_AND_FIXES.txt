@@ -1,0 +1,829 @@
+================================================================================
+V21 — FULL UAT REPORT + BUG FIXES + SEO IMPROVEMENTS
+Generated: 2026-03-27 (post-V20 deploy + prod DB cleanup)
+Priority: HIGH — Site is live, collectors running, subscribers possible any day
+================================================================================
+
+CURRENT STATE (after V20 cleanup):
+  - Deploy: LIVE (commit 0215c33, deployed 6:36 PM March 27)
+  - /api/health: WORKING (status "ok", collection "healthy")
+  - Total permits: 427,324 (down from 516,897 after dedup + cleanup)
+  - Collector: ACTIVELY RUNNING (last_collection_run just happened)
+  - Calgary: GONE
+  - Garbage numeric cities: GONE
+  - Duplicates: 79,336 removed
+
+This file covers EVERYTHING found during a full UAT — frontend, backend,
+data quality, SEO, and customer flows. Organized by priority.
+
+================================================================================
+PART 1: CRITICAL BUGS (Fix before subscribers see the site)
+================================================================================
+
+BUG #1 — JSON COORDINATES DISPLAYED AS ADDRESSES
+------------------------------------------------------------------------
+Severity: CRITICAL
+Count: 1,814 permits affected
+Location: Primarily Silver Spring, MD area permits
+
+PROBLEM:
+Some permits have raw JSON objects stored in the address field instead
+of parsed street addresses. They display on the site like:
+  {'latitude': '39.028879', 'longitude': '-77.103714', 'human_address': '...'}
+
+This looks broken and unprofessional to any visitor.
+
+ROOT CAUSE:
+The Socrata collector receives location fields as JSON objects containing
+lat/lon and a human_address sub-field. The collector stores the raw JSON
+string instead of extracting the human_address value.
+
+FIX (two parts):
+
+Part A — Fix the collector to parse JSON addresses going forward:
+  In the Socrata collector's normalize function, when extracting the
+  address field, check if the value looks like a JSON object (starts
+  with '{' or contains 'human_address'). If so, parse it:
+
+    import json
+    raw_address = record.get('address') or record.get('location') or ''
+    if isinstance(raw_address, dict):
+        raw_address = raw_address.get('human_address', '') or str(raw_address)
+    elif isinstance(raw_address, str) and raw_address.startswith('{'):
+        try:
+            parsed = json.loads(raw_address.replace("'", '"'))
+            raw_address = parsed.get('human_address', '') or raw_address
+        except:
+            pass
+
+Part B — Clean existing bad data on prod DB:
+  Run on Render Shell:
+
+  python3 -c "
+  import sqlite3, json, re
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  rows = conn.execute(\"SELECT rowid, address FROM permits WHERE address LIKE '%human_address%' OR address LIKE '%coordinates%'\").fetchall()
+  fixed = 0
+  for rowid, addr in rows:
+      try:
+          parsed = json.loads(addr.replace(chr(39), chr(34)))
+          human = parsed.get('human_address', '')
+          if human:
+              conn.execute('UPDATE permits SET address=? WHERE rowid=?', (human, rowid))
+              fixed += 1
+      except: pass
+  conn.commit()
+  print('Fixed', fixed, 'of', len(rows), 'JSON addresses')
+  "
+
+VERIFY: Search for permits in Silver Spring, MD — addresses should now
+show normal street addresses, not JSON blobs.
+
+
+BUG #2 — "HOUSTON, OK" HAS 4,321 PERMITS (WRONG STATE)
+------------------------------------------------------------------------
+Severity: CRITICAL
+Count: 4,321 permits
+
+PROBLEM:
+Houston is in Texas, not Oklahoma. But 4,321 permits are tagged as
+Houston, OK. This is likely from a bulk Oklahoma source that has a
+city called Houston in the data, OR the collector mapped it wrong.
+
+FIX:
+First, check if there's actually a tiny Houston, OK (there isn't —
+there's no incorporated place called Houston in Oklahoma). These are
+almost certainly Fort Worth/Texas area permits miscategorized.
+
+Run on Render Shell:
+  python3 -c "
+  import sqlite3
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  # Check what these Houston OK permits look like
+  rows = conn.execute(\"SELECT address, permit_type, filing_date FROM permits WHERE city='Houston' AND state='OK' LIMIT 10\").fetchall()
+  for r in rows: print(r)
+  # Check if there's also Houston TX
+  tx = conn.execute(\"SELECT COUNT(*) FROM permits WHERE city='Houston' AND state='TX'\").fetchone()[0]
+  print('Houston TX count:', tx)
+  ok = conn.execute(\"SELECT COUNT(*) FROM permits WHERE city='Houston' AND state='OK'\").fetchone()[0]
+  print('Houston OK count:', ok)
+  "
+
+If the Houston OK permits look like real Houston TX permits (Texas
+addresses, normal permit types), fix them:
+  conn.execute("UPDATE permits SET state='TX' WHERE city='Houston' AND state='OK'")
+
+If they look like Oklahoma data, investigate which source is producing
+them and fix the source config.
+
+
+BUG #3 — PERMIT TYPES STORED AS CITY NAMES ("Gas", "Plumbing", etc.)
+------------------------------------------------------------------------
+Severity: CRITICAL
+Count: ~2,000 permits across "Gas" (~989), "Plumbing" (~987), and similar
+
+PROBLEM:
+Some permits have the permit TYPE in the city field instead of the
+actual city name. This creates fake "cities" like "Gas" and "Plumbing"
+in the data. These show up in query results and pollute the data.
+
+ROOT CAUSE:
+A bulk source (likely a county-level dataset) has columns that got
+mapped wrong — the permit_type column was mapped to the city field.
+
+FIX:
+Step 1 — Identify the source:
+  python3 -c "
+  import sqlite3
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  rows = conn.execute(\"SELECT city, state, source_city_key, COUNT(*) FROM permits WHERE city IN ('Gas','Plumbing','Electrical','Mechanical','Building','Fire') GROUP BY city, state, source_city_key\").fetchall()
+  for r in rows: print(r)
+  "
+
+Step 2 — Once you know the source_city_key, fix the field mapping in
+the source config so it doesn't happen again.
+
+Step 3 — Clean up existing data. If the permits belong to a known city
+(check the source config), update them:
+  UPDATE permits SET city='[correct city]' WHERE city IN ('Gas','Plumbing','Electrical','Mechanical') AND source_city_key='[source]'
+
+If you can't determine the correct city, delete them:
+  DELETE FROM permits WHERE city IN ('Gas','Plumbing','Electrical','Mechanical','Building','Fire')
+
+
+BUG #4 — 56,981 PERMITS WITH EMPTY STATE FIELD
+------------------------------------------------------------------------
+Severity: HIGH
+Count: 56,981 permits (12.57% of all data)
+
+PROBLEM:
+Over 56K permits have an empty string '' as the state. These permits
+still appear on the site but can't be properly categorized by state.
+
+FIX:
+Step 1 — Check which cities these belong to:
+  python3 -c "
+  import sqlite3
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  rows = conn.execute(\"SELECT city, COUNT(*) as cnt FROM permits WHERE state='' OR state IS NULL GROUP BY city ORDER BY cnt DESC LIMIT 20\").fetchall()
+  for r in rows: print(r)
+  "
+
+Step 2 — For each city, if the correct state is obvious (e.g., Orlando
+is always FL), batch-update them:
+  UPDATE permits SET state='FL' WHERE city='Orlando' AND (state='' OR state IS NULL)
+  UPDATE permits SET state='TX' WHERE city='Houston' AND (state='' OR state IS NULL)
+  etc.
+
+Step 3 — Add state validation in the collector: reject or flag permits
+where state is empty/NULL before insertion.
+
+
+BUG #5 — 75,323 PERMITS WITH NO FILING DATE (16.6%)
+------------------------------------------------------------------------
+Severity: HIGH
+Count: 75,323 permits
+
+PROBLEM:
+16.6% of permits have no filing_date. These can't be sorted by recency
+and may show as stale. Some entire cities have no dates at all
+(Watertown WI, Hagerstown MD, Santa Rosa CA, Madison County ID — each
+with ~4,000 dateless permits).
+
+FIX:
+Step 1 — Identify which sources produce dateless permits:
+  python3 -c "
+  import sqlite3
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  rows = conn.execute(\"SELECT city, state, source_city_key, COUNT(*) FROM permits WHERE filing_date IS NULL OR filing_date='' GROUP BY city, state, source_city_key ORDER BY COUNT(*) DESC LIMIT 20\").fetchall()
+  for r in rows: print(r)
+  "
+
+Step 2 — For each source, check if there's an alternative date field
+(issued_date, date, collected_at) that could be used as a fallback:
+  UPDATE permits SET filing_date = COALESCE(issued_date, date, collected_at)
+  WHERE filing_date IS NULL OR filing_date = ''
+
+Step 3 — Update source configs to map the correct date field.
+
+
+BUG #6 — 215 PERMITS WITH STATE='AB' (ALBERTA, CANADA)
+------------------------------------------------------------------------
+Severity: MEDIUM
+Count: 215 permits
+
+PROBLEM:
+Even though we deleted Calgary, there are still 215 permits with
+state='AB' (Alberta). These slipped through because they may have
+a different city name.
+
+FIX:
+  DELETE FROM permits WHERE state='AB'
+
+And verify the collector's state validation catches 'AB' going forward
+(the is_valid_state() function should already block this).
+
+
+================================================================================
+PART 2: DATA QUALITY IMPROVEMENTS
+================================================================================
+
+ISSUE #7 — 78% OF PERMITS HAVE ZERO/NULL ESTIMATED COST
+------------------------------------------------------------------------
+Severity: MEDIUM
+Count: 355,691 permits
+
+PROBLEM:
+78% of permits have no cost data. The site displays "$0" or blank for
+these, which makes lead quality look poor. The homepage claims "$23.7B
+total project value" but that's from only 22% of permits.
+
+This is partly unavoidable (not all sources provide cost) but should
+be mitigated:
+
+FIX:
+1. In the display/template code, show "Cost not reported" instead of
+   "$0" or blank when estimated_cost is 0 or NULL.
+2. In the lead quality scoring, don't penalize permits for missing
+   cost — many legitimate permits don't report cost.
+3. Consider hiding cost column entirely when a city's permits are
+   mostly zero-cost.
+
+
+ISSUE #8 — 21,520 PERMITS WITH NO ADDRESS (4.75%)
+------------------------------------------------------------------------
+Severity: MEDIUM
+Count: 21,520 permits
+
+PROBLEM:
+These show as "N/A" or "Address not provided" on the site. They have
+limited value as leads since you can't identify the property.
+
+FIX:
+1. Don't DELETE these — some have other useful data (contractor name,
+   permit type, cost).
+2. In the API/display layer, add a filter option: "Hide permits without
+   addresses" (default ON for the main view).
+3. Move "Address not provided" permits to the bottom of sort results
+   (the scoring code already does this, verify it works on display).
+
+
+ISSUE #9 — 2,862 CITIES WITH 5 OR FEWER PERMITS
+------------------------------------------------------------------------
+Severity: LOW-MEDIUM
+Count: 2,862 cities (61.6% of all city/state combinations)
+
+PROBLEM:
+These cities show as having data but a visitor clicking through would
+see almost nothing. Bad experience — feels like an empty site.
+
+FIX:
+1. In the /cities page grid, only show cities with 10+ permits.
+2. Cities with <10 permits should still work if someone navigates
+   directly (don't 404), but don't promote them.
+3. On city pages with very few permits, show a message like:
+   "We're actively collecting permit data for [City]. Check back soon
+   for more leads."
+
+
+ISSUE #10 — prod_cities TABLE IS EMPTY
+------------------------------------------------------------------------
+Severity: LOW (site works without it, but autonomy engine needs it)
+
+PROBLEM:
+The prod_cities table has 0 rows on production. The site derives its
+city list from CITY_REGISTRY in city_configs.py, so the front end
+works fine. But the autonomy engine's maintenance cycle, staleness
+detection, and city management features all depend on prod_cities.
+
+FIX:
+Populate prod_cities from the actual permit data:
+  python3 -c "
+  import sqlite3
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  conn.execute('''INSERT OR IGNORE INTO prod_cities (city, state, total_permits, status)
+    SELECT city, state, COUNT(*), 'active'
+    FROM permits
+    WHERE city != '' AND state != ''
+    GROUP BY city, state
+    HAVING COUNT(*) >= 10''')
+  conn.commit()
+  print('Populated prod_cities:', conn.execute('SELECT COUNT(*) FROM prod_cities').fetchone()[0])
+  "
+
+
+ISSUE #11 — us_cities TABLE HAS 43,326 ROWS (EXPECTED ~19,500)
+------------------------------------------------------------------------
+Severity: LOW
+
+PROBLEM:
+The us_cities table has roughly double the expected row count. The seed
+script was likely run twice. This doesn't break anything but wastes
+space and could confuse the autonomy engine's priority calculations.
+
+FIX:
+Check for duplicates:
+  python3 -c "
+  import sqlite3
+  conn = sqlite3.connect('/var/data/permitgrab.db')
+  dupes = conn.execute('SELECT city_name, state, COUNT(*) FROM us_cities GROUP BY city_name, state HAVING COUNT(*) > 1').fetchall()
+  print('Duplicate city entries:', len(dupes))
+  if dupes: print('Examples:', dupes[:5])
+  "
+
+If duplicates exist, deduplicate:
+  DELETE FROM us_cities WHERE id NOT IN (
+    SELECT MIN(id) FROM us_cities GROUP BY city_name, state
+  )
+
+
+================================================================================
+PART 3: FRONTEND / UX FIXES
+================================================================================
+
+FIX #12 — PRICING PAGE SHOWS 2 PLANS, HOMEPAGE MENTIONS 3
+------------------------------------------------------------------------
+Severity: MEDIUM
+
+PROBLEM:
+The pricing page shows Free ($0) and Professional ($149/mo). But other
+parts of the site reference Starter/Professional/Enterprise tiers.
+This is confusing for visitors comparing plans.
+
+FIX:
+Either:
+A) Remove references to Starter/Enterprise from the homepage/other
+   pages and keep the 2-tier model (simpler), OR
+B) Add all 3 tiers to the pricing page with clear feature comparison.
+
+Recommendation: Go with option A for now (2 tiers: Free + Pro). Fewer
+choices = higher conversion.
+
+
+FIX #13 — "N/A" ADDRESSES VISIBLE TO USERS
+------------------------------------------------------------------------
+Severity: MEDIUM
+
+PROBLEM:
+Permits with no address show "N/A" in the address column on city pages.
+This looks unprofessional and isn't useful information.
+
+FIX:
+In the city_landing.html template (~line 140, 162):
+  Change: {{ (v.address or 'N/A')|title }}
+  To: {{ v.address|title if v.address and v.address != 'Address not provided' else 'Address pending' }}
+
+"Address pending" sounds like it might be updated, which is better than
+a hard "N/A" that implies permanent unavailability.
+
+
+FIX #14 — CONTRACTORS PAGE SHOWS "0 contractors" BY DEFAULT
+------------------------------------------------------------------------
+Severity: LOW-MEDIUM
+
+PROBLEM:
+The Contractors page at /contractors shows "0 contractors" and "No
+contractors found" when you first land on it. This is a bad first
+impression even though data loads when you select a specific city.
+
+FIX:
+1. Pre-populate with contractors from the most active cities.
+2. OR show a helpful message: "Select a city to view active contractors"
+   instead of "No contractors found".
+3. OR default to the user's city (if known) or the largest market.
+
+
+================================================================================
+PART 4: SEO IMPROVEMENTS (Get more organic traffic)
+================================================================================
+
+SEO #1 — ADD og:image TO ALL CITY + BLOG PAGES [HIGH IMPACT]
+------------------------------------------------------------------------
+Severity: HIGH for traffic growth
+
+PROBLEM:
+Only the homepage has an og:image meta tag. All city pages, the /cities
+directory, pricing page, blog index, and individual blog posts are
+MISSING og:image. When these pages get shared on social media (Facebook,
+LinkedIn, Twitter/X), they show no preview image — dramatically reducing
+click-through rates.
+
+FIX:
+In templates/base.html, the og:image is set to a default. But city and
+blog templates need to override it.
+
+Option A (quick): Set a universal og:image fallback in base.html that
+looks good for any page (e.g., PermitGrab logo + tagline graphic).
+  <meta property="og:image" content="{{ og_image or url_for('static', filename='img/og-default.png') }}">
+
+Option B (better): Pass og_image from each route handler:
+  - City pages: Generate or use a city-branded image
+  - Blog posts: Use a blog-specific or post-specific image
+  - Pricing: Use a pricing-specific image
+
+At minimum, ensure og-default.png exists and is a high-quality
+1200x630px image with the PermitGrab brand.
+
+
+SEO #2 — ADD twitter:image META TAG
+------------------------------------------------------------------------
+Severity: MEDIUM
+
+PROBLEM:
+twitter:image is missing from most pages. Twitter/X cards won't show
+preview images.
+
+FIX:
+In base.html, add:
+  <meta name="twitter:image" content="{{ og_image or url_for('static', filename='img/og-default.png') }}">
+
+This can share the same image as og:image.
+
+
+SEO #3 — ADD INTERNAL LINKS FROM BLOG POSTS TO CITY PAGES
+------------------------------------------------------------------------
+Severity: HIGH for SEO
+
+PROBLEM:
+Blog posts about specific cities (Spokane, DC, Durham, Phoenix) don't
+link to their corresponding permit pages (/permits/spokane, /permits/dc,
+etc.). This is a huge missed opportunity for:
+  - Passing SEO link equity to city pages
+  - Converting blog readers into site users
+  - Improving internal linking topology
+
+FIX:
+For each blog post that mentions a city:
+1. Add a CTA box near the top: "View live building permits in [City] →"
+   linking to /permits/[city-slug]
+2. Add contextual in-text links where the city is first mentioned
+3. Add a "Related Permits" section at the bottom with links to the
+   city pages mentioned in the article
+
+This should be done for ALL existing blog posts AND built into the
+blog post template as a standard practice.
+
+
+SEO #4 — CITY PAGE SCHEMA.ORG ENHANCEMENTS
+------------------------------------------------------------------------
+Severity: MEDIUM
+
+PROBLEM:
+City pages have Dataset schema, which is good. But they could also
+benefit from:
+  - LocalBusiness schema for contractor leads
+  - BreadcrumbList schema (breadcrumbs exist visually but not as
+    structured data)
+  - FAQ schema if there are FAQ sections
+
+FIX:
+Add BreadcrumbList schema to city pages:
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://permitgrab.com/"},
+      {"@type": "ListItem", "position": 2, "name": "{{ state }}", "item": "https://permitgrab.com/states/{{ state|lower }}"},
+      {"@type": "ListItem", "position": 3, "name": "{{ city }}", "item": "https://permitgrab.com/permits/{{ slug }}"}
+    ]
+  }
+  </script>
+
+
+SEO #5 — PROGRAMMATIC STATE PAGES (NEW PAGES FOR SEO)
+------------------------------------------------------------------------
+Severity: HIGH for traffic growth
+
+PROBLEM:
+There are no state-level pages (e.g., /states/florida, /states/texas).
+The breadcrumbs link to states but those pages may not exist. State
+pages would capture searches like "Florida building permits" and
+"Texas contractor leads" which have significant search volume.
+
+FIX:
+Create a state landing page template that:
+1. Lists all cities in that state with permit counts
+2. Shows aggregate state stats (total permits, avg project value)
+3. Has unique meta title: "[State] Building Permits & Contractor Leads"
+4. Has unique meta description referencing the state and city count
+5. Links to all city pages within the state
+
+Route: /states/<state-slug> (e.g., /states/florida, /states/texas)
+Add all 50 states + DC to the sitemap.
+
+
+SEO #6 — SITEMAP IMPROVEMENTS
+------------------------------------------------------------------------
+Severity: MEDIUM
+
+PROBLEM:
+The sitemap only includes cities from CITY_REGISTRY (the active sources).
+If you have 870+ city pages but only ~60 configured sources, the sitemap
+is missing 800+ pages that Google should know about.
+
+FIX:
+1. Ensure sitemap.xml includes ALL city pages that have permits (query
+   the DB for distinct city/state combos with 10+ permits)
+2. Add lastmod dates based on the most recent permit filing_date for
+   each city
+3. Add state pages (from SEO #5 above) to the sitemap
+4. Add all blog posts with proper lastmod dates
+5. Set changefreq: "daily" for city pages, "weekly" for blog posts
+
+
+SEO #7 — IMAGE LAZY LOADING
+------------------------------------------------------------------------
+Severity: LOW
+
+PROBLEM:
+No lazy loading detected on images. If there are below-fold images,
+they load upfront, slowing initial page load.
+
+FIX:
+Add loading="lazy" to all img tags that are below the fold:
+  <img src="..." alt="..." loading="lazy">
+
+Skip this for hero images and above-fold content.
+
+
+================================================================================
+PART 5: RENDER SHELL COMMANDS (Copy-paste in order)
+================================================================================
+
+After making the code fixes above, run these on Render Shell to clean
+the existing bad data:
+
+STEP 1: Fix JSON addresses
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3, json
+conn = sqlite3.connect('/var/data/permitgrab.db')
+rows = conn.execute(\"SELECT rowid, address FROM permits WHERE address LIKE '%human_address%' OR address LIKE '%coordinates%'\").fetchall()
+fixed = 0
+for rowid, addr in rows:
+    try:
+        parsed = json.loads(addr.replace(chr(39), chr(34)))
+        human = parsed.get('human_address', '')
+        if human:
+            conn.execute('UPDATE permits SET address=? WHERE rowid=?', (human, rowid))
+            fixed += 1
+    except: pass
+conn.commit()
+print('Fixed', fixed, 'of', len(rows), 'JSON addresses')
+"
+
+STEP 2: Fix Houston OK → TX (verify first)
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+# Check what these look like first
+rows = conn.execute(\"SELECT address, permit_type, filing_date, source_city_key FROM permits WHERE city='Houston' AND state='OK' LIMIT 5\").fetchall()
+for r in rows: print(r)
+print('Houston OK count:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE city='Houston' AND state='OK'\").fetchone()[0])
+print('Houston TX count:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE city='Houston' AND state='TX'\").fetchone()[0])
+"
+# IF they look like Texas permits, run:
+# python3 -c "import sqlite3; conn = sqlite3.connect('/var/data/permitgrab.db'); print(conn.execute(\"UPDATE permits SET state='TX' WHERE city='Houston' AND state='OK'\").rowcount); conn.commit()"
+
+STEP 3: Delete permit-type-as-city-name records
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+rows = conn.execute(\"SELECT city, COUNT(*) FROM permits WHERE city IN ('Gas','Plumbing','Electrical','Mechanical','Building','Fire','Roofing','Sewer','Demolition','Grading','Pool','Sign','Fence') GROUP BY city\").fetchall()
+print('Fake cities found:')
+for r in rows: print(r)
+total = sum(r[1] for r in rows)
+print('Total:', total)
+"
+# Then delete them:
+# python3 -c "import sqlite3; conn = sqlite3.connect('/var/data/permitgrab.db'); d = conn.execute(\"DELETE FROM permits WHERE city IN ('Gas','Plumbing','Electrical','Mechanical','Building','Fire','Roofing','Sewer','Demolition','Grading','Pool','Sign','Fence')\").rowcount; conn.commit(); print('Deleted:', d)"
+
+STEP 4: Delete remaining Alberta permits
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+d = conn.execute(\"DELETE FROM permits WHERE state='AB'\").rowcount
+conn.commit()
+print('Deleted AB permits:', d)
+"
+
+STEP 5: Backfill empty states where city is unambiguous
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+# Map common cities to their states
+fixes = {
+    'Orlando': 'FL', 'Houston': 'TX', 'Chicago': 'IL', 'Austin': 'TX',
+    'Phoenix': 'AZ', 'Denver': 'CO', 'Portland': 'OR', 'Boston': 'MA',
+    'Los Angeles': 'CA', 'San Jose': 'CA', 'Milwaukee': 'WI',
+    'Baltimore': 'MD', 'Fort Worth': 'TX', 'Dallas': 'TX',
+    'San Antonio': 'TX', 'Nashville': 'TN', 'Mesa': 'AZ',
+    'New York City': 'NY', 'Seattle': 'WA', 'San Francisco': 'CA',
+    'Little Rock': 'AR', 'New Orleans': 'LA', 'Utica': 'NY'
+}
+total = 0
+for city, state in fixes.items():
+    n = conn.execute(\"UPDATE permits SET state=? WHERE city=? AND (state='' OR state IS NULL)\", (state, city)).rowcount
+    if n > 0:
+        print(f'  {city} -> {state}: {n} fixed')
+        total += n
+conn.commit()
+print('Total empty states fixed:', total)
+"
+
+STEP 6: Backfill empty filing dates from alternative date fields
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+n = conn.execute(\"UPDATE permits SET filing_date = COALESCE(issued_date, date) WHERE (filing_date IS NULL OR filing_date = '') AND (issued_date IS NOT NULL AND issued_date != '' OR date IS NOT NULL AND date != '')\").rowcount
+conn.commit()
+print('Filing dates backfilled:', n)
+"
+
+STEP 7: Populate prod_cities from permit data
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+conn.execute('''INSERT OR IGNORE INTO prod_cities (city, state, total_permits, status)
+  SELECT city, state, COUNT(*), 'active'
+  FROM permits
+  WHERE city != '' AND state != '' AND city NOT IN ('Gas','Plumbing','Electrical','Mechanical')
+  GROUP BY city, state
+  HAVING COUNT(*) >= 10''')
+conn.commit()
+print('Populated prod_cities:', conn.execute('SELECT COUNT(*) FROM prod_cities').fetchone()[0])
+"
+
+STEP 8: Deduplicate us_cities
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+before = conn.execute('SELECT COUNT(*) FROM us_cities').fetchone()[0]
+conn.execute('DELETE FROM us_cities WHERE id NOT IN (SELECT MIN(id) FROM us_cities GROUP BY city_name, state)')
+after = conn.execute('SELECT COUNT(*) FROM us_cities').fetchone()[0]
+conn.commit()
+print('us_cities before:', before, 'after:', after, 'removed:', before - after)
+"
+
+STEP 9: Final verification
+------------------------------------------------------------------------
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/var/data/permitgrab.db')
+print('=== FINAL STATE ===')
+print('Total permits:', conn.execute('SELECT COUNT(*) FROM permits').fetchone()[0])
+print('Garbage cities:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE city GLOB '[0-9]*'\").fetchone()[0])
+print('Calgary:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE city='Calgary'\").fetchone()[0])
+print('Alberta:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE state='AB'\").fetchone()[0])
+print('Empty state:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE state='' OR state IS NULL\").fetchone()[0])
+print('No date:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE filing_date IS NULL OR filing_date=''\").fetchone()[0])
+print('JSON addresses:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE address LIKE '%coordinates%' OR address LIKE '%human_address%'\").fetchone()[0])
+print('Fake city names:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE city IN ('Gas','Plumbing','Electrical','Mechanical','Building','Fire')\").fetchone()[0])
+print('Houston OK:', conn.execute(\"SELECT COUNT(*) FROM permits WHERE city='Houston' AND state='OK'\").fetchone()[0])
+print('prod_cities:', conn.execute('SELECT COUNT(*) FROM prod_cities').fetchone()[0])
+print('us_cities:', conn.execute('SELECT COUNT(*) FROM us_cities').fetchone()[0])
+print('=== DONE ===')
+"
+
+
+================================================================================
+PART 6: SEO CODE CHANGES (do in the codebase before deploying)
+================================================================================
+
+CHANGE 1: og:image and twitter:image on all pages
+------------------------------------------------------------------------
+File: templates/base.html
+
+In the <head> section, ensure these meta tags exist and use a variable:
+  <meta property="og:image" content="{{ og_image or '/static/img/og-default.png' }}">
+  <meta name="twitter:image" content="{{ og_image or '/static/img/og-default.png' }}">
+
+Then in each route handler in server.py, pass og_image when rendering:
+  return render_template('city_landing.html', og_image='/static/img/og-default.png', ...)
+
+Make sure /static/img/og-default.png exists and is a 1200x630px branded
+image (PermitGrab logo, tagline, maybe a city skyline graphic).
+
+
+CHANGE 2: BreadcrumbList schema on city pages
+------------------------------------------------------------------------
+File: templates/city_landing.html
+
+Add inside the <head> or at the bottom of the page:
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home",
+       "item": "https://permitgrab.com/"},
+      {"@type": "ListItem", "position": 2, "name": "{{ state_name }}",
+       "item": "https://permitgrab.com/states/{{ state|lower }}"},
+      {"@type": "ListItem", "position": 3, "name": "{{ city_name }}",
+       "item": "https://permitgrab.com/permits/{{ city_slug }}"}
+    ]
+  }
+  </script>
+
+
+CHANGE 3: Blog posts link to city pages
+------------------------------------------------------------------------
+For every blog post that mentions a city, add a prominent CTA:
+  <div class="blog-cta">
+    <a href="/permits/{{ city_slug }}">
+      View live building permits in {{ city_name }} →
+    </a>
+  </div>
+
+If blog posts are generated programmatically, build this into the
+template. If they're static HTML, manually add links.
+
+
+CHANGE 4: State landing pages (NEW)
+------------------------------------------------------------------------
+Create a new route in server.py:
+  @app.route('/states/<state_slug>')
+  def state_page(state_slug):
+      # Get all cities in this state with permit counts
+      # Render state_landing.html template
+
+Create templates/state_landing.html with:
+  - State name as H1
+  - Grid of cities in the state with permit counts
+  - Aggregate stats (total permits, cities covered)
+  - Unique meta title: "[State] Building Permits & Contractor Leads"
+  - Links to each city page
+
+Add to sitemap.xml generation.
+
+
+CHANGE 5: Improve sitemap with all permit cities
+------------------------------------------------------------------------
+File: server.py (sitemap generation function, ~line 1373)
+
+Instead of only including CITY_REGISTRY cities, query the database:
+  cities = conn.execute('''
+    SELECT DISTINCT city, state, MAX(filing_date) as lastmod
+    FROM permits
+    WHERE city != '' AND state != ''
+    GROUP BY city, state
+    HAVING COUNT(*) >= 10
+  ''').fetchall()
+
+Include these in the sitemap with lastmod dates.
+
+
+CHANGE 6: Hide low-count cities from /cities grid
+------------------------------------------------------------------------
+File: server.py (cities_list route) or template
+
+Only show cities with 10+ permits in the browse grid. Cities with
+fewer permits should still be accessible by direct URL but not
+promoted in the browse experience.
+
+
+================================================================================
+SUMMARY — PRIORITY ORDER
+================================================================================
+
+DO FIRST (Critical for subscriber readiness):
+  1. BUG #1: Fix JSON coordinate addresses (1,814 permits)
+  2. BUG #2: Fix Houston OK → TX (4,321 permits)
+  3. BUG #3: Delete permit-type city names (Gas, Plumbing — ~2,000)
+  4. BUG #4: Backfill empty states (56,981 permits)
+  5. BUG #6: Delete remaining Alberta permits (215)
+  6. Run PART 5 shell commands
+
+DO SECOND (Improve data quality):
+  7. BUG #5: Backfill filing dates (75,323 permits)
+  8. ISSUE #7: Display "Cost not reported" instead of $0
+  9. ISSUE #8: Filter/deprioritize "Address not provided"
+  10. ISSUE #10: Populate prod_cities table
+  11. ISSUE #11: Deduplicate us_cities
+
+DO THIRD (SEO — get traffic):
+  12. SEO #1: Add og:image to all pages
+  13. SEO #2: Add twitter:image
+  14. SEO #3: Internal links from blog to city pages
+  15. SEO #5: Create state landing pages
+  16. SEO #6: Expand sitemap
+
+DO FOURTH (Polish):
+  17. FIX #12: Align pricing page tiers
+  18. FIX #13: Show "Address pending" instead of "N/A"
+  19. FIX #14: Fix contractors page empty state
+  20. SEO #4: BreadcrumbList schema
+  21. SEO #7: Image lazy loading
+  22. ISSUE #9: Hide low-count cities from grid
+
+================================================================================
+END OF V21
+================================================================================

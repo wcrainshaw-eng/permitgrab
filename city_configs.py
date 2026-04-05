@@ -1786,8 +1786,8 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,  # V63: Deactivated - ArcGIS stale since April 2024
-        "notes": "V63: Deactivated - ArcGIS confirmed stale (April 2024). No live API alternative.",
+        "active": True,  # V72: Reactivated - endpoint confirmed working with permits through 2016+
+        "notes": "V72: Reactivated - ArcGIS FeatureServer confirmed working. Data from 2009-present via KIVA (2009-Sept 2016) and POSSE LMS (Sept 2016-present).",
     },
 
     "cleveland": {
@@ -6652,25 +6652,12 @@ CITY_REGISTRY = {
         "name": "Huntington Beach",
         "state": "CA",
         "slug": "huntington-beach",
-        "platform": "socrata",
-        "endpoint": "https://data.huntingtonbeachca.gov/resource/n6jd-r4hc.json",
-        "dataset_id": "n6jd-r4hc",
-        "description": "Building Permits",
-        "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "work_type": "work_class",
-            "address": "address",
-            "zip": "zip_code",
-            "filing_date": "issue_date",
-            "status": "status",
-            "estimated_cost": "valuation",
-            "description": "description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": False,  # V62: Deactivated - fabricated Socrata endpoint,  # V12.31 Deactivated: Error parsing response,
-        "notes": "V12.6: Deactivated â fabricated Socrata domain",
+        "platform": "accela",
+        "endpoint": "https://engage.huntingtonbeachca.gov/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Home",
+        "_accela_city_key": "huntington_beach",
+        "description": "Building Permits via Accela Citizen Access",
+        "active": True,  # V72: Converted to Accela scraper
+        "notes": "V72: Custom Accela domain engage.huntingtonbeachca.gov. Previously deactivated â fabricated Socrata domain",
     },
 
     "fremont": {

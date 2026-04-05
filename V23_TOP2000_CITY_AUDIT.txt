@@ -1,0 +1,2909 @@
+================================================================================
+V23 CITY AUDIT INSTRUCTIONS - PermitGrab System
+================================================================================
+Task: Work through every non-working city in the PermitGrab system and get them
+       collecting fresh building permit data.
+
+Total Cities to Process: 1,898
+  - Priority 1 (STALE):        15 cities (have config, but data is old)
+  - Priority 2 (NO_DATA):      154 cities (have config, but 0 permits collected)
+  - Priority 3 (INACTIVE):     183 cities (were deactivated)
+  - Priority 4 (NOT_CONFIGURED): 1,546 cities (no config exists)
+
+Target: Process all 1,898 by the end of the audit.
+
+================================================================================
+## 1. OVERVIEW
+================================================================================
+
+GOAL:
+Work through every city in the worklist (see section 13) until EACH one is in
+one of these states:
+
+  A) ACTIVE & COLLECTING
+     - Config exists in city_configs.py with "active": True
+     - A test fetch (python3 -c "from collector import fetch_permits...") returns
+       recent data (within last 6 months)
+     - Config has a one-line V23 AUDIT comment at the top
+
+  B) BLOCKED (data source not available)
+     - Config has "notes" field with "# BLOCKED:" prefix
+     - The comment explains exactly why data can't be collected
+     - Examples:
+       "# BLOCKED: Requires login to city portal, no public API found"
+       "# BLOCKED: No public building permit dataset found"
+       "# BLOCKED: Dataset exists but returns 403 Forbidden"
+       "# BLOCKED: Public portal took offline 2025-11-01, no replacement source"
+
+  C) LOGIN_REQUIRED (manual handling needed)
+     - Config has "notes" field with "# LOGIN_REQUIRED:" prefix
+     - These will be handled manually through Chrome later
+     - Examples:
+       "# LOGIN_REQUIRED: Portal requires API key registration at [URL]"
+       "# LOGIN_REQUIRED: City portal requires password authentication"
+
+WORK ORDER:
+1. Process Priority 1 (STALE) cities first — biggest population first
+2. Then Priority 2 (NO_DATA) — biggest population first
+3. Then Priority 3 (INACTIVE) — biggest population first
+4. Then Priority 4 (NOT_CONFIGURED) — biggest population first
+
+Within each tier, sort by population (descending) so we fix the most important
+cities first.
+
+================================================================================
+## 2. HOW TO DISCOVER DATA SOURCES FOR A CITY
+================================================================================
+
+For each city, Code should try these approaches IN ORDER:
+
+### 2.1 SOCRATA DISCOVERY
+Socrata is the most common open data platform in the US (SODA API).
+
+1. Check the city's main open data portal:
+   - Common domains:
+     * data.cityof[name].org
+     * data.[name]gov.com
+     * [name].data.socrata.com
+     * opendata.[name].gov
+   - Look for URLs like: https://data.domain.com/resource/xxxx-xxxx.json
+
+2. Use the Socrata Discovery API:
+   curl -s "https://api.us.socrata.com/api/catalog/v1?q=building+permit&domains=data.cityofdallas.us" | python3 -m json.tool
+
+3. Search for dataset names containing:
+   - "building permit"
+   - "construction permit"
+   - "development permit"
+   - "permit issued"
+   - "permits approved"
+
+4. Once you find a dataset ID (xxxx-xxxx), test it:
+   curl -s "https://data.domain.com/resource/xxxx-xxxx.json?$limit=3&$order=date_field+DESC" | python3 -m json.tool
+
+
+### 2.2 ARCGIS DISCOVERY
+ArcGIS REST APIs are also very common, especially for government agencies.
+
+1. Check if the city has a GIS portal (common patterns):
+   - https://gis.[city].gov
+   - https://maps.[city].gov
+   - https://arcgis.com/home/search.html?q=[city] building permit
+
+2. Try Google:
+   site:arcgis.com "[city name]" building permit
+
+3. Look for FeatureServer endpoints in this pattern:
+   https://services[N].arcgis.com/[orgid]/ArcGIS/rest/services/[ServiceName]/FeatureServer/[layer]/query
+
+4. Common org IDs:
+   - Test with: services.arcgis.com, services1.arcgis.com, services2.arcgis.com, etc.
+
+5. Test the endpoint:
+   curl -s "https://services1.arcgis.com/orgid/ArcGIS/rest/services/Permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=3&orderByFields=IssuedDate+DESC&f=json" | python3 -m json.tool
+
+
+### 2.3 CKAN DISCOVERY
+CKAN is a datastore platform (less common than Socrata but still used).
+
+1. Check if the city runs CKAN:
+   - https://data.[city].gov/api/3/action/datastore_search?resource_id=[id]
+   - https://opendata.[city].gov/api/3/action/datastore_search?resource_id=[id]
+
+2. Find datasets by browsing the web UI or using:
+   curl -s "https://data.domain.com/api/3/action/package_search?q=building+permit" | python3 -m json.tool
+
+3. Extract resource_id from the result and test:
+   curl -s "https://data.domain.com/api/3/action/datastore_search?resource_id=UUID&limit=3&sort=date_field+desc" | python3 -m json.tool
+
+
+### 2.4 STATE/COUNTY LEVEL FALLBACK
+If the city doesn't have its own open data portal, check the COUNTY or STATE portal.
+
+Examples:
+- Many NJ cities use NJ's statewide Socrata (nj.gov/opendata)
+  Use config option: "city_filter": {"field": "CITY_NAME", "value": "Newark"}
+- Many TX cities use statewide or county portals
+- Many CA cities use state-level Socrata
+
+Format in config:
+```python
+"city_filter": {
+    "field": "CITY_NAME",
+    "value": "Newark"
+}
+```
+
+The collector will automatically add this to the WHERE clause.
+
+
+### 2.5 GOOGLE FALLBACK (Last Resort)
+If you can't find a direct source, try:
+
+search: "[city name]" "[state]" open data building permits
+search: "[city name]" building permit data portal
+search: site:socrata.com OR site:arcgis.com OR site:data.gov "[city]" permit
+
+Sometimes you'll find a data.gov portal or academic institution that hosts data
+for smaller cities.
+
+
+### 2.6 IF NO SOURCE EXISTS
+Mark the city with "# BLOCKED:" and move on. Don't spend more than 15 minutes
+on a single city. If there's no public API and you can't find one after trying
+all approaches above, it's BLOCKED.
+
+
+================================================================================
+## 3. CONFIG FORMAT REFERENCE
+================================================================================
+
+All configs go in city_configs.py under the CITY_REGISTRY dictionary.
+
+### 3.1 SOCRATA CONFIG TEMPLATE
+
+```python
+"city_key": {
+    "name": "City Name",
+    "state": "XX",
+    "slug": "city-name",
+    "lat": 40.000,
+    "lon": -100.000,
+    "platform": "socrata",
+    "endpoint": "https://data.domain.com/resource/xxxx-xxxx.json",
+    "dataset_id": "xxxx-xxxx",
+    "description": "Brief description of dataset",
+    "field_map": {
+        "permit_number": "permit_id",
+        "permit_type": "permit_type",
+        "address": "street_address",
+        "filing_date": "issued_date",
+        "description": "work_description",
+        "estimated_cost": "project_value",
+    },
+    "date_field": "issued_date",
+    "limit": 2000,
+    "active": True,
+    "notes": "V23: Added via audit",
+},
+```
+
+### 3.2 ARCGIS CONFIG TEMPLATE
+
+```python
+"city_key": {
+    "name": "City Name",
+    "state": "XX",
+    "slug": "city-name",
+    "lat": 40.000,
+    "lon": -100.000,
+    "platform": "arcgis",
+    "endpoint": "https://services[N].arcgis.com/[orgid]/ArcGIS/rest/services/[ServiceName]/FeatureServer/[layer]/query",
+    "dataset_id": "[ServiceName]",
+    "description": "Brief description",
+    "field_map": {
+        "permit_number": "PermitNum",
+        "permit_type": "PermitType",
+        "address": "Address",
+        "filing_date": "IssuedDate",
+        "description": "Description",
+        "estimated_cost": "EstCost",
+    },
+    "date_field": "IssuedDate",
+    "date_format": "date",  # or "epoch" for epoch milliseconds, or "none"
+    "limit": 2000,
+    "active": True,
+    "notes": "V23: Added via audit",
+},
+```
+
+Note on date_format:
+  - "date" (default): ISO format YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS
+  - "epoch": Unix epoch milliseconds (e.g., 1711929600000)
+  - "none": No date filtering applied (fetch all records)
+
+### 3.3 CKAN CONFIG TEMPLATE
+
+```python
+"city_key": {
+    "name": "City Name",
+    "state": "XX",
+    "slug": "city-name",
+    "lat": 40.000,
+    "lon": -100.000,
+    "platform": "ckan",
+    "endpoint": "https://data.domain.com/api/3/action/datastore_search",
+    "dataset_id": "resource-uuid-here",
+    "description": "Brief description",
+    "field_map": {
+        "permit_number": "PERMIT_NO",
+        "permit_type": "PERMIT_TYPE",
+        "address": "ADDRESS",
+        "filing_date": "ISSUED_DATE",
+        "description": "DESCRIPTION",
+    },
+    "date_field": "ISSUED_DATE",
+    "limit": 2000,
+    "active": True,
+    "notes": "V23: Added via audit",
+},
+```
+
+### 3.4 FIELD MAP GUIDELINES
+
+The field_map maps PermitGrab's standard fields to the SOURCE field names.
+
+REQUIRED fields (at minimum):
+  - "filing_date" → the date field (MUST be present)
+
+STRONGLY RECOMMENDED fields (include if available):
+  - "permit_number" → permit ID/number
+  - "permit_type" → type of permit
+  - "address" → street address
+
+OPTIONAL but useful:
+  - "description" → project description
+  - "estimated_cost" → job value / estimated cost
+  - "contact_name" → contractor or applicant name
+  - "owner_name" → property owner
+  - "latitude" / "longitude" → coordinates
+  - "status" → permit status
+  - "issue_date" → date issued (if different from filing_date)
+  - Any other city-specific fields that appear in the data
+
+DO NOT include a field in field_map if:
+  - The field doesn't exist in the source data
+  - You're not sure what it maps to
+  - It's not useful for permit research
+
+The "date_field" at the TOP LEVEL MUST match the SOURCE field name.
+This is what the collector uses for date-range filtering.
+Example: if the source uses "IssuedDate", then:
+  - "date_field": "IssuedDate"  (top level, source name)
+  - "filing_date": "IssuedDate" (in field_map, maps to source)
+
+### 3.5 LAT/LON COORDINATES
+
+Every city config MUST have "lat" and "lon" fields. These should be well-known
+coordinates for the city center (used for geolocation on the website).
+
+You can find these by:
+  - Google: "[city name], [state]" — look at the coordinates
+  - OpenStreetMap
+  - Common knowledge (e.g., Chicago's downtown is ~41.88, -87.63)
+  - City hall address coordinates
+
+Precision: 3-4 decimal places is fine (e.g., 41.878, -87.630)
+
+### 3.6 SLUG FORMAT
+
+The slug is used in URLs: permitgrab.com/permits/[slug]
+
+Format rules:
+  - lowercase
+  - hyphens (no underscores)
+  - no state suffix UNLESS there's ambiguity
+  - max 40 characters
+
+Examples:
+  - Los Angeles, CA → "los-angeles"
+  - Portland, OR → "portland"
+  - Portland, ME → "portland-me"
+  - San Jose, CA → "san-jose"
+  - New York City, NY → "new-york"
+
+
+================================================================================
+## 4. HOW TO VALIDATE A DATA SOURCE BEFORE ADDING CONFIG
+================================================================================
+
+Before adding a config to city_configs.py, Code MUST:
+
+1. Make a test HTTP request to the endpoint
+2. Verify the response contains actual permit data (not error)
+3. Check that the date field has RECENT data (within last 6 months)
+4. Identify the correct field names from the response JSON
+5. Verify it's building/construction permits (not business licenses, zoning, etc.)
+
+### 4.1 SOCRATA TEST
+
+```bash
+curl -s "https://data.domain.com/resource/xxxx-xxxx.json?\$limit=3&\$order=date_field+DESC" | python3 -m json.tool | head -50
+```
+
+You should see:
+  - 3-10 JSON objects (permits)
+  - Each with field names you can map
+  - A date field with RECENT dates (2026-02 or later)
+  - No error messages
+
+### 4.2 ARCGIS TEST
+
+```bash
+curl -s "https://services.arcgis.com/.../FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=3&orderByFields=DateField+DESC&f=json" | python3 -m json.tool | head -100
+```
+
+You should see:
+  - "features": [ ... ] array with 3-10 objects
+  - Each object has "attributes": { field_name: value, ... }
+  - No "error" key at the top level
+  - No HTTP error (should be 200)
+
+### 4.3 CKAN TEST
+
+```bash
+curl -s "https://data.domain.com/api/3/action/datastore_search?resource_id=UUID&limit=3&sort=date_field+desc" | python3 -m json.tool | head -50
+```
+
+You should see:
+  - "success": true
+  - "result": { "records": [ ... ] }
+  - 3-10 records in the array
+  - Each with field names matching the dataset schema
+  - RECENT dates in the date field
+
+### 4.4 COMMON VALIDATION FAILURES
+
+1. Empty response (no records)
+   → The endpoint is working but there's no data matching the date filter.
+   → Check if the date field name is correct.
+   → Check if the dataset is really building permits (not empty).
+
+2. 403 Forbidden / 401 Unauthorized
+   → The dataset requires authentication.
+   → Mark as "# LOGIN_REQUIRED: Dataset requires API key or login"
+
+3. 404 Not Found
+   → The endpoint is dead. Try searching for a replacement.
+   → If no replacement exists, mark as "# BLOCKED: Endpoint removed/404"
+
+4. JSON parse error or HTML response
+   → The endpoint doesn't return JSON.
+   → It might be a web form or PDF.
+   → Try a different endpoint or mark as BLOCKED.
+
+5. Recent dates are OLD (oldest is 2024-01 or earlier)
+   → The dataset may be discontinued.
+   → Check if the city has a newer source.
+   → If not, mark as "# BLOCKED: Dataset last updated [date], no active feed"
+
+6. Rows return but all nulls in key fields
+   → The field names don't match what the collector expects.
+   → Inspect the actual field names from the response.
+   → Update the field_map accordingly.
+
+
+================================================================================
+## 5. HANDLING EACH PRIORITY TIER
+================================================================================
+
+### 5.1 STALE CITIES (PRIORITY 1)
+
+These cities ALREADY have a config in city_configs.py but data is old
+(last_data is 30+ days in the past).
+
+Likely issues:
+  - Endpoint URL changed or dataset was migrated
+  - Started requiring authentication
+  - Dataset was taken offline
+  - Date field name changed
+
+Process for each STALE city:
+
+1. Open city_configs.py and find the existing config for this city
+   - Note the current endpoint, date_field, and field_map
+
+2. Test the current endpoint:
+   - Run the curl command from section 4
+   - Does it return data? Any errors?
+
+3. If the endpoint WORKS:
+   - Check if the date field still has recent data
+   - If yes, the issue might be:
+     a) The date_field name changed (different field now has recent data)
+     b) The site.endpoint still works but data is somehow stale
+   - Update the config if needed and mark as "V23 AUDIT: 2026-03-28 - FIXED"
+
+4. If the endpoint is DEAD (404, 403, or doesn't return data):
+   - Search for a replacement dataset on the same city domain
+   - Check if the city migrated to a new portal
+   - Google: "[city name]" open data building permit (find new URL)
+   - If found, update the endpoint URL and test it
+
+5. If NO alternative endpoint exists:
+   - Mark with: "# BLOCKED: Original endpoint offline, no public replacement found"
+   - Add V23 AUDIT comment
+
+6. Save, commit with message: "V23: Batch 1 - Fixed [N] STALE cities"
+
+
+### 5.2 NO_DATA CITIES (PRIORITY 2)
+
+These cities HAVE a config and are marked active: True, but have collected
+0 permits since creation. The config is likely WRONG.
+
+Likely issues:
+  - Wrong endpoint URL entirely
+  - Wrong field_map (field names don't match the actual data)
+  - Wrong date_field
+  - Endpoint returns data but NOT building permits (it's business licenses, etc.)
+  - Data is present but all dates are in the past (old dataset)
+
+Process for each NO_DATA city:
+
+1. Open city_configs.py and find the existing config
+
+2. Test the endpoint directly:
+   - Run the curl command from section 4
+   - What does it actually return?
+
+3. If it returns ERROR (403, 404, etc.):
+   - Same as STALE: search for replacement
+   - Or mark as BLOCKED if none exists
+
+4. If it returns DATA but looks WRONG:
+   - Check if the field names in field_map match the actual response
+   - If "permit_number" field is "PERMITS_ID" in response, that's a mismatch
+   - Fix the field_map
+   - Verify the data_field is correct
+
+5. If it returns DATA but ALL DATES ARE OLD:
+   - The dataset exists but is abandoned (last update 2024-11, no new permits)
+   - Mark as "# BLOCKED: Dataset exists but last update [date], no active permits"
+
+6. If it returns DATA and looks CORRECT:
+   - The issue might be with how the collector processes it
+   - Run a manual test: python3 -c "from collector import fetch_permits; data, status = fetch_permits('city_key', days_back=180); print(f'{len(data)} permits, status: {status}')"
+   - Check the status message
+   - If it works now, mark as "V23 AUDIT: 2026-03-28 - REACTIVATED"
+
+7. Save, commit with message: "V23: Batch N - Fixed [X] NO_DATA cities"
+
+
+### 5.3 INACTIVE CITIES (PRIORITY 3)
+
+These cities HAVE a config but "active": False. They were deactivated for a
+reason (endpoint broken, data wasn't good, etc.). Check if the reason still
+applies.
+
+Process for each INACTIVE city:
+
+1. Read the config and notes field
+   - The notes should explain WHY it was deactivated
+   - If no notes, it's a mystery — assume endpoint was broken
+
+2. Test the endpoint:
+   - Run the curl command from section 4
+   - Does it work now?
+
+3. If it WORKS and returns RECENT data:
+   - The issue may have been temporary (server down, etc.)
+   - Update config: "active": True
+   - Add notes: "V23 AUDIT: 2026-03-28 - REACTIVATED - Endpoint working"
+
+4. If it STILL DOESN'T WORK:
+   - Try to find a replacement source
+   - If found, update endpoint and set active: True
+   - If not found, add "# BLOCKED:" comment explaining why
+
+5. If it WORKS but ALL DATA IS OLD:
+   - Mark as "# BLOCKED: Endpoint works but data last updated [date]"
+
+6. Save, commit with message: "V23: Batch N - Processed [Y] INACTIVE cities"
+
+
+### 5.4 NOT_CONFIGURED CITIES (PRIORITY 4)
+
+These cities have NO config entry in city_configs.py. Full discovery needed.
+
+Process for each NOT_CONFIGURED city:
+
+1. Identify the city's open data strategy:
+   - Does the city have its own open data portal? (socrata, arcgis, ckan, etc.)
+   - Or do they rely on county/state level data?
+
+2. Search for building permit datasets:
+   - Follow discovery methods in section 2
+   - Try Socrata → ArcGIS → CKAN → State/County → Google
+   - Don't spend more than 15-20 minutes on a single city
+
+3. If a SOURCE is FOUND:
+   - Validate it (section 4)
+   - Create a new config entry
+   - Test it with: python3 -c "from collector import fetch_permits; data, status = fetch_permits('city_key', days_back=180); print(f'{len(data)} permits, status: {status}')"
+   - If it returns data, set "active": True
+   - Add comment: "V23 AUDIT: 2026-03-28 - NEW - Added config for [dataset]"
+
+4. If NO SOURCE exists after 15+ minutes of searching:
+   - Create a minimal config entry (required fields only)
+   - Set "active": False
+   - Add notes: "# BLOCKED: No public building permit dataset found for [City], [State]"
+
+5. Save, commit with message: "V23: Batch N - Added [Z] NOT_CONFIGURED cities"
+
+
+================================================================================
+## 6. FIELD MAP GUIDELINES (DETAILED)
+================================================================================
+
+The field_map is the most critical part of the config. It tells the collector
+how to extract permit data from the source API response.
+
+### REQUIRED FIELDS
+
+"filing_date" (CRITICAL):
+  - Maps to the source's date field
+  - Used for filtering (only get permits from last 180 days)
+  - Must always be present
+  - Example: "filing_date": "issued_date"
+
+### IMPORTANT FIELDS (Include if available)
+
+"permit_number":
+  - The unique permit ID
+  - Examples: "PERMIT_ID", "PermitNum", "permitnumber", "job__"
+  - If not available, use blank string: "permit_number": ""
+
+"permit_type":
+  - Type of permit (residential, commercial, demolition, etc.)
+  - Examples: "PERMIT_TYPE", "permittypemapped", "work_type"
+  - If not available, use blank string
+
+"address":
+  - Street address of the property
+  - Examples: "street_address", "SITE ADDRESS", "primary_address"
+  - If not available, try combining "street_number" + "street_name"
+
+### OPTIONAL BUT USEFUL FIELDS
+
+"description":
+  - Project description / scope of work
+  - Examples: "work_description", "PROJECT DESCRIPTION", "job_description"
+
+"estimated_cost":
+  - Job value or project valuation
+  - Examples: "project_value", "VALUATION", "estimated_job_costs"
+
+"contact_name":
+  - Contractor or applicant name
+  - Examples: "contractorname", "APPLICANT_NAME", "applicant_business_name"
+
+"owner_name":
+  - Property owner name
+  - Examples: "OWNER_NAME", "owner_business_name"
+
+"latitude" / "longitude":
+  - Coordinates (if available)
+  - Examples: "lat", "LATITUDE", "gis_latitude"
+
+"status":
+  - Permit status (approved, issued, pending, etc.)
+  - Examples: "permit_status", "APPLICATION_STATUS_NAME", "statuscurrent"
+
+"issue_date":
+  - Date permit was issued (if different from filing_date)
+  - Examples: "issued_date", "issue_date", "approval_date"
+
+### HOW TO FIND FIELD NAMES
+
+1. Run the test curl command and look at the actual response JSON
+2. Example Socrata response:
+   ```json
+   {
+     "permit_id": "2024-123456",
+     "permit_type": "Building Permit",
+     "address": "123 Main St",
+     "issued_date": "2026-03-20T00:00:00",
+     "work_description": "New construction, 5-story office"
+   }
+   ```
+   Map these to standard fields:
+   - "permit_number": "permit_id"
+   - "permit_type": "permit_type"
+   - "address": "address"
+   - "filing_date": "issued_date"
+   - "description": "work_description"
+
+3. Be EXACT with field name capitalization:
+   - "IssuedDate" is different from "issued_date"
+   - "CITY_NAME" is different from "city_name"
+   - Check the actual response
+
+4. When in doubt, test the collector:
+   python3 -c "from collector import fetch_permits; data, status = fetch_permits('city_key', days_back=1); print(data[0].keys() if data else 'no data')"
+
+### TOP-LEVEL DATE_FIELD
+
+The "date_field" at the config top level MUST be the SOURCE field name.
+This is what the collector uses in the WHERE clause for date filtering.
+
+```python
+"config_key": {
+    ...
+    "date_field": "issued_date",        # SOURCE field name (from API)
+    "field_map": {
+        "filing_date": "issued_date",   # Standard field maps to source field
+        ...
+    }
+}
+```
+
+These must MATCH. If they don't, the collector won't filter by date.
+
+
+================================================================================
+## 7. COORDINATES (LAT/LON)
+================================================================================
+
+Every city config MUST have "lat" and "lon" fields (in decimal degrees).
+
+These are used for:
+  - Geolocation on the PermitGrab website
+  - Geographic clustering in the admin dashboard
+  - Future location-based features
+
+How to find coordinates:
+
+1. Google: "[city name], [state]"
+   - Google Maps shows coordinates at the bottom
+   - Copy the lat/lon
+
+2. OpenStreetMap: openstreetmap.org
+   - Search for the city
+   - Right-click on the map center
+   - Copy coordinates
+
+3. City Hall address
+   - Find the address of city hall
+   - Google the coordinates
+   - Use that as the city center
+
+4. Common knowledge:
+   - New York City: 40.713, -74.006
+   - Los Angeles: 34.052, -118.244
+   - Chicago: 41.878, -87.630
+   - Houston: 29.761, -95.369
+   - Phoenix: 33.448, -112.074
+
+Precision: 3-4 decimal places is fine. Don't over-specify.
+
+Example:
+```python
+"lat": 40.713,   # New York latitude
+"lon": -74.006,  # New York longitude
+```
+
+
+================================================================================
+## 8. SLUG FORMAT
+================================================================================
+
+The slug is used in URLs: permitgrab.com/permits/[slug]
+
+Slug rules:
+  - Lowercase only
+  - Hyphens for word separators (NO underscores, NO spaces)
+  - Max 40 characters
+  - No ambiguity problems
+  - Use state suffix ONLY if two cities have the same name
+
+Examples:
+  - "Los Angeles, CA" → "los-angeles"
+  - "Portland, OR" → "portland"
+  - "Portland, ME" → "portland-me"
+  - "Fort Worth, TX" → "fort-worth"
+  - "New York City, NY" → "new-york"
+  - "San Jose, CA" → "san-jose"
+  - "St. Paul, MN" → "st-paul"
+
+If you're unsure, check existing city_configs.py for the pattern.
+Most cities DON'T have state suffix (only when there's ambiguity).
+
+
+================================================================================
+## 9. ADMIN API & TESTING
+================================================================================
+
+### ADMIN API DETAILS
+
+- Admin API endpoint: POST /api/admin/collect-city
+- Admin API key: 122f635f639857bd9296150ba2e64419
+- Header: X-Admin-Key
+
+Example:
+```bash
+curl -X POST "https://permitgrab.com/api/admin/collect-city" \
+  -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  -H "Content-Type: application/json" \
+  -d '{"city": "city_key"}'
+```
+
+### LOCAL TESTING (On Render)
+
+After updating city_configs.py, test locally:
+
+```python
+python3 -c "
+from collector import fetch_permits
+data, status = fetch_permits('city_key', days_back=180)
+print(f'{len(data)} permits')
+print(f'Status: {status}')
+if data:
+    print('Sample:', data[0])
+"
+```
+
+If this returns N>0 permits and status is OK, the config is working.
+
+
+================================================================================
+## 10. PROGRESS TRACKING & COMMIT MESSAGES
+================================================================================
+
+After processing each batch of ~20 cities, add progress comments above each
+config entry:
+
+```python
+# V23 AUDIT: 2026-03-28 - FIXED - endpoint URL updated, now returning data
+```
+
+or
+
+```python
+# V23 AUDIT: 2026-03-28 - BLOCKED - No public building permit dataset found
+```
+
+Status codes:
+  - FIXED: Config was broken/old, now working
+  - ACTIVATED: Was inactive, reactivated
+  - REVALIDATED: Already active, confirmed working
+  - NEW: Added new config for NOT_CONFIGURED city
+  - BLOCKED: No public data source available
+  - LOGIN_REQUIRED: Requires manual auth setup
+
+Commit messages:
+
+```
+V23: Audit batch 1 - Fixed 8 STALE cities (Dallas, Atlanta, Reno, ...)
+```
+
+```
+V23: Audit batch 2 - Added 15 NOT_CONFIGURED cities (Phoenix, Philadelphia, ...)
+```
+
+```
+V23: Audit batch N - Processed 20 mixed cities, 3 BLOCKED, 17 active
+```
+
+
+================================================================================
+## 11. BATCHING STRATEGY
+================================================================================
+
+Process cities in batches of approximately 15-25 at a time.
+
+Why batches?
+  - Reduce commit risk (smaller, focused changes)
+  - Allow easy rollback if a batch has issues
+  - Clear progress tracking
+  - Easier to test individual cities
+
+Batch process:
+
+1. Load worklist.txt
+2. Sort by priority tier + population (descending)
+3. Pick next 20 cities from the sorted list
+4. For each city:
+   - Discover/validate data source (section 2 & 4)
+   - Create or fix config (section 3)
+   - Add V23 AUDIT comment
+   - Set "active": True or add "# BLOCKED:" note
+
+5. Open city_configs.py and apply all changes for the batch
+6. Spot-check 3-5 configs by running the test command
+7. Save and commit:
+   ```
+   git add city_configs.py
+   git commit -m "V23: Audit batch [N] - [summary]"
+   ```
+
+8. Move to next batch
+
+Expected timeline:
+  - ~5-10 cities per hour (includes research, validation, config writing)
+  - 1,898 cities / 7 cities per hour = ~270 hours of work
+  - With concurrent processing, aim to complete all tiers in ~2-3 weeks
+
+
+================================================================================
+## 12. IMPORTANT NOTES & SPECIAL CASES
+================================================================================
+
+### A. CALIFORNIA CITIES
+Many California cities share data through statewide portals:
+  - State of California Open Data (data.ca.gov)
+  - Individual county portals (data.county.ca.us)
+  - Regional council of governments portals
+
+Often need "city_filter" in config to narrow down to specific city.
+
+### B. NEW JERSEY CITIES
+Most NJ cities use NJ's statewide Socrata portal (nj.gov/opendata or similar).
+Use config option to filter by city name:
+
+```python
+"city_filter": {
+    "field": "CITY_NAME",
+    "value": "Newark"
+}
+```
+
+### C. TEXAS CITIES
+Many Texas cities are in regional councils of governments (COGs):
+  - North Central Texas Council of Governments
+  - NCTCOG Building Permits portal
+  - May share the same dataset with city-level filtering
+
+Check city's website for the primary data source.
+
+### D. EPOCH TIMESTAMPS
+ArcGIS often uses epoch milliseconds instead of date strings.
+
+Epoch milliseconds = Unix timestamp * 1000
+Example: 1711929600000 = March 31, 2024 16:00:00 UTC
+
+In config, set: "date_format": "epoch"
+
+### E. EMPTY DATASETS
+Some cities create open data portals but never populate them.
+After 2-3 test calls with no data, mark as:
+```
+"# BLOCKED: Public dataset exists but is empty (0 records)"
+```
+
+### F. CITY_FILTER SYNTAX
+Some platforms (especially CKAN) require exact syntax for city filters.
+
+Socrata:
+```python
+"city_filter": {
+    "field": "CITY_NAME",
+    "value": "Newark"
+}
+# Becomes: AND upper(CITY_NAME) = upper('Newark')
+```
+
+CKAN:
+```python
+"city_filter": {
+    "field": "CITY_NAME",
+    "value": "Newark"
+}
+# Becomes: Python string comparison (case-insensitive)
+```
+
+### G. ARCHIVED/DISCONTINUED DATASETS
+Some cities take datasets offline when they upgrade systems.
+If you find an old Socrata dataset that returns 404:
+  - Check if the city migrated to a new platform
+  - Check if they moved the dataset to a different domain
+  - Mark as BLOCKED only after checking the city's current website
+
+### H. LOGIN-REQUIRED ENDPOINTS
+If the only source requires API key registration:
+
+```python
+"notes": "# LOGIN_REQUIRED: Portal requires API key registration at https://[city].gov/opendata/register"
+```
+
+These will be processed manually later through Chrome.
+
+### I. TESTING DATE RANGES
+Always test with a date range that should return data:
+
+```bash
+# Test last 6 months
+curl -s "https://data.domain.com/resource/xxxx-xxxx.json?\$limit=3&\$where=issued_date%20%3E%20%272025-09-28%27&\$order=issued_date+DESC" | python3 -m json.tool
+```
+
+If this returns 0 records, try:
+  - Last year: 2025-03-28
+  - Last 2 years: 2024-03-28
+  - All records: remove $where clause
+
+This tells you if the dataset is actively maintained.
+
+### J. INCONSISTENT FIELD NAMES
+Some APIs use different field names in different responses or across pages.
+Always validate with the ACTUAL response, not documentation.
+
+### K. PERFORMANCE & RATE LIMITS
+Most open data APIs don't have aggressive rate limits, but some do:
+  - Don't hammer the API during discovery
+  - Use limit=3-5 for test requests
+  - If you hit rate limits, wait 1-2 minutes before retrying
+
+### L. FIELD NAME CASE SENSITIVITY
+APIs differ in case sensitivity:
+  - Socrata: lowercase fields (e.g., "permit_id")
+  - ArcGIS: often PascalCase (e.g., "PermitID")
+  - CKAN: often UPPERCASE (e.g., "PERMIT_ID")
+
+Always check the ACTUAL response to get the exact case.
+
+
+================================================================================
+## 13. DEPLOYMENT & ONGOING
+================================================================================
+
+### CHANGES GO TO city_configs.py
+
+All changes are made directly to:
+  /sessions/gracious-dazzling-carson/mnt/Documents/PermitGrab/city_configs.py
+
+The collector reads this file at runtime (on a 6-hour schedule on Render).
+
+### NO SEPARATE DEPLOYMENT STEP
+
+Just commit to git:
+```bash
+git add city_configs.py
+git commit -m "V23: [message]"
+git push origin main
+```
+
+The Render environment pulls from main and restarts collectors automatically.
+
+### TESTING ON RENDER
+
+You can test a city directly on Render using the shell:
+```bash
+python3 -c "from collector import fetch_permits; data, status = fetch_permits('dallas', days_back=180); print(f'{len(data)} permits, status: {status}')"
+```
+
+### MONITORING
+
+After deploying a batch, monitor:
+  - PermitGrab admin dashboard for successful collections
+  - Render logs for errors
+  - Health check API: GET /api/admin/city-status?key=ADMIN_KEY
+
+### NEXT PHASES (AFTER INITIAL AUDIT)
+
+1. Phase 2: Manual Chrome automation for LOGIN_REQUIRED cities
+2. Phase 3: Selenium/Playwright scripts for portal scraping
+3. Phase 4: Performance optimization (caching, incremental updates)
+4. Phase 5: Public launch with all 1,898+ cities
+
+
+================================================================================
+## 14. FULL CITY WORKLIST (1,898 cities)
+================================================================================
+
+Below is the complete worklist sorted by priority tier and population.
+Process from top to bottom, left to right.
+
+LEGEND:
+  - [STALE]: Config exists, but data is 30+ days old
+  - [NO_DATA]: Config exists and active, but 0 permits collected
+  - [INACTIVE]: Config exists but "active": False
+  - [NOT_CONFIGURED]: No config entry exists
+
+  1. [STALE] #9 Dallas, TX (pop 1,326,087) — key: "dallas", platform: socrata, last_data: 2026-02-24, permits: 7
+  2. [STALE] #32 Atlanta, GA (pop 520,070) — key: "atlanta", platform: arcgis, last_data: 2026-01-29, permits: 1015
+  3. [STALE] #73 Reno, NV (pop 281,714) — key: "reno", platform: socrata, last_data: 2026-02-23, permits: 1
+  4. [STALE] #529 Camden, NJ (pop 71,749) — key: "camden", platform: socrata, last_data: 2026-01-30, permits: 31
+  5. [STALE] #751 Rockwall, TX (pop 53,547) — key: "rockwall", platform: socrata, last_data: 2026-01-30, permits: 2
+  6. [STALE] #858 Sayreville, NJ (pop 47,165) — key: "sayreville_nj", platform: socrata, last_data: 2026-01-20, permits: 15
+  7. [STALE] #897 Linden, NJ (pop 45,393) — key: "linden_nj", platform: socrata, last_data: 2026-01-30, permits: 32
+  8. [STALE] #1027 Urbana, IL (pop 39,831) — key: "urbana", platform: socrata, last_data: 2026-02-20, permits: 149
+  9. [STALE] #1048 Atlantic City, NJ (pop 38,959) — key: "atlantic_city_nj", platform: socrata, last_data: 2026-01-20, permits: 1
+  10. [STALE] #1175 College Park, MD (pop 34,667) — key: "", platform: , last_data: 2026-02-19, permits: 3
+  11. [STALE] #1215 Garfield, NJ (pop 33,530) — key: "garfield_nj", platform: socrata, last_data: 2026-01-29, permits: 2
+  12. [STALE] #1335 Laurel, MD (pop 30,238) — key: "laurel_md", platform: socrata, last_data: 2026-02-03, permits: 1
+  13. [STALE] #1505 Royse City, TX (pop 26,387) — key: "royse_city", platform: socrata, last_data: 2026-02-23, permits: 11
+  14. [STALE] #1667 Mesquite, NV (pop 23,599) — key: "", platform: , last_data: 2026-01-29, permits: 1
+  15. [STALE] #1829 Hyattsville, MD (pop 21,052) — key: "", platform: , last_data: 2026-02-25, permits: 3
+  16. [NO_DATA] #5 Phoenix, AZ (pop 1,673,164) — key: "phoenix", platform: arcgis
+  17. [NO_DATA] #6 Philadelphia, PA (pop 1,573,916) — key: "philadelphia", platform: carto
+  18. [NO_DATA] #7 San Antonio, TX (pop 1,526,656) — key: "san_antonio", platform: ckan
+  19. [NO_DATA] #8 San Diego, CA (pop 1,404,452) — key: "san_diego", platform: socrata
+  20. [NO_DATA] #11 Fort Worth, TX (pop 1,008,106) — key: "fort_worth", platform: arcgis
+  21. [NO_DATA] #12 San Jose, CA (pop 997,368) — key: "san_jose", platform: ckan
+  22. [NO_DATA] #14 Charlotte, NC (pop 943,476) — key: "charlotte", platform: arcgis
+  23. [NO_DATA] #15 Columbus, OH (pop 933,263) — key: "columbus", platform: arcgis
+  24. [NO_DATA] #18 Denver, CO (pop 729,019) — key: "denver", platform: arcgis
+  25. [NO_DATA] #21 Las Vegas, NV (pop 678,922) — key: "las_vegas", platform: arcgis
+  26. [NO_DATA] #22 Boston, MA (pop 673,458) — key: "boston", platform: ckan
+  27. [NO_DATA] #23 Detroit, MI (pop 645,705) — key: "detroit", platform: arcgis
+  28. [NO_DATA] #26 Baltimore, MD (pop 568,271) — key: "baltimore", platform: arcgis
+  29. [NO_DATA] #27 Milwaukee, WI (pop 563,531) — key: "milwaukee", platform: ckan
+  30. [NO_DATA] #28 Albuquerque, NM (pop 560,326) — key: "albuquerque", platform: arcgis
+  31. [NO_DATA] #29 Tucson, AZ (pop 554,013) — key: "tucson", platform: arcgis
+  32. [NO_DATA] #31 Sacramento, CA (pop 535,798) — key: "sacramento", platform: arcgis
+  33. [NO_DATA] #33 Mesa, AZ (pop 517,151) — key: "mesa", platform: socrata
+  34. [NO_DATA] #34 Kansas City, MO (pop 516,032) — key: "kansas_city", platform: socrata
+  35. [NO_DATA] #35 Raleigh, NC (pop 499,825) — key: "raleigh", platform: arcgis
+  36. [NO_DATA] #39 Virginia Beach, VA (pop 454,808) — key: "virginia_beach", platform: arcgis
+  37. [NO_DATA] #42 Minneapolis, MN (pop 428,579) — key: "minneapolis", platform: arcgis
+  38. [NO_DATA] #46 Arlington, TX (pop 403,672) — key: "arlington", platform: arcgis
+  39. [NO_DATA] #47 Aurora, CO (pop 403,130) — key: "aurora_co", platform: arcgis
+  40. [NO_DATA] #49 Cleveland, OH (pop 365,379) — key: "cleveland", platform: arcgis
+  41. [NO_DATA] #62 Pittsburgh, PA (pop 307,668) — key: "pittsburgh", platform: ckan
+  42. [NO_DATA] #63 St. Paul, MN (pop 307,465) — key: "st_paul", platform: arcgis
+  43. [NO_DATA] #64 Greensboro, NC (pop 307,381) — key: "greensboro", platform: arcgis
+  44. [NO_DATA] #66 Durham, NC (pop 301,870) — key: "durham", platform: arcgis
+  45. [NO_DATA] #71 Gilbert, AZ (pop 288,790) — key: "gilbert", platform: arcgis
+  46. [NO_DATA] #89 Scottsdale, AZ (pop 246,170) — key: "scottsdale", platform: arcgis
+  47. [NO_DATA] #96 Spokane, WA (pop 230,609) — key: "spokane", platform: arcgis
+  48. [NO_DATA] #99 Tacoma, WA (pop 228,202) — key: "tacoma", platform: arcgis
+  49. [NO_DATA] #105 Salt Lake City, UT (pop 217,783) — key: "salt_lake_city", platform: socrata
+  50. [NO_DATA] #111 Sioux Falls, SD (pop 209,289) — key: "sioux_falls", platform: arcgis
+  51. [NO_DATA] #114 Tallahassee, FL (pop 205,089) — key: "tallahassee", platform: arcgis
+  52. [NO_DATA] #120 Oxnard, CA (pop 200,616) — key: "oxnard_ca", platform: socrata
+  53. [NO_DATA] #122 Peoria, AZ (pop 199,924) — key: "peoria", platform: arcgis
+  54. [NO_DATA] #124 Knoxville, TN (pop 198,722) — key: "knoxville", platform: arcgis
+  55. [NO_DATA] #130 Chattanooga, TN (pop 191,496) — key: "chattanooga", platform: arcgis
+  56. [NO_DATA] #132 Tempe, AZ (pop 190,114) — key: "tempe", platform: arcgis
+  57. [NO_DATA] #141 Salem, OR (pop 180,406) — key: "salem", platform: arcgis
+  58. [NO_DATA] #149 Fort Collins, CO (pop 170,924) — key: "fort_collins", platform: socrata
+  59. [NO_DATA] #151 Murfreesboro, TN (pop 168,387) — key: "murfreesboro_tn", platform: arcgis
+  60. [NO_DATA] #164 Charleston, SC (pop 157,665) — key: "charleston", platform: arcgis
+  61. [NO_DATA] #170 Bellevue, WA (pop 154,377) — key: "bellevue", platform: arcgis
+  62. [NO_DATA] #180 Gainesville, FL (pop 148,720) — key: "gainesville", platform: socrata
+  63. [NO_DATA] #205 Pasadena, CA (pop 137,195) — key: "pasadena", platform: arcgis
+  64. [NO_DATA] #211 Round Rock, TX (pop 135,359) — key: "round_rock", platform: socrata
+  65. [NO_DATA] #225 Wilmington, NC (pop 125,284) — key: "wilmington_nc", platform: arcgis
+  66. [NO_DATA] #250 Las Cruces, NM (pop 116,998) — key: "las_cruces", platform: arcgis
+  67. [NO_DATA] #324 Georgetown, TX (pop 101,344) — key: "georgetown_tx", platform: socrata
+  68. [NO_DATA] #326 Albany, NY (pop 101,317) — key: "albany", platform: socrata
+  69. [NO_DATA] #329 Deltona, FL (pop 100,513) — key: "deltona_fl", platform: arcgis
+  70. [NO_DATA] #351 Bellingham, WA (pop 95,860) — key: "bellingham_wa", platform: arcgis
+  71. [NO_DATA] #356 Asheville, NC (pop 94,992) — key: "asheville_nc", platform: arcgis
+  72. [NO_DATA] #387 Frederick, MD (pop 89,537) — key: "frederick", platform: socrata
+  73. [NO_DATA] #400 Leander, TX (pop 87,511) — key: "leander", platform: socrata
+  74. [NO_DATA] #417 Auburn, WA (pop 85,513) — key: "auburn_wa", platform: socrata
+  75. [NO_DATA] #427 Longview, TX (pop 83,668) — key: "longview_tx", platform: arcgis
+  76. [NO_DATA] #436 Newport Beach, CA (pop 82,970) — key: "newport_beach_ca", platform: arcgis
+  77. [NO_DATA] #443 Somerville, MA (pop 82,149) — key: "somerville", platform: socrata
+  78. [NO_DATA] #444 Cicero, IL (pop 82,090) — key: "cicero_il", platform: socrata
+  79. [NO_DATA] #446 Johns Creek, GA (pop 81,167) — key: "johns_creek_ga", platform: arcgis
+  80. [NO_DATA] #452 Lynchburg, VA (pop 80,301) — key: "lynchburg_va", platform: arcgis
+  81. [NO_DATA] #470 Cedar Park, TX (pop 78,380) — key: "cedar_park", platform: socrata
+  82. [NO_DATA] #481 Schaumburg, IL (pop 77,099) — key: "schaumburg_il", platform: socrata
+  83. [NO_DATA] #491 Evanston, IL (pop 76,006) — key: "evanston_il", platform: socrata
+  84. [NO_DATA] #499 Arlington Heights, IL (pop 75,596) — key: "arlington_heights_il", platform: socrata
+  85. [NO_DATA] #501 Noblesville, IN (pop 75,239) — key: "noblesville_in", platform: arcgis
+  86. [NO_DATA] #508 Bayonne, NJ (pop 74,532) — key: "bayonne_nj", platform: socrata
+  87. [NO_DATA] #515 Framingham, MA (pop 73,361) — key: "framingham", platform: socrata
+  88. [NO_DATA] #527 East Orange, NJ (pop 71,850) — key: "east_orange_nj", platform: socrata
+  89. [NO_DATA] #538 Passaic, NJ (pop 70,722) — key: "passaic_nj", platform: socrata
+  90. [NO_DATA] #570 Alpharetta, GA (pop 67,275) — key: "alpharetta_ga", platform: arcgis
+  91. [NO_DATA] #576 Union City, NJ (pop 66,918) — key: "union_city_nj", platform: socrata
+  92. [NO_DATA] #577 Pflugerville, TX (pop 66,819) — key: "pflugerville", platform: socrata
+  93. [NO_DATA] #588 Palatine, IL (pop 65,951) — key: "palatine_il", platform: socrata
+  94. [NO_DATA] #589 Skokie, IL (pop 65,850) — key: "skokie_il", platform: socrata
+  95. [NO_DATA] #594 Parker, CO (pop 65,473) — key: "parker", platform: socrata
+  96. [NO_DATA] #633 Vineland, NJ (pop 62,070) — key: "vineland_nj", platform: socrata
+  97. [NO_DATA] #672 Petaluma, CA (pop 59,393) — key: "petaluma", platform: socrata
+  98. [NO_DATA] #675 Hoboken, NJ (pop 59,149) — key: "hoboken_nj", platform: socrata
+  99. [NO_DATA] #681 Des Plaines, IL (pop 58,832) — key: "des_plaines_il", platform: socrata
+  100. [NO_DATA] #696 Orland Park, IL (pop 58,020) — key: "orland_park_il", platform: socrata
+  101. [NO_DATA] #713 Perth Amboy, NJ (pop 56,939) — key: "perth_amboy_nj", platform: socrata
+  102. [NO_DATA] #718 Oak Lawn, IL (pop 56,531) — key: "oak_lawn_il", platform: socrata
+  103. [NO_DATA] #719 Plainfield, NJ (pop 56,507) — key: "plainfield_nj", platform: socrata
+  104. [NO_DATA] #731 Mount Prospect, IL (pop 55,460) — key: "mount_prospect_il", platform: socrata
+  105. [NO_DATA] #736 Berwyn, IL (pop 55,152) — key: "berwyn_il", platform: socrata
+  106. [NO_DATA] #737 Tinley Park, IL (pop 54,856) — key: "tinley_park_il", platform: socrata
+  107. [NO_DATA] #760 West New York, NJ (pop 52,975) — key: "west_new_york_nj", platform: socrata
+  108. [NO_DATA] #761 Oak Park, IL (pop 52,947) — key: "oak_park_il", platform: socrata
+  109. [NO_DATA] #793 Hoffman Estates, IL (pop 50,920) — key: "hoffman_estates_il", platform: socrata
+  110. [NO_DATA] #851 Glenview, IL (pop 47,634) — key: "glenview_il", platform: socrata
+  111. [NO_DATA] #867 Hackensack, NJ (pop 46,630) — key: "hackensack_nj", platform: socrata
+  112. [NO_DATA] #943 Buffalo Grove, IL (pop 43,072) — key: "buffalo_grove_il", platform: socrata
+  113. [NO_DATA] #957 Hutto, TX (pop 42,661) — key: "hutto", platform: socrata
+  114. [NO_DATA] #993 Kearny, NJ (pop 40,866) — key: "kearny_nj", platform: socrata
+  115. [NO_DATA] #998 Bartlett, IL (pop 40,718) — key: "bartlett_il", platform: socrata
+  116. [NO_DATA] #1002 Fort Lee, NJ (pop 40,566) — key: "fort_lee_nj", platform: socrata
+  117. [NO_DATA] #1005 Myrtle Beach, SC (pop 40,535) — key: "myrtle_beach", platform: arcgis
+  118. [NO_DATA] #1066 Park Ridge, IL (pop 38,445) — key: "park_ridge_il", platform: socrata
+  119. [NO_DATA] #1069 Streamwood, IL (pop 38,360) — key: "streamwood_il", platform: socrata
+  120. [NO_DATA] #1071 Wheeling, IL (pop 38,329) — key: "wheeling_il", platform: socrata
+  121. [NO_DATA] #1116 Hanover Park, IL (pop 36,685) — key: "hanover_park_il", platform: socrata
+  122. [NO_DATA] #1123 Fair Lawn, NJ (pop 36,489) — key: "fair_lawn_nj", platform: socrata
+  123. [NO_DATA] #1167 Calumet City, IL (pop 34,855) — key: "calumet_city_il", platform: socrata
+  124. [NO_DATA] #1179 Northbrook, IL (pop 34,546) — key: "northbrook_il", platform: socrata
+  125. [NO_DATA] #1186 West Hollywood, CA (pop 34,371) — key: "west_hollywood", platform: socrata
+  126. [NO_DATA] #1227 Long Branch, NJ (pop 33,214) — key: "long_branch_nj", platform: socrata
+  127. [NO_DATA] #1235 Sachse, TX (pop 33,008) — key: "sachse", platform: socrata
+  128. [NO_DATA] #1264 Westfield, NJ (pop 32,050) — key: "westfield_nj", platform: socrata
+  129. [NO_DATA] #1273 Elk Grove Village, IL (pop 31,802) — key: "elk_grove_village_il", platform: socrata
+  130. [NO_DATA] #1290 Princeton, NJ (pop 31,445) — key: "princeton_nj", platform: socrata
+  131. [NO_DATA] #1313 Rahway, NJ (pop 30,763) — key: "rahway_nj", platform: socrata
+  132. [NO_DATA] #1336 Englewood, NJ (pop 30,221) — key: "englewood_nj", platform: socrata
+  133. [NO_DATA] #1346 Niles, IL (pop 29,918) — key: "niles_il", platform: socrata
+  134. [NO_DATA] #1375 Bergenfield, NJ (pop 28,921) — key: "bergenfield_nj", platform: socrata
+  135. [NO_DATA] #1390 Burbank, IL (pop 28,606) — key: "burbank_il", platform: socrata
+  136. [NO_DATA] #1427 Millville, NJ (pop 27,838) — key: "millville_nj", platform: socrata
+  137. [NO_DATA] #1432 Bridgeton, NJ (pop 27,722) — key: "bridgeton_nj", platform: socrata
+  138. [NO_DATA] #1447 Wilmette, IL (pop 27,443) — key: "wilmette_il", platform: socrata
+  139. [NO_DATA] #1450 Camas, WA (pop 27,313) — key: "camas", platform: socrata
+  140. [NO_DATA] #1476 Oak Forest, IL (pop 26,813) — key: "oak_forest_il", platform: socrata
+  141. [NO_DATA] #1478 Paramus, NJ (pop 26,786) — key: "paramus_nj", platform: socrata
+  142. [NO_DATA] #1481 Ridgewood, NJ (pop 26,701) — key: "ridgewood_nj", platform: socrata
+  143. [NO_DATA] #1495 Chicago Heights, IL (pop 26,533) — key: "chicago_heights_il", platform: socrata
+  144. [NO_DATA] #1507 Lodi, NJ (pop 26,358) — key: "lodi_nj", platform: socrata
+  145. [NO_DATA] #1516 Cliffside Park, NJ (pop 26,183) — key: "cliffside_park_nj", platform: socrata
+  146. [NO_DATA] #1529 Carteret, NJ (pop 26,003) — key: "carteret_nj", platform: socrata
+  147. [NO_DATA] #1592 South Plainfield, NJ (pop 25,062) — key: "south_plainfield_nj", platform: socrata
+  148. [NO_DATA] #1629 Morton Grove, IL (pop 24,467) — key: "morton_grove_il", platform: socrata
+  149. [NO_DATA] #1636 Glassboro, NJ (pop 24,322) — key: "glassboro_nj", platform: socrata
+  150. [NO_DATA] #1648 Melrose Park, IL (pop 23,999) — key: "melrose_park_il", platform: socrata
+  151. [NO_DATA] #1661 Elmwood Park, IL (pop 23,698) — key: "elmwood_park_il", platform: socrata
+  152. [NO_DATA] #1694 Summit, NJ (pop 23,102) — key: "summit_nj", platform: socrata
+  153. [NO_DATA] #1698 North Plainfield, NJ (pop 23,072) — key: "north_plainfield_nj", platform: socrata
+  154. [NO_DATA] #1699 Roselle, NJ (pop 23,064) — key: "roselle_nj", platform: socrata
+  155. [NO_DATA] #1716 Roselle, IL (pop 22,871) — key: "roselle_il", platform: socrata
+  156. [NO_DATA] #1724 Secaucus, NJ (pop 22,710) — key: "secaucus_nj", platform: socrata
+  157. [NO_DATA] #1780 Lindenwold, NJ (pop 21,919) — key: "lindenwold_nj", platform: socrata
+  158. [NO_DATA] #1786 Blue Island, IL (pop 21,805) — key: "blue_island_il", platform: socrata
+  159. [NO_DATA] #1794 Elmwood Park, NJ (pop 21,680) — key: "elmwood_park_nj", platform: socrata
+  160. [NO_DATA] #1834 Park Forest, IL (pop 21,016) — key: "park_forest_il", platform: socrata
+  161. [NO_DATA] #1841 Pleasantville, NJ (pop 20,924) — key: "pleasantville_nj", platform: socrata
+  162. [NO_DATA] #1848 South Holland, IL (pop 20,775) — key: "south_holland_il", platform: socrata
+  163. [NO_DATA] #1850 Morristown, NJ (pop 20,732) — key: "morristown_nj", platform: socrata
+  164. [NO_DATA] #1855 Dolton, IL (pop 20,697) — key: "dolton_il", platform: socrata
+  165. [NO_DATA] #1871 Palisades Park, NJ (pop 20,520) — key: "palisades_park_nj", platform: socrata
+  166. [NO_DATA] #1910 Hawthorne, NJ (pop 20,006) — key: "hawthorne_nj", platform: socrata
+  167. [NO_DATA] #1962 Tinton Falls, NJ (pop 19,435) — key: "tinton_falls_nj", platform: socrata
+  168. [NO_DATA] #1977 Evergreen Park, IL (pop 19,301) — key: "evergreen_park_il", platform: socrata
+  169. [NO_DATA] #1979 Rutherford, NJ (pop 19,214) — key: "rutherford_nj", platform: socrata
+  170. [INACTIVE] #4 Houston, TX (pop 2,390,125) — key: "houston", platform: ckan
+  171. [INACTIVE] #19 Oklahoma City, OK (pop 712,919) — key: "oklahoma_city", platform: socrata
+  172. [INACTIVE] #20 El Paso, TX (pop 681,723) — key: "el_paso", platform: socrata
+  173. [INACTIVE] #25 Memphis, TN (pop 610,919) — key: "memphis", platform: socrata
+  174. [INACTIVE] #30 Fresno, CA (pop 550,105) — key: "fresno", platform: socrata
+  175. [INACTIVE] #36 Colorado Springs, CO (pop 493,554) — key: "colorado_springs", platform: socrata
+  176. [INACTIVE] #37 Omaha, NE (pop 489,265) — key: "omaha", platform: socrata
+  177. [INACTIVE] #40 Long Beach, CA (pop 450,901) — key: "long_beach", platform: socrata
+  178. [INACTIVE] #41 Oakland, CA (pop 443,554) — key: "oakland", platform: socrata
+  179. [INACTIVE] #44 Tulsa, OK (pop 415,154) — key: "tulsa", platform: socrata
+  180. [INACTIVE] #48 Wichita, KS (pop 400,991) — key: "wichita", platform: socrata
+  181. [INACTIVE] #52 Anaheim, CA (pop 344,561) — key: "anaheim", platform: socrata
+  182. [INACTIVE] #55 Stockton, CA (pop 324,975) — key: "stockton", platform: socrata
+  183. [INACTIVE] #56 Riverside, CA (pop 323,757) — key: "riverside", platform: socrata
+  184. [INACTIVE] #57 Irvine, CA (pop 318,683) — key: "irvine", platform: socrata
+  185. [INACTIVE] #58 Corpus Christi, TX (pop 317,317) — key: "corpus_christi", platform: socrata
+  186. [INACTIVE] #59 Newark, NJ (pop 317,303) — key: "newark", platform: socrata
+  187. [INACTIVE] #60 Santa Ana, CA (pop 316,184) — key: "santa_ana", platform: socrata
+  188. [INACTIVE] #65 Jersey City, NJ (pop 302,824) — key: "jersey_city", platform: socrata
+  189. [INACTIVE] #67 Lincoln, NE (pop 300,619) — key: "lincoln", platform: socrata
+  190. [INACTIVE] #68 North Las Vegas, NV (pop 294,034) — key: "north_las_vegas", platform: socrata
+  191. [INACTIVE] #70 Anchorage, AK (pop 289,600) — key: "anchorage", platform: socrata
+  192. [INACTIVE] #72 Madison, WI (pop 285,300) — key: "madison", platform: socrata
+  193. [INACTIVE] #74 Chandler, AZ (pop 281,231) — key: "chandler", platform: socrata
+  194. [INACTIVE] #75 St. Louis, MO (pop 279,695) — key: "st_louis", platform: socrata
+  195. [INACTIVE] #76 Chula Vista, CA (pop 278,546) — key: "chula_vista", platform: socrata
+  196. [INACTIVE] #78 Fort Wayne, IN (pop 273,203) — key: "fort_wayne", platform: socrata
+  197. [INACTIVE] #79 Lubbock, TX (pop 272,086) — key: "lubbock", platform: socrata
+  198. [INACTIVE] #80 St. Petersburg, FL (pop 267,102) — key: "st_petersburg", platform: socrata
+  199. [INACTIVE] #81 Toledo, OH (pop 265,638) — key: "toledo", platform: socrata
+  200. [INACTIVE] #82 Laredo, TX (pop 261,260) — key: "laredo", platform: socrata
+  201. [INACTIVE] #83 Port St. Lucie, FL (pop 258,575) — key: "port_st_lucie", platform: socrata
+  202. [INACTIVE] #84 Glendale, AZ (pop 258,143) — key: "glendale_az", platform: socrata
+  203. [INACTIVE] #85 Irving, TX (pop 258,060) — key: "irving", platform: socrata
+  204. [INACTIVE] #86 Winston-Salem, NC (pop 255,769) — key: "winston_salem", platform: socrata
+  205. [INACTIVE] #87 Chesapeake, VA (pop 254,997) — key: "chesapeake", platform: socrata
+  206. [INACTIVE] #88 Garland, TX (pop 250,431) — key: "garland", platform: socrata
+  207. [INACTIVE] #93 Richmond, VA (pop 233,655) — key: "richmond", platform: socrata
+  208. [INACTIVE] #97 Huntsville, AL (pop 230,402) — key: "huntsville", platform: socrata
+  209. [INACTIVE] #98 Santa Clarita, CA (pop 229,159) — key: "santa_clarita", platform: socrata
+  210. [INACTIVE] #100 Fremont, CA (pop 228,192) — key: "fremont", platform: socrata
+  211. [INACTIVE] #102 San Bernardino, CA (pop 224,775) — key: "san_bernardino", platform: socrata
+  212. [INACTIVE] #103 Modesto, CA (pop 220,592) — key: "modesto", platform: socrata
+  213. [INACTIVE] #104 Fontana, CA (pop 218,455) — key: "fontana", platform: socrata
+  214. [INACTIVE] #107 Des Moines, IA (pop 213,096) — key: "des_moines", platform: socrata
+  215. [INACTIVE] #108 Worcester, MA (pop 211,286) — key: "worcester", platform: socrata
+  216. [INACTIVE] #109 Yonkers, NY (pop 211,040) — key: "yonkers", platform: socrata
+  217. [INACTIVE] #110 Fayetteville, NC (pop 209,496) — key: "fayetteville_nc", platform: socrata
+  218. [INACTIVE] #112 Grand Prairie, TX (pop 207,331) — key: "grand_prairie", platform: socrata
+  219. [INACTIVE] #113 Rochester, NY (pop 207,282) — key: "rochester", platform: socrata
+  220. [INACTIVE] #117 Overland Park, KS (pop 202,893) — key: "overland_park", platform: socrata
+  221. [INACTIVE] #119 Mobile, AL (pop 201,367) — key: "mobile", platform: socrata
+  222. [INACTIVE] #121 Grand Rapids, MI (pop 200,117) — key: "grand_rapids", platform: socrata
+  223. [INACTIVE] #123 Vancouver, WA (pop 198,992) — key: "vancouver_wa", platform: socrata
+  224. [INACTIVE] #125 Birmingham, AL (pop 196,357) — key: "birmingham", platform: socrata
+  225. [INACTIVE] #126 Montgomery, AL (pop 195,818) — key: "montgomery", platform: socrata
+  226. [INACTIVE] #127 Providence, RI (pop 194,706) — key: "providence", platform: socrata
+  227. [INACTIVE] #128 Huntington Beach, CA (pop 193,151) — key: "huntington_beach", platform: socrata
+  228. [INACTIVE] #133 Akron, OH (pop 189,664) — key: "akron", platform: socrata
+  229. [INACTIVE] #134 Glendale, CA (pop 187,823) — key: "glendale", platform: socrata
+  230. [INACTIVE] #138 Elk Grove, CA (pop 182,797) — key: "elk_grove", platform: socrata
+  231. [INACTIVE] #139 Cary, NC (pop 182,659) — key: "cary", platform: socrata
+  232. [INACTIVE] #143 Eugene, OR (pop 178,786) — key: "eugene", platform: socrata
+  233. [INACTIVE] #144 Santa Rosa, CA (pop 177,524) — key: "santa_rosa", platform: socrata
+  234. [INACTIVE] #146 Shreveport, LA (pop 176,578) — key: "shreveport", platform: socrata
+  235. [INACTIVE] #150 Springfield, MO (pop 170,596) — key: "springfield_mo", platform: socrata
+  236. [INACTIVE] #152 Surprise, AZ (pop 167,564) — key: "surprise", platform: socrata
+  237. [INACTIVE] #153 Lancaster, CA (pop 167,426) — key: "lancaster_ca", platform: socrata
+  238. [INACTIVE] #156 Palmdale, CA (pop 162,536) — key: "palmdale", platform: socrata
+  239. [INACTIVE] #158 Salinas, CA (pop 160,783) — key: "salinas", platform: socrata
+  240. [INACTIVE] #160 Paterson, NJ (pop 160,463) — key: "paterson", platform: socrata
+  241. [INACTIVE] #163 Hayward, CA (pop 158,440) — key: "hayward", platform: socrata
+  242. [INACTIVE] #166 Lakewood, CO (pop 156,868) — key: "lakewood_co", platform: socrata
+  243. [INACTIVE] #167 Sunnyvale, CA (pop 156,792) — key: "sunnyvale", platform: socrata
+  244. [INACTIVE] #168 Kansas City, KS (pop 156,752) — key: "kansas_city_ks", platform: socrata
+  245. [INACTIVE] #169 Springfield, MA (pop 154,888) — key: "springfield_ma", platform: socrata
+  246. [INACTIVE] #173 Bridgeport, CT (pop 151,599) — key: "bridgeport", platform: socrata
+  247. [INACTIVE] #177 Escondido, CA (pop 148,847) — key: "escondido", platform: socrata
+  248. [INACTIVE] #178 Savannah, GA (pop 148,808) — key: "savannah", platform: socrata
+  249. [INACTIVE] #179 McAllen, TX (pop 148,782) — key: "mcallen", platform: socrata
+  250. [INACTIVE] #181 Pomona, CA (pop 147,966) — key: "pomona", platform: socrata
+  251. [INACTIVE] #183 Thornton, CO (pop 146,689) — key: "thornton", platform: socrata
+  252. [INACTIVE] #184 Waco, TX (pop 146,608) — key: "waco", platform: socrata
+  253. [INACTIVE] #186 Syracuse, NY (pop 146,097) — key: "syracuse", platform: socrata
+  254. [INACTIVE] #187 Columbia, SC (pop 144,788) — key: "columbia_sc", platform: socrata
+  255. [INACTIVE] #188 Midland, TX (pop 143,687) — key: "midland", platform: socrata
+  256. [INACTIVE] #190 Palm Bay, FL (pop 142,023) — key: "palm_bay", platform: socrata
+  257. [INACTIVE] #191 Jackson, MS (pop 141,449) — key: "jackson", platform: socrata
+  258. [INACTIVE] #193 Victorville, CA (pop 140,721) — key: "victorville", platform: socrata
+  259. [INACTIVE] #194 Elizabeth, NJ (pop 140,413) — key: "elizabeth", platform: socrata
+  260. [INACTIVE] #196 Meridian, ID (pop 139,740) — key: "meridian", platform: socrata
+  261. [INACTIVE] #197 Torrance, CA (pop 139,576) — key: "torrance", platform: socrata
+  262. [INACTIVE] #198 Stamford, CT (pop 139,134) — key: "stamford", platform: socrata
+  263. [INACTIVE] #199 West Valley City, UT (pop 138,144) — key: "west_valley_city", platform: socrata
+  264. [INACTIVE] #201 Cedar Rapids, IA (pop 137,904) — key: "cedar_rapids", platform: socrata
+  265. [INACTIVE] #204 New Haven, CT (pop 137,562) — key: "new_haven", platform: socrata
+  266. [INACTIVE] #207 Dayton, OH (pop 136,346) — key: "dayton", platform: socrata
+  267. [INACTIVE] #208 Fargo, ND (pop 136,285) — key: "fargo", platform: socrata
+  268. [INACTIVE] #214 Norman, OK (pop 131,010) — key: "norman", platform: socrata
+  269. [INACTIVE] #216 Abilene, TX (pop 130,501) — key: "abilene", platform: socrata
+  270. [INACTIVE] #217 Pearland, TX (pop 129,620) — key: "pearland", platform: socrata
+  271. [INACTIVE] #221 Allentown, PA (pop 127,138) — key: "allentown", platform: socrata
+  272. [INACTIVE] #224 Topeka, KS (pop 125,467) — key: "topeka", platform: socrata
+  273. [INACTIVE] #226 Lakeland, FL (pop 124,990) — key: "lakeland", platform: socrata
+  274. [INACTIVE] #228 Concord, CA (pop 124,016) — key: "concord", platform: socrata
+  275. [INACTIVE] #229 Rochester, MN (pop 123,624) — key: "rochester_mn", platform: socrata
+  276. [INACTIVE] #230 Vallejo, CA (pop 123,475) — key: "vallejo", platform: socrata
+  277. [INACTIVE] #231 Ann Arbor, MI (pop 122,925) — key: "ann_arbor", platform: socrata
+  278. [INACTIVE] #234 Hartford, CT (pop 122,129) — key: "hartford", platform: socrata
+  279. [INACTIVE] #235 Arvada, CO (pop 121,873) — key: "arvada", platform: socrata
+  280. [INACTIVE] #236 Berkeley, CA (pop 121,749) — key: "berkeley", platform: socrata
+  281. [INACTIVE] #238 Billings, MT (pop 121,483) — key: "billings", platform: socrata
+  282. [INACTIVE] #240 Lowell, MA (pop 120,418) — key: "lowell", platform: socrata
+  283. [INACTIVE] #241 Odessa, TX (pop 119,748) — key: "odessa", platform: socrata
+  284. [INACTIVE] #246 Goodyear, AZ (pop 118,186) — key: "goodyear", platform: socrata
+  285. [INACTIVE] #248 Nampa, ID (pop 117,350) — key: "nampa", platform: socrata
+  286. [INACTIVE] #254 Manchester, NH (pop 116,386) — key: "manchester", platform: socrata
+  287. [INACTIVE] #256 Waterbury, CT (pop 115,908) — key: "waterbury", platform: socrata
+  288. [INACTIVE] #257 Provo, UT (pop 115,479) — key: "provo", platform: socrata
+  289. [INACTIVE] #258 Evansville, IN (pop 115,395) — key: "evansville", platform: socrata
+  290. [INACTIVE] #260 Westminster, CO (pop 115,302) — key: "westminster_co", platform: socrata
+  291. [INACTIVE] #264 Lansing, MI (pop 114,336) — key: "lansing", platform: socrata
+  292. [INACTIVE] #265 Buckeye, AZ (pop 114,334) — key: "buckeye", platform: socrata
+  293. [INACTIVE] #271 Beaumont, TX (pop 112,893) — key: "beaumont", platform: socrata
+  294. [INACTIVE] #273 Rio Rancho, NM (pop 112,524) — key: "rio_rancho", platform: socrata
+  295. [INACTIVE] #276 Tyler, TX (pop 112,219) — key: "tyler", platform: socrata
+  296. [INACTIVE] #280 Sparks, NV (pop 111,520) — key: "sparks", platform: socrata
+  297. [INACTIVE] #283 Pueblo, CO (pop 111,166) — key: "pueblo", platform: socrata
+  298. [INACTIVE] #287 Downey, CA (pop 109,368) — key: "downey", platform: socrata
+  299. [INACTIVE] #299 Green Bay, WI (pop 106,311) — key: "green_bay", platform: socrata
+  300. [INACTIVE] #300 St. George, UT (pop 106,288) — key: "st_george", platform: socrata
+  301. [INACTIVE] #305 El Monte, CA (pop 104,639) — key: "el_monte", platform: socrata
+  302. [INACTIVE] #308 South Bend, IN (pop 103,713) — key: "south_bend", platform: socrata
+  303. [INACTIVE] #313 Quincy, MA (pop 103,434) — key: "quincy_ma", platform: socrata
+  304. [INACTIVE] #315 Fayetteville, AR (pop 103,134) — key: "fayetteville_ar", platform: socrata
+  305. [INACTIVE] #323 Daly City, CA (pop 101,418) — key: "daly_city", platform: socrata
+  306. [INACTIVE] #327 Davenport, IA (pop 100,938) — key: "davenport", platform: socrata
+  307. [INACTIVE] #336 Kenosha, WI (pop 99,578) — key: "kenosha", platform: socrata
+  308. [INACTIVE] #346 Avondale, AZ (pop 96,609) — key: "avondale", platform: socrata
+  309. [INACTIVE] #361 Norwalk, CT (pop 93,661) — key: "norwalk", platform: socrata
+  310. [INACTIVE] #366 Erie, PA (pop 92,940) — key: "erie", platform: socrata
+  311. [INACTIVE] #376 Trenton, NJ (pop 91,193) — key: "trenton", platform: socrata
+  312. [INACTIVE] #380 Newton, MA (pop 90,700) — key: "newton_ma", platform: socrata
+  313. [INACTIVE] #381 Santa Fe, NM (pop 90,551) — key: "santa_fe", platform: socrata
+  314. [INACTIVE] #384 Clifton, NJ (pop 90,322) — key: "clifton", platform: socrata
+  315. [INACTIVE] #392 Danbury, CT (pop 88,692) — key: "danbury", platform: socrata
+  316. [INACTIVE] #393 Ogden, UT (pop 88,656) — key: "ogden", platform: socrata
+  317. [INACTIVE] #398 Duluth, MN (pop 87,986) — key: "duluth", platform: socrata
+  318. [INACTIVE] #405 Sioux City, IA (pop 86,875) — key: "sioux_city", platform: socrata
+  319. [INACTIVE] #418 New Rochelle, NY (pop 85,512) — key: "new_rochelle", platform: socrata
+  320. [INACTIVE] #421 Cranston, RI (pop 84,448) — key: "cranston", platform: socrata
+  321. [INACTIVE] #422 Layton, UT (pop 84,348) — key: "layton", platform: socrata
+  322. [INACTIVE] #430 Warwick, RI (pop 83,554) — key: "warwick_ri", platform: socrata
+  323. [INACTIVE] #455 Bloomington, IN (pop 79,986) — key: "bloomington_in", platform: socrata
+  324. [INACTIVE] #463 Bowling Green, KY (pop 79,076) — key: "bowling_green_ky", platform: socrata
+  325. [INACTIVE] #474 Missoula, MT (pop 78,204) — key: "missoula", platform: socrata
+  326. [INACTIVE] #475 Racine, WI (pop 78,057) — key: "racine", platform: socrata
+  327. [INACTIVE] #482 Pawtucket, RI (pop 76,996) — key: "pawtucket", platform: socrata
+  328. [INACTIVE] #486 Iowa City, IA (pop 76,710) — key: "iowa_city", platform: socrata
+  329. [INACTIVE] #493 Scranton, PA (pop 75,905) — key: "scranton", platform: socrata
+  330. [INACTIVE] #500 Appleton, WI (pop 75,344) — key: "appleton", platform: socrata
+  331. [INACTIVE] #507 Gulfport, MS (pop 74,621) — key: "gulfport", platform: socrata
+  332. [INACTIVE] #509 Greenville, SC (pop 74,371) — key: "greenville_sc", platform: socrata
+  333. [INACTIVE] #517 Wilmington, DE (pop 73,176) — key: "wilmington_de", platform: socrata
+  334. [INACTIVE] #526 Mount Vernon, NY (pop 71,999) — key: "mount_vernon", platform: socrata
+  335. [INACTIVE] #549 Portland, ME (pop 69,568) — key: "portland_me", platform: socrata
+  336. [INACTIVE] #550 Idaho Falls, ID (pop 69,523) — key: "idaho_falls", platform: socrata
+  337. [INACTIVE] #551 Schenectady, NY (pop 69,495) — key: "schenectady", platform: socrata
+  338. [INACTIVE] #558 Casa Grande, AZ (pop 68,927) — key: "casa_grande", platform: socrata
+  339. [INACTIVE] #593 Cheyenne, WY (pop 65,704) — key: "cheyenne", platform: socrata
+  340. [INACTIVE] #624 Council Bluffs, IA (pop 62,665) — key: "council_bluffs", platform: socrata
+  341. [INACTIVE] #627 White Plains, NY (pop 62,561) — key: "white_plains", platform: socrata
+  342. [INACTIVE] #647 Meriden, CT (pop 60,849) — key: "meriden", platform: socrata
+  343. [INACTIVE] #691 Pocatello, ID (pop 58,231) — key: "pocatello", platform: socrata
+  344. [INACTIVE] #704 New Brunswick, NJ (pop 57,487) — key: "new_brunswick", platform: socrata
+  345. [INACTIVE] #757 Grand Island, NE (pop 53,250) — key: "grand_island", platform: socrata
+  346. [INACTIVE] #789 Troy, NY (pop 51,065) — key: "troy", platform: socrata
+  347. [INACTIVE] #864 Binghamton, NY (pop 46,773) — key: "binghamton", platform: socrata
+  348. [INACTIVE] #870 Charleston, WV (pop 46,482) — key: "charleston_wv", platform: socrata
+  349. [INACTIVE] #918 Burlington, VT (pop 44,432) — key: "burlington", platform: socrata
+  350. [INACTIVE] #1001 Annapolis, MD (pop 40,689) — key: "annapolis", platform: socrata
+  351. [INACTIVE] #1016 Dover, DE (pop 40,191) — key: "dover", platform: socrata
+  352. [INACTIVE] #1170 Kearney, NE (pop 34,741) — key: "kearney", platform: socrata
+  353. [NOT_CONFIGURED] #43 Bakersfield, CA (pop 417,468)
+  354. [NOT_CONFIGURED] #54 Lexington-Fayette urban county, KY (pop 329,437)
+  355. [NOT_CONFIGURED] #90 Boise City, ID (pop 237,963)
+  356. [NOT_CONFIGURED] #106 Moreno Valley, CA (pop 213,919)
+  357. [NOT_CONFIGURED] #116 Amarillo, TX (pop 203,729)
+  358. [NOT_CONFIGURED] #118 Columbus, GA (pop 201,830)
+  359. [NOT_CONFIGURED] #129 Brownsville, TX (pop 191,967)
+  360. [NOT_CONFIGURED] #135 Clarksville, TN (pop 185,690)
+  361. [NOT_CONFIGURED] #136 Ontario, CA (pop 185,285)
+  362. [NOT_CONFIGURED] #137 Newport News, VA (pop 183,056)
+  363. [NOT_CONFIGURED] #140 Aurora, IL (pop 180,710)
+  364. [NOT_CONFIGURED] #145 Rancho Cucamonga, CA (pop 176,675)
+  365. [NOT_CONFIGURED] #147 Garden Grove, CA (pop 172,361)
+  366. [NOT_CONFIGURED] #148 Oceanside, CA (pop 170,941)
+  367. [NOT_CONFIGURED] #154 Denton, TX (pop 165,998)
+  368. [NOT_CONFIGURED] #159 Killeen, TX (pop 160,616)
+  369. [NOT_CONFIGURED] #165 Macon-Bibb County, GA (pop 157,056)
+  370. [NOT_CONFIGURED] #171 Naperville, IL (pop 153,124)
+  371. [NOT_CONFIGURED] #172 Joliet, IL (pop 151,837)
+  372. [NOT_CONFIGURED] #174 Mesquite, TX (pop 150,140)
+  373. [NOT_CONFIGURED] #175 Pasadena, TX (pop 149,617)
+  374. [NOT_CONFIGURED] #176 Olathe, KS (pop 149,035)
+  375. [NOT_CONFIGURED] #182 Rockford, IL (pop 147,486)
+  376. [NOT_CONFIGURED] #185 Visalia, CA (pop 146,271)
+  377. [NOT_CONFIGURED] #195 Fullerton, CA (pop 140,054)
+  378. [NOT_CONFIGURED] #200 Orange, CA (pop 137,941)
+  379. [NOT_CONFIGURED] #202 Warren, MI (pop 137,686)
+  380. [NOT_CONFIGURED] #203 Hampton, VA (pop 137,596)
+  381. [NOT_CONFIGURED] #206 Kent, WA (pop 136,588)
+  382. [NOT_CONFIGURED] #209 Lewisville, TX (pop 135,983)
+  383. [NOT_CONFIGURED] #210 Carrollton, TX (pop 135,456)
+  384. [NOT_CONFIGURED] #212 Sterling Heights, MI (pop 134,342)
+  385. [NOT_CONFIGURED] #213 Santa Clara, CA (pop 133,132)
+  386. [NOT_CONFIGURED] #215 Columbia, MO (pop 130,900)
+  387. [NOT_CONFIGURED] #219 Clovis, CA (pop 127,993)
+  388. [NOT_CONFIGURED] #222 North Charleston, SC (pop 126,005)
+  389. [NOT_CONFIGURED] #223 Simi Valley, CA (pop 125,778)
+  390. [NOT_CONFIGURED] #227 Thousand Oaks, CA (pop 124,229)
+  391. [NOT_CONFIGURED] #232 Broken Arrow, OK (pop 122,756)
+  392. [NOT_CONFIGURED] #233 Fairfield, CA (pop 122,646)
+  393. [NOT_CONFIGURED] #237 Independence, MO (pop 121,629)
+  394. [NOT_CONFIGURED] #242 High Point, NC (pop 118,601)
+  395. [NOT_CONFIGURED] #243 League City, TX (pop 118,456)
+  396. [NOT_CONFIGURED] #244 Antioch, CA (pop 118,453)
+  397. [NOT_CONFIGURED] #249 Menifee, CA (pop 117,041)
+  398. [NOT_CONFIGURED] #251 Clearwater, FL (pop 116,811)
+  399. [NOT_CONFIGURED] #252 West Jordan, UT (pop 116,688)
+  400. [NOT_CONFIGURED] #253 New Braunfels, TX (pop 116,477)
+  401. [NOT_CONFIGURED] #261 Elgin, IL (pop 114,701)
+  402. [NOT_CONFIGURED] #262 Conroe, TX (pop 114,581)
+  403. [NOT_CONFIGURED] #263 Greeley, CO (pop 114,363)
+  404. [NOT_CONFIGURED] #266 Tuscaloosa, AL (pop 114,288)
+  405. [NOT_CONFIGURED] #268 Carlsbad, CA (pop 113,575)
+  406. [NOT_CONFIGURED] #270 Springfield, IL (pop 112,949)
+  407. [NOT_CONFIGURED] #272 Murrieta, CA (pop 112,539)
+  408. [NOT_CONFIGURED] #274 Temecula, CA (pop 112,431)
+  409. [NOT_CONFIGURED] #275 Concord, NC (pop 112,395)
+  410. [NOT_CONFIGURED] #278 South Fulton, GA (pop 112,003)
+  411. [NOT_CONFIGURED] #279 Peoria, IL (pop 111,696)
+  412. [NOT_CONFIGURED] #281 Gresham, OR (pop 111,507)
+  413. [NOT_CONFIGURED] #282 Santa Maria, CA (pop 111,346)
+  414. [NOT_CONFIGURED] #284 Hillsboro, OR (pop 110,337)
+  415. [NOT_CONFIGURED] #285 Sugar Land, TX (pop 109,851)
+  416. [NOT_CONFIGURED] #286 San Buenaventura (Ventura), CA (pop 109,831)
+  417. [NOT_CONFIGURED] #288 Costa Mesa, CA (pop 109,131)
+  418. [NOT_CONFIGURED] #289 Centennial, CO (pop 108,853)
+  419. [NOT_CONFIGURED] #290 Edinburg, TX (pop 108,733)
+  420. [NOT_CONFIGURED] #291 Spokane Valley, WA (pop 108,267)
+  421. [NOT_CONFIGURED] #292 Jurupa Valley, CA (pop 108,154)
+  422. [NOT_CONFIGURED] #293 Bend, OR (pop 106,926)
+  423. [NOT_CONFIGURED] #294 West Covina, CA (pop 106,920)
+  424. [NOT_CONFIGURED] #296 Palm Coast, FL (pop 106,729)
+  425. [NOT_CONFIGURED] #297 Lee's Summit, MO (pop 106,419)
+  426. [NOT_CONFIGURED] #298 Dearborn, MI (pop 106,377)
+  427. [NOT_CONFIGURED] #301 Brockton, MA (pop 105,788)
+  428. [NOT_CONFIGURED] #302 Renton, WA (pop 105,543)
+  429. [NOT_CONFIGURED] #303 Sandy Springs, GA (pop 105,505)
+  430. [NOT_CONFIGURED] #304 Rialto, CA (pop 104,918)
+  431. [NOT_CONFIGURED] #306 Vacaville, CA (pop 103,994)
+  432. [NOT_CONFIGURED] #307 Fishers, IN (pop 103,986)
+  433. [NOT_CONFIGURED] #309 Carmel, IN (pop 103,606)
+  434. [NOT_CONFIGURED] #310 Yuma, AZ (pop 103,559)
+  435. [NOT_CONFIGURED] #311 Burbank, CA (pop 103,533)
+  436. [NOT_CONFIGURED] #312 Lynn, MA (pop 103,489)
+  437. [NOT_CONFIGURED] #314 El Cajon, CA (pop 103,291)
+  438. [NOT_CONFIGURED] #316 Suffolk, VA (pop 103,105)
+  439. [NOT_CONFIGURED] #317 San Mateo, CA (pop 103,006)
+  440. [NOT_CONFIGURED] #318 Chico, CA (pop 102,911)
+  441. [NOT_CONFIGURED] #319 Inglewood, CA (pop 102,774)
+  442. [NOT_CONFIGURED] #320 Wichita Falls, TX (pop 102,372)
+  443. [NOT_CONFIGURED] #322 Hesperia, CA (pop 101,836)
+  444. [NOT_CONFIGURED] #325 New Bedford, MA (pop 101,318)
+  445. [NOT_CONFIGURED] #330 Federal Way, WA (pop 100,252)
+  446. [NOT_CONFIGURED] #331 San Angelo, TX (pop 100,159)
+  447. [NOT_CONFIGURED] #332 Tracy, CA (pop 100,136)
+  448. [NOT_CONFIGURED] #335 Longmont, CO (pop 99,818)
+  449. [NOT_CONFIGURED] #337 Vista, CA (pop 99,322)
+  450. [NOT_CONFIGURED] #338 Edmond, OK (pop 99,040)
+  451. [NOT_CONFIGURED] #339 Beaverton, OR (pop 98,302)
+  452. [NOT_CONFIGURED] #340 Norwalk, CA (pop 98,230)
+  453. [NOT_CONFIGURED] #341 Roanoke, VA (pop 97,912)
+  454. [NOT_CONFIGURED] #342 Yakima, WA (pop 97,390)
+  455. [NOT_CONFIGURED] #343 Lawrence, KS (pop 97,271)
+  456. [NOT_CONFIGURED] #344 Orem, UT (pop 96,646)
+  457. [NOT_CONFIGURED] #345 San Marcos, CA (pop 96,620)
+  458. [NOT_CONFIGURED] #347 Portsmouth, VA (pop 96,482)
+  459. [NOT_CONFIGURED] #348 Temple, TX (pop 96,267)
+  460. [NOT_CONFIGURED] #349 Merced, CA (pop 96,073)
+  461. [NOT_CONFIGURED] #350 Reading, PA (pop 96,000)
+  462. [NOT_CONFIGURED] #352 Mount Pleasant, SC (pop 95,604)
+  463. [NOT_CONFIGURED] #353 Kirkland, WA (pop 95,499)
+  464. [NOT_CONFIGURED] #354 O'Fallon, MO (pop 95,355)
+  465. [NOT_CONFIGURED] #355 Greenville, NC (pop 95,138)
+  466. [NOT_CONFIGURED] #357 Fall River, MA (pop 94,689)
+  467. [NOT_CONFIGURED] #358 Manteca, CA (pop 94,292)
+  468. [NOT_CONFIGURED] #359 Indio, CA (pop 94,275)
+  469. [NOT_CONFIGURED] #360 Chino, CA (pop 94,010)
+  470. [NOT_CONFIGURED] #362 Redding, CA (pop 93,502)
+  471. [NOT_CONFIGURED] #363 Lehi, UT (pop 93,446)
+  472. [NOT_CONFIGURED] #364 Livonia, MI (pop 93,113)
+  473. [NOT_CONFIGURED] #365 Hoover, AL (pop 93,013)
+  474. [NOT_CONFIGURED] #367 Hemet, CA (pop 92,912)
+  475. [NOT_CONFIGURED] #368 North Port, FL (pop 92,875)
+  476. [NOT_CONFIGURED] #369 Sandy, UT (pop 92,840)
+  477. [NOT_CONFIGURED] #370 Roswell, GA (pop 92,227)
+  478. [NOT_CONFIGURED] #371 Champaign, IL (pop 91,961)
+  479. [NOT_CONFIGURED] #372 Nashua, NH (pop 91,851)
+  480. [NOT_CONFIGURED] #373 Mission Viejo, CA (pop 91,601)
+  481. [NOT_CONFIGURED] #374 Bryan, TX (pop 91,541)
+  482. [NOT_CONFIGURED] #375 Carson, CA (pop 91,358)
+  483. [NOT_CONFIGURED] #377 Compton, CA (pop 91,129)
+  484. [NOT_CONFIGURED] #378 South Gate, CA (pop 90,805)
+  485. [NOT_CONFIGURED] #379 Santa Monica, CA (pop 90,729)
+  486. [NOT_CONFIGURED] #382 Fort Smith, AR (pop 90,507)
+  487. [NOT_CONFIGURED] #385 Lawton, OK (pop 90,027)
+  488. [NOT_CONFIGURED] #386 Westminster, CA (pop 89,537)
+  489. [NOT_CONFIGURED] #388 Springdale, AR (pop 89,368)
+  490. [NOT_CONFIGURED] #389 Lawrence, MA (pop 89,332)
+  491. [NOT_CONFIGURED] #390 Troy, MI (pop 89,209)
+  492. [NOT_CONFIGURED] #391 Franklin, TN (pop 89,142)
+  493. [NOT_CONFIGURED] #394 Mission, TX (pop 88,574)
+  494. [NOT_CONFIGURED] #395 Waukegan, IL (pop 88,570)
+  495. [NOT_CONFIGURED] #396 Bloomington, MN (pop 88,344)
+  496. [NOT_CONFIGURED] #397 Folsom, CA (pop 88,091)
+  497. [NOT_CONFIGURED] #399 Melbourne, FL (pop 87,561)
+  498. [NOT_CONFIGURED] #401 Mountain View, CA (pop 87,316)
+  499. [NOT_CONFIGURED] #402 Santa Barbara, CA (pop 87,291)
+  500. [NOT_CONFIGURED] #403 Lake Forest, CA (pop 87,159)
+  501. [NOT_CONFIGURED] #404 Citrus Heights, CA (pop 86,909)
+  502. [NOT_CONFIGURED] #406 Kennewick, WA (pop 86,728)
+  503. [NOT_CONFIGURED] #407 San Leandro, CA (pop 86,571)
+  504. [NOT_CONFIGURED] #408 Medford, OR (pop 86,301)
+  505. [NOT_CONFIGURED] #409 Warner Robins, GA (pop 86,199)
+  506. [NOT_CONFIGURED] #410 South Jordan, UT (pop 86,156)
+  507. [NOT_CONFIGURED] #411 Daytona Beach, FL (pop 86,015)
+  508. [NOT_CONFIGURED] #412 Baytown, TX (pop 86,004)
+  509. [NOT_CONFIGURED] #413 San Ramon, CA (pop 85,924)
+  510. [NOT_CONFIGURED] #415 Whittier, CA (pop 85,589)
+  511. [NOT_CONFIGURED] #416 Gastonia, NC (pop 85,535)
+  512. [NOT_CONFIGURED] #419 Livermore, CA (pop 84,867)
+  513. [NOT_CONFIGURED] #423 Farmington Hills, MI (pop 84,173)
+  514. [NOT_CONFIGURED] #424 Rancho Cordova, CA (pop 84,113)
+  515. [NOT_CONFIGURED] #425 Queen Creek, AZ (pop 83,781)
+  516. [NOT_CONFIGURED] #426 Auburn, AL (pop 83,757)
+  517. [NOT_CONFIGURED] #428 Hawthorne, CA (pop 83,633)
+  518. [NOT_CONFIGURED] #432 Castle Rock, CO (pop 83,213)
+  519. [NOT_CONFIGURED] #433 Boynton Beach, FL (pop 83,095)
+  520. [NOT_CONFIGURED] #434 Perris, CA (pop 83,032)
+  521. [NOT_CONFIGURED] #435 Redwood City, CA (pop 82,982)
+  522. [NOT_CONFIGURED] #437 Brooklyn Park, MN (pop 82,893)
+  523. [NOT_CONFIGURED] #438 Westland, MI (pop 82,745)
+  524. [NOT_CONFIGURED] #439 Buena Park, CA (pop 82,611)
+  525. [NOT_CONFIGURED] #440 Jonesboro, AR (pop 82,384)
+  526. [NOT_CONFIGURED] #441 Largo, FL (pop 82,337)
+  527. [NOT_CONFIGURED] #442 Redmond, WA (pop 82,195)
+  528. [NOT_CONFIGURED] #445 Pasco, WA (pop 81,724)
+  529. [NOT_CONFIGURED] #447 Lake Charles, LA (pop 81,157)
+  530. [NOT_CONFIGURED] #448 Pharr, TX (pop 81,142)
+  531. [NOT_CONFIGURED] #449 Loveland, CO (pop 81,102)
+  532. [NOT_CONFIGURED] #450 Mansfield, TX (pop 80,803)
+  533. [NOT_CONFIGURED] #451 Woodbury, MN (pop 80,596)
+  534. [NOT_CONFIGURED] #453 Alhambra, CA (pop 80,279)
+  535. [NOT_CONFIGURED] #454 Flower Mound, TX (pop 79,990)
+  536. [NOT_CONFIGURED] #456 Rapid City, SD (pop 79,894)
+  537. [NOT_CONFIGURED] #457 Milpitas, CA (pop 79,746)
+  538. [NOT_CONFIGURED] #458 Flint, MI (pop 79,735)
+  539. [NOT_CONFIGURED] #459 Upland, CA (pop 79,684)
+  540. [NOT_CONFIGURED] #460 Bethlehem, PA (pop 79,453)
+  541. [NOT_CONFIGURED] #461 Parma, OH (pop 79,350)
+  542. [NOT_CONFIGURED] #462 Bloomington, IL (pop 79,232)
+  543. [NOT_CONFIGURED] #464 Tustin, CA (pop 78,863)
+  544. [NOT_CONFIGURED] #465 Alameda, CA (pop 78,795)
+  545. [NOT_CONFIGURED] #466 Missouri City, TX (pop 78,582)
+  546. [NOT_CONFIGURED] #467 Wyoming, MI (pop 78,559)
+  547. [NOT_CONFIGURED] #468 Plymouth, MN (pop 78,551)
+  548. [NOT_CONFIGURED] #469 Lakewood, CA (pop 78,494)
+  549. [NOT_CONFIGURED] #471 Rochester Hills, MI (pop 78,330)
+  550. [NOT_CONFIGURED] #472 Broomfield, CO (pop 78,323)
+  551. [NOT_CONFIGURED] #473 Mableton, GA (pop 78,314)
+  552. [NOT_CONFIGURED] #476 Lakeville, MN (pop 77,971)
+  553. [NOT_CONFIGURED] #477 Bismarck, ND (pop 77,772)
+  554. [NOT_CONFIGURED] #478 Flagstaff, AZ (pop 77,539)
+  555. [NOT_CONFIGURED] #479 Chino Hills, CA (pop 77,418)
+  556. [NOT_CONFIGURED] #480 Pittsburg, CA (pop 77,131)
+  557. [NOT_CONFIGURED] #483 Napa, CA (pop 76,921)
+  558. [NOT_CONFIGURED] #484 Southfield, MI (pop 76,874)
+  559. [NOT_CONFIGURED] #485 Ankeny, IA (pop 76,727)
+  560. [NOT_CONFIGURED] #487 Maricopa, AZ (pop 76,654)
+  561. [NOT_CONFIGURED] #489 Marysville, WA (pop 76,209)
+  562. [NOT_CONFIGURED] #490 Hammond, IN (pop 76,030)
+  563. [NOT_CONFIGURED] #492 Apex, NC (pop 75,977)
+  564. [NOT_CONFIGURED] #494 New Britain, CT (pop 75,871)
+  565. [NOT_CONFIGURED] #495 Rock Hill, SC (pop 75,798)
+  566. [NOT_CONFIGURED] #496 Bellflower, CA (pop 75,716)
+  567. [NOT_CONFIGURED] #497 Pleasanton, CA (pop 75,664)
+  568. [NOT_CONFIGURED] #498 Rogers, AR (pop 75,639)
+  569. [NOT_CONFIGURED] #502 Blaine, MN (pop 75,172)
+  570. [NOT_CONFIGURED] #504 Rocklin, CA (pop 75,129)
+  571. [NOT_CONFIGURED] #505 Apple Valley, CA (pop 75,029)
+  572. [NOT_CONFIGURED] #506 Bolingbrook, IL (pop 74,756)
+  573. [NOT_CONFIGURED] #511 Redlands, CA (pop 74,279)
+  574. [NOT_CONFIGURED] #512 West Des Moines, IA (pop 73,664)
+  575. [NOT_CONFIGURED] #513 Johnson City, TN (pop 73,635)
+  576. [NOT_CONFIGURED] #514 Lake Elsinore, CA (pop 73,595)
+  577. [NOT_CONFIGURED] #516 Kalamazoo, MI (pop 73,290)
+  578. [NOT_CONFIGURED] #518 Caldwell, ID (pop 73,088)
+  579. [NOT_CONFIGURED] #519 Turlock, CA (pop 72,888)
+  580. [NOT_CONFIGURED] #520 Maple Grove, MN (pop 72,739)
+  581. [NOT_CONFIGURED] #521 Tulare, CA (pop 72,601)
+  582. [NOT_CONFIGURED] #522 St. Charles, MO (pop 72,458)
+  583. [NOT_CONFIGURED] #523 Eau Claire, WI (pop 72,331)
+  584. [NOT_CONFIGURED] #524 Harlingen, TX (pop 72,234)
+  585. [NOT_CONFIGURED] #525 St. Cloud, MN (pop 72,145)
+  586. [NOT_CONFIGURED] #528 Lafayette, IN (pop 71,757)
+  587. [NOT_CONFIGURED] #530 Dothan, AL (pop 71,650)
+  588. [NOT_CONFIGURED] #531 Waukesha, WI (pop 71,461)
+  589. [NOT_CONFIGURED] #532 North Richland Hills, TX (pop 71,436)
+  590. [NOT_CONFIGURED] #533 St. Joseph, MO (pop 71,098)
+  591. [NOT_CONFIGURED] #534 St. Cloud, FL (pop 71,036)
+  592. [NOT_CONFIGURED] #535 Jacksonville, NC (pop 70,840)
+  593. [NOT_CONFIGURED] #536 Walnut Creek, CA (pop 70,817)
+  594. [NOT_CONFIGURED] #537 Eastvale, CA (pop 70,751)
+  595. [NOT_CONFIGURED] #539 Conway, AR (pop 70,711)
+  596. [NOT_CONFIGURED] #542 Grand Junction, CO (pop 70,554)
+  597. [NOT_CONFIGURED] #543 Dublin, CA (pop 70,544)
+  598. [NOT_CONFIGURED] #544 Ocala, FL (pop 70,251)
+  599. [NOT_CONFIGURED] #545 Commerce City, CO (pop 70,245)
+  600. [NOT_CONFIGURED] #547 Camarillo, CA (pop 69,881)
+  601. [NOT_CONFIGURED] #548 Shawnee, KS (pop 69,724)
+  602. [NOT_CONFIGURED] #552 Jackson, TN (pop 69,303)
+  603. [NOT_CONFIGURED] #553 Baldwin Park, CA (pop 69,247)
+  604. [NOT_CONFIGURED] #554 Canton, OH (pop 69,211)
+  605. [NOT_CONFIGURED] #555 Yuba City, CA (pop 69,148)
+  606. [NOT_CONFIGURED] #556 Madera, CA (pop 69,094)
+  607. [NOT_CONFIGURED] #557 Ames, IA (pop 69,026)
+  608. [NOT_CONFIGURED] #559 Decatur, IL (pop 68,763)
+  609. [NOT_CONFIGURED] #560 Lodi, CA (pop 68,642)
+  610. [NOT_CONFIGURED] #562 Haverhill, MA (pop 68,291)
+  611. [NOT_CONFIGURED] #563 Greenwood, IN (pop 68,175)
+  612. [NOT_CONFIGURED] #564 Rowlett, TX (pop 68,123)
+  613. [NOT_CONFIGURED] #565 Redondo Beach, CA (pop 68,075)
+  614. [NOT_CONFIGURED] #566 Novi, MI (pop 67,675)
+  615. [NOT_CONFIGURED] #567 Palo Alto, CA (pop 67,658)
+  616. [NOT_CONFIGURED] #568 Gary, IN (pop 67,555)
+  617. [NOT_CONFIGURED] #569 Waterloo, IA (pop 67,477)
+  618. [NOT_CONFIGURED] #571 Oshkosh, WI (pop 67,242)
+  619. [NOT_CONFIGURED] #572 Eagan, MN (pop 67,240)
+  620. [NOT_CONFIGURED] #573 Davis, CA (pop 67,125)
+  621. [NOT_CONFIGURED] #574 Huntersville, NC (pop 67,087)
+  622. [NOT_CONFIGURED] #578 Albany, GA (pop 66,705)
+  623. [NOT_CONFIGURED] #579 Malden, MA (pop 66,693)
+  624. [NOT_CONFIGURED] #581 Yorba Linda, CA (pop 66,489)
+  625. [NOT_CONFIGURED] #582 Sammamish, WA (pop 66,474)
+  626. [NOT_CONFIGURED] #583 Janesville, WI (pop 66,428)
+  627. [NOT_CONFIGURED] #584 Brentwood, CA (pop 66,286)
+  628. [NOT_CONFIGURED] #585 Shoreline, WA (pop 66,251)
+  629. [NOT_CONFIGURED] #586 Union City, CA (pop 66,196)
+  630. [NOT_CONFIGURED] #587 Victoria, TX (pop 66,020)
+  631. [NOT_CONFIGURED] #590 Waltham, MA (pop 65,849)
+  632. [NOT_CONFIGURED] #591 Kyle, TX (pop 65,833)
+  633. [NOT_CONFIGURED] #592 Lorain, OH (pop 65,751)
+  634. [NOT_CONFIGURED] #595 Muncie, IN (pop 65,320)
+  635. [NOT_CONFIGURED] #596 Burnsville, MN (pop 64,864)
+  636. [NOT_CONFIGURED] #597 Bellevue, NE (pop 64,777)
+  637. [NOT_CONFIGURED] #598 South San Francisco, CA (pop 64,660)
+  638. [NOT_CONFIGURED] #599 Kenner, LA (pop 64,650)
+  639. [NOT_CONFIGURED] #600 North Little Rock, AR (pop 64,498)
+  640. [NOT_CONFIGURED] #601 Richland, WA (pop 64,372)
+  641. [NOT_CONFIGURED] #602 Millcreek, UT (pop 64,217)
+  642. [NOT_CONFIGURED] #603 Laguna Niguel, CA (pop 64,185)
+  643. [NOT_CONFIGURED] #604 Madison, AL (pop 64,029)
+  644. [NOT_CONFIGURED] #605 Chapel Hill, NC (pop 64,028)
+  645. [NOT_CONFIGURED] #606 Hamilton, OH (pop 63,953)
+  646. [NOT_CONFIGURED] #607 Hendersonville, TN (pop 63,947)
+  647. [NOT_CONFIGURED] #608 Moore, OK (pop 63,845)
+  648. [NOT_CONFIGURED] #609 Coon Rapids, MN (pop 63,807)
+  649. [NOT_CONFIGURED] #611 Lynwood, CA (pop 63,596)
+  650. [NOT_CONFIGURED] #612 Porterville, CA (pop 63,517)
+  651. [NOT_CONFIGURED] #614 Wellington, FL (pop 63,258)
+  652. [NOT_CONFIGURED] #615 Bossier City, LA (pop 63,218)
+  653. [NOT_CONFIGURED] #616 Marietta, GA (pop 63,122)
+  654. [NOT_CONFIGURED] #617 Westfield, IN (pop 62,994)
+  655. [NOT_CONFIGURED] #619 Woodland, CA (pop 62,983)
+  656. [NOT_CONFIGURED] #621 Eden Prairie, MN (pop 62,905)
+  657. [NOT_CONFIGURED] #622 Apopka, FL (pop 62,777)
+  658. [NOT_CONFIGURED] #623 Lakewood, WA (pop 62,709)
+  659. [NOT_CONFIGURED] #625 San Clemente, CA (pop 62,627)
+  660. [NOT_CONFIGURED] #626 Santa Cruz, CA (pop 62,581)
+  661. [NOT_CONFIGURED] #628 Pontiac, MI (pop 62,528)
+  662. [NOT_CONFIGURED] #629 Marana, AZ (pop 62,380)
+  663. [NOT_CONFIGURED] #630 Herriman, UT (pop 62,352)
+  664. [NOT_CONFIGURED] #632 Bristol, CT (pop 62,195)
+  665. [NOT_CONFIGURED] #634 Corvallis, OR (pop 61,993)
+  666. [NOT_CONFIGURED] #635 Taunton, MA (pop 61,936)
+  667. [NOT_CONFIGURED] #636 Bentonville, AR (pop 61,791)
+  668. [NOT_CONFIGURED] #637 Taylor, MI (pop 61,544)
+  669. [NOT_CONFIGURED] #638 St. Peters, MO (pop 61,398)
+  670. [NOT_CONFIGURED] #639 La Habra, CA (pop 61,391)
+  671. [NOT_CONFIGURED] #640 Burlington, NC (pop 61,365)
+  672. [NOT_CONFIGURED] #641 Blue Springs, MO (pop 61,246)
+  673. [NOT_CONFIGURED] #642 Little Elm, TX (pop 61,219)
+  674. [NOT_CONFIGURED] #643 Springfield, OR (pop 61,182)
+  675. [NOT_CONFIGURED] #644 Encinitas, CA (pop 61,137)
+  676. [NOT_CONFIGURED] #645 Dearborn Heights, MI (pop 61,040)
+  677. [NOT_CONFIGURED] #646 Stonecrest, GA (pop 61,015)
+  678. [NOT_CONFIGURED] #648 La Mesa, CA (pop 60,767)
+  679. [NOT_CONFIGURED] #649 Revere, MA (pop 60,702)
+  680. [NOT_CONFIGURED] #650 Owensboro, KY (pop 60,675)
+  681. [NOT_CONFIGURED] #652 Montebello, CA (pop 60,617)
+  682. [NOT_CONFIGURED] #653 Hanford, CA (pop 60,594)
+  683. [NOT_CONFIGURED] #654 Eagle Mountain, UT (pop 60,575)
+  684. [NOT_CONFIGURED] #655 Kannapolis, NC (pop 60,521)
+  685. [NOT_CONFIGURED] #656 Gilroy, CA (pop 60,390)
+  686. [NOT_CONFIGURED] #657 Smyrna, TN (pop 60,302)
+  687. [NOT_CONFIGURED] #658 Weymouth Town, MA (pop 60,159)
+  688. [NOT_CONFIGURED] #659 Kokomo, IN (pop 60,093)
+  689. [NOT_CONFIGURED] #660 Great Falls, MT (pop 60,013)
+  690. [NOT_CONFIGURED] #661 Euless, TX (pop 60,010)
+  691. [NOT_CONFIGURED] #662 Winter Haven, FL (pop 59,975)
+  692. [NOT_CONFIGURED] #664 Medford, MA (pop 59,898)
+  693. [NOT_CONFIGURED] #665 Grand Forks, ND (pop 59,845)
+  694. [NOT_CONFIGURED] #666 West Allis, WI (pop 59,784)
+  695. [NOT_CONFIGURED] #668 Hempstead, NY (pop 59,569)
+  696. [NOT_CONFIGURED] #669 Beaumont, CA (pop 59,502)
+  697. [NOT_CONFIGURED] #670 Lenexa, KS (pop 59,427)
+  698. [NOT_CONFIGURED] #671 Spring Hill, TN (pop 59,398)
+  699. [NOT_CONFIGURED] #673 Brookhaven, GA (pop 59,370)
+  700. [NOT_CONFIGURED] #674 Pico Rivera, CA (pop 59,363)
+  701. [NOT_CONFIGURED] #676 Youngstown, OH (pop 59,123)
+  702. [NOT_CONFIGURED] #677 Santee, CA (pop 59,104)
+  703. [NOT_CONFIGURED] #678 Lake Havasu City, AZ (pop 59,037)
+  704. [NOT_CONFIGURED] #679 Dubuque, IA (pop 58,987)
+  705. [NOT_CONFIGURED] #680 Gardena, CA (pop 58,921)
+  706. [NOT_CONFIGURED] #682 Casper, WY (pop 58,823)
+  707. [NOT_CONFIGURED] #683 Cupertino, CA (pop 58,710)
+  708. [NOT_CONFIGURED] #684 Lacey, WA (pop 58,644)
+  709. [NOT_CONFIGURED] #685 Terre Haute, IN (pop 58,531)
+  710. [NOT_CONFIGURED] #686 Midwest City, OK (pop 58,505)
+  711. [NOT_CONFIGURED] #687 National City, CA (pop 58,460)
+  712. [NOT_CONFIGURED] #688 Lancaster, PA (pop 58,441)
+  713. [NOT_CONFIGURED] #689 Bowie, MD (pop 58,421)
+  714. [NOT_CONFIGURED] #690 Royal Oak, MI (pop 58,251)
+  715. [NOT_CONFIGURED] #692 Bradenton, FL (pop 58,184)
+  716. [NOT_CONFIGURED] #693 Carson, NV (pop 58,148)
+  717. [NOT_CONFIGURED] #694 Springfield, OH (pop 58,138)
+  718. [NOT_CONFIGURED] #695 St. Clair Shores, MI (pop 58,077)
+  719. [NOT_CONFIGURED] #697 Monterey Park, CA (pop 57,996)
+  720. [NOT_CONFIGURED] #698 Decatur, AL (pop 57,974)
+  721. [NOT_CONFIGURED] #699 Bozeman, MT (pop 57,894)
+  722. [NOT_CONFIGURED] #700 Texas City, TX (pop 57,875)
+  723. [NOT_CONFIGURED] #701 Taylorsville, UT (pop 57,819)
+  724. [NOT_CONFIGURED] #703 Southaven, MS (pop 57,493)
+  725. [NOT_CONFIGURED] #705 Saratoga Springs, UT (pop 57,411)
+  726. [NOT_CONFIGURED] #706 Coeur d'Alene, ID (pop 57,355)
+  727. [NOT_CONFIGURED] #707 Tigard, OR (pop 57,301)
+  728. [NOT_CONFIGURED] #708 Smyrna, GA (pop 57,177)
+  729. [NOT_CONFIGURED] #709 Albany, OR (pop 57,156)
+  730. [NOT_CONFIGURED] #710 Bonita Springs, FL (pop 57,112)
+  731. [NOT_CONFIGURED] #711 Kingsport, TN (pop 57,109)
+  732. [NOT_CONFIGURED] #712 Kettering, OH (pop 57,028)
+  733. [NOT_CONFIGURED] #714 Logan, UT (pop 56,770)
+  734. [NOT_CONFIGURED] #715 Wake Forest, NC (pop 56,764)
+  735. [NOT_CONFIGURED] #716 DeSoto, TX (pop 56,711)
+  736. [NOT_CONFIGURED] #717 Bartlett, TN (pop 56,708)
+  737. [NOT_CONFIGURED] #720 Highland, CA (pop 56,499)
+  738. [NOT_CONFIGURED] #721 Olympia, WA (pop 56,271)
+  739. [NOT_CONFIGURED] #722 Lincoln, CA (pop 56,268)
+  740. [NOT_CONFIGURED] #723 Burleson, TX (pop 56,253)
+  741. [NOT_CONFIGURED] #724 Fountain Valley, CA (pop 56,036)
+  742. [NOT_CONFIGURED] #725 West Sacramento, CA (pop 55,991)
+  743. [NOT_CONFIGURED] #726 Anderson, IN (pop 55,851)
+  744. [NOT_CONFIGURED] #727 Port Arthur, TX (pop 55,799)
+  745. [NOT_CONFIGURED] #728 Valdosta, GA (pop 55,667)
+  746. [NOT_CONFIGURED] #730 San Jacinto, CA (pop 55,515)
+  747. [NOT_CONFIGURED] #732 Peabody, MA (pop 55,418)
+  748. [NOT_CONFIGURED] #733 Chicopee, MA (pop 55,381)
+  749. [NOT_CONFIGURED] #734 West Haven, CT (pop 55,379)
+  750. [NOT_CONFIGURED] #735 Apple Valley, MN (pop 55,272)
+  751. [NOT_CONFIGURED] #738 Kentwood, MI (pop 54,768)
+  752. [NOT_CONFIGURED] #739 Manhattan, KS (pop 54,700)
+  753. [NOT_CONFIGURED] #740 Fulshear, TX (pop 54,629)
+  754. [NOT_CONFIGURED] #741 Rocky Mount, NC (pop 54,541)
+  755. [NOT_CONFIGURED] #742 Arcadia, CA (pop 54,472)
+  756. [NOT_CONFIGURED] #743 Yucaipa, CA (pop 54,465)
+  757. [NOT_CONFIGURED] #744 Methuen, MA (pop 54,272)
+  758. [NOT_CONFIGURED] #746 Wheaton, IL (pop 53,741)
+  759. [NOT_CONFIGURED] #747 Elkhart, IN (pop 53,690)
+  760. [NOT_CONFIGURED] #748 Joplin, MO (pop 53,605)
+  761. [NOT_CONFIGURED] #749 Elyria, OH (pop 53,604)
+  762. [NOT_CONFIGURED] #750 Edina, MN (pop 53,564)
+  763. [NOT_CONFIGURED] #752 Galveston, TX (pop 53,538)
+  764. [NOT_CONFIGURED] #753 Colton, CA (pop 53,528)
+  765. [NOT_CONFIGURED] #755 Placentia, CA (pop 53,395)
+  766. [NOT_CONFIGURED] #756 Normal, IL (pop 53,304)
+  767. [NOT_CONFIGURED] #758 Delano, CA (pop 53,198)
+  768. [NOT_CONFIGURED] #759 Palm Desert, CA (pop 53,147)
+  769. [NOT_CONFIGURED] #762 Jeffersonville, IN (pop 52,912)
+  770. [NOT_CONFIGURED] #763 Mooresville, NC (pop 52,884)
+  771. [NOT_CONFIGURED] #764 Minnetonka, MN (pop 52,651)
+  772. [NOT_CONFIGURED] #765 Summerville, SC (pop 52,625)
+  773. [NOT_CONFIGURED] #766 Cathedral City, CA (pop 52,517)
+  774. [NOT_CONFIGURED] #767 Gallatin, TN (pop 52,489)
+  775. [NOT_CONFIGURED] #769 Diamond Bar, CA (pop 52,292)
+  776. [NOT_CONFIGURED] #770 Middletown, OH (pop 52,291)
+  777. [NOT_CONFIGURED] #771 Battle Creek, MI (pop 52,205)
+  778. [NOT_CONFIGURED] #772 Huntington Park, CA (pop 52,166)
+  779. [NOT_CONFIGURED] #773 Burien, WA (pop 52,046)
+  780. [NOT_CONFIGURED] #774 Columbus, IN (pop 51,970)
+  781. [NOT_CONFIGURED] #775 Collierville, TN (pop 51,951)
+  782. [NOT_CONFIGURED] #776 Everett, MA (pop 51,825)
+  783. [NOT_CONFIGURED] #777 Dunwoody, GA (pop 51,795)
+  784. [NOT_CONFIGURED] #778 Bothell, WA (pop 51,770)
+  785. [NOT_CONFIGURED] #780 Lebanon, TN (pop 51,501)
+  786. [NOT_CONFIGURED] #781 Prescott Valley, AZ (pop 51,440)
+  787. [NOT_CONFIGURED] #782 Newark, OH (pop 51,424)
+  788. [NOT_CONFIGURED] #783 Watsonville, CA (pop 51,320)
+  789. [NOT_CONFIGURED] #784 Grapevine, TX (pop 51,320)
+  790. [NOT_CONFIGURED] #785 Florissant, MO (pop 51,290)
+  791. [NOT_CONFIGURED] #786 Ocoee, FL (pop 51,269)
+  792. [NOT_CONFIGURED] #787 Paramount, CA (pop 51,169)
+  793. [NOT_CONFIGURED] #788 Harrisonburg, VA (pop 51,164)
+  794. [NOT_CONFIGURED] #790 La Crosse, WI (pop 51,049)
+  795. [NOT_CONFIGURED] #791 Mishawaka, IN (pop 51,020)
+  796. [NOT_CONFIGURED] #792 Cuyahoga Falls, OH (pop 50,979)
+  797. [NOT_CONFIGURED] #794 Clermont, FL (pop 50,851)
+  798. [NOT_CONFIGURED] #795 Murray, UT (pop 50,817)
+  799. [NOT_CONFIGURED] #796 Fort Pierce, FL (pop 50,805)
+  800. [NOT_CONFIGURED] #797 Harrisburg, PA (pop 50,649)
+  801. [NOT_CONFIGURED] #798 Downers Grove, IL (pop 50,552)
+  802. [NOT_CONFIGURED] #799 Enid, OK (pop 50,519)
+  803. [NOT_CONFIGURED] #800 Aliso Viejo, CA (pop 50,457)
+  804. [NOT_CONFIGURED] #802 Goose Creek, SC (pop 50,352)
+  805. [NOT_CONFIGURED] #803 Cleveland, TN (pop 50,232)
+  806. [NOT_CONFIGURED] #804 Sherman, TX (pop 50,229)
+  807. [NOT_CONFIGURED] #805 Draper, UT (pop 50,166)
+  808. [NOT_CONFIGURED] #806 Stillwater, OK (pop 50,138)
+  809. [NOT_CONFIGURED] #807 Glendora, CA (pop 50,101)
+  810. [NOT_CONFIGURED] #808 Portage, MI (pop 49,975)
+  811. [NOT_CONFIGURED] #809 St. Louis Park, MN (pop 49,899)
+  812. [NOT_CONFIGURED] #810 Titusville, FL (pop 49,883)
+  813. [NOT_CONFIGURED] #811 Barnstable Town, MA (pop 49,831)
+  814. [NOT_CONFIGURED] #812 Leesburg, VA (pop 49,831)
+  815. [NOT_CONFIGURED] #813 Lawrence, IN (pop 49,817)
+  816. [NOT_CONFIGURED] #814 San Luis Obispo, CA (pop 49,729)
+  817. [NOT_CONFIGURED] #815 Sheboygan, WI (pop 49,624)
+  818. [NOT_CONFIGURED] #816 Cedar Hill, TX (pop 49,618)
+  819. [NOT_CONFIGURED] #817 Rosemead, CA (pop 49,582)
+  820. [NOT_CONFIGURED] #818 Lakewood, OH (pop 49,517)
+  821. [NOT_CONFIGURED] #819 Huntsville, TX (pop 49,500)
+  822. [NOT_CONFIGURED] #820 Chesterfield, MO (pop 49,465)
+  823. [NOT_CONFIGURED] #821 Dublin, OH (pop 49,456)
+  824. [NOT_CONFIGURED] #822 Poway, CA (pop 49,435)
+  825. [NOT_CONFIGURED] #823 Cypress, CA (pop 49,286)
+  826. [NOT_CONFIGURED] #824 Ceres, CA (pop 49,253)
+  827. [NOT_CONFIGURED] #825 Covina, CA (pop 49,245)
+  828. [NOT_CONFIGURED] #826 East Lansing, MI (pop 48,964)
+  829. [NOT_CONFIGURED] #827 Plainfield, IL (pop 48,881)
+  830. [NOT_CONFIGURED] #828 Oro Valley, AZ (pop 48,855)
+  831. [NOT_CONFIGURED] #829 Columbia, TN (pop 48,812)
+  832. [NOT_CONFIGURED] #830 Wauwatosa, WI (pop 48,794)
+  833. [NOT_CONFIGURED] #831 Winter Garden, FL (pop 48,771)
+  834. [NOT_CONFIGURED] #832 Bedford, TX (pop 48,728)
+  835. [NOT_CONFIGURED] #833 Los Banos, CA (pop 48,684)
+  836. [NOT_CONFIGURED] #834 Holly Springs, NC (pop 48,674)
+  837. [NOT_CONFIGURED] #835 Wentzville, MO (pop 48,646)
+  838. [NOT_CONFIGURED] #836 Waxahachie, TX (pop 48,617)
+  839. [NOT_CONFIGURED] #837 Middletown, CT (pop 48,616)
+  840. [NOT_CONFIGURED] #838 Wilson, NC (pop 48,579)
+  841. [NOT_CONFIGURED] #839 Hattiesburg, MS (pop 48,522)
+  842. [NOT_CONFIGURED] #840 Euclid, OH (pop 48,421)
+  843. [NOT_CONFIGURED] #841 Shakopee, MN (pop 48,401)
+  844. [NOT_CONFIGURED] #842 Azusa, CA (pop 48,383)
+  845. [NOT_CONFIGURED] #843 Prescott, AZ (pop 48,224)
+  846. [NOT_CONFIGURED] #844 Biloxi, MS (pop 48,144)
+  847. [NOT_CONFIGURED] #845 Beavercreek, OH (pop 48,012)
+  848. [NOT_CONFIGURED] #846 East Providence, RI (pop 47,961)
+  849. [NOT_CONFIGURED] #847 Brea, CA (pop 47,844)
+  850. [NOT_CONFIGURED] #848 Spanish Fork, UT (pop 47,809)
+  851. [NOT_CONFIGURED] #849 Urbandale, IA (pop 47,759)
+  852. [NOT_CONFIGURED] #850 Gainesville, GA (pop 47,712)
+  853. [NOT_CONFIGURED] #852 Mansfield, OH (pop 47,593)
+  854. [NOT_CONFIGURED] #853 Niagara Falls, NY (pop 47,512)
+  855. [NOT_CONFIGURED] #854 Minot, ND (pop 47,440)
+  856. [NOT_CONFIGURED] #855 Olive Branch, MS (pop 47,365)
+  857. [NOT_CONFIGURED] #857 Roswell, NM (pop 47,176)
+  858. [NOT_CONFIGURED] #859 Oakley, CA (pop 47,158)
+  859. [NOT_CONFIGURED] #860 Mentor, OH (pop 47,113)
+  860. [NOT_CONFIGURED] #861 Attleboro, MA (pop 47,085)
+  861. [NOT_CONFIGURED] #862 Roseville, MI (pop 47,047)
+  862. [NOT_CONFIGURED] #863 Cerritos, CA (pop 46,851)
+  863. [NOT_CONFIGURED] #865 Riverton, UT (pop 46,680)
+  864. [NOT_CONFIGURED] #866 Keller, TX (pop 46,643)
+  865. [NOT_CONFIGURED] #868 Monroe, LA (pop 46,622)
+  866. [NOT_CONFIGURED] #869 Delaware, OH (pop 46,521)
+  867. [NOT_CONFIGURED] #871 Mankato, MN (pop 46,459)
+  868. [NOT_CONFIGURED] #872 La Mirada, CA (pop 46,367)
+  869. [NOT_CONFIGURED] #873 Rancho Santa Margarita, CA (pop 46,353)
+  870. [NOT_CONFIGURED] #874 West Lafayette, IN (pop 46,338)
+  871. [NOT_CONFIGURED] #875 North Lauderdale, FL (pop 46,335)
+  872. [NOT_CONFIGURED] #876 Fuquay-Varina, NC (pop 46,317)
+  873. [NOT_CONFIGURED] #877 Greer, SC (pop 46,316)
+  874. [NOT_CONFIGURED] #878 Farmington, NM (pop 46,262)
+  875. [NOT_CONFIGURED] #879 Newark, CA (pop 46,254)
+  876. [NOT_CONFIGURED] #880 Salina, KS (pop 46,109)
+  877. [NOT_CONFIGURED] #881 Elmhurst, IL (pop 46,108)
+  878. [NOT_CONFIGURED] #882 Morgan Hill, CA (pop 45,952)
+  879. [NOT_CONFIGURED] #883 The Colony, TX (pop 45,897)
+  880. [NOT_CONFIGURED] #885 Post Falls, ID (pop 45,800)
+  881. [NOT_CONFIGURED] #886 Haltom City, TX (pop 45,786)
+  882. [NOT_CONFIGURED] #888 Strongsville, OH (pop 45,768)
+  883. [NOT_CONFIGURED] #889 Moorhead, MN (pop 45,726)
+  884. [NOT_CONFIGURED] #890 Salem, MA (pop 45,677)
+  885. [NOT_CONFIGURED] #892 DeLand, FL (pop 45,587)
+  886. [NOT_CONFIGURED] #893 Newnan, GA (pop 45,548)
+  887. [NOT_CONFIGURED] #894 Brentwood, TN (pop 45,525)
+  888. [NOT_CONFIGURED] #895 Palm Springs, CA (pop 45,453)
+  889. [NOT_CONFIGURED] #896 Blacksburg, VA (pop 45,452)
+  890. [NOT_CONFIGURED] #898 Bremerton, WA (pop 45,291)
+  891. [NOT_CONFIGURED] #899 York, PA (pop 45,241)
+  892. [NOT_CONFIGURED] #900 Greenacres, FL (pop 45,197)
+  893. [NOT_CONFIGURED] #901 Coachella, CA (pop 45,165)
+  894. [NOT_CONFIGURED] #902 Fairfield, OH (pop 45,094)
+  895. [NOT_CONFIGURED] #903 Hickory, NC (pop 45,081)
+  896. [NOT_CONFIGURED] #904 Hollister, CA (pop 45,033)
+  897. [NOT_CONFIGURED] #905 Bountiful, UT (pop 45,024)
+  898. [NOT_CONFIGURED] #906 Huntington, WV (pop 44,942)
+  899. [NOT_CONFIGURED] #907 Rohnert Park, CA (pop 44,894)
+  900. [NOT_CONFIGURED] #908 Littleton, CO (pop 44,879)
+  901. [NOT_CONFIGURED] #909 Charlottesville, VA (pop 44,767)
+  902. [NOT_CONFIGURED] #910 Sierra Vista, AZ (pop 44,710)
+  903. [NOT_CONFIGURED] #911 Concord, NH (pop 44,674)
+  904. [NOT_CONFIGURED] #912 Wilkes-Barre, PA (pop 44,661)
+  905. [NOT_CONFIGURED] #913 Ormond Beach, FL (pop 44,596)
+  906. [NOT_CONFIGURED] #914 Woonsocket, RI (pop 44,508)
+  907. [NOT_CONFIGURED] #916 Lombard, IL (pop 44,490)
+  908. [NOT_CONFIGURED] #917 Fond du Lac, WI (pop 44,469)
+  909. [NOT_CONFIGURED] #919 Schertz, TX (pop 44,428)
+  910. [NOT_CONFIGURED] #920 Lake Worth Beach, FL (pop 44,417)
+  911. [NOT_CONFIGURED] #921 Apache Junction, AZ (pop 44,309)
+  912. [NOT_CONFIGURED] #922 El Centro, CA (pop 44,230)
+  913. [NOT_CONFIGURED] #923 Leominster, MA (pop 44,209)
+  914. [NOT_CONFIGURED] #924 Midlothian, TX (pop 44,104)
+  915. [NOT_CONFIGURED] #925 Mount Juliet, TN (pop 44,066)
+  916. [NOT_CONFIGURED] #926 Cleveland Heights, OH (pop 44,064)
+  917. [NOT_CONFIGURED] #927 Freeport, NY (pop 44,028)
+  918. [NOT_CONFIGURED] #928 Grove City, OH (pop 44,019)
+  919. [NOT_CONFIGURED] #929 Hagerstown, MD (pop 43,909)
+  920. [NOT_CONFIGURED] #930 Woburn, MA (pop 43,895)
+  921. [NOT_CONFIGURED] #931 Indian Trail, NC (pop 43,867)
+  922. [NOT_CONFIGURED] #932 Weslaco, TX (pop 43,864)
+  923. [NOT_CONFIGURED] #934 Manassas, VA (pop 43,616)
+  924. [NOT_CONFIGURED] #935 Lompoc, CA (pop 43,594)
+  925. [NOT_CONFIGURED] #936 Huber Heights, OH (pop 43,590)
+  926. [NOT_CONFIGURED] #937 Brighton, CO (pop 43,473)
+  927. [NOT_CONFIGURED] #938 Danville, CA (pop 43,410)
+  928. [NOT_CONFIGURED] #939 Bullhead City, AZ (pop 43,266)
+  929. [NOT_CONFIGURED] #940 Beverly, MA (pop 43,223)
+  930. [NOT_CONFIGURED] #941 Alexandria, LA (pop 43,133)
+  931. [NOT_CONFIGURED] #942 Pittsfield, MA (pop 43,121)
+  932. [NOT_CONFIGURED] #944 Plant City, FL (pop 43,046)
+  933. [NOT_CONFIGURED] #946 Saginaw, MI (pop 43,001)
+  934. [NOT_CONFIGURED] #947 Sumter, SC (pop 42,958)
+  935. [NOT_CONFIGURED] #948 Reynoldsburg, OH (pop 42,897)
+  936. [NOT_CONFIGURED] #949 Campbell, CA (pop 42,895)
+  937. [NOT_CONFIGURED] #950 Edmonds, WA (pop 42,871)
+  938. [NOT_CONFIGURED] #951 Owasso, OK (pop 42,821)
+  939. [NOT_CONFIGURED] #952 Shelton, CT (pop 42,805)
+  940. [NOT_CONFIGURED] #953 Midland, MI (pop 42,780)
+  941. [NOT_CONFIGURED] #954 Cottage Grove, MN (pop 42,760)
+  942. [NOT_CONFIGURED] #955 Altoona, PA (pop 42,719)
+  943. [NOT_CONFIGURED] #956 Florence, AL (pop 42,716)
+  944. [NOT_CONFIGURED] #958 Peachtree Corners, GA (pop 42,638)
+  945. [NOT_CONFIGURED] #959 Rosenberg, TX (pop 42,571)
+  946. [NOT_CONFIGURED] #960 Jefferson City, MO (pop 42,564)
+  947. [NOT_CONFIGURED] #961 Puyallup, WA (pop 42,552)
+  948. [NOT_CONFIGURED] #962 Marion, IA (pop 42,542)
+  949. [NOT_CONFIGURED] #963 Moline, IL (pop 42,442)
+  950. [NOT_CONFIGURED] #964 Marlborough, MA (pop 42,169)
+  951. [NOT_CONFIGURED] #965 Fitchburg, MA (pop 42,145)
+  952. [NOT_CONFIGURED] #966 Haines City, FL (pop 42,073)
+  953. [NOT_CONFIGURED] #967 San Bruno, CA (pop 42,035)
+  954. [NOT_CONFIGURED] #968 Danville, VA (pop 41,993)
+  955. [NOT_CONFIGURED] #969 Royal Palm Beach, FL (pop 41,948)
+  956. [NOT_CONFIGURED] #970 Oviedo, FL (pop 41,901)
+  957. [NOT_CONFIGURED] #971 Coppell, TX (pop 41,785)
+  958. [NOT_CONFIGURED] #972 Windsor, CO (pop 41,734)
+  959. [NOT_CONFIGURED] #973 Lancaster, OH (pop 41,671)
+  960. [NOT_CONFIGURED] #974 Covington, KY (pop 41,611)
+  961. [NOT_CONFIGURED] #975 Lynnwood, WA (pop 41,597)
+  962. [NOT_CONFIGURED] #976 Crystal Lake, IL (pop 41,513)
+  963. [NOT_CONFIGURED] #977 Milton, GA (pop 41,490)
+  964. [NOT_CONFIGURED] #978 La Vergne, TN (pop 41,430)
+  965. [NOT_CONFIGURED] #979 Cedar Falls, IA (pop 41,417)
+  966. [NOT_CONFIGURED] #980 Lake Stevens, WA (pop 41,350)
+  967. [NOT_CONFIGURED] #981 American Fork, UT (pop 41,298)
+  968. [NOT_CONFIGURED] #982 Friendswood, TX (pop 41,291)
+  969. [NOT_CONFIGURED] #983 Brookfield, WI (pop 41,268)
+  970. [NOT_CONFIGURED] #984 State College, PA (pop 41,228)
+  971. [NOT_CONFIGURED] #985 Stanton, CA (pop 41,188)
+  972. [NOT_CONFIGURED] #986 Romeoville, IL (pop 41,177)
+  973. [NOT_CONFIGURED] #987 Hobbs, NM (pop 41,061)
+  974. [NOT_CONFIGURED] #988 West Fargo, ND (pop 41,027)
+  975. [NOT_CONFIGURED] #989 Amherst Town, MA (pop 40,989)
+  976. [NOT_CONFIGURED] #990 Florence, SC (pop 40,923)
+  977. [NOT_CONFIGURED] #991 Tooele, UT (pop 40,919)
+  978. [NOT_CONFIGURED] #992 Cedar City, UT (pop 40,885)
+  979. [NOT_CONFIGURED] #994 Lathrop, CA (pop 40,860)
+  980. [NOT_CONFIGURED] #995 Cape Girardeau, MO (pop 40,818)
+  981. [NOT_CONFIGURED] #996 Lancaster, TX (pop 40,780)
+  982. [NOT_CONFIGURED] #997 Peachtree City, GA (pop 40,758)
+  983. [NOT_CONFIGURED] #999 Menomonee Falls, WI (pop 40,700)
+  984. [NOT_CONFIGURED] #1000 Rexburg, ID (pop 40,695)
+  985. [NOT_CONFIGURED] #1003 Belleville, IL (pop 40,560)
+  986. [NOT_CONFIGURED] #1004 Douglasville, GA (pop 40,540)
+  987. [NOT_CONFIGURED] #1006 Aventura, FL (pop 40,531)
+  988. [NOT_CONFIGURED] #1007 Georgetown, KY (pop 40,518)
+  989. [NOT_CONFIGURED] #1008 DeKalb, IL (pop 40,491)
+  990. [NOT_CONFIGURED] #1009 Westfield, MA (pop 40,403)
+  991. [NOT_CONFIGURED] #1010 Findlay, OH (pop 40,343)
+  992. [NOT_CONFIGURED] #1011 New Berlin, WI (pop 40,302)
+  993. [NOT_CONFIGURED] #1012 Bettendorf, IA (pop 40,281)
+  994. [NOT_CONFIGURED] #1013 Wausau, WI (pop 40,262)
+  995. [NOT_CONFIGURED] #1014 Chelsea, MA (pop 40,245)
+  996. [NOT_CONFIGURED] #1015 Valley Stream, NY (pop 40,232)
+  997. [NOT_CONFIGURED] #1017 Maplewood, MN (pop 40,142)
+  998. [NOT_CONFIGURED] #1018 Prattville, AL (pop 40,139)
+  999. [NOT_CONFIGURED] #1019 Germantown, TN (pop 40,128)
+  1000. [NOT_CONFIGURED] #1020 San Luis, AZ (pop 40,064)
+  1001. [NOT_CONFIGURED] #1021 Rancho Palos Verdes, CA (pop 40,064)
+  1002. [NOT_CONFIGURED] #1022 Monroe, NC (pop 40,054)
+  1003. [NOT_CONFIGURED] #1023 Lake Oswego, OR (pop 40,029)
+  1004. [NOT_CONFIGURED] #1024 Norwich, CT (pop 39,993)
+  1005. [NOT_CONFIGURED] #1025 La Quinta, CA (pop 39,907)
+  1006. [NOT_CONFIGURED] #1026 Culver City, CA (pop 39,883)
+  1007. [NOT_CONFIGURED] #1028 Winter Springs, FL (pop 39,822)
+  1008. [NOT_CONFIGURED] #1029 Parkland, FL (pop 39,700)
+  1009. [NOT_CONFIGURED] #1030 Issaquah, WA (pop 39,664)
+  1010. [NOT_CONFIGURED] #1031 Copperas Cove, TX (pop 39,627)
+  1011. [NOT_CONFIGURED] #1032 Riviera Beach, FL (pop 39,620)
+  1012. [NOT_CONFIGURED] #1033 Spartanburg, SC (pop 39,606)
+  1013. [NOT_CONFIGURED] #1034 Richmond, KY (pop 39,581)
+  1014. [NOT_CONFIGURED] #1035 Hutchinson, KS (pop 39,561)
+  1015. [NOT_CONFIGURED] #1036 Carol Stream, IL (pop 39,556)
+  1016. [NOT_CONFIGURED] #1037 Hurst, TX (pop 39,500)
+  1017. [NOT_CONFIGURED] #1038 Grants Pass, OR (pop 39,468)
+  1018. [NOT_CONFIGURED] #1039 Kearns metro township, UT (pop 39,398)
+  1019. [NOT_CONFIGURED] #1040 Weatherford, TX (pop 39,397)
+  1020. [NOT_CONFIGURED] #1041 Woodstock, GA (pop 39,381)
+  1021. [NOT_CONFIGURED] #1042 Garner, NC (pop 39,345)
+  1022. [NOT_CONFIGURED] #1043 Sun Prairie, WI (pop 39,253)
+  1023. [NOT_CONFIGURED] #1044 Duncanville, TX (pop 39,203)
+  1024. [NOT_CONFIGURED] #1045 Keizer, OR (pop 39,152)
+  1025. [NOT_CONFIGURED] #1046 Braintree Town, MA (pop 39,134)
+  1026. [NOT_CONFIGURED] #1047 Syracuse, UT (pop 38,999)
+  1027. [NOT_CONFIGURED] #1049 Hilliard, OH (pop 38,832)
+  1028. [NOT_CONFIGURED] #1050 Seguin, TX (pop 38,789)
+  1029. [NOT_CONFIGURED] #1051 Quincy, IL (pop 38,786)
+  1030. [NOT_CONFIGURED] #1052 Pine Bluff, AR (pop 38,785)
+  1031. [NOT_CONFIGURED] #1053 Oswego, IL (pop 38,778)
+  1032. [NOT_CONFIGURED] #1054 Lincoln Park, MI (pop 38,774)
+  1033. [NOT_CONFIGURED] #1055 Lewiston, ME (pop 38,772)
+  1034. [NOT_CONFIGURED] #1056 Rome, GA (pop 38,747)
+  1035. [NOT_CONFIGURED] #1057 Calexico, CA (pop 38,744)
+  1036. [NOT_CONFIGURED] #1058 Roy, UT (pop 38,719)
+  1037. [NOT_CONFIGURED] #1059 Warren, OH (pop 38,683)
+  1038. [NOT_CONFIGURED] #1060 Socorro, TX (pop 38,642)
+  1039. [NOT_CONFIGURED] #1061 Westerville, OH (pop 38,612)
+  1040. [NOT_CONFIGURED] #1062 Erie, CO (pop 38,594)
+  1041. [NOT_CONFIGURED] #1063 Portage, IN (pop 38,576)
+  1042. [NOT_CONFIGURED] #1064 Forney, TX (pop 38,572)
+  1043. [NOT_CONFIGURED] #1065 Phenix City, AL (pop 38,509)
+  1044. [NOT_CONFIGURED] #1067 Estero, FL (pop 38,443)
+  1045. [NOT_CONFIGURED] #1068 Oak Creek, WI (pop 38,373)
+  1046. [NOT_CONFIGURED] #1070 Bartlesville, OK (pop 38,355)
+  1047. [NOT_CONFIGURED] #1072 Oregon City, OR (pop 38,327)
+  1048. [NOT_CONFIGURED] #1073 Longview, WA (pop 38,294)
+  1049. [NOT_CONFIGURED] #1074 Northglenn, CO (pop 38,287)
+  1050. [NOT_CONFIGURED] #1075 East Point, GA (pop 38,270)
+  1051. [NOT_CONFIGURED] #1076 Hilton Head Island, SC (pop 38,158)
+  1052. [NOT_CONFIGURED] #1077 Vestavia Hills, AL (pop 38,151)
+  1053. [NOT_CONFIGURED] #1078 Cleburne, TX (pop 38,131)
+  1054. [NOT_CONFIGURED] #1079 Pleasant Grove, UT (pop 38,127)
+  1055. [NOT_CONFIGURED] #1080 Benton, AR (pop 38,088)
+  1056. [NOT_CONFIGURED] #1081 Canton, GA (pop 38,049)
+  1057. [NOT_CONFIGURED] #1082 La Porte, TX (pop 38,046)
+  1058. [NOT_CONFIGURED] #1083 Hot Springs, AR (pop 37,971)
+  1059. [NOT_CONFIGURED] #1084 Adelanto, CA (pop 37,941)
+  1060. [NOT_CONFIGURED] #1085 San Gabriel, CA (pop 37,926)
+  1061. [NOT_CONFIGURED] #1086 Holyoke, MA (pop 37,838)
+  1062. [NOT_CONFIGURED] #1087 Cibolo, TX (pop 37,816)
+  1063. [NOT_CONFIGURED] #1088 Leesburg, FL (pop 37,815)
+  1064. [NOT_CONFIGURED] #1089 Plainfield, IN (pop 37,796)
+  1065. [NOT_CONFIGURED] #1090 Monrovia, CA (pop 37,787)
+  1066. [NOT_CONFIGURED] #1091 Tupelo, MS (pop 37,775)
+  1067. [NOT_CONFIGURED] #1092 Kennesaw, GA (pop 37,740)
+  1068. [NOT_CONFIGURED] #1093 Wildomar, CA (pop 37,736)
+  1069. [NOT_CONFIGURED] #1094 New Albany, IN (pop 37,652)
+  1070. [NOT_CONFIGURED] #1095 Montclair, CA (pop 37,650)
+  1071. [NOT_CONFIGURED] #1096 Redmond, OR (pop 37,626)
+  1072. [NOT_CONFIGURED] #1097 Bell Gardens, CA (pop 37,565)
+  1073. [NOT_CONFIGURED] #1098 Clovis, NM (pop 37,555)
+  1074. [NOT_CONFIGURED] #1099 North Ridgeville, OH (pop 37,504)
+  1075. [NOT_CONFIGURED] #1100 Sahuarita, AZ (pop 37,448)
+  1076. [NOT_CONFIGURED] #1101 Leavenworth, KS (pop 37,370)
+  1077. [NOT_CONFIGURED] #1102 Farmers Branch, TX (pop 37,341)
+  1078. [NOT_CONFIGURED] #1103 San Juan, TX (pop 37,341)
+  1079. [NOT_CONFIGURED] #1105 Muskegon, MI (pop 37,287)
+  1080. [NOT_CONFIGURED] #1106 Greenfield, WI (pop 37,232)
+  1081. [NOT_CONFIGURED] #1107 Tucker, GA (pop 37,224)
+  1082. [NOT_CONFIGURED] #1108 Carpentersville, IL (pop 37,144)
+  1083. [NOT_CONFIGURED] #1109 Cookeville, TN (pop 37,102)
+  1084. [NOT_CONFIGURED] #1110 Pacifica, CA (pop 37,056)
+  1085. [NOT_CONFIGURED] #1111 Panama City, FL (pop 37,024)
+  1086. [NOT_CONFIGURED] #1113 Martinez, CA (pop 37,006)
+  1087. [NOT_CONFIGURED] #1114 Merrillville, IN (pop 36,989)
+  1088. [NOT_CONFIGURED] #1115 Muskogee, OK (pop 36,849)
+  1089. [NOT_CONFIGURED] #1117 La Puente, CA (pop 36,670)
+  1090. [NOT_CONFIGURED] #1118 Beloit, WI (pop 36,633)
+  1091. [NOT_CONFIGURED] #1119 Franklin, WI (pop 36,591)
+  1092. [NOT_CONFIGURED] #1120 Hinesville, GA (pop 36,583)
+  1093. [NOT_CONFIGURED] #1121 Salisbury, NC (pop 36,579)
+  1094. [NOT_CONFIGURED] #1122 Richfield, MN (pop 36,491)
+  1095. [NOT_CONFIGURED] #1124 El Mirage, AZ (pop 36,468)
+  1096. [NOT_CONFIGURED] #1125 Rock Island, IL (pop 36,434)
+  1097. [NOT_CONFIGURED] #1126 Fort Mill, SC (pop 36,244)
+  1098. [NOT_CONFIGURED] #1127 Inver Grove Heights, MN (pop 36,226)
+  1099. [NOT_CONFIGURED] #1128 Midvale, UT (pop 36,219)
+  1100. [NOT_CONFIGURED] #1129 Bluffton, SC (pop 36,146)
+  1101. [NOT_CONFIGURED] #1130 Upper Arlington, OH (pop 36,140)
+  1102. [NOT_CONFIGURED] #1131 Claremont, CA (pop 36,139)
+  1103. [NOT_CONFIGURED] #1132 Norristown, PA (pop 36,075)
+  1104. [NOT_CONFIGURED] #1133 Mason, OH (pop 36,046)
+  1105. [NOT_CONFIGURED] #1134 Springville, UT (pop 36,027)
+  1106. [NOT_CONFIGURED] #1135 Watertown, MA (pop 35,985)
+  1107. [NOT_CONFIGURED] #1136 Texarkana, TX (pop 35,971)
+  1108. [NOT_CONFIGURED] #1137 Dunedin, FL (pop 35,932)
+  1109. [NOT_CONFIGURED] #1138 Stockbridge, GA (pop 35,893)
+  1110. [NOT_CONFIGURED] #1139 Addison, IL (pop 35,728)
+  1111. [NOT_CONFIGURED] #1140 Torrington, CT (pop 35,673)
+  1112. [NOT_CONFIGURED] #1141 Roseville, MN (pop 35,637)
+  1113. [NOT_CONFIGURED] #1142 Moorpark, CA (pop 35,621)
+  1114. [NOT_CONFIGURED] #1143 Marion, OH (pop 35,576)
+  1115. [NOT_CONFIGURED] #1144 Richmond, IN (pop 35,561)
+  1116. [NOT_CONFIGURED] #1145 Gahanna, OH (pop 35,544)
+  1117. [NOT_CONFIGURED] #1147 Washington, UT (pop 35,501)
+  1118. [NOT_CONFIGURED] #1148 San Juan Capistrano, CA (pop 35,469)
+  1119. [NOT_CONFIGURED] #1149 Wenatchee, WA (pop 35,401)
+  1120. [NOT_CONFIGURED] #1150 Kingman, AZ (pop 35,383)
+  1121. [NOT_CONFIGURED] #1151 Mount Vernon, WA (pop 35,344)
+  1122. [NOT_CONFIGURED] #1152 Harker Heights, TX (pop 35,263)
+  1123. [NOT_CONFIGURED] #1153 McMinnville, OR (pop 35,255)
+  1124. [NOT_CONFIGURED] #1154 Englewood, CO (pop 35,238)
+  1125. [NOT_CONFIGURED] #1155 Statesboro, GA (pop 35,226)
+  1126. [NOT_CONFIGURED] #1156 Brunswick, OH (pop 35,166)
+  1127. [NOT_CONFIGURED] #1157 University Place, WA (pop 35,160)
+  1128. [NOT_CONFIGURED] #1158 Randolph Town, MA (pop 35,114)
+  1129. [NOT_CONFIGURED] #1159 Fairborn, OH (pop 35,105)
+  1130. [NOT_CONFIGURED] #1160 Crown Point, IN (pop 35,097)
+  1131. [NOT_CONFIGURED] #1161 Wildwood, MO (pop 35,082)
+  1132. [NOT_CONFIGURED] #1162 Valparaiso, IN (pop 35,065)
+  1133. [NOT_CONFIGURED] #1163 Holland, MI (pop 35,023)
+  1134. [NOT_CONFIGURED] #1164 Opelika, AL (pop 35,005)
+  1135. [NOT_CONFIGURED] #1165 Temple City, CA (pop 34,989)
+  1136. [NOT_CONFIGURED] #1166 Dalton, GA (pop 34,970)
+  1137. [NOT_CONFIGURED] #1168 Clearfield, UT (pop 34,778)
+  1138. [NOT_CONFIGURED] #1169 Long Beach, NY (pop 34,777)
+  1139. [NOT_CONFIGURED] #1171 Helena, MT (pop 34,729)
+  1140. [NOT_CONFIGURED] #1172 Lewiston, ID (pop 34,693)
+  1141. [NOT_CONFIGURED] #1173 Lima, OH (pop 34,690)
+  1142. [NOT_CONFIGURED] #1174 Del Rio, TX (pop 34,678)
+  1143. [NOT_CONFIGURED] #1176 Goldsboro, NC (pop 34,629)
+  1144. [NOT_CONFIGURED] #1177 Manitowoc, WI (pop 34,616)
+  1145. [NOT_CONFIGURED] #1178 Elizabethtown, KY (pop 34,565)
+  1146. [NOT_CONFIGURED] #1180 Deer Park, TX (pop 34,495)
+  1147. [NOT_CONFIGURED] #1181 Alabaster, AL (pop 34,460)
+  1148. [NOT_CONFIGURED] #1182 Goshen, IN (pop 34,458)
+  1149. [NOT_CONFIGURED] #1183 Leland, NC (pop 34,451)
+  1150. [NOT_CONFIGURED] #1184 Waukee, IA (pop 34,420)
+  1151. [NOT_CONFIGURED] #1185 Lufkin, TX (pop 34,399)
+  1152. [NOT_CONFIGURED] #1187 Cornelius, NC (pop 34,366)
+  1153. [NOT_CONFIGURED] #1188 Fitchburg, WI (pop 34,357)
+  1154. [NOT_CONFIGURED] #1189 Greenville, TX (pop 34,355)
+  1155. [NOT_CONFIGURED] #1190 University City, MO (pop 34,349)
+  1156. [NOT_CONFIGURED] #1191 Westlake, OH (pop 34,232)
+  1157. [NOT_CONFIGURED] #1192 New Bern, NC (pop 34,218)
+  1158. [NOT_CONFIGURED] #1193 Pleasant Hill, CA (pop 34,169)
+  1159. [NOT_CONFIGURED] #1194 Woodridge, IL (pop 34,103)
+  1160. [NOT_CONFIGURED] #1195 Stow, OH (pop 34,101)
+  1161. [NOT_CONFIGURED] #1196 Petersburg, VA (pop 34,058)
+  1162. [NOT_CONFIGURED] #1197 Chester, PA (pop 34,052)
+  1163. [NOT_CONFIGURED] #1198 Oak Ridge, TN (pop 34,039)
+  1164. [NOT_CONFIGURED] #1199 SeaTac, WA (pop 34,024)
+  1165. [NOT_CONFIGURED] #1200 Leawood, KS (pop 34,013)
+  1166. [NOT_CONFIGURED] #1201 Eastpointe, MI (pop 33,943)
+  1167. [NOT_CONFIGURED] #1202 Desert Hot Springs, CA (pop 33,917)
+  1168. [NOT_CONFIGURED] #1203 Dover, NH (pop 33,909)
+  1169. [NOT_CONFIGURED] #1204 Walla Walla, WA (pop 33,901)
+  1170. [NOT_CONFIGURED] #1205 Gillette, WY (pop 33,846)
+  1171. [NOT_CONFIGURED] #1206 Ithaca, NY (pop 33,768)
+  1172. [NOT_CONFIGURED] #1207 Florence, KY (pop 33,763)
+  1173. [NOT_CONFIGURED] #1208 Franklin Town, MA (pop 33,742)
+  1174. [NOT_CONFIGURED] #1210 Salisbury, MD (pop 33,616)
+  1175. [NOT_CONFIGURED] #1211 Rochester, NH (pop 33,598)
+  1176. [NOT_CONFIGURED] #1212 LaGrange, GA (pop 33,564)
+  1177. [NOT_CONFIGURED] #1213 Meridian, MS (pop 33,549)
+  1178. [NOT_CONFIGURED] #1214 Pullman, WA (pop 33,543)
+  1179. [NOT_CONFIGURED] #1216 St. Charles, IL (pop 33,482)
+  1180. [NOT_CONFIGURED] #1217 Nicholasville, KY (pop 33,458)
+  1181. [NOT_CONFIGURED] #1218 Manhattan Beach, CA (pop 33,453)
+  1182. [NOT_CONFIGURED] #1219 Eagle, ID (pop 33,451)
+  1183. [NOT_CONFIGURED] #1220 Brownsburg, IN (pop 33,430)
+  1184. [NOT_CONFIGURED] #1221 Andover, MN (pop 33,426)
+  1185. [NOT_CONFIGURED] #1222 Sherwood, AR (pop 33,281)
+  1186. [NOT_CONFIGURED] #1223 Bella Vista, AR (pop 33,274)
+  1187. [NOT_CONFIGURED] #1224 Kaysville, UT (pop 33,252)
+  1188. [NOT_CONFIGURED] #1226 San Dimas, CA (pop 33,226)
+  1189. [NOT_CONFIGURED] #1228 Des Moines, WA (pop 33,207)
+  1190. [NOT_CONFIGURED] #1229 Zionsville, IN (pop 33,161)
+  1191. [NOT_CONFIGURED] #1230 Duluth, GA (pop 33,157)
+  1192. [NOT_CONFIGURED] #1231 New Smyrna Beach, FL (pop 33,144)
+  1193. [NOT_CONFIGURED] #1232 Gadsden, AL (pop 33,086)
+  1194. [NOT_CONFIGURED] #1234 Menlo Park, CA (pop 33,040)
+  1195. [NOT_CONFIGURED] #1236 Morristown, TN (pop 32,994)
+  1196. [NOT_CONFIGURED] #1237 Sanford, NC (pop 32,971)
+  1197. [NOT_CONFIGURED] #1238 Laramie, WY (pop 32,957)
+  1198. [NOT_CONFIGURED] #1239 Los Gatos, CA (pop 32,952)
+  1199. [NOT_CONFIGURED] #1240 Savage, MN (pop 32,896)
+  1200. [NOT_CONFIGURED] #1241 Glendale Heights, IL (pop 32,866)
+  1201. [NOT_CONFIGURED] #1242 McDonough, GA (pop 32,803)
+  1202. [NOT_CONFIGURED] #1243 Massillon, OH (pop 32,750)
+  1203. [NOT_CONFIGURED] #1244 Aiken, SC (pop 32,694)
+  1204. [NOT_CONFIGURED] #1245 Foster City, CA (pop 32,657)
+  1205. [NOT_CONFIGURED] #1246 Mundelein, IL (pop 32,641)
+  1206. [NOT_CONFIGURED] #1247 Morrisville, NC (pop 32,628)
+  1207. [NOT_CONFIGURED] #1248 Goleta, CA (pop 32,611)
+  1208. [NOT_CONFIGURED] #1249 Athens, AL (pop 32,587)
+  1209. [NOT_CONFIGURED] #1250 Dana Point, CA (pop 32,585)
+  1210. [NOT_CONFIGURED] #1251 Bangor, ME (pop 32,446)
+  1211. [NOT_CONFIGURED] #1252 Cottonwood Heights, UT (pop 32,437)
+  1212. [NOT_CONFIGURED] #1253 Nacogdoches, TX (pop 32,381)
+  1213. [NOT_CONFIGURED] #1254 Bethel Park, PA (pop 32,376)
+  1214. [NOT_CONFIGURED] #1255 Maryville, TN (pop 32,373)
+  1215. [NOT_CONFIGURED] #1256 Chamblee, GA (pop 32,321)
+  1216. [NOT_CONFIGURED] #1257 Poughkeepsie, NY (pop 32,293)
+  1217. [NOT_CONFIGURED] #1258 Atwater, CA (pop 32,248)
+  1218. [NOT_CONFIGURED] #1259 O'Fallon, IL (pop 32,169)
+  1219. [NOT_CONFIGURED] #1260 West Bend, WI (pop 32,149)
+  1220. [NOT_CONFIGURED] #1261 Naugatuck, CT (pop 32,116)
+  1221. [NOT_CONFIGURED] #1262 Shawnee, OK (pop 32,092)
+  1222. [NOT_CONFIGURED] #1263 Bay City, MI (pop 32,086)
+  1223. [NOT_CONFIGURED] #1265 Matthews, NC (pop 32,048)
+  1224. [NOT_CONFIGURED] #1266 Wheat Ridge, CO (pop 31,999)
+  1225. [NOT_CONFIGURED] #1267 Carlsbad, NM (pop 31,999)
+  1226. [NOT_CONFIGURED] #1268 Rome, NY (pop 31,990)
+  1227. [NOT_CONFIGURED] #1270 Bell, CA (pop 31,930)
+  1228. [NOT_CONFIGURED] #1271 Banning, CA (pop 31,929)
+  1229. [NOT_CONFIGURED] #1272 Lawrenceville, GA (pop 31,877)
+  1230. [NOT_CONFIGURED] #1274 Santa Paula, CA (pop 31,786)
+  1231. [NOT_CONFIGURED] #1275 Brooklyn Center, MN (pop 31,755)
+  1232. [NOT_CONFIGURED] #1276 Fairbanks, AK (pop 31,732)
+  1233. [NOT_CONFIGURED] #1277 Clayton, NC (pop 31,732)
+  1234. [NOT_CONFIGURED] #1278 Bixby, OK (pop 31,728)
+  1235. [NOT_CONFIGURED] #1279 Statesville, NC (pop 31,693)
+  1236. [NOT_CONFIGURED] #1280 North Olmsted, OH (pop 31,690)
+  1237. [NOT_CONFIGURED] #1281 Alamogordo, NM (pop 31,667)
+  1238. [NOT_CONFIGURED] #1282 Casselberry, FL (pop 31,650)
+  1239. [NOT_CONFIGURED] #1283 Juneau city and, AK (pop 31,572)
+  1240. [NOT_CONFIGURED] #1284 El Paso de Robles (Paso Robles), CA (pop 31,568)
+  1241. [NOT_CONFIGURED] #1285 San Pablo, CA (pop 31,562)
+  1242. [NOT_CONFIGURED] #1286 Seaside, CA (pop 31,524)
+  1243. [NOT_CONFIGURED] #1287 Southlake, TX (pop 31,500)
+  1244. [NOT_CONFIGURED] #1288 Northport, AL (pop 31,492)
+  1245. [NOT_CONFIGURED] #1289 Michigan City, IN (pop 31,466)
+  1246. [NOT_CONFIGURED] #1292 Converse, TX (pop 31,400)
+  1247. [NOT_CONFIGURED] #1293 Magna metro township, UT (pop 31,381)
+  1248. [NOT_CONFIGURED] #1294 West Melbourne, FL (pop 31,378)
+  1249. [NOT_CONFIGURED] #1295 Harrison, NY (pop 31,321)
+  1250. [NOT_CONFIGURED] #1296 Northampton, MA (pop 31,315)
+  1251. [NOT_CONFIGURED] #1297 Kalispell, MT (pop 31,296)
+  1252. [NOT_CONFIGURED] #1298 Pekin, IL (pop 31,266)
+  1253. [NOT_CONFIGURED] #1299 Liberty, MO (pop 31,245)
+  1254. [NOT_CONFIGURED] #1300 North Attleborough Town, MA (pop 31,210)
+  1255. [NOT_CONFIGURED] #1301 Pooler, GA (pop 31,171)
+  1256. [NOT_CONFIGURED] #1302 Ballwin, MO (pop 31,036)
+  1257. [NOT_CONFIGURED] #1303 Beverly Hills, CA (pop 31,027)
+  1258. [NOT_CONFIGURED] #1305 Anderson, SC (pop 30,937)
+  1259. [NOT_CONFIGURED] #1306 Jackson, MI (pop 30,920)
+  1260. [NOT_CONFIGURED] #1307 North Royalton, OH (pop 30,894)
+  1261. [NOT_CONFIGURED] #1308 Burlingame, CA (pop 30,885)
+  1262. [NOT_CONFIGURED] #1309 Los Altos, CA (pop 30,864)
+  1263. [NOT_CONFIGURED] #1310 Winter Park, FL (pop 30,835)
+  1264. [NOT_CONFIGURED] #1311 Hopkinsville, KY (pop 30,800)
+  1265. [NOT_CONFIGURED] #1312 Highland Park, IL (pop 30,794)
+  1266. [NOT_CONFIGURED] #1314 Daphne, AL (pop 30,751)
+  1267. [NOT_CONFIGURED] #1315 Enterprise, AL (pop 30,731)
+  1268. [NOT_CONFIGURED] #1316 Crestview, FL (pop 30,727)
+  1269. [NOT_CONFIGURED] #1317 Paragould, AR (pop 30,680)
+  1270. [NOT_CONFIGURED] #1318 Fridley, MN (pop 30,679)
+  1271. [NOT_CONFIGURED] #1319 North Chicago, IL (pop 30,639)
+  1272. [NOT_CONFIGURED] #1320 Holladay, UT (pop 30,588)
+  1273. [NOT_CONFIGURED] #1321 Lafayette, CO (pop 30,587)
+  1274. [NOT_CONFIGURED] #1322 Rosemount, MN (pop 30,581)
+  1275. [NOT_CONFIGURED] #1323 Gurnee, IL (pop 30,546)
+  1276. [NOT_CONFIGURED] #1324 Algonquin, IL (pop 30,539)
+  1277. [NOT_CONFIGURED] #1325 Newark, DE (pop 30,506)
+  1278. [NOT_CONFIGURED] #1326 Gloucester, MA (pop 30,491)
+  1279. [NOT_CONFIGURED] #1327 Morgantown, WV (pop 30,490)
+  1280. [NOT_CONFIGURED] #1328 Saratoga, CA (pop 30,486)
+  1281. [NOT_CONFIGURED] #1329 Bowling Green, OH (pop 30,463)
+  1282. [NOT_CONFIGURED] #1330 Woodburn, OR (pop 30,449)
+  1283. [NOT_CONFIGURED] #1331 Oakdale, MN (pop 30,441)
+  1284. [NOT_CONFIGURED] #1332 Easton, PA (pop 30,432)
+  1285. [NOT_CONFIGURED] #1333 Laguna Hills, CA (pop 30,378)
+  1286. [NOT_CONFIGURED] #1334 Hazleton, PA (pop 30,354)
+  1287. [NOT_CONFIGURED] #1337 Independence, KY (pop 30,196)
+  1288. [NOT_CONFIGURED] #1338 La Verne, CA (pop 30,192)
+  1289. [NOT_CONFIGURED] #1339 Middletown, NY (pop 30,188)
+  1290. [NOT_CONFIGURED] #1340 Chaska, MN (pop 30,167)
+  1291. [NOT_CONFIGURED] #1341 Central, LA (pop 30,161)
+  1292. [NOT_CONFIGURED] #1342 Lawndale, CA (pop 30,160)
+  1293. [NOT_CONFIGURED] #1343 Fredericksburg, VA (pop 29,992)
+  1294. [NOT_CONFIGURED] #1344 North Tonawanda, NY (pop 29,981)
+  1295. [NOT_CONFIGURED] #1345 Melrose, MA (pop 29,938)
+  1296. [NOT_CONFIGURED] #1347 Venice, FL (pop 29,902)
+  1297. [NOT_CONFIGURED] #1348 Alvin, TX (pop 29,869)
+  1298. [NOT_CONFIGURED] #1349 Schererville, IN (pop 29,780)
+  1299. [NOT_CONFIGURED] #1350 Mauldin, SC (pop 29,746)
+  1300. [NOT_CONFIGURED] #1351 Atascadero, CA (pop 29,743)
+  1301. [NOT_CONFIGURED] #1352 Conway, SC (pop 29,656)
+  1302. [NOT_CONFIGURED] #1353 Suisun City, CA (pop 29,614)
+  1303. [NOT_CONFIGURED] #1354 Fountain, CO (pop 29,457)
+  1304. [NOT_CONFIGURED] #1355 Russellville, AR (pop 29,442)
+  1305. [NOT_CONFIGURED] #1356 Burton, MI (pop 29,420)
+  1306. [NOT_CONFIGURED] #1357 Hobart, IN (pop 29,418)
+  1307. [NOT_CONFIGURED] #1358 San Carlos, CA (pop 29,403)
+  1308. [NOT_CONFIGURED] #1359 Oak Park, MI (pop 29,402)
+  1309. [NOT_CONFIGURED] #1360 Jeffersontown, KY (pop 29,388)
+  1310. [NOT_CONFIGURED] #1361 Kirkwood, MO (pop 29,348)
+  1311. [NOT_CONFIGURED] #1362 East Palo Alto, CA (pop 29,296)
+  1312. [NOT_CONFIGURED] #1363 Galesburg, IL (pop 29,289)
+  1313. [NOT_CONFIGURED] #1364 Marysville, OH (pop 29,276)
+  1314. [NOT_CONFIGURED] #1365 Raytown, MO (pop 29,244)
+  1315. [NOT_CONFIGURED] #1366 Bridgewater Town, MA (pop 29,167)
+  1316. [NOT_CONFIGURED] #1367 Jacksonville, AR (pop 29,129)
+  1317. [NOT_CONFIGURED] #1368 Kuna, ID (pop 29,127)
+  1318. [NOT_CONFIGURED] #1369 Southgate, MI (pop 29,081)
+  1319. [NOT_CONFIGURED] #1370 West Springfield Town, MA (pop 29,028)
+  1320. [NOT_CONFIGURED] #1371 Monterey, CA (pop 29,015)
+  1321. [NOT_CONFIGURED] #1372 Garfield Heights, OH (pop 29,014)
+  1322. [NOT_CONFIGURED] #1373 Ramsey, MN (pop 28,999)
+  1323. [NOT_CONFIGURED] #1374 Happy Valley, OR (pop 28,969)
+  1324. [NOT_CONFIGURED] #1376 Texarkana, AR (pop 28,897)
+  1325. [NOT_CONFIGURED] #1377 Glen Ellyn, IL (pop 28,872)
+  1326. [NOT_CONFIGURED] #1378 Parkersburg, WV (pop 28,834)
+  1327. [NOT_CONFIGURED] #1379 McHenry, IL (pop 28,825)
+  1328. [NOT_CONFIGURED] #1380 Mint Hill, NC (pop 28,825)
+  1329. [NOT_CONFIGURED] #1381 Williston, ND (pop 28,821)
+  1330. [NOT_CONFIGURED] #1382 Eagle Pass, TX (pop 28,768)
+  1331. [NOT_CONFIGURED] #1383 Kernersville, NC (pop 28,760)
+  1332. [NOT_CONFIGURED] #1384 Agawam Town, MA (pop 28,749)
+  1333. [NOT_CONFIGURED] #1385 Saratoga Springs, NY (pop 28,741)
+  1334. [NOT_CONFIGURED] #1386 Lake in the Hills, IL (pop 28,706)
+  1335. [NOT_CONFIGURED] #1387 Shaker Heights, OH (pop 28,689)
+  1336. [NOT_CONFIGURED] #1388 Madison Heights, MI (pop 28,626)
+  1337. [NOT_CONFIGURED] #1389 Frankfort, KY (pop 28,610)
+  1338. [NOT_CONFIGURED] #1391 Sugar Hill, GA (pop 28,598)
+  1339. [NOT_CONFIGURED] #1392 Maple Valley, WA (pop 28,553)
+  1340. [NOT_CONFIGURED] #1394 Huntley, IL (pop 28,495)
+  1341. [NOT_CONFIGURED] #1395 New Lenox, IL (pop 28,480)
+  1342. [NOT_CONFIGURED] #1396 Pearl, MS (pop 28,458)
+  1343. [NOT_CONFIGURED] #1397 Slidell, LA (pop 28,440)
+  1344. [NOT_CONFIGURED] #1398 Ridgecrest, CA (pop 28,373)
+  1345. [NOT_CONFIGURED] #1399 Port Huron, MI (pop 28,342)
+  1346. [NOT_CONFIGURED] #1400 Carrollton, GA (pop 28,306)
+  1347. [NOT_CONFIGURED] #1401 Marion, IN (pop 28,216)
+  1348. [NOT_CONFIGURED] #1402 Madison, MS (pop 28,210)
+  1349. [NOT_CONFIGURED] #1403 Union City, GA (pop 28,195)
+  1350. [NOT_CONFIGURED] #1404 Fremont, NE (pop 28,190)
+  1351. [NOT_CONFIGURED] #1405 Brawley, CA (pop 28,188)
+  1352. [NOT_CONFIGURED] #1406 Mount Pleasant, WI (pop 28,184)
+  1353. [NOT_CONFIGURED] #1407 Newburgh, NY (pop 28,181)
+  1354. [NOT_CONFIGURED] #1408 Lake Jackson, TX (pop 28,158)
+  1355. [NOT_CONFIGURED] #1409 Lansing, IL (pop 28,107)
+  1356. [NOT_CONFIGURED] #1410 Glen Cove, NY (pop 28,088)
+  1357. [NOT_CONFIGURED] #1411 New London, CT (pop 28,081)
+  1358. [NOT_CONFIGURED] #1412 Simpsonville, SC (pop 28,078)
+  1359. [NOT_CONFIGURED] #1413 Foley, AL (pop 28,043)
+  1360. [NOT_CONFIGURED] #1414 Tualatin, OR (pop 28,036)
+  1361. [NOT_CONFIGURED] #1415 Prior Lake, MN (pop 28,018)
+  1362. [NOT_CONFIGURED] #1416 Garden City, KS (pop 27,996)
+  1363. [NOT_CONFIGURED] #1417 Danville, IL (pop 27,981)
+  1364. [NOT_CONFIGURED] #1418 Monroeville, PA (pop 27,966)
+  1365. [NOT_CONFIGURED] #1419 Asheboro, NC (pop 27,928)
+  1366. [NOT_CONFIGURED] #1420 Homewood, AL (pop 27,919)
+  1367. [NOT_CONFIGURED] #1421 Aberdeen, SD (pop 27,919)
+  1368. [NOT_CONFIGURED] #1422 Wilsonville, OR (pop 27,895)
+  1369. [NOT_CONFIGURED] #1423 Marshalltown, IA (pop 27,886)
+  1370. [NOT_CONFIGURED] #1424 Jenks, OK (pop 27,869)
+  1371. [NOT_CONFIGURED] #1425 Lemon Grove, CA (pop 27,867)
+  1372. [NOT_CONFIGURED] #1426 Bristol, TN (pop 27,867)
+  1373. [NOT_CONFIGURED] #1428 Tumwater, WA (pop 27,826)
+  1374. [NOT_CONFIGURED] #1429 Winchester, VA (pop 27,800)
+  1375. [NOT_CONFIGURED] #1430 Henderson, KY (pop 27,750)
+  1376. [NOT_CONFIGURED] #1431 Katy, TX (pop 27,741)
+  1377. [NOT_CONFIGURED] #1433 Kent, OH (pop 27,720)
+  1378. [NOT_CONFIGURED] #1434 Jamestown, NY (pop 27,699)
+  1379. [NOT_CONFIGURED] #1435 Maryland Heights, MO (pop 27,671)
+  1380. [NOT_CONFIGURED] #1436 Dodge City, KS (pop 27,663)
+  1381. [NOT_CONFIGURED] #1437 Williamsport, PA (pop 27,628)
+  1382. [NOT_CONFIGURED] #1438 Elk River, MN (pop 27,606)
+  1383. [NOT_CONFIGURED] #1439 Thomasville, NC (pop 27,605)
+  1384. [NOT_CONFIGURED] #1440 Allen Park, MI (pop 27,604)
+  1385. [NOT_CONFIGURED] #1441 Temple Terrace, FL (pop 27,588)
+  1386. [NOT_CONFIGURED] #1442 Gladstone, MO (pop 27,579)
+  1387. [NOT_CONFIGURED] #1443 Cabot, AR (pop 27,575)
+  1388. [NOT_CONFIGURED] #1444 Neenah, WI (pop 27,502)
+  1389. [NOT_CONFIGURED] #1445 Green, OH (pop 27,476)
+  1390. [NOT_CONFIGURED] #1446 Fate, TX (pop 27,467)
+  1391. [NOT_CONFIGURED] #1448 Hamtramck, MI (pop 27,424)
+  1392. [NOT_CONFIGURED] #1449 Wasco, CA (pop 27,409)
+  1393. [NOT_CONFIGURED] #1451 Balch Springs, TX (pop 27,307)
+  1394. [NOT_CONFIGURED] #1452 Walnut, CA (pop 27,250)
+  1395. [NOT_CONFIGURED] #1453 Lindenhurst, NY (pop 27,160)
+  1396. [NOT_CONFIGURED] #1454 Newberg, OR (pop 27,136)
+  1397. [NOT_CONFIGURED] #1455 Belmont, CA (pop 27,132)
+  1398. [NOT_CONFIGURED] #1456 Troy, OH (pop 27,122)
+  1399. [NOT_CONFIGURED] #1457 Round Lake Beach, IL (pop 27,091)
+  1400. [NOT_CONFIGURED] #1458 Sebastian, FL (pop 27,087)
+  1401. [NOT_CONFIGURED] #1459 Trussville, AL (pop 27,079)
+  1402. [NOT_CONFIGURED] #1460 Forest Grove, OR (pop 27,076)
+  1403. [NOT_CONFIGURED] #1461 Yukon, OK (pop 27,068)
+  1404. [NOT_CONFIGURED] #1462 Lemoore, CA (pop 27,057)
+  1405. [NOT_CONFIGURED] #1463 Greenville, MS (pop 27,015)
+  1406. [NOT_CONFIGURED] #1464 Vernon Hills, IL (pop 27,002)
+  1407. [NOT_CONFIGURED] #1465 Easley, SC (pop 27,001)
+  1408. [NOT_CONFIGURED] #1466 South Portland, ME (pop 26,994)
+  1409. [NOT_CONFIGURED] #1467 Wooster, OH (pop 26,982)
+  1410. [NOT_CONFIGURED] #1468 Moses Lake, WA (pop 26,969)
+  1411. [NOT_CONFIGURED] #1469 Mason City, IA (pop 26,948)
+  1412. [NOT_CONFIGURED] #1470 Shoreview, MN (pop 26,939)
+  1413. [NOT_CONFIGURED] #1471 Lockport, IL (pop 26,915)
+  1414. [NOT_CONFIGURED] #1472 Ossining, NY (pop 26,895)
+  1415. [NOT_CONFIGURED] #1473 Moscow, ID (pop 26,894)
+  1416. [NOT_CONFIGURED] #1474 Granite City, IL (pop 26,854)
+  1417. [NOT_CONFIGURED] #1475 New Iberia, LA (pop 26,849)
+  1418. [NOT_CONFIGURED] #1477 Oxford, MS (pop 26,801)
+  1419. [NOT_CONFIGURED] #1479 Edwardsville, IL (pop 26,715)
+  1420. [NOT_CONFIGURED] #1480 Paducah, KY (pop 26,712)
+  1421. [NOT_CONFIGURED] #1482 Austin, MN (pop 26,690)
+  1422. [NOT_CONFIGURED] #1483 Sanger, CA (pop 26,649)
+  1423. [NOT_CONFIGURED] #1484 Grandview, MO (pop 26,630)
+  1424. [NOT_CONFIGURED] #1485 Owatonna, MN (pop 26,626)
+  1425. [NOT_CONFIGURED] #1486 Superior, WI (pop 26,620)
+  1426. [NOT_CONFIGURED] #1487 Clinton, MS (pop 26,617)
+  1427. [NOT_CONFIGURED] #1488 Derby, KS (pop 26,604)
+  1428. [NOT_CONFIGURED] #1489 West Linn, OR (pop 26,597)
+  1429. [NOT_CONFIGURED] #1490 Galt, CA (pop 26,589)
+  1430. [NOT_CONFIGURED] #1491 Horn Lake, MS (pop 26,574)
+  1431. [NOT_CONFIGURED] #1492 Twentynine Palms, CA (pop 26,563)
+  1432. [NOT_CONFIGURED] #1493 South Salt Lake, UT (pop 26,561)
+  1433. [NOT_CONFIGURED] #1494 Batavia, IL (pop 26,555)
+  1434. [NOT_CONFIGURED] #1496 Hercules, CA (pop 26,499)
+  1435. [NOT_CONFIGURED] #1497 Benicia, CA (pop 26,477)
+  1436. [NOT_CONFIGURED] #1498 Stevens Point, WI (pop 26,465)
+  1437. [NOT_CONFIGURED] #1499 Lebanon, PA (pop 26,456)
+  1438. [NOT_CONFIGURED] #1500 Denison, TX (pop 26,446)
+  1439. [NOT_CONFIGURED] #1501 Plum, PA (pop 26,420)
+  1440. [NOT_CONFIGURED] #1502 Garden City, MI (pop 26,410)
+  1441. [NOT_CONFIGURED] #1503 El Cerrito, CA (pop 26,409)
+  1442. [NOT_CONFIGURED] #1504 North Augusta, SC (pop 26,395)
+  1443. [NOT_CONFIGURED] #1506 Staunton, VA (pop 26,361)
+  1444. [NOT_CONFIGURED] #1508 Nixa, MO (pop 26,352)
+  1445. [NOT_CONFIGURED] #1509 Soledad, CA (pop 26,345)
+  1446. [NOT_CONFIGURED] #1510 Avon Lake, OH (pop 26,342)
+  1447. [NOT_CONFIGURED] #1512 Centerville, OH (pop 26,311)
+  1448. [NOT_CONFIGURED] #1513 Greenfield, IN (pop 26,268)
+  1449. [NOT_CONFIGURED] #1514 Elmira, NY (pop 26,255)
+  1450. [NOT_CONFIGURED] #1517 Winona, MN (pop 26,173)
+  1451. [NOT_CONFIGURED] #1518 Tarpon Springs, FL (pop 26,168)
+  1452. [NOT_CONFIGURED] #1519 Farmington, UT (pop 26,163)
+  1453. [NOT_CONFIGURED] #1520 Norfolk, NE (pop 26,162)
+  1454. [NOT_CONFIGURED] #1521 Franklin, IN (pop 26,158)
+  1455. [NOT_CONFIGURED] #1522 Reedley, CA (pop 26,138)
+  1456. [NOT_CONFIGURED] #1523 Saginaw, TX (pop 26,116)
+  1457. [NOT_CONFIGURED] #1524 Xenia, OH (pop 26,067)
+  1458. [NOT_CONFIGURED] #1525 Wheeling, WV (pop 26,060)
+  1459. [NOT_CONFIGURED] #1526 Auburn Hills, MI (pop 26,047)
+  1460. [NOT_CONFIGURED] #1527 Fairhope, AL (pop 26,044)
+  1461. [NOT_CONFIGURED] #1528 Colleyville, TX (pop 26,012)
+  1462. [NOT_CONFIGURED] #1530 Yorkville, IL (pop 25,986)
+  1463. [NOT_CONFIGURED] #1531 Auburn, NY (pop 25,963)
+  1464. [NOT_CONFIGURED] #1532 Raymore, MO (pop 25,962)
+  1465. [NOT_CONFIGURED] #1533 Walker, MI (pop 25,921)
+  1466. [NOT_CONFIGURED] #1534 Salem, VA (pop 25,908)
+  1467. [NOT_CONFIGURED] #1535 Woodstock, IL (pop 25,892)
+  1468. [NOT_CONFIGURED] #1536 Brandon, MS (pop 25,870)
+  1469. [NOT_CONFIGURED] #1537 Belton, MO (pop 25,861)
+  1470. [NOT_CONFIGURED] #1538 Windsor, CA (pop 25,846)
+  1471. [NOT_CONFIGURED] #1539 Starkville, MS (pop 25,844)
+  1472. [NOT_CONFIGURED] #1540 Gardner, KS (pop 25,836)
+  1473. [NOT_CONFIGURED] #1541 Dinuba, CA (pop 25,833)
+  1474. [NOT_CONFIGURED] #1542 Pickerington, OH (pop 25,814)
+  1475. [NOT_CONFIGURED] #1543 Shelbyville, TN (pop 25,792)
+  1476. [NOT_CONFIGURED] #1544 East Chicago, IN (pop 25,768)
+  1477. [NOT_CONFIGURED] #1545 Muskego, WI (pop 25,759)
+  1478. [NOT_CONFIGURED] #1546 Peekskill, NY (pop 25,757)
+  1479. [NOT_CONFIGURED] #1547 Medina, OH (pop 25,757)
+  1480. [NOT_CONFIGURED] #1548 Chanhassen, MN (pop 25,746)
+  1481. [NOT_CONFIGURED] #1549 Centerton, AR (pop 25,745)
+  1482. [NOT_CONFIGURED] #1550 Rockville Centre, NY (pop 25,718)
+  1483. [NOT_CONFIGURED] #1551 Dickinson, ND (pop 25,695)
+  1484. [NOT_CONFIGURED] #1552 Middletown, DE (pop 25,686)
+  1485. [NOT_CONFIGURED] #1553 South Pasadena, CA (pop 25,656)
+  1486. [NOT_CONFIGURED] #1554 Ottumwa, IA (pop 25,648)
+  1487. [NOT_CONFIGURED] #1555 Belton, TX (pop 25,635)
+  1488. [NOT_CONFIGURED] #1556 Riverbank, CA (pop 25,625)
+  1489. [NOT_CONFIGURED] #1557 Corsicana, TX (pop 25,591)
+  1490. [NOT_CONFIGURED] #1558 Avon, OH (pop 25,573)
+  1491. [NOT_CONFIGURED] #1559 Imperial Beach, CA (pop 25,568)
+  1492. [NOT_CONFIGURED] #1560 Fernley, NV (pop 25,508)
+  1493. [NOT_CONFIGURED] #1561 Patterson, CA (pop 25,495)
+  1494. [NOT_CONFIGURED] #1562 West Chicago, IL (pop 25,469)
+  1495. [NOT_CONFIGURED] #1563 De Pere, WI (pop 25,453)
+  1496. [NOT_CONFIGURED] #1564 Eureka, CA (pop 25,412)
+  1497. [NOT_CONFIGURED] #1566 Norco, CA (pop 25,400)
+  1498. [NOT_CONFIGURED] #1567 Pelham, AL (pop 25,396)
+  1499. [NOT_CONFIGURED] #1568 Lafayette, CA (pop 25,371)
+  1500. [NOT_CONFIGURED] #1569 Lexington, SC (pop 25,354)
+  1501. [NOT_CONFIGURED] #1570 Mequon, WI (pop 25,329)
+  1502. [NOT_CONFIGURED] #1571 Belvidere, IL (pop 25,325)
+  1503. [NOT_CONFIGURED] #1572 Perrysburg, OH (pop 25,313)
+  1504. [NOT_CONFIGURED] #1573 Mercer Island, WA (pop 25,302)
+  1505. [NOT_CONFIGURED] #1574 University Park, TX (pop 25,268)
+  1506. [NOT_CONFIGURED] #1575 Papillion, NE (pop 25,248)
+  1507. [NOT_CONFIGURED] #1576 Farragut, TN (pop 25,242)
+  1508. [NOT_CONFIGURED] #1577 Key West, FL (pop 25,240)
+  1509. [NOT_CONFIGURED] #1578 Caledonia, WI (pop 25,240)
+  1510. [NOT_CONFIGURED] #1579 Auburn, ME (pop 25,200)
+  1511. [NOT_CONFIGURED] #1580 Mountlake Terrace, WA (pop 25,198)
+  1512. [NOT_CONFIGURED] #1581 Loma Linda, CA (pop 25,197)
+  1513. [NOT_CONFIGURED] #1583 Hastings, NE (pop 25,152)
+  1514. [NOT_CONFIGURED] #1584 Kerrville, TX (pop 25,141)
+  1515. [NOT_CONFIGURED] #1585 Columbus, NE (pop 25,126)
+  1516. [NOT_CONFIGURED] #1586 Inkster, MI (pop 25,108)
+  1517. [NOT_CONFIGURED] #1587 Cartersville, GA (pop 25,082)
+  1518. [NOT_CONFIGURED] #1588 Bessemer, AL (pop 25,079)
+  1519. [NOT_CONFIGURED] #1589 Norton Shores, MI (pop 25,070)
+  1520. [NOT_CONFIGURED] #1590 Eustis, FL (pop 25,067)
+  1521. [NOT_CONFIGURED] #1591 Ardmore, OK (pop 25,064)
+  1522. [NOT_CONFIGURED] #1593 Paris, TX (pop 25,037)
+  1523. [NOT_CONFIGURED] #1594 Johnston, IA (pop 25,022)
+  1524. [NOT_CONFIGURED] #1595 Faribault, MN (pop 24,983)
+  1525. [NOT_CONFIGURED] #1596 Alton, IL (pop 24,967)
+  1526. [NOT_CONFIGURED] #1597 Hazelwood, MO (pop 24,951)
+  1527. [NOT_CONFIGURED] #1598 South Elgin, IL (pop 24,921)
+  1528. [NOT_CONFIGURED] #1599 Zanesville, OH (pop 24,916)
+  1529. [NOT_CONFIGURED] #1600 Barstow, CA (pop 24,897)
+  1530. [NOT_CONFIGURED] #1601 Florence, AZ (pop 24,891)
+  1531. [NOT_CONFIGURED] #1602 Fort Dodge, IA (pop 24,886)
+  1532. [NOT_CONFIGURED] #1603 Kingsville, TX (pop 24,884)
+  1533. [NOT_CONFIGURED] #1604 Homer Glen, IL (pop 24,852)
+  1534. [NOT_CONFIGURED] #1606 Athens, OH (pop 24,824)
+  1535. [NOT_CONFIGURED] #1607 Horizon City, TX (pop 24,802)
+  1536. [NOT_CONFIGURED] #1608 Perry, GA (pop 24,792)
+  1537. [NOT_CONFIGURED] #1609 Mandan, ND (pop 24,788)
+  1538. [NOT_CONFIGURED] #1610 Wadsworth, OH (pop 24,753)
+  1539. [NOT_CONFIGURED] #1611 Ennis, TX (pop 24,753)
+  1540. [NOT_CONFIGURED] #1612 Hurricane, UT (pop 24,753)
+  1541. [NOT_CONFIGURED] #1613 Avon, IN (pop 24,735)
+  1542. [NOT_CONFIGURED] #1614 San Benito, TX (pop 24,712)
+  1543. [NOT_CONFIGURED] #1615 Payson, UT (pop 24,666)
+  1544. [NOT_CONFIGURED] #1616 Romulus, MI (pop 24,652)
+  1545. [NOT_CONFIGURED] #1617 Barberton, OH (pop 24,624)
+  1546. [NOT_CONFIGURED] #1619 West Haven, UT (pop 24,617)
+  1547. [NOT_CONFIGURED] #1620 Groveland, FL (pop 24,602)
+  1548. [NOT_CONFIGURED] #1621 Zion, IL (pop 24,583)
+  1549. [NOT_CONFIGURED] #1622 Ridgeland, MS (pop 24,576)
+  1550. [NOT_CONFIGURED] #1623 Brookings, SD (pop 24,555)
+  1551. [NOT_CONFIGURED] #1624 Benbrook, TX (pop 24,542)
+  1552. [NOT_CONFIGURED] #1625 Selma, CA (pop 24,505)
+  1553. [NOT_CONFIGURED] #1626 Decatur, GA (pop 24,482)
+  1554. [NOT_CONFIGURED] #1627 Newport, RI (pop 24,482)
+  1555. [NOT_CONFIGURED] #1628 Riverside, OH (pop 24,472)
+  1556. [NOT_CONFIGURED] #1630 Farmington, MN (pop 24,464)
+  1557. [NOT_CONFIGURED] #1631 Corinth, TX (pop 24,450)
+  1558. [NOT_CONFIGURED] #1632 Seal Beach, CA (pop 24,421)
+  1559. [NOT_CONFIGURED] #1633 Van Buren, AR (pop 24,396)
+  1560. [NOT_CONFIGURED] #1634 Emporia, KS (pop 24,354)
+  1561. [NOT_CONFIGURED] #1635 Edgewater, FL (pop 24,334)
+  1562. [NOT_CONFIGURED] #1637 Westmont, IL (pop 24,308)
+  1563. [NOT_CONFIGURED] #1638 Marshall, TX (pop 24,263)
+  1564. [NOT_CONFIGURED] #1639 St. John, IN (pop 24,250)
+  1565. [NOT_CONFIGURED] #1640 Ponca City, OK (pop 24,234)
+  1566. [NOT_CONFIGURED] #1641 Wyandotte, MI (pop 24,214)
+  1567. [NOT_CONFIGURED] #1642 Willoughby, OH (pop 24,208)
+  1568. [NOT_CONFIGURED] #1643 Sandusky, OH (pop 24,174)
+  1569. [NOT_CONFIGURED] #1644 Kenmore, WA (pop 24,166)
+  1570. [NOT_CONFIGURED] #1645 Oak Harbor, WA (pop 24,163)
+  1571. [NOT_CONFIGURED] #1646 Clinton, IA (pop 24,118)
+  1572. [NOT_CONFIGURED] #1647 Watertown, NY (pop 24,038)
+  1573. [NOT_CONFIGURED] #1649 Searcy, AR (pop 23,997)
+  1574. [NOT_CONFIGURED] #1650 Griffin, GA (pop 23,994)
+  1575. [NOT_CONFIGURED] #1651 Mustang, OK (pop 23,965)
+  1576. [NOT_CONFIGURED] #1652 Coralville, IA (pop 23,959)
+  1577. [NOT_CONFIGURED] #1653 Otsego, MN (pop 23,875)
+  1578. [NOT_CONFIGURED] #1654 Solon, OH (pop 23,875)
+  1579. [NOT_CONFIGURED] #1655 Maywood, CA (pop 23,838)
+  1580. [NOT_CONFIGURED] #1656 Roseburg, OR (pop 23,795)
+  1581. [NOT_CONFIGURED] #1657 Collinsville, IL (pop 23,766)
+  1582. [NOT_CONFIGURED] #1658 Kingston, NY (pop 23,748)
+  1583. [NOT_CONFIGURED] #1660 Clinton, UT (pop 23,728)
+  1584. [NOT_CONFIGURED] #1662 Fountain Hills, AZ (pop 23,696)
+  1585. [NOT_CONFIGURED] #1663 Burlington, IA (pop 23,637)
+  1586. [NOT_CONFIGURED] #1664 Loves Park, IL (pop 23,636)
+  1587. [NOT_CONFIGURED] #1665 Munster, IN (pop 23,634)
+  1588. [NOT_CONFIGURED] #1666 Jacksonville Beach, FL (pop 23,630)
+  1589. [NOT_CONFIGURED] #1668 North Salt Lake, UT (pop 23,593)
+  1590. [NOT_CONFIGURED] #1669 Pottstown, PA (pop 23,553)
+  1591. [NOT_CONFIGURED] #1670 Lisle, IL (pop 23,548)
+  1592. [NOT_CONFIGURED] #1671 West Memphis, AR (pop 23,538)
+  1593. [NOT_CONFIGURED] #1672 Kankakee, IL (pop 23,535)
+  1594. [NOT_CONFIGURED] #1673 Webster Groves, MO (pop 23,525)
+  1595. [NOT_CONFIGURED] #1674 Waynesboro, VA (pop 23,498)
+  1596. [NOT_CONFIGURED] #1675 Highland, IN (pop 23,497)
+  1597. [NOT_CONFIGURED] #1676 Duarte, CA (pop 23,493)
+  1598. [NOT_CONFIGURED] #1677 Watertown, SD (pop 23,492)
+  1599. [NOT_CONFIGURED] #1678 San Fernando, CA (pop 23,488)
+  1600. [NOT_CONFIGURED] #1679 White Bear Lake, MN (pop 23,479)
+  1601. [NOT_CONFIGURED] #1680 DeBary, FL (pop 23,468)
+  1602. [NOT_CONFIGURED] #1681 Hammond, LA (pop 23,426)
+  1603. [NOT_CONFIGURED] #1682 Albertville, AL (pop 23,392)
+  1604. [NOT_CONFIGURED] #1683 Maywood, IL (pop 23,364)
+  1605. [NOT_CONFIGURED] #1685 Millbrae, CA (pop 23,321)
+  1606. [NOT_CONFIGURED] #1686 Muscatine, IA (pop 23,298)
+  1607. [NOT_CONFIGURED] #1687 Sapulpa, OK (pop 23,297)
+  1608. [NOT_CONFIGURED] #1688 Ozark, MO (pop 23,248)
+  1609. [NOT_CONFIGURED] #1689 Oakdale, CA (pop 23,209)
+  1610. [NOT_CONFIGURED] #1690 Waxhaw, NC (pop 23,178)
+  1611. [NOT_CONFIGURED] #1691 Duncan, OK (pop 23,174)
+  1612. [NOT_CONFIGURED] #1692 Freeport, IL (pop 23,140)
+  1613. [NOT_CONFIGURED] #1693 Watauga, TX (pop 23,120)
+  1614. [NOT_CONFIGURED] #1695 Maple Heights, OH (pop 23,081)
+  1615. [NOT_CONFIGURED] #1696 Hudson, OH (pop 23,073)
+  1616. [NOT_CONFIGURED] #1697 Trotwood, OH (pop 23,073)
+  1617. [NOT_CONFIGURED] #1700 Suwanee, GA (pop 23,062)
+  1618. [NOT_CONFIGURED] #1701 Marina, CA (pop 23,047)
+  1619. [NOT_CONFIGURED] #1702 Champlin, MN (pop 23,045)
+  1620. [NOT_CONFIGURED] #1703 Chambersburg, PA (pop 23,041)
+  1621. [NOT_CONFIGURED] #1704 Keene, NH (pop 23,036)
+  1622. [NOT_CONFIGURED] #1705 Central Falls, RI (pop 23,034)
+  1623. [NOT_CONFIGURED] #1706 Garden City, NY (pop 22,993)
+  1624. [NOT_CONFIGURED] #1707 Terrell, TX (pop 22,977)
+  1625. [NOT_CONFIGURED] #1708 Hopewell, VA (pop 22,970)
+  1626. [NOT_CONFIGURED] #1709 Rock Springs, WY (pop 22,967)
+  1627. [NOT_CONFIGURED] #1710 Battle Ground, WA (pop 22,959)
+  1628. [NOT_CONFIGURED] #1711 Portsmouth, NH (pop 22,938)
+  1629. [NOT_CONFIGURED] #1712 Prairie Village, KS (pop 22,919)
+  1630. [NOT_CONFIGURED] #1713 North Ogden, UT (pop 22,908)
+  1631. [NOT_CONFIGURED] #1714 Alton, TX (pop 22,907)
+  1632. [NOT_CONFIGURED] #1715 Sunny Isles Beach, FL (pop 22,903)
+  1633. [NOT_CONFIGURED] #1717 Machesney Park, IL (pop 22,839)
+  1634. [NOT_CONFIGURED] #1718 Columbus, MS (pop 22,820)
+  1635. [NOT_CONFIGURED] #1719 Shelby, NC (pop 22,778)
+  1636. [NOT_CONFIGURED] #1720 Lino Lakes, MN (pop 22,774)
+  1637. [NOT_CONFIGURED] #1721 West Chester, PA (pop 22,758)
+  1638. [NOT_CONFIGURED] #1722 Shafter, CA (pop 22,754)
+  1639. [NOT_CONFIGURED] #1723 Boerne, TX (pop 22,712)
+  1640. [NOT_CONFIGURED] #1725 Radcliff, KY (pop 22,706)
+  1641. [NOT_CONFIGURED] #1726 Greenwood, SC (pop 22,667)
+  1642. [NOT_CONFIGURED] #1727 Christiansburg, VA (pop 22,632)
+  1643. [NOT_CONFIGURED] #1728 Corcoran, CA (pop 22,627)
+  1644. [NOT_CONFIGURED] #1729 Acworth, GA (pop 22,624)
+  1645. [NOT_CONFIGURED] #1730 Bloomingdale, IL (pop 22,622)
+  1646. [NOT_CONFIGURED] #1731 Watertown, WI (pop 22,617)
+  1647. [NOT_CONFIGURED] #1732 Altoona, IA (pop 22,598)
+  1648. [NOT_CONFIGURED] #1733 Oxford, OH (pop 22,585)
+  1649. [NOT_CONFIGURED] #1734 Middleton, WI (pop 22,566)
+  1650. [NOT_CONFIGURED] #1735 Laguna Beach, CA (pop 22,564)
+  1651. [NOT_CONFIGURED] #1736 North Platte, NE (pop 22,549)
+  1652. [NOT_CONFIGURED] #1737 Big Spring, TX (pop 22,541)
+  1653. [NOT_CONFIGURED] #1738 Seymour, IN (pop 22,524)
+  1654. [NOT_CONFIGURED] #1739 Carlisle, PA (pop 22,517)
+  1655. [NOT_CONFIGURED] #1740 Hastings, MN (pop 22,502)
+  1656. [NOT_CONFIGURED] #1741 Sanford, ME (pop 22,497)
+  1657. [NOT_CONFIGURED] #1742 Clemmons, NC (pop 22,471)
+  1658. [NOT_CONFIGURED] #1743 La Porte, IN (pop 22,444)
+  1659. [NOT_CONFIGURED] #1744 Evans, CO (pop 22,394)
+  1660. [NOT_CONFIGURED] #1745 New Brighton, MN (pop 22,374)
+  1661. [NOT_CONFIGURED] #1746 Biddeford, ME (pop 22,370)
+  1662. [NOT_CONFIGURED] #1747 Columbia Heights, MN (pop 22,358)
+  1663. [NOT_CONFIGURED] #1748 Snellville, GA (pop 22,336)
+  1664. [NOT_CONFIGURED] #1749 Ruston, LA (pop 22,330)
+  1665. [NOT_CONFIGURED] #1750 Sedalia, MO (pop 22,310)
+  1666. [NOT_CONFIGURED] #1751 Zephyrhills, FL (pop 22,304)
+  1667. [NOT_CONFIGURED] #1752 Bryant, AR (pop 22,271)
+  1668. [NOT_CONFIGURED] #1753 Calabasas, CA (pop 22,256)
+  1669. [NOT_CONFIGURED] #1754 Carbondale, IL (pop 22,223)
+  1670. [NOT_CONFIGURED] #1755 Helena, AL (pop 22,200)
+  1671. [NOT_CONFIGURED] #1756 Birmingham, MI (pop 22,198)
+  1672. [NOT_CONFIGURED] #1757 Harrison, NJ (pop 22,182)
+  1673. [NOT_CONFIGURED] #1758 Klamath Falls, OR (pop 22,174)
+  1674. [NOT_CONFIGURED] #1759 Stephenville, TX (pop 22,147)
+  1675. [NOT_CONFIGURED] #1760 Bonney Lake, WA (pop 22,145)
+  1676. [NOT_CONFIGURED] #1761 Imperial, CA (pop 22,102)
+  1677. [NOT_CONFIGURED] #1762 Oxford, AL (pop 22,088)
+  1678. [NOT_CONFIGURED] #1763 Bartow, FL (pop 22,084)
+  1679. [NOT_CONFIGURED] #1764 Crystal, MN (pop 22,082)
+  1680. [NOT_CONFIGURED] #1765 Junction City, KS (pop 22,053)
+  1681. [NOT_CONFIGURED] #1766 Clarksville, IN (pop 22,041)
+  1682. [NOT_CONFIGURED] #1767 East Peoria, IL (pop 22,024)
+  1683. [NOT_CONFIGURED] #1768 Villa Park, IL (pop 22,020)
+  1684. [NOT_CONFIGURED] #1769 Darien, IL (pop 22,015)
+  1685. [NOT_CONFIGURED] #1770 Tavares, FL (pop 22,007)
+  1686. [NOT_CONFIGURED] #1771 Lebanon, OH (pop 21,995)
+  1687. [NOT_CONFIGURED] #1772 Hanahan, SC (pop 21,983)
+  1688. [NOT_CONFIGURED] #1773 East Ridge, TN (pop 21,970)
+  1689. [NOT_CONFIGURED] #1774 Howard, WI (pop 21,961)
+  1690. [NOT_CONFIGURED] #1775 Arlington, WA (pop 21,959)
+  1691. [NOT_CONFIGURED] #1776 Montgomery, IL (pop 21,957)
+  1692. [NOT_CONFIGURED] #1777 Lynn Haven, FL (pop 21,954)
+  1693. [NOT_CONFIGURED] #1778 Dickinson, TX (pop 21,941)
+  1694. [NOT_CONFIGURED] #1779 West St. Paul, MN (pop 21,920)
+  1695. [NOT_CONFIGURED] #1781 North Liberty, IA (pop 21,904)
+  1696. [NOT_CONFIGURED] #1782 Willmar, MN (pop 21,892)
+  1697. [NOT_CONFIGURED] #1783 Yucca Valley, CA (pop 21,858)
+  1698. [NOT_CONFIGURED] #1784 Marquette, MI (pop 21,845)
+  1699. [NOT_CONFIGURED] #1785 Knightdale, NC (pop 21,829)
+  1700. [NOT_CONFIGURED] #1787 Pleasant Prairie, WI (pop 21,802)
+  1701. [NOT_CONFIGURED] #1788 Chillicothe, OH (pop 21,769)
+  1702. [NOT_CONFIGURED] #1789 American Canyon, CA (pop 21,742)
+  1703. [NOT_CONFIGURED] #1790 South Burlington, VT (pop 21,713)
+  1704. [NOT_CONFIGURED] #1791 Mountain Brook, AL (pop 21,701)
+  1705. [NOT_CONFIGURED] #1792 Cudahy, CA (pop 21,694)
+  1706. [NOT_CONFIGURED] #1793 St. Michael, MN (pop 21,681)
+  1707. [NOT_CONFIGURED] #1795 Montrose, CO (pop 21,646)
+  1708. [NOT_CONFIGURED] #1796 Tukwila, WA (pop 21,636)
+  1709. [NOT_CONFIGURED] #1797 Milwaukie, OR (pop 21,620)
+  1710. [NOT_CONFIGURED] #1798 Covington, WA (pop 21,567)
+  1711. [NOT_CONFIGURED] #1799 Alliance, OH (pop 21,523)
+  1712. [NOT_CONFIGURED] #1800 Manor, TX (pop 21,500)
+  1713. [NOT_CONFIGURED] #1801 Pascagoula, MS (pop 21,476)
+  1714. [NOT_CONFIGURED] #1802 Rocky River, OH (pop 21,468)
+  1715. [NOT_CONFIGURED] #1803 Culpeper, VA (pop 21,464)
+  1716. [NOT_CONFIGURED] #1804 Republic, MO (pop 21,392)
+  1717. [NOT_CONFIGURED] #1805 Westbrook, ME (pop 21,386)
+  1718. [NOT_CONFIGURED] #1806 Gardner, MA (pop 21,381)
+  1719. [NOT_CONFIGURED] #1807 South Euclid, OH (pop 21,363)
+  1720. [NOT_CONFIGURED] #1808 New Castle, PA (pop 21,332)
+  1721. [NOT_CONFIGURED] #1809 Port Hueneme, CA (pop 21,325)
+  1722. [NOT_CONFIGURED] #1811 Northfield, MN (pop 21,316)
+  1723. [NOT_CONFIGURED] #1812 Mineola, NY (pop 21,305)
+  1724. [NOT_CONFIGURED] #1813 Mukilteo, WA (pop 21,299)
+  1725. [NOT_CONFIGURED] #1814 Del City, OK (pop 21,272)
+  1726. [NOT_CONFIGURED] #1815 Golden Valley, MN (pop 21,263)
+  1727. [NOT_CONFIGURED] #1816 Grayslake, IL (pop 21,262)
+  1728. [NOT_CONFIGURED] #1817 South Lake Tahoe, CA (pop 21,225)
+  1729. [NOT_CONFIGURED] #1818 Hays, KS (pop 21,213)
+  1730. [NOT_CONFIGURED] #1819 Fort Walton Beach, FL (pop 21,188)
+  1731. [NOT_CONFIGURED] #1820 Geneva, IL (pop 21,168)
+  1732. [NOT_CONFIGURED] #1821 Frankfort, IL (pop 21,160)
+  1733. [NOT_CONFIGURED] #1822 Highland, UT (pop 21,146)
+  1734. [NOT_CONFIGURED] #1823 Anniston, AL (pop 21,127)
+  1735. [NOT_CONFIGURED] #1825 Mount Pleasant, MI (pop 21,090)
+  1736. [NOT_CONFIGURED] #1826 Carrboro, NC (pop 21,079)
+  1737. [NOT_CONFIGURED] #1827 Ashland, KY (pop 21,066)
+  1738. [NOT_CONFIGURED] #1828 Saco, ME (pop 21,064)
+  1739. [NOT_CONFIGURED] #1830 Greenfield, CA (pop 21,042)
+  1740. [NOT_CONFIGURED] #1831 Arnold, MO (pop 21,036)
+  1741. [NOT_CONFIGURED] #1832 Tullahoma, TN (pop 21,035)
+  1742. [NOT_CONFIGURED] #1833 Germantown, WI (pop 21,032)
+  1743. [NOT_CONFIGURED] #1835 Ellensburg, WA (pop 20,996)
+  1744. [NOT_CONFIGURED] #1836 East Moline, IL (pop 20,995)
+  1745. [NOT_CONFIGURED] #1837 Mill Creek, WA (pop 20,993)
+  1746. [NOT_CONFIGURED] #1838 Angleton, TX (pop 20,979)
+  1747. [NOT_CONFIGURED] #1839 Piqua, OH (pop 20,940)
+  1748. [NOT_CONFIGURED] #1840 Ashland, OR (pop 20,935)
+  1749. [NOT_CONFIGURED] #1842 Durant, OK (pop 20,908)
+  1750. [NOT_CONFIGURED] #1843 Shelbyville, IN (pop 20,845)
+  1751. [NOT_CONFIGURED] #1844 Elko, NV (pop 20,822)
+  1752. [NOT_CONFIGURED] #1845 Louisville, CO (pop 20,811)
+  1753. [NOT_CONFIGURED] #1846 North Myrtle Beach, SC (pop 20,798)
+  1754. [NOT_CONFIGURED] #1847 Kingsland, GA (pop 20,789)
+  1755. [NOT_CONFIGURED] #1849 New Hope, MN (pop 20,745)
+  1756. [NOT_CONFIGURED] #1851 Murrysville, PA (pop 20,729)
+  1757. [NOT_CONFIGURED] #1852 Portland, TX (pop 20,725)
+  1758. [NOT_CONFIGURED] #1853 Baldwin, PA (pop 20,712)
+  1759. [NOT_CONFIGURED] #1854 Forest Lake, MN (pop 20,700)
+  1760. [NOT_CONFIGURED] #1856 Alamo, TX (pop 20,694)
+  1761. [NOT_CONFIGURED] #1857 Lynbrook, NY (pop 20,684)
+  1762. [NOT_CONFIGURED] #1858 Westminster, MD (pop 20,662)
+  1763. [NOT_CONFIGURED] #1859 Rolla, MO (pop 20,660)
+  1764. [NOT_CONFIGURED] #1860 Painesville, OH (pop 20,660)
+  1765. [NOT_CONFIGURED] #1861 Auburndale, FL (pop 20,659)
+  1766. [NOT_CONFIGURED] #1862 Mebane, NC (pop 20,654)
+  1767. [NOT_CONFIGURED] #1863 Libertyville, IL (pop 20,643)
+  1768. [NOT_CONFIGURED] #1864 Johnstown, CO (pop 20,639)
+  1769. [NOT_CONFIGURED] #1865 Winder, GA (pop 20,628)
+  1770. [NOT_CONFIGURED] #1866 Claremore, OK (pop 20,602)
+  1771. [NOT_CONFIGURED] #1867 South St. Paul, MN (pop 20,590)
+  1772. [NOT_CONFIGURED] #1868 Sulphur, LA (pop 20,572)
+  1773. [NOT_CONFIGURED] #1869 Pittsburg, KS (pop 20,547)
+  1774. [NOT_CONFIGURED] #1870 Parma Heights, OH (pop 20,524)
+  1775. [NOT_CONFIGURED] #1872 Crowley, TX (pop 20,483)
+  1776. [NOT_CONFIGURED] #1873 Sherwood, OR (pop 20,441)
+  1777. [NOT_CONFIGURED] #1874 Bethany, OK (pop 20,421)
+  1778. [NOT_CONFIGURED] #1875 Fayetteville, GA (pop 20,419)
+  1779. [NOT_CONFIGURED] #1876 Punta Gorda, FL (pop 20,416)
+  1780. [NOT_CONFIGURED] #1877 Lockport, NY (pop 20,394)
+  1781. [NOT_CONFIGURED] #1878 Sidney, OH (pop 20,392)
+  1782. [NOT_CONFIGURED] #1879 Zachary, LA (pop 20,370)
+  1783. [NOT_CONFIGURED] #1880 Gallup, NM (pop 20,339)
+  1784. [NOT_CONFIGURED] #1881 Harrisburg, NC (pop 20,335)
+  1785. [NOT_CONFIGURED] #1882 Sand Springs, OK (pop 20,330)
+  1786. [NOT_CONFIGURED] #1883 Brigham City, UT (pop 20,319)
+  1787. [NOT_CONFIGURED] #1884 Dixon, CA (pop 20,296)
+  1788. [NOT_CONFIGURED] #1885 Phoenixville, PA (pop 20,286)
+  1789. [NOT_CONFIGURED] #1886 Universal City, TX (pop 20,267)
+  1790. [NOT_CONFIGURED] #1887 Adrian, MI (pop 20,259)
+  1791. [NOT_CONFIGURED] #1888 Miamisburg, OH (pop 20,253)
+  1792. [NOT_CONFIGURED] #1889 Cullman, AL (pop 20,239)
+  1793. [NOT_CONFIGURED] #1890 South Milwaukee, WI (pop 20,233)
+  1794. [NOT_CONFIGURED] #1891 Crest Hill, IL (pop 20,223)
+  1795. [NOT_CONFIGURED] #1892 La Marque, TX (pop 20,194)
+  1796. [NOT_CONFIGURED] #1893 Monroe, MI (pop 20,177)
+  1797. [NOT_CONFIGURED] #1894 Erlanger, KY (pop 20,172)
+  1798. [NOT_CONFIGURED] #1896 Golden, CO (pop 20,151)
+  1799. [NOT_CONFIGURED] #1897 Ypsilanti, MI (pop 20,150)
+  1800. [NOT_CONFIGURED] #1898 Holly Springs, GA (pop 20,133)
+  1801. [NOT_CONFIGURED] #1899 Seagoville, TX (pop 20,124)
+  1802. [NOT_CONFIGURED] #1900 St. Marys, GA (pop 20,119)
+  1803. [NOT_CONFIGURED] #1901 Port Angeles, WA (pop 20,112)
+  1804. [NOT_CONFIGURED] #1902 Conyers, GA (pop 20,111)
+  1805. [NOT_CONFIGURED] #1903 Villa Rica, GA (pop 20,095)
+  1806. [NOT_CONFIGURED] #1904 Ammon, ID (pop 20,095)
+  1807. [NOT_CONFIGURED] #1905 Boone, NC (pop 20,080)
+  1808. [NOT_CONFIGURED] #1906 Siloam Springs, AR (pop 20,075)
+  1809. [NOT_CONFIGURED] #1907 El Reno, OK (pop 20,041)
+  1810. [NOT_CONFIGURED] #1908 Forest Park, OH (pop 20,033)
+  1811. [NOT_CONFIGURED] #1909 Vicksburg, MS (pop 20,032)
+  1812. [NOT_CONFIGURED] #1911 Oconomowoc, WI (pop 20,002)
+  1813. [NOT_CONFIGURED] #1912 Warrensburg, MO (pop 19,998)
+  1814. [NOT_CONFIGURED] #1913 Sartell, MN (pop 19,979)
+  1815. [NOT_CONFIGURED] #1914 Nogales, AZ (pop 19,965)
+  1816. [NOT_CONFIGURED] #1915 Lake Zurich, IL (pop 19,960)
+  1817. [NOT_CONFIGURED] #1916 Panama City Beach, FL (pop 19,955)
+  1818. [NOT_CONFIGURED] #1917 Lebanon, OR (pop 19,950)
+  1819. [NOT_CONFIGURED] #1918 Whitehall, OH (pop 19,940)
+  1820. [NOT_CONFIGURED] #1919 Monroe, WA (pop 19,927)
+  1821. [NOT_CONFIGURED] #1920 Mokena, IL (pop 19,915)
+  1822. [NOT_CONFIGURED] #1921 Cocoa, FL (pop 19,909)
+  1823. [NOT_CONFIGURED] #1922 Los Lunas, NM (pop 19,907)
+  1824. [NOT_CONFIGURED] #1923 Lexington, NC (pop 19,904)
+  1825. [NOT_CONFIGURED] #1924 Onalaska, WI (pop 19,898)
+  1826. [NOT_CONFIGURED] #1925 Mayfield Heights, OH (pop 19,886)
+  1827. [NOT_CONFIGURED] #1926 Springfield, TN (pop 19,842)
+  1828. [NOT_CONFIGURED] #1927 Lomita, CA (pop 19,841)
+  1829. [NOT_CONFIGURED] #1928 Richmond Hill, GA (pop 19,839)
+  1830. [NOT_CONFIGURED] #1929 Sheridan, WY (pop 19,813)
+  1831. [NOT_CONFIGURED] #1930 Durango, CO (pop 19,811)
+  1832. [NOT_CONFIGURED] #1931 Broadview Heights, OH (pop 19,792)
+  1833. [NOT_CONFIGURED] #1932 Mamaroneck, NY (pop 19,783)
+  1834. [NOT_CONFIGURED] #1933 Harvey, IL (pop 19,781)
+  1835. [NOT_CONFIGURED] #1934 Maitland, FL (pop 19,776)
+  1836. [NOT_CONFIGURED] #1935 Plattsburgh, NY (pop 19,758)
+  1837. [NOT_CONFIGURED] #1936 Glenn Heights, TX (pop 19,752)
+  1838. [NOT_CONFIGURED] #1937 Hermiston, OR (pop 19,746)
+  1839. [NOT_CONFIGURED] #1938 Brenham, TX (pop 19,728)
+  1840. [NOT_CONFIGURED] #1939 Oregon, OH (pop 19,726)
+  1841. [NOT_CONFIGURED] #1940 Oroville, CA (pop 19,712)
+  1842. [NOT_CONFIGURED] #1941 Minneola, FL (pop 19,675)
+  1843. [NOT_CONFIGURED] #1942 Coolidge, AZ (pop 19,674)
+  1844. [NOT_CONFIGURED] #1943 Arvin, CA (pop 19,661)
+  1845. [NOT_CONFIGURED] #1944 Springboro, OH (pop 19,646)
+  1846. [NOT_CONFIGURED] #1945 Lake Forest, IL (pop 19,642)
+  1847. [NOT_CONFIGURED] #1946 Powder Springs, GA (pop 19,632)
+  1848. [NOT_CONFIGURED] #1947 Lackawanna, NY (pop 19,629)
+  1849. [NOT_CONFIGURED] #1948 La Cañada Flintridge, CA (pop 19,621)
+  1850. [NOT_CONFIGURED] #1949 Calhoun, GA (pop 19,592)
+  1851. [NOT_CONFIGURED] #1950 Palestine, TX (pop 19,583)
+  1852. [NOT_CONFIGURED] #1951 Orinda, CA (pop 19,573)
+  1853. [NOT_CONFIGURED] #1952 Stuart, FL (pop 19,566)
+  1854. [NOT_CONFIGURED] #1953 Point Pleasant, NJ (pop 19,565)
+  1855. [NOT_CONFIGURED] #1954 Maumelle, AR (pop 19,541)
+  1856. [NOT_CONFIGURED] #1955 Kinston, NC (pop 19,519)
+  1857. [NOT_CONFIGURED] #1956 Clive, IA (pop 19,508)
+  1858. [NOT_CONFIGURED] #1957 Twinsburg, OH (pop 19,504)
+  1859. [NOT_CONFIGURED] #1958 Madisonville, KY (pop 19,502)
+  1860. [NOT_CONFIGURED] #1959 Hopkins, MN (pop 19,462)
+  1861. [NOT_CONFIGURED] #1960 Norwood, OH (pop 19,455)
+  1862. [NOT_CONFIGURED] #1961 Albany, CA (pop 19,439)
+  1863. [NOT_CONFIGURED] #1963 Ferndale, MI (pop 19,431)
+  1864. [NOT_CONFIGURED] #1964 Agoura Hills, CA (pop 19,429)
+  1865. [NOT_CONFIGURED] #1965 Plainview, TX (pop 19,429)
+  1866. [NOT_CONFIGURED] #1966 Winchester, KY (pop 19,413)
+  1867. [NOT_CONFIGURED] #1967 Firestone, CO (pop 19,396)
+  1868. [NOT_CONFIGURED] #1968 Seminole, FL (pop 19,395)
+  1869. [NOT_CONFIGURED] #1969 Bluffdale, UT (pop 19,393)
+  1870. [NOT_CONFIGURED] #1970 Stillwater, MN (pop 19,386)
+  1871. [NOT_CONFIGURED] #1971 Red Oak, TX (pop 19,365)
+  1872. [NOT_CONFIGURED] #1972 Fox Crossing, WI (pop 19,362)
+  1873. [NOT_CONFIGURED] #1973 North Aurora, IL (pop 19,329)
+  1874. [NOT_CONFIGURED] #1974 Graham, NC (pop 19,311)
+  1875. [NOT_CONFIGURED] #1975 Manvel, TX (pop 19,309)
+  1876. [NOT_CONFIGURED] #1976 Forest Park, GA (pop 19,301)
+  1877. [NOT_CONFIGURED] #1978 Orange, TX (pop 19,275)
+  1878. [NOT_CONFIGURED] #1980 Eloy, AZ (pop 19,199)
+  1879. [NOT_CONFIGURED] #1981 Ansonia, CT (pop 19,195)
+  1880. [NOT_CONFIGURED] #1982 Chowchilla, CA (pop 19,191)
+  1881. [NOT_CONFIGURED] #1983 Liberal, KS (pop 19,184)
+  1882. [NOT_CONFIGURED] #1984 Augusta, ME (pop 19,168)
+  1883. [NOT_CONFIGURED] #1985 Farmington, MO (pop 19,165)
+  1884. [NOT_CONFIGURED] #1986 Newburyport, MA (pop 19,163)
+  1885. [NOT_CONFIGURED] #1987 Lake St. Louis, MO (pop 19,160)
+  1886. [NOT_CONFIGURED] #1988 Lansdale, PA (pop 19,154)
+  1887. [NOT_CONFIGURED] #1989 Deerfield, IL (pop 19,138)
+  1888. [NOT_CONFIGURED] #1990 Central Point, OR (pop 19,128)
+  1889. [NOT_CONFIGURED] #1991 Port Orchard, WA (pop 19,122)
+  1890. [NOT_CONFIGURED] #1992 South El Monte, CA (pop 19,121)
+  1891. [NOT_CONFIGURED] #1993 Sylvania, OH (pop 19,102)
+  1892. [NOT_CONFIGURED] #1994 Centralia, WA (pop 19,061)
+  1893. [NOT_CONFIGURED] #1995 Lakeway, TX (pop 19,056)
+  1894. [NOT_CONFIGURED] #1996 Gautier, MS (pop 19,055)
+  1895. [NOT_CONFIGURED] #1997 Martinsburg, WV (pop 19,047)
+  1896. [NOT_CONFIGURED] #1998 Heber, UT (pop 19,042)
+  1897. [NOT_CONFIGURED] #1999 Youngsville, LA (pop 19,038)
+  1898. [NOT_CONFIGURED] #2000 Wildwood, FL (pop 19,031)

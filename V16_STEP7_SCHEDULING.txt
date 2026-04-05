@@ -1,0 +1,154 @@
+PERMITGRAB V16 STEP 7 — COLLECTION SCHEDULE & FRESHNESS
+========================================================
+Date: March 27, 2026
+Context: V16 just landed. 678 cities now in prod_cities.
+         This step ensures they ALL stay fresh automatically.
+
+⚠️  GUARDRAILS:
+  - Do NOT create blog posts or modify blog content
+  - Do NOT change SEO, schemas, or templates
+  - Do NOT spawn Claude agents to search for data sources
+  - Stay focused on the collector pipeline only
+  - Commit after each task
+
+
+CURRENT STATE (already working):
+  - scheduled_collection() thread runs every 6 HOURS
+  - Calls collect_refresh(days_back=7)
+  - Which calls _collect_all_inner(days_back=7)
+  - Which iterates prod_cities if table has data (V15 mode)
+  - This means every active source SHOULD get hit 4x/day
+
+THE CONCERN:
+  We just went from 18 to 678 cities in prod_cities.
+  Need to verify the collection loop handles this at scale
+  and that bulk sources aren't being hit redundantly.
+
+
+===================================================================
+TASK A: VERIFY NO TRUNCATION (5 min)
+===================================================================
+
+Check _collect_all_inner() in collector.py for any LIMIT clauses,
+early exits, or max-iteration caps that would prevent it from
+processing all 678 prod_cities entries.
+
+Specifically check:
+  - The SQL query that fetches prod_cities (no LIMIT?)
+  - Any "break" or "continue" conditions in the loop
+  - Any timeout that would kill the loop partway through
+  - The lock mechanism — does it timeout before finishing?
+
+If there's a LIMIT or cap, remove it or raise it to 2000+.
+
+
+===================================================================
+TASK B: DEDUPLICATE BULK SOURCE REQUESTS (10 min)
+===================================================================
+
+This is the most important optimization. With 678 cities, many
+share the same bulk source (e.g., 420 NJ cities all come from
+nj_statewide). The collector must NOT hit the NJ endpoint 420
+times — it should hit it ONCE and distribute permits to all cities.
+
+Check how _collect_all_inner() handles this in V15/prod_cities mode:
+
+  IF it iterates prod_cities one by one and calls fetch for each:
+    → PROBLEM. It will hit nj_statewide 420 times.
+    → FIX: Group prod_cities by source_id first.
+           For each unique bulk source_id, call collect_bulk_source()
+           ONCE, then distribute results to all cities sharing that source.
+           For individual city sources, call fetch_permits() as normal.
+
+  IF it already groups by source_id:
+    → GOOD. Just verify it works correctly.
+
+The pattern should be:
+  1. Get all active prod_cities
+  2. Group by source_id
+  3. For each unique bulk source: collect once, split by city_field
+  4. For each unique city source: collect individually
+  5. Insert all permits
+
+
+===================================================================
+TASK C: ADD HEALTH CHECK ENDPOINT (5 min)
+===================================================================
+
+Add a simple way to verify collection is running:
+
+  1. Create a module-level variable or db field:
+     LAST_COLLECTION_RUN = None
+
+  2. At the END of each successful collect_refresh() call:
+     Update LAST_COLLECTION_RUN = datetime.now()
+     Also store in DB: INSERT OR REPLACE into a simple
+     key_value table: key='last_collection_run', value=timestamp
+
+  3. Add endpoint GET /api/health that returns:
+     {
+       "status": "ok",
+       "last_collection": "2026-03-27T14:30:00",
+       "cities_active": 678,
+       "collection_interval_hours": 6,
+       "next_expected": "2026-03-27T20:30:00"
+     }
+
+  4. If last_collection is >12 hours ago, return status="stale"
+
+This lets us quickly check if collection is running by hitting
+the health endpoint.
+
+
+===================================================================
+TASK D: VERIFY RENDER LOGS SHOW RUNS (5 min)
+===================================================================
+
+After deploying, check Render logs to confirm:
+  - The initial collection fires ~5 min after deploy
+  - The scheduled collection fires every 6 hours
+  - Look for "REFRESH Collection" or "V12.50" log lines
+  - Confirm it processes all 678 cities (not just 18)
+
+Run this check:
+  python3 -c "
+  import db as permitdb
+  permitdb.init_db()
+  conn = permitdb.get_db()
+  count = conn.execute('SELECT COUNT(*) FROM prod_cities WHERE status=\"active\"').fetchone()[0]
+  print(f'Active prod_cities: {count}')
+  recent = conn.execute('SELECT COUNT(*) FROM permits WHERE date >= date(\"now\", \"-1 day\")').fetchone()[0]
+  print(f'Permits from last 24hrs: {recent}')
+  "
+
+
+===================================================================
+TASK E: TIMING CHECK (5 min)
+===================================================================
+
+Estimate how long a full collection takes with 678 cities:
+
+  - If bulk sources are deduplicated (Task B), we're really
+    hitting ~21 bulk sources + ~11 individual city sources = ~32 API calls
+  - At ~5-10 seconds each = 2-5 minutes total
+  - Well within the 6-hour window
+
+  BUT if bulk sources are NOT deduplicated, we'd hit:
+  - 678 individual API calls × 5 seconds = ~56 minutes
+  - Still fits in 6 hours but wasteful and slow
+  - And we'd be hammering NJ's API 420 times which is rude
+
+  Run a timed test collection and log the duration.
+  If it takes >30 minutes, Task B dedup is critical.
+
+
+===================================================================
+VERIFICATION
+===================================================================
+
+[ ] _collect_all_inner() has no LIMIT cap on prod_cities query
+[ ] Bulk sources are hit once per collection, not once per city
+[ ] /api/health endpoint exists and returns collection status
+[ ] Render logs show collection running after deploy
+[ ] Full collection completes in <30 minutes
+[ ] All changes committed and pushed

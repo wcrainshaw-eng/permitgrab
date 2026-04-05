@@ -1,0 +1,410 @@
+================================================================================
+V19 — SEED US CITIES & COUNTIES TABLES
+Generated: 2026-03-27
+Priority: CRITICAL — Without this, the autonomy engine has ZERO cities to search
+================================================================================
+
+THE PROBLEM:
+The autonomy engine (autonomy_engine.py) calls get_next_unsearched_city() and
+get_next_unsearched_county() every cycle. Both query for rows WHERE status=
+'not_started' ORDER BY priority ASC. Both tables are COMPLETELY EMPTY (0 rows).
+The engine has been running since launch with nothing to iterate.
+
+The seeder scripts already exist and are tested. They just need to be RUN on
+Render. This is a 4-step process that MUST be done in order.
+
+================================================================================
+STEP 1: RUN seed_us_cities.py
+================================================================================
+
+Location: /opt/render/project/src/seed_us_cities.py  (or wherever the repo is)
+Command:  python3 seed_us_cities.py
+
+WHAT IT DOES:
+- Downloads Census Bureau sub-est2024.csv from:
+  https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/cities/totals/sub-est2024.csv
+- Falls back to SimpleMaps uscities.csv if Census download fails
+- Parses ~19,500 US incorporated places
+- For each city, extracts: city_name, state (abbreviation), county, county_fips
+  (5-digit: state 2 + county 3), population, latitude, longitude
+- Generates slug as: {slugified-city-name}-{state} (e.g., "new-york-ny")
+- Deduplicates by slug
+- INSERTs all cities with status='not_started', priority=99999
+- Runs calculate_priorities() which ranks all cities by population descending
+  (priority 1 = New York, priority 2 = Los Angeles, etc.)
+- Runs match_existing_cities() which reads CITY_REGISTRY from city_configs.py
+  and marks any already-active cities as status='active' in us_cities
+
+TABLE SCHEMA IT WRITES TO:
+  CREATE TABLE us_cities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      city_name TEXT NOT NULL,        -- e.g., "New York"
+      state TEXT NOT NULL,            -- e.g., "NY"
+      county TEXT,                    -- e.g., "New York" (without " County")
+      county_fips TEXT,               -- e.g., "36061" (2-digit state + 3-digit county)
+      population INTEGER DEFAULT 0,   -- e.g., 8258035
+      latitude REAL,                  -- e.g., 40.7128
+      longitude REAL,                 -- e.g., -74.0060
+      slug TEXT UNIQUE,               -- e.g., "new-york-ny"
+      status TEXT DEFAULT 'not_started',
+      status_reason TEXT,
+      covered_by_source TEXT,         -- source_key if covered by bulk county source
+      priority INTEGER DEFAULT 99999, -- 1 = highest pop, ascending
+      last_searched_at TEXT,
+      search_attempts INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+  )
+
+EXPECTED OUTPUT:
+  ============================================================
+  PermitGrab V12.54 — Seed US Cities
+  ============================================================
+  [Seed] Downloading: https://www2.census.gov/...
+  [Seed] Parsed ~19,500 cities from Census data
+  [Seed] ~19,200 unique cities after deduplication
+  [Seed] Inserted: ~19,200, Skipped (duplicates): ~300
+  [Seed] Calculating priorities for ~19,200 cities...
+  [Seed] Priorities assigned
+  [Seed] Matched N existing active cities from city_configs.py
+  ============================================================
+  SUMMARY:
+    Total cities: ~19,200
+    Active (already have data): N
+    Not started (to be searched): ~19,200 - N
+  ============================================================
+
+VERIFY AFTER RUNNING:
+  python3 -c "
+  import db; db.init_db()
+  conn = db.get_connection()
+  total = conn.execute('SELECT COUNT(*) FROM us_cities').fetchone()[0]
+  top5 = conn.execute('SELECT city_name, state, population, priority FROM us_cities ORDER BY priority ASC LIMIT 5').fetchall()
+  print(f'Total: {total}')
+  for r in top5: print(dict(r))
+  "
+
+Expected: Total ~19,200. Top 5 should be New York NY, Los Angeles CA, Chicago IL,
+Houston TX, Phoenix AZ with priorities 1-5.
+
+IF CENSUS DOWNLOAD FAILS:
+The script auto-falls back to SimpleMaps. If BOTH fail (e.g., Render blocks
+outbound HTTP to census.gov), you'll need to:
+  1. Download sub-est2024.csv on your local machine
+  2. Upload it to the repo as data/sub-est2024.csv
+  3. Modify seed_us_cities.py line 297-299 to read from local file:
+     with open('data/sub-est2024.csv', 'r') as f:
+         csv_data = f.read()
+
+================================================================================
+STEP 2: RUN seed_us_counties.py  (MUST run AFTER step 1)
+================================================================================
+
+Location: /opt/render/project/src/seed_us_counties.py
+Command:  python3 seed_us_counties.py
+
+WHAT IT DOES:
+- Reads the us_cities table (just populated in Step 1)
+- Groups cities by county_fips to get ~3,143 distinct US counties
+- For each county, calculates:
+  - cities_in_county: how many cities are in this county
+  - population: sum of all city populations in the county
+  - priority: ranked by (cities_in_county * population) descending
+  - portal_domain: pre-populated from 100+ known Socrata/ArcGIS domains
+    (e.g., 'data.lacounty.gov' for LA County, 'data.kingcounty.gov' for King WA)
+  - status: 'not_started' (or 'covered_by_state' for NJ which has statewide data)
+- Matches existing BULK_SOURCES from city_configs.py and marks matching counties
+  as status='has_data' with their source_key
+
+DEPENDENCY: This script WILL FAIL if us_cities is empty. It reads from us_cities
+to derive county data. That's why Step 1 must run first.
+
+TABLE SCHEMA IT WRITES TO:
+  CREATE TABLE us_counties (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      county_name TEXT NOT NULL,       -- e.g., "Los Angeles"
+      state TEXT NOT NULL,             -- e.g., "CA"
+      fips TEXT UNIQUE,                -- e.g., "06037" (5-digit FIPS)
+      population INTEGER DEFAULT 0,    -- sum of city populations
+      cities_in_county INTEGER DEFAULT 0,
+      portal_domain TEXT,              -- e.g., "data.lacounty.gov"
+      status TEXT DEFAULT 'not_started',
+      status_reason TEXT,
+      source_key TEXT,                 -- if has_data, which source_key covers it
+      last_searched_at TEXT,
+      priority INTEGER DEFAULT 99999,
+      created_at TEXT DEFAULT (datetime('now'))
+  )
+
+PRE-POPULATED PORTAL DOMAINS (100+ counties, including):
+  - All major FL counties (Miami-Dade, Broward, Palm Beach, Hillsborough, etc.)
+  - All major CA counties (LA, San Diego, Orange, Riverside, Santa Clara, etc.)
+  - All major TX counties (Harris, Dallas, Tarrant, Bexar, Travis, etc.)
+  - AZ: Maricopa, Pima
+  - NV: Clark
+  - GA: Fulton, Gwinnett, Cobb, DeKalb
+  - NC: Mecklenburg, Wake, Guilford, Forsyth
+  - CO: Denver, Arapahoe, Jefferson, Adams, El Paso, Douglas
+  - PA: Philadelphia, Allegheny, Montgomery
+  - OH: Franklin, Cuyahoga, Hamilton
+  - WA: King, Pierce, Snohomish
+  - OR: Multnomah, Washington, Clackamas
+  - NY: All 5 NYC boroughs, Nassau, Westchester, Erie
+  - IL: Cook, DuPage, Lake, Will
+  - TN: Shelby, Davidson, Knox
+  - IN: Marion
+  - MO: St. Louis
+  - WI: Milwaukee, Dane
+  - MN: Hennepin, Ramsey
+  - UT: Salt Lake
+  - MD: Montgomery, Prince Georges, Baltimore, Anne Arundel
+
+EXPECTED OUTPUT:
+  ============================================================
+  PermitGrab V12.54 — Seed US Counties
+  ============================================================
+  [Seed] Found ~19,200 cities in us_cities table
+  [Seed] Found ~3,143 distinct counties from us_cities
+  [Seed] Inserted: ~3,100, Skipped (duplicates): ~40
+  [Seed] Recalculating priorities...
+  [Seed] Priorities assigned by cities * population rank
+  [Seed] Marked N counties as has_data from BULK_SOURCES
+  ============================================================
+  SUMMARY:
+    Total counties: ~3,100
+    With known portals: ~100+
+    Not started (to be searched): ~3,000
+    Has data (bulk source exists): N
+    Covered by state-level source: 21 (NJ counties)
+  ============================================================
+
+VERIFY AFTER RUNNING:
+  python3 -c "
+  import db; db.init_db()
+  conn = db.get_connection()
+  total = conn.execute('SELECT COUNT(*) FROM us_counties').fetchone()[0]
+  top5 = conn.execute('SELECT county_name, state, population, portal_domain, priority FROM us_counties ORDER BY priority ASC LIMIT 5').fetchall()
+  print(f'Total: {total}')
+  for r in top5: print(dict(r))
+  "
+
+Expected: Total ~3,100. Top 5 should be the most populous counties with the
+most cities (likely Los Angeles CA, Cook IL, Harris TX, Maricopa AZ, etc.)
+
+================================================================================
+STEP 3: RUN backfill_coverage.py  (MUST run AFTER steps 1 & 2)
+================================================================================
+
+Location: /opt/render/project/src/backfill_coverage.py
+Command:  python3 backfill_coverage.py
+
+WHAT IT DOES:
+- Reads all active bulk sources from city_sources table (mode='bulk', status='active')
+- For each bulk source, queries the actual API endpoint to get distinct city names
+  (supports both Socrata $select=distinct and ArcGIS returnDistinctValues)
+- Matches those city names against us_cities (fuzzy matching included)
+- Marks matched cities as status='covered_by_county' with covered_by_source=source_key
+- Updates city_sources.covers_cities with the list of matched slugs
+
+WHY THIS MATTERS:
+Without this step, the autonomy engine would waste time searching for cities
+that are ALREADY covered by existing bulk county-level sources. This step
+marks those cities so get_next_unsearched_city() skips them.
+
+EXPECTED OUTPUT:
+  Will process each active bulk source and print how many cities matched.
+  Summary shows how many cities were marked covered_by_county vs remaining.
+
+DEPENDENCY: Requires us_cities to be populated (Step 1) AND bulk sources to
+exist in city_sources table. If city_sources is empty, this step does nothing
+but that's okay — it just means no cities get pre-marked as covered.
+
+================================================================================
+STEP 4: VERIFY THE AUTONOMY ENGINE NOW HAS WORK
+================================================================================
+
+After all 3 scripts run, verify the engine will find targets:
+
+  python3 -c "
+  import db; db.init_db()
+  from city_source_db import (
+      get_next_unsearched_county, get_next_unsearched_city,
+      count_unsearched_counties, count_unsearched_cities
+  )
+  print(f'Unsearched counties: {count_unsearched_counties()}')
+  print(f'Unsearched cities: {count_unsearched_cities()}')
+
+  county = get_next_unsearched_county()
+  print(f'Next county: {county}')
+
+  city = get_next_unsearched_city()
+  print(f'Next city: {city}')
+  "
+
+EXPECTED:
+  Unsearched counties: ~3,000+
+  Unsearched cities: ~15,000+ (some marked covered_by_county)
+  Next county: {county_name: 'Los Angeles', state: 'CA', ...}
+  Next city: {city_name: 'New York', state: 'NY', priority: 1, ...}
+
+If both return actual data, the autonomy engine will start processing on its
+next cycle. The engine runs continuously:
+  1. Phase A: process_county() — searches counties first (higher ROI, covers
+     multiple cities at once via mark_county_cities_covered())
+  2. Phase B: process_city() — then searches individual cities that weren't
+     covered by any county source
+
+================================================================================
+STEP 5 (OPTIONAL): RUN migrate_configs.py
+================================================================================
+
+Location: /opt/render/project/src/migrate_configs.py
+Command:  python3 migrate_configs.py
+
+Only needed if city_sources table is empty. This migrates CITY_REGISTRY and
+BULK_SOURCES from city_configs.py into the city_sources SQLite table, which
+the autonomy engine uses to track discovered sources.
+
+If city_sources already has data (check with:
+  python3 -c "import db; db.init_db(); print(db.get_connection().execute('SELECT COUNT(*) FROM city_sources').fetchone()[0])"
+), you can skip this step.
+
+================================================================================
+HOW THE AUTONOMY ENGINE USES THESE TABLES
+================================================================================
+
+FILE: autonomy_engine.py → run_search_cycle() (line 999)
+
+  def run_search_cycle():
+      # Phase A: Counties first (higher ROI)
+      county = get_next_unsearched_county()     ← reads us_counties WHERE status='not_started' ORDER BY priority ASC
+      while county:
+          result = process_county(county)         ← searches Socrata/ArcGIS for county-level permit data
+          ...
+          county = get_next_unsearched_county()
+
+      # Phase B: Individual cities
+      city = get_next_unsearched_city()           ← reads us_cities WHERE status='not_started' ORDER BY priority ASC
+      while city:
+          result = process_city(city)              ← searches for city-level permit data
+          ...
+          city = get_next_unsearched_city()
+
+STATUS FLOW FOR CITIES:
+  not_started → searching → active            (found working source, loaded permits)
+  not_started → searching → no_data_available (searched, nothing found)
+  not_started → searching → rejected          (found data, failed validation or <10 permits)
+  not_started → covered_by_county             (bulk county source covers this city)
+
+STATUS FLOW FOR COUNTIES:
+  not_started → searching → has_data          (found bulk dataset, marked all cities covered)
+  not_started → searching → no_data           (no viable dataset found)
+  covered_by_state                            (NJ — statewide data covers all counties)
+
+MAINTENANCE CYCLE (after all searched once):
+  - Cities with no_data_available for 90+ days → reset to not_started (re-search)
+  - Counties with no_data for 30+ days → reset to not_started (re-search)
+  - Stuck in 'searching' status (crash recovery) → reset to not_started
+
+PRIORITY FIELD:
+  - Lower number = higher priority = searched first
+  - Cities: priority = population rank (1 = NYC, 2 = LA, etc.)
+  - Counties: priority = rank by (cities_in_county * population)
+  - The engine processes from priority 1 upward, so the biggest cities/counties
+    get searched first
+
+================================================================================
+COMPLETE EXECUTION SEQUENCE (copy-paste into Render shell)
+================================================================================
+
+# Step 1: Seed cities
+python3 seed_us_cities.py
+
+# Step 2: Seed counties (depends on Step 1)
+python3 seed_us_counties.py
+
+# Step 3: Backfill coverage (depends on Steps 1 & 2)
+python3 backfill_coverage.py
+
+# Step 4: Verify
+python3 -c "
+import db; db.init_db()
+conn = db.get_connection()
+cities = conn.execute('SELECT COUNT(*) FROM us_cities').fetchone()[0]
+counties = conn.execute('SELECT COUNT(*) FROM us_counties').fetchone()[0]
+not_started_cities = conn.execute(\"SELECT COUNT(*) FROM us_cities WHERE status='not_started'\").fetchone()[0]
+not_started_counties = conn.execute(\"SELECT COUNT(*) FROM us_counties WHERE status='not_started'\").fetchone()[0]
+active = conn.execute(\"SELECT COUNT(*) FROM us_cities WHERE status='active'\").fetchone()[0]
+covered = conn.execute(\"SELECT COUNT(*) FROM us_cities WHERE status='covered_by_county'\").fetchone()[0]
+top3 = conn.execute('SELECT city_name, state, population, priority FROM us_cities ORDER BY priority ASC LIMIT 3').fetchall()
+print(f'Cities: {cities} total, {not_started_cities} to search, {active} active, {covered} covered by county')
+print(f'Counties: {counties} total, {not_started_counties} to search')
+print(f'Top 3 cities by priority:')
+for r in top3: print(f'  #{r[3]}: {r[0]}, {r[1]} (pop {r[2]:,})')
+"
+
+# Step 5 (if needed): Migrate configs
+python3 -c "import db; db.init_db(); print('city_sources:', db.get_connection().execute('SELECT COUNT(*) FROM city_sources').fetchone()[0])"
+# If 0, run: python3 migrate_configs.py
+
+================================================================================
+WHAT HAPPENS AFTER THIS
+================================================================================
+
+Once these tables are seeded, the autonomy engine will:
+
+1. On its next cycle, get_next_unsearched_county() returns Los Angeles County, CA
+   (or whichever county has the highest priority)
+2. process_county() searches Socrata catalogs and ArcGIS hubs for "Los Angeles
+   building permits" using the pre-populated portal_domain
+3. If it finds a valid dataset, it:
+   - Pulls 6 months of permits
+   - Validates the data
+   - Creates a city_sources entry
+   - Calls mark_county_cities_covered() which marks ALL cities in that county
+     as covered_by_county in us_cities
+   - Sets county status to 'has_data'
+4. After exhausting counties, it moves to Phase B (individual cities)
+5. get_next_unsearched_city() returns the highest-priority not_started city
+   (skipping any already covered_by_county)
+6. process_city() searches for that specific city's permit data
+7. If found, creates source, pulls permits, marks city as 'active'
+8. If not found, marks as 'no_data_available' with reason
+
+The engine will grind through all ~19,500 cities by population order.
+Biggest cities first. Progress is tracked in real-time via:
+  /api/admin/discovery-status (if this endpoint exists)
+  Or query: SELECT status, COUNT(*) FROM us_cities GROUP BY status
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+PROBLEM: seed_us_cities.py says "ERROR: Could not download city data"
+CAUSE: Render may block outbound HTTP to census.gov or simplemaps.com
+FIX: Download CSV locally, upload to repo, modify script to read local file
+
+PROBLEM: seed_us_counties.py says "us_cities is empty"
+CAUSE: Step 1 didn't run or failed
+FIX: Run seed_us_cities.py first, verify it populated the table
+
+PROBLEM: After seeding, autonomy engine still not finding anything
+CAUSE: Engine may need restart to pick up new data
+FIX: Redeploy on Render, or wait for the next 5-minute sleep to expire
+
+PROBLEM: Census CSV format changed (parsing errors)
+CAUSE: Census Bureau updates their CSV format annually
+FIX: Check the column names. The script looks for: NAME, STNAME,
+     POPESTIMATE2024, STATE, COUNTY, LATITUDE, LONGITUDE. Print the
+     header row to see current column names and adjust parse_census_csv().
+
+PROBLEM: Duplicate slug errors during insert
+CAUSE: Two cities with same name in same state (e.g., two "Springfield, IL")
+FIX: INSERT OR IGNORE handles this — duplicates are silently skipped. The
+     first one (by CSV order) wins. This is expected and fine.
+
+PROBLEM: county_fips is NULL for many cities
+CAUSE: Census CSV may not include county FIPS for all incorporated places.
+       SimpleMaps fallback has better county_fips coverage.
+FIX: Cities without county_fips won't be grouped into counties, so they'll
+     only be found in Phase B (individual city search). Not blocking.
+================================================================================
