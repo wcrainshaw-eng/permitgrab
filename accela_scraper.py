@@ -657,6 +657,35 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
         "base_url": "https://permits.jccal.org/citizenaccess",
     },
+    # V72: Connecticut cities with Accela
+    "hartford_ct": {
+        "agency_code": "HARTFORD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: Iowa counties with Accela
+    "polk_county_ia": {
+        "agency_code": "POLKCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: New Mexico cities with Accela
+    "las_cruces_nm": {
+        "agency_code": "LASCRUCES",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V72: Wisconsin cities with Accela
+    "madison_wi": {
+        "agency_code": "MADISON",
+        "module": "Permitting",
+        "tab_name": "Home",
+        "search_url_path": "Cap/CapHome.aspx?module=Permitting&TabName=Home",
+        "base_url": "https://elam.cityofmadison.com/CitizenAccess",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
