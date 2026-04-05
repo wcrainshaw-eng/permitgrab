@@ -794,6 +794,98 @@ ACCELA_CONFIGS = {
         "tab_name": "Permits",
         "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
     },
+    # V72 Batch 6: More Accela portals
+    "maricopa_county_az": {
+        "agency_code": "MCOSS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://accela.maricopa.gov/CitizenAccessMCOSS",
+    },
+    "allegheny_county_pa": {
+        "agency_code": "ALLEGHENY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "cary_nc": {
+        "agency_code": "CARY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "baton_rouge_la": {
+        "agency_code": "EBR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "albany_ny": {
+        "agency_code": "ALBANY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "montgomery_county_md": {
+        "agency_code": "MOCO",
+        "module": "DPS",
+        "tab_name": "DPS",
+        "search_url_path": "Cap/CapHome.aspx?module=DPS&TabName=DPS",
+    },
+    "prince_william_county_va": {
+        "agency_code": "PWC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "loudoun_county_va": {
+        "agency_code": "LOUDOUN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "henrico_county_va": {
+        "agency_code": "HENRICO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "volusia_county_fl": {
+        "agency_code": "VOLUSIA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "seminole_county_fl": {
+        "agency_code": "SEMINOLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "orange_county_fl": {
+        "agency_code": "ORANGECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "palm_beach_county_fl": {
+        "agency_code": "PBC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "broward_county_fl": {
+        "agency_code": "BROWARD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "duval_county_fl": {
+        "agency_code": "DUVAL",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
