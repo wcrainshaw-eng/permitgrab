@@ -1176,6 +1176,104 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
+    # V73: New Accela cities
+    "visalia": {
+        "agency_code": "VISALIA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "inglewood": {
+        "agency_code": "INGLEWOOD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "downey": {
+        "agency_code": "DOWNEY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "berkeley": {
+        "agency_code": "BERKELEY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "torrance": {
+        "agency_code": "TORRANCE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "fontana": {
+        "agency_code": "FONTANA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "richmond_ca": {
+        "agency_code": "RICHMOND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "concord_ca": {
+        "agency_code": "CONCORD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "knoxville": {
+        "agency_code": "KNOXVILLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "chesapeake_va": {
+        "agency_code": "CHESAPEAKE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "tampa": {
+        "agency_code": "TAMPA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "hollywood_fl": {
+        "agency_code": "HOLLYWOOD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "san_leandro": {
+        "agency_code": "SANLEANDRO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "fort_lauderdale": {
+        "agency_code": "FTLAUDERDALE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "wichita": {
+        "agency_code": "WICHITA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "grand_rapids": {
+        "agency_code": "GR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+        "base_url": "https://inspections.grcity.us/CitizenAccess",
+    },
 }
 
 BASE_URL = "https://aca-prod.accela.com"
