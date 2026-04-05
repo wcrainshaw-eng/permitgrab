@@ -2163,6 +2163,49 @@ def admin_activate_city_sources():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/reset-failures', methods=['POST'])
+def admin_reset_failures():
+    """V72: Reset consecutive_failures for a city or all cities.
+
+    POST body: {"city_slug": "kansas-city"} to reset one city
+    POST body: {} or {"city_slug": "all"} to reset all cities
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        city_slug = data.get('city_slug', 'all')
+
+        conn = permitdb.get_connection()
+
+        if city_slug == 'all':
+            conn.execute("UPDATE prod_cities SET consecutive_failures=0, consecutive_no_new=0")
+            result = conn.execute("SELECT COUNT(*) as cnt FROM prod_cities").fetchone()
+            count = result['cnt'] if isinstance(result, dict) else result[0]
+            conn.commit()
+            return jsonify({
+                'status': 'success',
+                'message': f'Reset consecutive_failures for all {count} cities'
+            })
+        else:
+            conn.execute(
+                "UPDATE prod_cities SET consecutive_failures=0, consecutive_no_new=0 WHERE city_slug=?",
+                (city_slug,)
+            )
+            conn.commit()
+            return jsonify({
+                'status': 'success',
+                'message': f'Reset consecutive_failures for {city_slug}'
+            })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
