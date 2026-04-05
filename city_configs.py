@@ -9422,11 +9422,11 @@ CITY_REGISTRY = {
             "estimated_cost": "permit_project_cost",
             "description": "permit_use_class",
         },
-        "date_field": "issue_date",
+        "date_field": "application_date",  # V73: Fixed - was issue_date (not in response)
         "default_filter": "$where=permit_type='Building'",
         "limit": 2000,
         "active": True,
-        "notes": "V26: Data provided via norfolk_va bulk source.",
+        "notes": "V26: Data provided via norfolk_va bulk source. V73: Fixed date_field.",
     },
 
     "chesapeake": {
@@ -33753,8 +33753,8 @@ CITY_REGISTRY = {
             "address": "Address",
         },
         "limit": 2000,
-        "active": True,
-        "notes": "V73: New ArcGIS city. Pop ~99K.",
+        "active": False,  # V73: Deactivated - ArcGIS service not found
+        "notes": "V73: Deactivated - Miscellaneous3/MapServer service not found.",
     },
 
     "new_bern_nc": {
@@ -33785,8 +33785,8 @@ CITY_REGISTRY = {
         "date_field": "IssueDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V73: New ArcGIS city. Pop ~43K.",
+        "active": False,  # V73: Deactivated - ArcGIS layer not found
+        "notes": "V73: Deactivated - Layer not found in ArcGIS service.",
     },
 
     "columbus_ga": {
@@ -33801,8 +33801,8 @@ CITY_REGISTRY = {
         "date_field": "IssueDate",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,
-        "notes": "V73: New ArcGIS city. Pop ~206K.",
+        "active": False,  # V73: Deactivated - endpoint timeout
+        "notes": "V73: Deactivated - endpoint consistently times out.",
     },
 
     "pearland_tx": {

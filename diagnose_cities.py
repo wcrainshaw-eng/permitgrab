@@ -151,6 +151,42 @@ def test_ckan(key, config):
         return 'DEAD', f'Error: {str(e)[:50]}', None
 
 
+def test_carto(key, config):
+    """Test CARTO SQL API endpoint."""
+    endpoint = config.get('endpoint', '')
+
+    if not endpoint:
+        return 'DEAD', 'No endpoint configured', None
+
+    try:
+        # CARTO SQL API test query
+        url = f"{endpoint}?q=SELECT%20*%20FROM%20permits%20LIMIT%201"
+        resp = requests.get(url, timeout=TIMEOUT)
+
+        if resp.status_code != 200:
+            return 'DEAD', f'HTTP {resp.status_code}', None
+
+        try:
+            data = resp.json()
+        except:
+            return 'DEAD', 'Invalid JSON response', None
+
+        if 'error' in data:
+            return 'DEAD', f'CARTO error: {data["error"][:50]}', None
+
+        rows = data.get('rows', [])
+        if not rows:
+            return 'DEAD', 'Empty rows - no records', None
+
+        fields = list(rows[0].keys())
+        return 'WORKING', f'{len(fields)} fields, has data', fields
+
+    except requests.exceptions.Timeout:
+        return 'DEAD', 'Timeout (>15s)', None
+    except Exception as e:
+        return 'DEAD', f'Error: {str(e)[:50]}', None
+
+
 def test_accela(key, config):
     """Accela needs Playwright - just verify config exists."""
     accela_key = config.get('_accela_city_key', '')
@@ -203,6 +239,8 @@ def main():
             status, detail, fields = test_ckan(key, config)
         elif platform == 'accela':
             status, detail, fields = test_accela(key, config)
+        elif platform == 'carto':
+            status, detail, fields = test_carto(key, config)
         else:
             status, detail, fields = 'DEAD', f'Unknown platform: {platform}', None
 
