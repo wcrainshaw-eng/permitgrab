@@ -25,6 +25,17 @@ from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_s
 import analytics
 import db as permitdb  # V12.50: SQLite database layer (renamed to avoid Flask-SQLAlchemy collision)
 
+# V78: Global tracking for email digest daemon thread
+DIGEST_STATUS = {
+    'thread_started': None,
+    'last_heartbeat': None,
+    'last_digest_attempt': None,
+    'last_digest_result': None,
+    'last_digest_sent': 0,
+    'last_digest_failed': 0,
+    'thread_alive': False
+}
+
 # V14.1: TRADE_MAPPING - SQL LIKE patterns for matching permits to trades
 # Used by city_trade_landing() to filter permits at database level
 TRADE_MAPPING = {
@@ -1754,11 +1765,15 @@ def admin_email_stats():
 
 @app.route('/api/admin/email-status')
 def admin_email_status():
-    """V73: Comprehensive email system health check."""
+    """V73: Comprehensive email system health check.
+    V78: Added digest daemon thread status tracking."""
     diagnostics = {
         'timestamp': datetime.now().isoformat(),
         'checks': {}
     }
+
+    # V78: Include daemon thread status
+    diagnostics['digest_daemon'] = DIGEST_STATUS.copy()
 
     # Check 1: SMTP environment variables
     try:
@@ -1794,7 +1809,6 @@ def admin_email_status():
             'status': 'OK' if SUBSCRIBERS_FILE.exists() else 'MISSING'
         }
         if SUBSCRIBERS_FILE.exists():
-            import json
             with open(SUBSCRIBERS_FILE) as f:
                 raw_subs = json.load(f)
             diagnostics['checks']['subscribers_file']['total'] = len(raw_subs)
@@ -9818,7 +9832,14 @@ def schedule_email_tasks():
     - Onboarding nudges: 9 AM ET (14:00 UTC)
 
     V64: Added robust error logging, heartbeat, and crash recovery.
+    V78: Added DIGEST_STATUS tracking and fixed timing (5-min checks during 7 AM window).
     """
+    global DIGEST_STATUS
+
+    # V78: Mark thread as started
+    DIGEST_STATUS['thread_started'] = datetime.now().isoformat()
+    DIGEST_STATUS['thread_alive'] = True
+
     # V64: Wrap imports in try/except to catch missing dependencies
     try:
         import pytz
@@ -9827,7 +9848,34 @@ def schedule_email_tasks():
         print(f"[{datetime.now()}] [CRITICAL] Email scheduler failed to import: {e}")
         import traceback
         traceback.print_exc()
+        DIGEST_STATUS['thread_alive'] = False
+        DIGEST_STATUS['last_digest_result'] = f'import_error: {e}'
         return  # Don't silently die — exit with error logged
+
+    # V78: Auto-create subscribers.json if it doesn't exist
+    try:
+        from pathlib import Path
+        subscribers_path = Path("/var/data/subscribers.json")
+        if not subscribers_path.exists():
+            # Check if /var/data exists (Render persistent disk)
+            var_data = Path("/var/data")
+            if var_data.exists():
+                default_subscribers = [
+                    {
+                        "email": "wcrainshaw@gmail.com",
+                        "active": True,
+                        "digest_cities": ["atlanta"],
+                        "created_at": datetime.now().strftime("%Y-%m-%d")
+                    }
+                ]
+                subscribers_path.write_text(json.dumps(default_subscribers, indent=2))
+                print(f"[{datetime.now()}] V78: Created subscribers.json with default subscriber")
+            else:
+                print(f"[{datetime.now()}] V78: /var/data not found - running locally, skipping subscribers.json creation")
+        else:
+            print(f"[{datetime.now()}] V78: subscribers.json already exists")
+    except Exception as e:
+        print(f"[{datetime.now()}] V78: Could not create subscribers.json: {e}")
 
     # V68: Wait 3 minutes for initial startup (increased from 2)
     print(f"[{datetime.now()}] V68: Email scheduler waiting 3 minutes for startup...")
@@ -9835,26 +9883,39 @@ def schedule_email_tasks():
 
     et = pytz.timezone('America/New_York')
 
+    # V78: Track if we've already run digest today to prevent duplicates
+    last_digest_date = None
+
     while True:
         try:
             now_utc = datetime.utcnow()
             now_et = datetime.now(et)
+            today_date = now_et.date()
+
+            # V78: Update heartbeat timestamp
+            DIGEST_STATUS['last_heartbeat'] = datetime.now().isoformat()
 
             # V64: Heartbeat every cycle so we can verify thread is alive in Render logs
-            print(f"[{datetime.now()}] V64: Email scheduler heartbeat: {now_et.strftime('%I:%M %p ET')}")
+            print(f"[{datetime.now()}] V78: Email scheduler heartbeat: {now_et.strftime('%I:%M %p ET')} (thread_alive=True)")
 
             # Check if it's time for daily tasks (7-9 AM ET window)
             if 7 <= now_et.hour <= 9:
-                # Daily digest at 7 AM ET
-                if now_et.hour == 7 and now_et.minute < 30:
-                    print(f"[{datetime.now()}] V64: Running daily digest...")
+                # Daily digest at 7 AM ET (run once per day)
+                if now_et.hour == 7 and last_digest_date != today_date:
+                    print(f"[{datetime.now()}] V78: Running daily digest...")
+                    DIGEST_STATUS['last_digest_attempt'] = datetime.now().isoformat()
                     try:
                         sent, failed = send_daily_digest()
-                        print(f"[{datetime.now()}] V64: Daily digest complete - {sent} sent, {failed} failed")
+                        print(f"[{datetime.now()}] V78: Daily digest complete - {sent} sent, {failed} failed")
+                        DIGEST_STATUS['last_digest_result'] = 'success'
+                        DIGEST_STATUS['last_digest_sent'] = sent
+                        DIGEST_STATUS['last_digest_failed'] = failed
+                        last_digest_date = today_date  # Mark as done for today
                     except Exception as e:
                         print(f"[{datetime.now()}] [ERROR] Daily digest failed: {e}")
                         import traceback
                         traceback.print_exc()
+                        DIGEST_STATUS['last_digest_result'] = f'error: {e}'
 
                 # Trial lifecycle at 8 AM ET
                 if now_et.hour == 8 and now_et.minute < 30:
@@ -9882,12 +9943,17 @@ def schedule_email_tasks():
             print(f"[{datetime.now()}] [ERROR] Email scheduler error: {e}")
             import traceback
             traceback.print_exc()
+            DIGEST_STATUS['last_digest_result'] = f'loop_error: {e}'
             # V64: Wait 5 min on error before retrying, don't die
             time.sleep(300)
             continue
 
-        # Check every 30 minutes
-        time.sleep(1800)
+        # V78: Check every 5 minutes during 7-9 AM ET window to not miss digest
+        # Check every 30 minutes outside that window to save resources
+        if 6 <= now_et.hour <= 9:
+            time.sleep(300)  # 5 minutes during morning window
+        else:
+            time.sleep(1800)  # 30 minutes otherwise
 
 
 def run_initial_collection():
