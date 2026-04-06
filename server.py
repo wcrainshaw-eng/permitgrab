@@ -2378,6 +2378,43 @@ def fix_known_broken_configs():
         fixes_applied.append("Updated rochester source_type to accela in prod_cities")
 
         # =================================================================
+        # FIX 2b: V76 - Fix platform mismatches for 3 major cities
+        # =================================================================
+        # These cities had wrong platform labels causing the wrong fetcher to be used.
+        # fort_worth: endpoint is ArcGIS FeatureServer, not Socrata
+        conn.execute("""
+            UPDATE city_sources
+            SET platform = 'arcgis'
+            WHERE source_key = 'fort_worth' AND platform != 'arcgis'
+        """)
+        fixes_applied.append("Fixed fort_worth platform to arcgis")
+
+        # san_antonio: endpoint is CKAN API, not Socrata
+        conn.execute("""
+            UPDATE city_sources
+            SET platform = 'ckan'
+            WHERE source_key = 'san_antonio' AND platform != 'ckan'
+        """)
+        fixes_applied.append("Fixed san_antonio platform to ckan")
+
+        # washington_dc: endpoint is ArcGIS FeatureServer, not Socrata
+        conn.execute("""
+            UPDATE city_sources
+            SET platform = 'arcgis'
+            WHERE source_key = 'washington_dc' AND platform != 'arcgis'
+        """)
+        fixes_applied.append("Fixed washington_dc platform to arcgis")
+
+        # =================================================================
+        # FIX 2c: V76 - Sync prod_cities source_type for these 3 cities
+        # =================================================================
+        # Note: prod_cities uses hyphens, city_sources uses underscores
+        conn.execute("UPDATE prod_cities SET source_type = 'arcgis' WHERE city_slug = 'fort-worth'")
+        conn.execute("UPDATE prod_cities SET source_type = 'ckan' WHERE city_slug = 'san-antonio'")
+        conn.execute("UPDATE prod_cities SET source_type = 'arcgis' WHERE city_slug = 'washington-dc'")
+        fixes_applied.append("Synced prod_cities source_type for fort-worth, san-antonio, washington-dc")
+
+        # =================================================================
         # FIX 3: Ensure slug/key mappings work
         # =================================================================
         # For cities where prod_cities uses hyphen (kansas-city) but city_sources
@@ -2415,7 +2452,20 @@ def fix_known_broken_configs():
         fixes_applied.append(f"Reset failures in prod_cities for {len(affected_slugs)} cities")
 
         conn.commit()
-        print(f"[V75] fix_known_broken_configs applied {len(fixes_applied)} fixes:")
+
+        # =================================================================
+        # FIX 5: V76 - Run platform audit with auto-fix
+        # =================================================================
+        # This catches any remaining platform/endpoint mismatches we didn't
+        # explicitly handle above
+        try:
+            audit_result = audit_platform_mismatches(auto_fix=True)
+            if audit_result.get('auto_fixed'):
+                fixes_applied.append(f"Auto-fixed {len(audit_result['auto_fixed'])} platform mismatches: {audit_result['auto_fixed']}")
+        except Exception as audit_err:
+            print(f"[V76] Platform audit error (non-fatal): {audit_err}")
+
+        print(f"[V76] fix_known_broken_configs applied {len(fixes_applied)} fixes:")
         for fix in fixes_applied:
             print(f"  - {fix}")
 
@@ -2449,6 +2499,106 @@ def admin_fix_broken_configs():
             'status': 'success',
             'fixes_applied': fixes,
             'count': len(fixes)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+def audit_platform_mismatches(auto_fix=False):
+    """V76: Audit city_sources for platform/endpoint mismatches.
+
+    Checks if the platform field matches the endpoint URL pattern:
+    - "arcgis.com" or "FeatureServer" or "MapServer" → should be "arcgis"
+    - "/api/3/action/" → should be "ckan"
+    - "accela.com" → should be "accela"
+    - ".json" with socrata-like domain → likely "socrata"
+
+    Returns a report of mismatches and optionally auto-fixes them.
+    """
+    try:
+        conn = permitdb.get_connection()
+        mismatches = []
+        fixed = []
+
+        rows = conn.execute("""
+            SELECT source_key, platform, endpoint FROM city_sources
+            WHERE endpoint IS NOT NULL AND endpoint != ''
+        """).fetchall()
+
+        for row in rows:
+            source_key = row[0]
+            current_platform = row[1] or ''
+            endpoint = row[2] or ''
+            endpoint_lower = endpoint.lower()
+
+            detected_platform = None
+
+            # Detect platform from endpoint URL
+            if 'arcgis.com' in endpoint_lower or 'featureserver' in endpoint_lower or 'mapserver' in endpoint_lower:
+                detected_platform = 'arcgis'
+            elif '/api/3/action/' in endpoint_lower:
+                detected_platform = 'ckan'
+            elif 'accela.com' in endpoint_lower:
+                detected_platform = 'accela'
+            elif endpoint_lower.endswith('.json') and '.gov' in endpoint_lower:
+                detected_platform = 'socrata'
+
+            # Check for mismatch
+            if detected_platform and current_platform != detected_platform:
+                mismatch = {
+                    'source_key': source_key,
+                    'current_platform': current_platform,
+                    'detected_platform': detected_platform,
+                    'endpoint': endpoint[:80] + '...' if len(endpoint) > 80 else endpoint
+                }
+                mismatches.append(mismatch)
+
+                if auto_fix:
+                    conn.execute(
+                        "UPDATE city_sources SET platform = ? WHERE source_key = ?",
+                        (detected_platform, source_key)
+                    )
+                    fixed.append(source_key)
+
+        if auto_fix and fixed:
+            conn.commit()
+
+        return {
+            'total_checked': len(rows),
+            'mismatches_found': len(mismatches),
+            'mismatches': mismatches,
+            'auto_fixed': fixed if auto_fix else []
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}
+
+
+@app.route('/api/admin/audit-platforms', methods=['POST'])
+def admin_audit_platforms():
+    """V76: Audit city_sources for platform/endpoint mismatches.
+
+    POST body:
+    {
+        "auto_fix": true  // optional, default false - automatically fix mismatches
+    }
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        auto_fix = data.get('auto_fix', False)
+
+        report = audit_platform_mismatches(auto_fix=auto_fix)
+        return jsonify({
+            'status': 'success',
+            **report
         })
     except Exception as e:
         import traceback
@@ -2578,22 +2728,23 @@ def admin_cleanup_prod_cities():
             """)
             action = 'deleted'
         else:
-            # Deactivate entries that have never collected and have 0 permits
+            # V76: Use 'paused' instead of 'inactive' — CHECK constraint only allows
+            # 'active', 'paused', 'failed', 'pending'
             conn.execute("""
-                UPDATE prod_cities SET status = 'inactive'
+                UPDATE prod_cities SET status = 'paused'
                 WHERE last_collection IS NULL
                 AND total_permits = 0
                 AND status = 'active'
                 AND source_id NOT IN (SELECT source_key FROM city_sources WHERE status='active')
             """)
-            action = 'deactivated'
+            action = 'paused'
 
         # Get counts
         active_count = conn.execute(
             "SELECT COUNT(*) FROM prod_cities WHERE status='active'"
         ).fetchone()[0]
-        inactive_count = conn.execute(
-            "SELECT COUNT(*) FROM prod_cities WHERE status='inactive'"
+        paused_count = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE status='paused'"
         ).fetchone()[0]
         no_data_count = conn.execute(
             "SELECT COUNT(*) FROM prod_cities WHERE status='active' AND total_permits=0"
@@ -2605,7 +2756,7 @@ def admin_cleanup_prod_cities():
             'status': 'success',
             'action': action,
             'prod_cities_active': active_count,
-            'prod_cities_inactive': inactive_count,
+            'prod_cities_paused': paused_count,
             'no_data_count': no_data_count
         })
 
