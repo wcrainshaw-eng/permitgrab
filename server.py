@@ -10178,52 +10178,7 @@ def get_all_blog_posts():
     return posts
 
 
-@app.route('/blog')
-def blog_index():
-    """Blog index page. V14.0: Added pagination."""
-    all_posts = get_all_blog_posts()
-
-    # V14.0: Pagination
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
-    total_posts = len(all_posts)
-    total_pages = math.ceil(total_posts / per_page) if total_posts > 0 else 1
-
-    # Ensure page is valid
-    if page < 1:
-        page = 1
-    elif page > total_pages:
-        page = total_pages
-
-    # Slice posts for current page
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    posts = all_posts[start_idx:end_idx]
-
-    # V29: Build prev/next URLs for rel="prev"/rel="next" pagination SEO
-    prev_url = f"/blog?page={page - 1}" if page > 1 else None
-    next_url = f"/blog?page={page + 1}" if page < total_pages else None
-
-    return render_template('blog_index.html',
-                           posts=posts,
-                           page=page,
-                           total_pages=total_pages,
-                           total_posts=total_posts,
-                           per_page=per_page,
-                           prev_url=prev_url,
-                           next_url=next_url)
-
-
-@app.route('/blog/<slug>')
-def blog_post(slug):
-    """Individual blog post page."""
-    post = parse_blog_post(f"{slug}.md")
-    if not post:
-        # V12.60: Use branded 404 instead of bare string
-        footer_cities = get_cities_with_data()
-        return render_template('404.html', footer_cities=footer_cities), 404
-    return render_template('blog_post.html', post=post)
-
+# V79: Old blog routes removed — now using BLOG_POSTS data structure (see line ~6178)
 
 # ===========================
 # SCHEDULED DATA COLLECTION
