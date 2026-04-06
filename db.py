@@ -447,6 +447,7 @@ def init_db():
                     ("V86 city linking", lambda: _run_v86_city_linking(conn)),
                     ("V87 source cleanup", lambda: _run_v87_source_cleanup(conn)),
                     ("V88 expand cities", lambda: _run_v88_expand_cities(conn)),
+                    ("V89 purge broken", lambda: _run_v89_purge_broken_sources(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -826,7 +827,10 @@ def init_db():
     # V88: Expand prod_cities to 2,000
     _run_v88_expand_cities(conn)
 
-    print(f"[DB] V88: Database initialized at {DB_PATH}")
+    # V89: Purge broken sources
+    _run_v89_purge_broken_sources(conn)
+
+    print(f"[DB] V89: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations_pg(conn):
@@ -1348,6 +1352,63 @@ def _run_v88_expand_cities(conn):
 
     final_count = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
     print(f"[V88] Added {added} cities, now have {final_count} prod_cities")
+
+
+def _run_v89_purge_broken_sources(conn):
+    """V89: Delete sources that have never produced actual permits.
+
+    A source is considered broken if:
+    - Its source_key doesn't appear in any permit's source_city_key
+    - OR it's not linked to a city that has permits
+
+    This cleans up the 1,175+ broken sources polluting the system.
+    """
+    # Get source_keys that have actually produced permits
+    working_sources = conn.execute("""
+        SELECT DISTINCT source_city_key FROM permits
+        WHERE source_city_key IS NOT NULL AND source_city_key != ''
+    """).fetchall()
+    working_keys = {r[0] for r in working_sources}
+
+    # Get all city_sources
+    all_sources = conn.execute("SELECT id, source_key, name, state FROM city_sources").fetchall()
+
+    deleted = 0
+    kept = 0
+
+    for src in all_sources:
+        src_id, source_key, name, state = src
+
+        # Keep if this source_key appears in permits
+        if source_key in working_keys:
+            kept += 1
+            continue
+
+        # Delete broken source
+        conn.execute("DELETE FROM city_sources WHERE id = ?", (src_id,))
+        deleted += 1
+
+    conn.commit()
+
+    # Also clean up bulk_sources that haven't produced permits
+    bulk_deleted = 0
+    bulk_sources = conn.execute("SELECT id, source_key FROM bulk_sources").fetchall()
+    for src in bulk_sources:
+        if src[1] not in working_keys:
+            conn.execute("DELETE FROM bulk_sources WHERE id = ?", (src[0],))
+            bulk_deleted += 1
+
+    conn.commit()
+
+    print(f"[V89] Purged {deleted} broken city_sources, kept {kept} working")
+    print(f"[V89] Purged {bulk_deleted} broken bulk_sources")
+
+    # Final counts
+    city_src = conn.execute("SELECT COUNT(*) FROM city_sources").fetchone()[0]
+    bulk_src = conn.execute("SELECT COUNT(*) FROM bulk_sources").fetchone()[0]
+    cities_with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
+
+    print(f"[V89] Clean state: {cities_with_data} cities with data, {city_src} city sources, {bulk_src} bulk sources")
 
 
 def _run_v33_source_linking(conn):
