@@ -831,60 +831,35 @@ def _run_v33_source_linking(conn):
 
 
 def _deactivate_bulk_covered_cities(conn):
-    """V35: Deactivate ALL city_sources that have never produced a single permit.
+    """V35/V82: Deactivate city_sources that have NEVER produced permits AND are old.
 
-    If a source has never delivered data, it's dead weight — wasting collection
-    cycles and dragging down the success rate. Only keep sources that have
-    actually produced permits in prod_cities or the permits table.
+    V82 FIX: Only deactivate sources that:
+    1. Have been around for at least 7 days (created_at older than 7 days)
+    2. Have been collected at least once (last_collected_at is not null)
+    3. Still have 0 total_permits_collected
+
+    This prevents newly added sources from being deactivated before they get a chance to run.
     """
     try:
-        # Step 1: Find all source_keys that have EVER produced data
-        # Check prod_cities for sources with permits
-        prod_sources = conn.execute("""
-            SELECT DISTINCT source_id FROM prod_cities
-            WHERE total_permits > 0 AND source_id IS NOT NULL AND source_id != ''
-        """).fetchall()
-        working_sources = {r['source_id'] for r in prod_sources}
-
-        # Also check source_city_key in permits table (catches bulk sources)
-        permit_sources = conn.execute("""
-            SELECT DISTINCT source_city_key FROM permits
-            WHERE source_city_key IS NOT NULL AND source_city_key != ''
-        """).fetchall()
-        for r in permit_sources:
-            working_sources.add(r['source_city_key'])
-
-        # Safety check: if we found very few working sources, something is wrong
-        # with the data — don't mass-deactivate in that case
-        if len(working_sources) < 50:
-            print(f"[V35] Only {len(working_sources)} working sources found — skipping deactivation (safety threshold: 50)")
-            return
-
-        # Step 2: Deactivate any active city_source NOT in the working set
-        active_sources = conn.execute("""
-            SELECT source_key FROM city_sources WHERE status = 'active'
-        """).fetchall()
-
-        deactivated = 0
-        kept = 0
-        for row in active_sources:
-            if row['source_key'] not in working_sources:
-                conn.execute(
-                    "UPDATE city_sources SET status = 'inactive' WHERE source_key = ?",
-                    (row['source_key'],)
-                )
-                deactivated += 1
-            else:
-                kept += 1
+        # V82: Only deactivate sources that are old AND have been tried AND still have no data
+        result = conn.execute("""
+            UPDATE city_sources
+            SET status = 'inactive', last_failure_reason = 'v82_no_data_after_collection'
+            WHERE status = 'active'
+              AND (total_permits_collected IS NULL OR total_permits_collected = 0)
+              AND last_collected_at IS NOT NULL
+              AND created_at < datetime('now', '-7 days')
+        """)
+        deactivated = result.rowcount
 
         if deactivated > 0:
             conn.commit()
-            print(f"[V35] Deactivated {deactivated} city sources that never produced data. Kept {kept} working sources.")
+            print(f"[V82] Deactivated {deactivated} old city sources that never produced data after collection.")
         else:
-            print(f"[V35] All {kept} active city sources have data — nothing to deactivate")
+            print(f"[V82] No old unproductive sources to deactivate.")
 
     except Exception as e:
-        print(f"[V35] Source deactivation error: {e}")
+        print(f"[V82] Source deactivation error: {e}")
 
 
 def _fix_arcgis_date_formats(conn):
