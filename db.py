@@ -448,6 +448,7 @@ def init_db():
                     ("V87 source cleanup", lambda: _run_v87_source_cleanup(conn)),
                     ("V88 expand cities", lambda: _run_v88_expand_cities(conn)),
                     ("V89 purge broken", lambda: _run_v89_purge_broken_sources(conn)),
+                    ("V90 rebuild cities", lambda: _run_v90_rebuild_cities(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -830,7 +831,10 @@ def init_db():
     # V89: Purge broken sources
     _run_v89_purge_broken_sources(conn)
 
-    print(f"[DB] V89: Database initialized at {DB_PATH}")
+    # V90: Rebuild prod_cities with top 20K by population
+    _run_v90_rebuild_cities(conn)
+
+    print(f"[DB] V90: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations_pg(conn):
@@ -1409,6 +1413,156 @@ def _run_v89_purge_broken_sources(conn):
     cities_with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
 
     print(f"[V89] Clean state: {cities_with_data} cities with data, {city_src} city sources, {bulk_src} bulk sources")
+
+
+def _run_v90_rebuild_cities(conn):
+    """V90: Rebuild prod_cities with top 20K cities by population.
+
+    - Adds population column
+    - Imports top 20K cities from us_cities ordered by population
+    - Preserves cities that have permit data (keeps prod_city_id links intact)
+    - Sets status based on whether city has data
+    """
+    import re
+
+    # Step 1: Add population column if not exists
+    try:
+        conn.execute("SELECT population FROM prod_cities LIMIT 1")
+    except Exception:
+        conn.execute("ALTER TABLE prod_cities ADD COLUMN population INTEGER DEFAULT 0")
+        print("[V90] Added population column to prod_cities")
+        conn.commit()
+
+    # Step 2: Check if us_cities exists
+    try:
+        conn.execute("SELECT 1 FROM us_cities LIMIT 1")
+    except Exception:
+        print("[V90] us_cities table not found, skipping rebuild")
+        return
+
+    # Step 3: Get IDs of cities that have permit data (must preserve these)
+    cities_with_data = conn.execute("""
+        SELECT id, city, state FROM prod_cities WHERE total_permits > 0
+    """).fetchall()
+    preserve_ids = {r[0] for r in cities_with_data}
+    preserve_keys = {(r[1].lower(), r[2]) for r in cities_with_data}
+    print(f"[V90] Preserving {len(preserve_ids)} cities with permit data")
+
+    # Step 4: States to exclude from city names
+    US_STATES = {
+        'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+        'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+        'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+        'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+        'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+        'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+        'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+        'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+        'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+        'West Virginia', 'Wisconsin', 'Wyoming', 'Puerto Rico'
+    }
+
+    # Step 5: Get top 20K cities from us_cities
+    all_cities = conn.execute("""
+        SELECT city_name, state, population FROM us_cities
+        WHERE population > 0
+        ORDER BY population DESC
+    """).fetchall()
+
+    # Filter to real cities only
+    clean_cities = []
+    for city_name, state, population in all_cities:
+        # Skip states
+        if city_name in US_STATES:
+            continue
+
+        # Skip counties, townships, etc.
+        skip_patterns = ['County', 'township', 'Township', 'Parish', '(pt.)',
+                        '(balance)', 'Planning', 'metropolitan', 'borough',
+                        'CDP', 'city (pt', 'town (pt']
+        if any(p in city_name for p in skip_patterns):
+            continue
+
+        # Clean city name
+        clean_name = city_name
+        if clean_name.endswith(' city'):
+            clean_name = clean_name[:-5]
+        if clean_name.endswith(' town'):
+            clean_name = clean_name[:-5]
+
+        clean_cities.append((clean_name, state, population))
+
+        if len(clean_cities) >= 20000:
+            break
+
+    print(f"[V90] Found {len(clean_cities)} clean cities from us_cities")
+
+    # Step 6: Delete prod_cities that don't have data and aren't in top 20K
+    top_20k_keys = {(c[0].lower(), c[1]) for c in clean_cities}
+
+    deleted = 0
+    all_prod = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+    for row in all_prod:
+        pid, city, state = row
+        key = (city.lower(), state)
+
+        # Keep if has data
+        if pid in preserve_ids:
+            continue
+
+        # Keep if in top 20K
+        if key in top_20k_keys:
+            continue
+
+        # Delete
+        conn.execute("DELETE FROM prod_cities WHERE id = ?", (pid,))
+        deleted += 1
+
+    conn.commit()
+    print(f"[V90] Deleted {deleted} cities not in top 20K and without data")
+
+    # Step 7: Add/update cities from top 20K
+    added = 0
+    updated = 0
+    existing = conn.execute("SELECT LOWER(city), state, id FROM prod_cities").fetchall()
+    existing_map = {(r[0], r[1]): r[2] for r in existing}
+
+    for city_name, state, population in clean_cities:
+        key = (city_name.lower(), state)
+        slug = f"{city_name.lower().replace(' ', '-').replace('.', '').replace(',', '')}-{state.lower()}"
+
+        if key in existing_map:
+            # Update population
+            conn.execute("""
+                UPDATE prod_cities SET population = ? WHERE id = ?
+            """, (population, existing_map[key]))
+            updated += 1
+        else:
+            # Insert new
+            try:
+                conn.execute("""
+                    INSERT INTO prod_cities (city, state, city_slug, population, status, added_by)
+                    VALUES (?, ?, ?, ?, 'pending', 'v90_rebuild')
+                """, (city_name, state, slug, population))
+                added += 1
+            except Exception:
+                pass  # Skip duplicates
+
+    conn.commit()
+
+    # Step 8: Update status based on data
+    conn.execute("""
+        UPDATE prod_cities SET status = 'active' WHERE total_permits > 0
+    """)
+    conn.execute("""
+        UPDATE prod_cities SET status = 'pending' WHERE total_permits = 0 OR total_permits IS NULL
+    """)
+    conn.commit()
+
+    # Final stats
+    total = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+    with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
+    print(f"[V90] Rebuild complete: {total} cities ({with_data} with data), added {added}, updated {updated}")
 
 
 def _run_v33_source_linking(conn):

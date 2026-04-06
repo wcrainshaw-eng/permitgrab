@@ -7284,10 +7284,28 @@ def api_filters():
 
 @app.route('/api/cities')
 def api_cities():
-    """GET /api/cities - Get all active cities with info."""
+    """GET /api/cities - Get all active cities with permit data.
+
+    V90: Now reads from prod_cities table (database) instead of static CITY_REGISTRY.
+    Only returns cities with actual permit data (total_permits > 0).
+    """
+    # Get cities with data from database
+    cities = permitdb.get_prod_cities(status='active', min_permits=1)
+
+    # Format for frontend compatibility
+    formatted_cities = []
+    for city in cities:
+        formatted_cities.append({
+            'name': city['name'],
+            'state': city['state'],
+            'slug': city['slug'],
+            'permit_count': city['permit_count'],
+            'active': city['active'],
+        })
+
     return jsonify({
-        'count': get_city_count(),
-        'cities': get_all_cities_info(),
+        'count': len(formatted_cities),
+        'cities': formatted_cities,
     })
 
 
