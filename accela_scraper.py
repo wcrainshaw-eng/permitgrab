@@ -2658,9 +2658,15 @@ def fetch_accela(config, days_back):
                 city_key = key
                 break
 
+    # V81: Also try source_key directly - city_sources table uses source_key as primary identifier
+    if not city_key:
+        source_key = config.get("source_key", "")
+        if source_key and source_key in ACCELA_CONFIGS:
+            city_key = source_key
+
     if not city_key:
         # V46: Raise instead of silent return so collector logs as error
-        raise ValueError(f"Cannot determine Accela city_key from config: {config.get('name', 'unknown')}")
+        raise ValueError(f"Cannot determine Accela city_key from config: {config.get('name', 'unknown')} (source_key: {config.get('source_key', 'none')})")
 
     try:
         # V46: Reset global browser/playwright before each call.
