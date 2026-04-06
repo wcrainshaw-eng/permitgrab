@@ -144,6 +144,90 @@ NEIGHBORHOOD_TO_CITY = {
     ('Palomar', 'FL'): 'Orlando', ('Azalea Park', 'FL'): 'Orlando',
 }
 
+# V85: City name canonicalization — maps variant names to canonical names
+# This fixes the issue where 180K+ permits aren't counted due to name mismatches
+# Format: lowercase variant -> canonical name
+CITY_NAME_CANONICALIZATION = {
+    # Major city variants
+    'new york city': 'New York',
+    'nyc': 'New York',
+    'manhattan': 'New York',
+    'brooklyn': 'New York',
+    'queens': 'New York',
+    'bronx': 'New York',
+    'staten island': 'New York',
+
+    'washington dc': 'Washington',
+    'washington d.c.': 'Washington',
+    'washington, d.c.': 'Washington',
+    'district of columbia': 'Washington',
+
+    'orleans': 'New Orleans',  # Common truncation
+    'nola': 'New Orleans',
+
+    'la': 'Los Angeles',
+    'l.a.': 'Los Angeles',
+
+    'sf': 'San Francisco',
+    's.f.': 'San Francisco',
+
+    'philly': 'Philadelphia',
+    'phila': 'Philadelphia',
+
+    'vegas': 'Las Vegas',
+
+    'ft worth': 'Fort Worth',
+    'ft. worth': 'Fort Worth',
+
+    'ft lauderdale': 'Fort Lauderdale',
+    'ft. lauderdale': 'Fort Lauderdale',
+
+    'st louis': 'Saint Louis',
+    'st. louis': 'Saint Louis',
+
+    'st paul': 'Saint Paul',
+    'st. paul': 'Saint Paul',
+
+    'st petersburg': 'Saint Petersburg',
+    'st. petersburg': 'Saint Petersburg',
+
+    # County variants - often reported without "County"
+    'miami-dade': 'Miami-Dade County',
+    'broward': 'Broward County',
+    'palm beach': 'Palm Beach County',
+    'orange county': 'Orange County',  # Keep as-is but normalize
+    'los angeles county': 'Los Angeles County',
+    'san diego county': 'San Diego County',
+    'cook county': 'Cook County',
+
+    # State abbreviation suffixes that sneak in
+    'houston tx': 'Houston',
+    'dallas tx': 'Dallas',
+    'austin tx': 'Austin',
+    'chicago il': 'Chicago',
+    'phoenix az': 'Phoenix',
+    'seattle wa': 'Seattle',
+    'denver co': 'Denver',
+    'atlanta ga': 'Atlanta',
+    'miami fl': 'Miami',
+    'tampa fl': 'Tampa',
+    'orlando fl': 'Orlando',
+}
+
+# V85: Garbage city names that should be filtered out entirely
+GARBAGE_CITY_NAMES = {
+    'hickory creek',  # Bulk source garbage - 51K permits
+    'island park',    # Suspicious bulk data
+    'warr acres',     # Bulk source issue
+    'unincorporated', # Generic placeholder
+    'unknown',
+    'n/a',
+    'na',
+    'none',
+    'test',
+    'sample',
+}
+
 
 def is_garbage_city_name(city_name):
     """V18/V35: Check if a city name is garbage (database field name, test data, etc.)."""
@@ -186,6 +270,58 @@ def clean_city_name_for_prod(city_name, state=""):
     cleaned = re.sub(r'^City\s+of\s+', '', cleaned, flags=re.IGNORECASE)
 
     return cleaned.strip()
+
+
+def canonicalize_city_name(city_name, state=""):
+    """V85: Canonicalize city name to match prod_cities entries.
+
+    This handles:
+    1. Known variant names (NYC -> New York, Orleans -> New Orleans)
+    2. State suffix removal (Houston TX -> Houston)
+    3. Garbage name filtering
+    4. Neighborhood to city mapping
+
+    Returns:
+        tuple: (canonical_name, is_garbage)
+        - canonical_name: The cleaned/canonical city name
+        - is_garbage: True if this should be filtered out entirely
+    """
+    if not city_name:
+        return city_name, True
+
+    # Normalize whitespace and case for lookup
+    cleaned = ' '.join(city_name.strip().split())
+    lookup_key = cleaned.lower()
+
+    # Check if it's a known garbage name
+    if lookup_key in GARBAGE_CITY_NAMES:
+        return city_name, True
+
+    # Check garbage patterns
+    if is_garbage_city_name(cleaned):
+        return city_name, True
+
+    # Check canonicalization map
+    if lookup_key in CITY_NAME_CANONICALIZATION:
+        return CITY_NAME_CANONICALIZATION[lookup_key], False
+
+    # Check neighborhood mapping
+    if state and (cleaned.title(), state.upper()) in NEIGHBORHOOD_TO_CITY:
+        return NEIGHBORHOOD_TO_CITY[(cleaned.title(), state.upper())], False
+
+    # Apply standard cleaning
+    cleaned = clean_city_name_for_prod(cleaned, state)
+
+    # Remove trailing state abbreviation if present (e.g., "Houston TX" -> "Houston")
+    if state and len(state) == 2:
+        import re
+        pattern = rf'\s+{re.escape(state)}$'
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+    # Remove " City" suffix (e.g., "Oklahoma City" stays, but "Kansas City" stays too)
+    # Only remove if it's redundant like "New York City" -> handled by canonicalization
+
+    return cleaned.strip().title(), False
 
 
 def normalize_city_name(city_name):
@@ -307,6 +443,7 @@ def init_db():
                     ("V34 data cleanup", lambda: _run_v34_data_cleanup(conn)),
                     ("Bulk city deactivation", lambda: _deactivate_bulk_covered_cities(conn)),
                     ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
+                    ("V85 city name canonicalization", lambda: _migrate_canonical_city_names(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -628,6 +765,9 @@ def init_db():
 
     # V35: Fix ArcGIS date_format for MapServer endpoints that can't handle epoch filters
     _fix_arcgis_date_formats(conn)
+
+    # V85: Canonicalize existing permit city names
+    _migrate_canonical_city_names(conn)
 
     # V34: Sync prod_cities.total_permits with actual permit counts in DB
     _sync_prod_city_counts(conn)
@@ -1143,6 +1283,74 @@ def _run_v34_data_cleanup(conn):
         return 0
 
 
+def _migrate_canonical_city_names(conn):
+    """V85: One-time migration to canonicalize existing permit city names.
+
+    This updates permits with known variant names to their canonical form,
+    enabling proper matching to prod_cities.
+    """
+    try:
+        # Check if we've already run this migration
+        check = conn.execute("""
+            SELECT COUNT(*) as cnt FROM permits WHERE city = 'New York City'
+        """).fetchone()
+
+        if check['cnt'] == 0:
+            print("[V85] City name migration: no 'New York City' variants found, may already be migrated")
+            return
+
+        print(f"[V85] Migrating city names - found {check['cnt']} 'New York City' variants")
+
+        # Get all distinct city/state combos that need canonicalization
+        distinct_cities = conn.execute("""
+            SELECT DISTINCT city, state FROM permits
+            WHERE city IS NOT NULL AND city != ''
+        """).fetchall()
+
+        updates = []
+        for row in distinct_cities:
+            canonical, is_garbage = canonicalize_city_name(row['city'], row['state'] or '')
+            if is_garbage:
+                # Delete garbage permits
+                result = conn.execute(
+                    "DELETE FROM permits WHERE city = ? AND (state = ? OR (state IS NULL AND ? IS NULL))",
+                    (row['city'], row['state'], row['state'])
+                )
+                if result.rowcount > 0:
+                    print(f"[V85] Deleted {result.rowcount} garbage permits: '{row['city']}'")
+            elif canonical != row['city']:
+                updates.append((canonical, row['city'], row['state']))
+
+        # Batch update each variant
+        total_updated = 0
+        for canonical, old_city, state in updates:
+            if state:
+                result = conn.execute(
+                    "UPDATE permits SET city = ? WHERE city = ? AND state = ?",
+                    (canonical, old_city, state)
+                )
+            else:
+                result = conn.execute(
+                    "UPDATE permits SET city = ? WHERE city = ? AND state IS NULL",
+                    (canonical, old_city)
+                )
+            if result.rowcount > 0:
+                print(f"[V85] Canonicalized {result.rowcount}: '{old_city}' → '{canonical}'")
+                total_updated += result.rowcount
+
+        conn.commit()
+        print(f"[V85] City name migration complete: {total_updated} permits updated")
+
+    except Exception as e:
+        print(f"[V85] City name migration error: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+
 def _sync_prod_city_counts(conn):
     """V34: Sync prod_cities.total_permits with actual permit counts in DB.
 
@@ -1170,18 +1378,30 @@ def _sync_prod_city_counts(conn):
 
         conn.commit()
 
-        # Get actual counts per city from permits table
+        # V85: Get actual counts per city from permits table, then canonicalize
         actual = conn.execute("""
-            SELECT LOWER(city) as city_lower, COUNT(*) as cnt
-            FROM permits GROUP BY LOWER(city)
+            SELECT city, state, COUNT(*) as cnt
+            FROM permits
+            WHERE city IS NOT NULL AND city != ''
+            GROUP BY city, state
         """).fetchall()
-        count_map = {r['city_lower']: r['cnt'] for r in actual}
 
-        # Update each prod_city
-        prod = conn.execute("SELECT id, city FROM prod_cities").fetchall()
+        # V85: Build count map using canonical names (merge variants)
+        count_map = {}  # canonical_name_lower -> count
+        for r in actual:
+            canonical, is_garbage = canonicalize_city_name(r['city'], r['state'] or '')
+            if is_garbage:
+                continue
+            key = canonical.lower()
+            count_map[key] = count_map.get(key, 0) + r['cnt']
+
+        # Update each prod_city using canonical name matching
+        prod = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
         updated = 0
         for row in prod:
-            actual_count = count_map.get(row['city'].lower(), 0)
+            # V85: Canonicalize prod_city name for matching
+            canonical_prod, _ = canonicalize_city_name(row['city'], row['state'] or '')
+            actual_count = count_map.get(canonical_prod.lower(), 0)
             conn.execute(
                 "UPDATE prod_cities SET total_permits = ? WHERE id = ?",
                 (actual_count, row['id'])
@@ -1189,7 +1409,7 @@ def _sync_prod_city_counts(conn):
             updated += 1
 
         conn.commit()
-        nonzero = sum(1 for r in prod if count_map.get(r['city'].lower(), 0) > 0)
+        nonzero = sum(1 for r in prod if count_map.get(canonicalize_city_name(r['city'], r['state'] or '')[0].lower(), 0) > 0)
         print(f"[V34] Synced {updated} prod_cities permit counts ({nonzero} have data)")
 
         # V35: Auto-reactivate paused cities that now have data
@@ -1249,6 +1469,29 @@ def upsert_permits(permits, source_city_key=None):
                 p['state'] = _city_to_state[city]
     except Exception as e:
         print(f"[V30] State normalization warning: {e}")
+
+    # V85: Canonicalize city names to ensure consistent matching
+    canonicalized = 0
+    filtered_garbage = 0
+    pre_canon_permits = permits
+    permits = []
+    for p in pre_canon_permits:
+        city = p.get('city', '').strip() if p.get('city') else ''
+        state = p.get('state', '').strip() if p.get('state') else ''
+        if city:
+            canonical, is_garbage = canonicalize_city_name(city, state)
+            if is_garbage:
+                filtered_garbage += 1
+                continue
+            if canonical != city:
+                p['city'] = canonical
+                canonicalized += 1
+        permits.append(p)
+
+    if canonicalized > 0:
+        print(f"[V85] Canonicalized {canonicalized} city names")
+    if filtered_garbage > 0:
+        print(f"[V85] Filtered {filtered_garbage} permits with garbage city names")
 
     # V19: Pre-filter to check for existing permits by address+city+state+filing_date
     # This prevents duplicates even when permit_number differs
