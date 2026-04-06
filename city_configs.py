@@ -1731,8 +1731,8 @@ CITY_REGISTRY = {
         "date_field": "ApplicationDate",
         "date_format": "none",
         "limit": 2000,
-        "active": True,
-        "notes": "V52: New endpoint + date_format=none. Render-tested and backfilled 2026-04-01.",
+        "active": False,
+        "notes": "V83: DEACTIVATED - This endpoint belongs to Virginia Beach, not Jacksonville. COJ uses JaxEPICS (jaxepics.coj.net) with no public API. Need custom scraper.",
     },
 
     "virginia_beach": {
