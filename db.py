@@ -446,6 +446,7 @@ def init_db():
                     ("V85 city name canonicalization", lambda: _migrate_canonical_city_names(conn)),
                     ("V86 city linking", lambda: _run_v86_city_linking(conn)),
                     ("V87 source cleanup", lambda: _run_v87_source_cleanup(conn)),
+                    ("V88 expand cities", lambda: _run_v88_expand_cities(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -822,7 +823,10 @@ def init_db():
     # V87: Clean up sources - separate bulk from city, remove garbage
     _run_v87_source_cleanup(conn)
 
-    print(f"[DB] V87: Database initialized at {DB_PATH}")
+    # V88: Expand prod_cities to 2,000
+    _run_v88_expand_cities(conn)
+
+    print(f"[DB] V88: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations_pg(conn):
@@ -1248,6 +1252,102 @@ def _run_v87_source_cleanup(conn):
     prod_count = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
 
     print(f"[V87] Final: {city_count} city sources, {bulk_count} bulk sources, {prod_count} prod_cities")
+
+
+def _run_v88_expand_cities(conn):
+    """V88: Expand prod_cities to 2,000 cities from us_cities table.
+
+    Adds cities with population >= 25,000 that aren't already in prod_cities.
+    """
+    # List of state names to exclude (we want cities, not states)
+    US_STATES = {
+        'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+        'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+        'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+        'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+        'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+        'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+        'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+        'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+        'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+        'West Virginia', 'Wisconsin', 'Wyoming', 'Puerto Rico', 'District of Columbia'
+    }
+
+    # Check if us_cities table exists
+    try:
+        conn.execute("SELECT 1 FROM us_cities LIMIT 1")
+    except Exception:
+        print("[V88] us_cities table not found, skipping expansion")
+        return
+
+    # Check current count
+    current_count = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+    if current_count >= 2000:
+        print(f"[V88] Already have {current_count} prod_cities, skipping expansion")
+        return
+
+    # Get existing city/state combos
+    existing = set()
+    rows = conn.execute("SELECT LOWER(city), state FROM prod_cities").fetchall()
+    for r in rows:
+        existing.add((r[0], r[1]))
+
+    # Get cities to add from us_cities
+    cities_to_add = []
+    all_cities = conn.execute("""
+        SELECT city_name, state, population FROM us_cities
+        WHERE population >= 25000
+        ORDER BY population DESC
+    """).fetchall()
+
+    for city_name, state, population in all_cities:
+        # Skip states
+        if city_name in US_STATES:
+            continue
+
+        # Skip counties, parishes, planning regions, etc.
+        skip_patterns = ['County', 'Parish', '(pt.)', '(balance)', 'Balance of',
+                        'Planning Region', 'metropolitan', 'borough', 'CDP',
+                        'city (balance)', 'town (pt.)']
+        if any(p in city_name for p in skip_patterns):
+            continue
+
+        # Clean up city name (remove " city" suffix if present)
+        clean_name = city_name
+        if clean_name.endswith(' city'):
+            clean_name = clean_name[:-5]
+        if clean_name.endswith(' town'):
+            clean_name = clean_name[:-5]
+
+        # Skip if already exists
+        if (clean_name.lower(), state) in existing:
+            continue
+
+        cities_to_add.append((clean_name, state, population))
+
+        # Stop at 2000 total
+        if current_count + len(cities_to_add) >= 2000:
+            break
+
+    # Add cities
+    added = 0
+    for city_name, state, population in cities_to_add:
+        try:
+            # Create slug
+            slug = f"{city_name.lower().replace(' ', '-').replace('.', '')}-{state.lower()}"
+
+            conn.execute("""
+                INSERT OR IGNORE INTO prod_cities (city, state, city_slug, status, added_by)
+                VALUES (?, ?, ?, 'pending', 'v88_expansion')
+            """, (city_name, state, slug))
+            added += 1
+        except Exception as e:
+            pass  # Skip duplicates
+
+    conn.commit()
+
+    final_count = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+    print(f"[V88] Added {added} cities, now have {final_count} prod_cities")
 
 
 def _run_v33_source_linking(conn):
