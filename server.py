@@ -2766,6 +2766,107 @@ def admin_cleanup_prod_cities():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/activate-paused-cities', methods=['POST'])
+def admin_activate_paused_cities():
+    """V77: Bulk-activate paused cities that have valid CITY_REGISTRY configs.
+
+    This activates the 529+ cities that were synced from CITY_REGISTRY but
+    inserted as status='paused' and never collected.
+
+    For each paused city:
+    1. Check if source_id has valid config in city_sources (active) OR in CITY_REGISTRY (active=True)
+    2. If yes: activate in prod_cities AND activate matching city_sources entry
+    3. Return count of activated cities
+
+    POST body: {} (no parameters needed)
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from city_configs import CITY_REGISTRY
+
+        conn = permitdb.get_connection()
+        activated = []
+        skipped = []
+        city_sources_activated = []
+
+        # Get all paused cities
+        paused_cities = conn.execute("""
+            SELECT city_slug, source_id, city, state FROM prod_cities WHERE status = 'paused'
+        """).fetchall()
+
+        for row in paused_cities:
+            city_slug = row[0]
+            source_id = row[1]
+            city_name = row[2]
+            state = row[3]
+
+            # Check if source_id has valid config
+            has_valid_config = False
+
+            # Check 1: city_sources table
+            cs_row = conn.execute(
+                "SELECT source_key, status FROM city_sources WHERE source_key = ?",
+                (source_id,)
+            ).fetchone()
+
+            if cs_row:
+                has_valid_config = True
+                # Also activate city_sources if it's inactive
+                if cs_row[1] != 'active':
+                    conn.execute(
+                        "UPDATE city_sources SET status = 'active' WHERE source_key = ?",
+                        (source_id,)
+                    )
+                    city_sources_activated.append(source_id)
+
+            # Check 2: CITY_REGISTRY dict (if not found in city_sources)
+            if not has_valid_config and source_id in CITY_REGISTRY:
+                if CITY_REGISTRY[source_id].get('active', False):
+                    has_valid_config = True
+
+            # Check 3: Try hyphen-to-underscore conversion
+            if not has_valid_config:
+                underscore_id = source_id.replace('-', '_')
+                if underscore_id in CITY_REGISTRY:
+                    if CITY_REGISTRY[underscore_id].get('active', False):
+                        has_valid_config = True
+
+            if has_valid_config:
+                # Activate in prod_cities
+                conn.execute("""
+                    UPDATE prod_cities SET status = 'active', notes = 'V77: Bulk activated from paused'
+                    WHERE city_slug = ?
+                """, (city_slug,))
+                activated.append({'city_slug': city_slug, 'source_id': source_id})
+            else:
+                skipped.append({'city_slug': city_slug, 'source_id': source_id, 'reason': 'no valid config'})
+
+        conn.commit()
+
+        # Get final counts
+        active_count = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE status='active'").fetchone()[0]
+        paused_count = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE status='paused'").fetchone()[0]
+
+        return jsonify({
+            'status': 'success',
+            'activated_count': len(activated),
+            'skipped_count': len(skipped),
+            'city_sources_activated': len(city_sources_activated),
+            'prod_cities_active': active_count,
+            'prod_cities_paused': paused_count,
+            'activated': activated[:50],  # Limit response size
+            'skipped': skipped[:50]
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
@@ -8587,6 +8688,153 @@ def city_landing_inner(city_slug):
     )
 
 
+@app.route('/permits/<state_slug>/<city_slug>')
+def state_city_landing(state_slug, city_slug):
+    """V77: Render SEO-optimized city landing page with state/city URL format.
+
+    URL format: /permits/{state}/{city} e.g., /permits/texas/fort-worth
+
+    This is the primary city page route for SEO. Each city page targets
+    "[city] building permits" keywords for contractors.
+    """
+    # Check if state_slug is a valid state
+    if state_slug not in STATE_CONFIG:
+        # Not a valid state — fall through to city/trade route
+        # by calling city_trade_landing directly
+        return city_trade_landing(state_slug, city_slug)
+
+    state_abbrev = STATE_CONFIG[state_slug]['abbrev']
+    state_name = STATE_CONFIG[state_slug]['name']
+
+    # Look up city in prod_cities first (authoritative source)
+    conn = permitdb.get_connection()
+    city_row = conn.execute("""
+        SELECT city, state, city_slug, source_id, source_type, total_permits,
+               newest_permit_date, last_collection, data_freshness, status
+        FROM prod_cities
+        WHERE city_slug = ? AND state = ?
+    """, (city_slug, state_abbrev)).fetchone()
+
+    if not city_row:
+        # Try without state filter (some cities might not have state stored correctly)
+        city_row = conn.execute("""
+            SELECT city, state, city_slug, source_id, source_type, total_permits,
+                   newest_permit_date, last_collection, data_freshness, status
+            FROM prod_cities WHERE city_slug = ?
+        """, (city_slug,)).fetchone()
+
+    if not city_row:
+        # Fall back to CITY_REGISTRY lookup
+        city_key, city_config = get_city_by_slug_auto(city_slug)
+        if not city_config:
+            return render_city_not_found(city_slug)
+        city_name = city_config['name']
+        city_state = city_config.get('state', state_abbrev)
+        total_permits = 0
+        newest_permit_date = None
+        last_collection = None
+        data_freshness = 'no_data'
+        is_active = city_config.get('active', False)
+    else:
+        city_name = city_row['city']
+        city_state = city_row['state']
+        total_permits = city_row['total_permits'] or 0
+        newest_permit_date = city_row['newest_permit_date']
+        last_collection = city_row['last_collection']
+        data_freshness = city_row['data_freshness'] or 'no_data'
+        is_active = city_row['status'] == 'active'
+
+    # Get recent permits from permits table
+    filter_name = city_name
+    permits_cursor = conn.execute("""
+        SELECT * FROM permits
+        WHERE city = ? AND state = ?
+        ORDER BY filing_date DESC, estimated_cost DESC
+        LIMIT 50
+    """, (filter_name, city_state))
+    recent_permits = [dict(row) for row in permits_cursor]
+
+    # If no permits with state filter, try without
+    if not recent_permits:
+        permits_cursor = conn.execute("""
+            SELECT * FROM permits
+            WHERE city = ?
+            ORDER BY filing_date DESC, estimated_cost DESC
+            LIMIT 50
+        """, (filter_name,))
+        recent_permits = [dict(row) for row in permits_cursor]
+
+    # Get permit stats
+    stats_row = conn.execute("""
+        SELECT COUNT(*) as permit_count,
+               MIN(filing_date) as earliest_date,
+               MAX(filing_date) as latest_date
+        FROM permits WHERE city = ?
+    """, (filter_name,)).fetchone()
+
+    permit_count = stats_row['permit_count'] if stats_row else 0
+    earliest_date = stats_row['earliest_date'] if stats_row else None
+    latest_date = stats_row['latest_date'] if stats_row else None
+
+    # Get permit types breakdown
+    types_cursor = conn.execute("""
+        SELECT COALESCE(permit_type, 'Other') as ptype, COUNT(*) as cnt
+        FROM permits WHERE city = ?
+        GROUP BY permit_type
+        ORDER BY cnt DESC
+        LIMIT 10
+    """, (filter_name,))
+    permit_types = {row['ptype']: row['cnt'] for row in types_cursor}
+
+    # Get nearby cities in same state for internal linking
+    nearby_cities = conn.execute("""
+        SELECT city_slug, city, total_permits
+        FROM prod_cities
+        WHERE state = ? AND city_slug != ? AND status = 'active' AND total_permits > 0
+        ORDER BY total_permits DESC
+        LIMIT 10
+    """, (city_state, city_slug)).fetchall()
+
+    # Format display name
+    display_name = format_city_name(city_name)
+
+    # SEO meta
+    meta_title = f"{display_name}, {state_name} Building Permits | PermitGrab"
+    meta_description = f"Browse recent building permits in {display_name}, {state_name}. Track new construction, renovations, and remodeling permits updated daily. Built for contractors and builders."
+
+    # Robots directive
+    robots_directive = "index, follow" if permit_count > 0 and is_active else "noindex, follow"
+
+    # Canonical URL
+    canonical_url = f"{SITE_URL}/permits/{state_slug}/{city_slug}"
+
+    footer_cities = get_cities_with_data()
+
+    return render_template('city_landing_v77.html',
+        city_name=display_name,
+        city_slug=city_slug,
+        state_abbrev=city_state,
+        state_name=state_name,
+        state_slug=state_slug,
+        total_permits=total_permits,
+        permit_count=permit_count,
+        earliest_date=earliest_date,
+        latest_date=latest_date,
+        newest_permit_date=newest_permit_date,
+        last_collection=last_collection,
+        data_freshness=data_freshness,
+        is_active=is_active,
+        recent_permits=recent_permits,
+        permit_types=permit_types,
+        nearby_cities=nearby_cities,
+        meta_title=meta_title,
+        meta_description=meta_description,
+        robots_directive=robots_directive,
+        canonical_url=canonical_url,
+        footer_cities=footer_cities,
+    )
+
+
 @app.route('/permits/<city_slug>/<trade_slug>')
 def city_trade_landing(city_slug, trade_slug):
     """Render SEO-optimized city × trade landing page."""
@@ -8943,9 +9191,14 @@ def sitemap_pages():
 
 @app.route('/sitemap-cities.xml')
 def sitemap_cities():
-    """V28: Sitemap for city pages and state hub pages."""
+    """V28: Sitemap for city pages and state hub pages.
+    V77: Added city URLs in /permits/{state}/{city} format for SEO.
+    """
     today = datetime.now().strftime('%Y-%m-%d')
     url_map = {}
+
+    # V77: Create reverse mapping from state abbrev to state slug
+    abbrev_to_state_slug = {v['abbrev']: k for k, v in STATE_CONFIG.items()}
 
     # State hub pages
     for state_slug in STATE_CONFIG.keys():
@@ -8962,7 +9215,7 @@ def sitemap_cities():
     city_lastmod = _get_city_lastmod_map()
     state_slugs = set(STATE_CONFIG.keys())
 
-    # City pages from discovered cities
+    # City pages from discovered cities (old format: /permits/{city})
     all_discovered_cities = discover_cities_from_permits()
     for slug, city_info in all_discovered_cities.items():
         if slug in state_slugs:
@@ -8993,6 +9246,43 @@ def sitemap_cities():
                 'priority': '0.6',
                 'lastmod': today
             }
+
+    # V77: Add city URLs in new /permits/{state}/{city} format
+    # These are the SEO-optimized URLs targeting "[city] building permits" keywords
+    try:
+        conn = permitdb.get_connection()
+        active_cities = conn.execute("""
+            SELECT city_slug, state, last_collection, data_freshness, total_permits
+            FROM prod_cities
+            WHERE status = 'active'
+              AND data_freshness != 'no_data'
+              AND total_permits > 0
+        """).fetchall()
+
+        for city_row in active_cities:
+            city_slug = city_row['city_slug']
+            state_abbrev = city_row['state']
+            last_collection = city_row['last_collection']
+
+            # Get state slug from abbreviation
+            state_slug = abbrev_to_state_slug.get(state_abbrev)
+            if not state_slug:
+                continue  # Skip if state not in our config
+
+            # Format lastmod
+            lastmod = last_collection[:10] if last_collection else today
+
+            # New format: /permits/{state}/{city}
+            loc = f"{SITE_URL}/permits/{state_slug}/{city_slug}"
+            if loc not in url_map:
+                url_map[loc] = {
+                    'loc': loc,
+                    'changefreq': 'daily',
+                    'priority': '0.7',
+                    'lastmod': lastmod
+                }
+    except Exception as e:
+        print(f"[sitemap_cities] V77 city URLs error: {e}")
 
     return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
 
@@ -9708,6 +9998,14 @@ def start_collectors():
         print(f"[{datetime.now()}] V75: Applied {len(fixes)} config fixes")
     except Exception as e:
         print(f"[{datetime.now()}] V75: Config fix error (non-fatal): {e}")
+
+    # V77: Sync CITY_REGISTRY to prod_cities — activates paused cities
+    print(f"[{datetime.now()}] V77: Syncing CITY_REGISTRY to prod_cities...")
+    try:
+        sync_city_registry_to_prod_cities()
+        print(f"[{datetime.now()}] V77: Registry sync complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V77: Registry sync error (non-fatal): {e}")
 
     print(f"[{datetime.now()}] V67: Starting background collectors with staggered init...")
 

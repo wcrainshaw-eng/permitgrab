@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta_title }}</title>
+<meta name="description" content="{{ meta_description }}">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta name="robots" content="{{ robots_directive }}">
+
+<!-- Open Graph -->
+<meta property="og:title" content="{{ meta_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="https://permitgrab.com/static/og-image.png">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ meta_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+<meta name="twitter:image" content="https://permitgrab.com/static/og-image.png">
+
+<!-- V77 SEO: Geo-targeting -->
+<meta name="geo.region" content="US-{{ state_abbrev }}">
+<meta name="geo.placename" content="{{ city_name }}, {{ state_name }}">
+
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+{% include 'partials/analytics.html' %}
+
+<!-- V77: Dataset Schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  "name": "{{ city_name }}, {{ state_name }} Building Permits",
+  "description": "Building permit records for {{ city_name }}, {{ state_name }}",
+  "url": "{{ canonical_url }}",
+  "temporalCoverage": "{% if earliest_date and latest_date %}{{ earliest_date }}/{{ latest_date }}{% else %}2024/2026{% endif %}",
+  "spatialCoverage": {
+    "@type": "Place",
+    "name": "{{ city_name }}, {{ state_name }}"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "PermitGrab",
+    "url": "https://permitgrab.com"
+  },
+  "dateModified": "{% if last_collection %}{{ last_collection }}{% else %}{{ now().strftime('%Y-%m-%d') if now else '2026-04-05' }}{% endif %}",
+  "variableMeasured": "Building Permits"
+}
+</script>
+
+<!-- V77: Breadcrumb Schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://permitgrab.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "{{ state_name }} Permits",
+      "item": "https://permitgrab.com/permits/{{ state_slug }}"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "{{ city_name }} Permits"
+    }
+  ]
+}
+</script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #dbeafe;
+  --accent: #f97316;
+  --accent-dark: #ea580c;
+  --green: #16a34a;
+  --green-light: #dcfce7;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+/* BREADCRUMBS */
+.breadcrumbs {
+  background: var(--gray-100);
+  padding: 12px 32px;
+  font-size: 13px;
+}
+.breadcrumbs-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.breadcrumbs a {
+  color: var(--gray-500);
+  text-decoration: none;
+}
+.breadcrumbs a:hover {
+  color: var(--primary);
+}
+.breadcrumbs span {
+  color: var(--gray-400);
+  margin: 0 8px;
+}
+.breadcrumbs .current {
+  color: var(--gray-700);
+}
+
+/* HERO */
+.hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+  color: white;
+  padding: 48px 32px 56px;
+}
+.hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.hero h1 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 12px;
+}
+.hero .subtitle {
+  font-size: 18px;
+  color: rgba(255,255,255,.7);
+  max-width: 600px;
+  margin-bottom: 24px;
+}
+
+/* PERMIT ACTIVITY SUMMARY */
+.summary-cards {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.summary-card {
+  background: rgba(255,255,255,.1);
+  border-radius: var(--radius);
+  padding: 20px 28px;
+  min-width: 140px;
+}
+.summary-card-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.summary-card-label {
+  font-size: 13px;
+  color: rgba(255,255,255,.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.freshness-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(22,163,74,.2);
+  color: #4ade80;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 20px;
+}
+.freshness-dot {
+  width: 8px;
+  height: 8px;
+  background: #4ade80;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* SECTIONS */
+.section {
+  padding: 48px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.section-header {
+  margin-bottom: 24px;
+}
+.section-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.section-header p {
+  font-size: 16px;
+  color: var(--gray-500);
+}
+
+/* PERMITS TABLE */
+.permits-table-container {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.permits-table-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.permits-table-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+.permits-table-header a {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.permits-table-header a:hover {
+  text-decoration: underline;
+}
+.permits-table-wrap {
+  overflow-x: auto;
+}
+.permits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.permits-table th {
+  background: var(--gray-50);
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: var(--gray-600);
+  border-bottom: 1px solid var(--gray-200);
+  white-space: nowrap;
+}
+.permits-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--gray-700);
+}
+.permits-table tr:hover {
+  background: var(--gray-50);
+}
+.permits-table .address {
+  font-weight: 500;
+  color: var(--gray-900);
+}
+.permits-table .description {
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.permits-table .permit-type {
+  display: inline-block;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* PERMIT TYPES */
+.types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.type-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  border: 1px solid var(--gray-200);
+}
+.type-card h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 4px;
+}
+.type-card .count {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* CONTRACTOR CONTEXT */
+.contractor-context {
+  background: white;
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+}
+.contractor-context p {
+  font-size: 16px;
+  color: var(--gray-600);
+  line-height: 1.8;
+}
+
+/* NEARBY CITIES */
+.nearby-cities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.nearby-city-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  text-decoration: none;
+  color: var(--gray-700);
+  transition: all .2s;
+}
+.nearby-city-link:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+.nearby-city-link .name {
+  font-weight: 600;
+}
+.nearby-city-link .permits {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.nearby-city-link .arrow {
+  color: var(--primary);
+  font-size: 18px;
+}
+
+/* STATE LINK */
+.state-link-section {
+  text-align: center;
+  padding: 40px 32px;
+  background: var(--gray-100);
+}
+.state-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.state-link:hover {
+  text-decoration: underline;
+}
+
+/* CTA */
+.cta-section {
+  background: var(--primary);
+  padding: 60px 32px;
+  text-align: center;
+  color: white;
+}
+.cta-section h2 {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+.cta-section p {
+  font-size: 18px;
+  opacity: 0.9;
+  margin-bottom: 24px;
+}
+.cta-btn {
+  display: inline-block;
+  background: white;
+  color: var(--primary);
+  padding: 14px 32px;
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all .2s;
+}
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+
+/* NO DATA STATE */
+.no-data-message {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 60px 32px;
+  text-align: center;
+  border: 1px solid var(--gray-200);
+}
+.no-data-message h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 12px;
+}
+.no-data-message p {
+  font-size: 16px;
+  color: var(--gray-500);
+  margin-bottom: 20px;
+}
+.no-data-message .btn {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 12px 28px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  .hero h1 { font-size: 28px; }
+  .summary-cards { flex-direction: column; gap: 12px; }
+  .summary-card { min-width: auto; }
+  .section { padding: 32px 20px; }
+  .permits-table th, .permits-table td { padding: 10px 12px; }
+  .types-grid { grid-template-columns: repeat(2, 1fr); }
+  .nearby-cities-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<!-- V77: Breadcrumbs -->
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <div class="breadcrumbs-inner">
+    <a href="/">Home</a>
+    <span>/</span>
+    <a href="/permits/{{ state_slug }}">{{ state_name }}</a>
+    <span>/</span>
+    <span class="current">{{ city_name }}</span>
+  </div>
+</nav>
+
+<!-- HERO with Permit Activity Summary -->
+<section class="hero">
+  <div class="hero-inner">
+    <h1>{{ city_name }}, {{ state_name }} Building Permits</h1>
+    <p class="subtitle">Track new construction, renovations, and remodeling permits. Updated daily for contractors and builders.</p>
+
+    <!-- PERMIT ACTIVITY SUMMARY -->
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="summary-card-value">{{ "{:,}".format(permit_count) }}</div>
+        <div class="summary-card-label">Total Permits</div>
+      </div>
+      {% if earliest_date and latest_date %}
+      <div class="summary-card">
+        <div class="summary-card-value">{{ earliest_date[:4] if earliest_date else '---' }}-{{ latest_date[:4] if latest_date else '---' }}</div>
+        <div class="summary-card-label">Date Range</div>
+      </div>
+      {% endif %}
+      {% if last_collection %}
+      <div class="summary-card">
+        <div class="summary-card-value">{{ last_collection[:10] if last_collection else 'N/A' }}</div>
+        <div class="summary-card-label">Last Updated</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if data_freshness == 'fresh' or data_freshness == 'aging' %}
+    <div class="freshness-badge">
+      <span class="freshness-dot"></span>
+      Updated daily
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- RECENT PERMITS TABLE -->
+<section class="section">
+  <div class="section-header">
+    <h2>Recent Building Permits in {{ city_name }}</h2>
+    <p>Latest permits filed with the {{ city_name }} building department</p>
+  </div>
+
+  {% if recent_permits %}
+  <div class="permits-table-container">
+    <div class="permits-table-header">
+      <h3>Recent Permits</h3>
+      <a href="/?city={{ city_name }}">View all {{ permit_count }} permits &rarr;</a>
+    </div>
+    <div class="permits-table-wrap">
+      <table class="permits-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Address</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Contractor/Applicant</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for permit in recent_permits[:25] %}
+          <tr>
+            <td>{{ permit.filing_date or 'N/A' }}</td>
+            <td class="address">{{ permit.address or 'Address not listed' }}</td>
+            <td>
+              {% if permit.permit_type %}
+              <span class="permit-type">{{ permit.permit_type }}</span>
+              {% else %}
+              <span style="color: var(--gray-400);">-</span>
+              {% endif %}
+            </td>
+            <td class="description" title="{{ permit.description or '' }}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}...{% endif %}</td>
+            <td>{{ permit.contractor or permit.applicant_name or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="no-data-message">
+    <h3>Permit Data Coming Soon</h3>
+    <p>We're working on adding {{ city_name }} permit data to our coverage. Sign up to be notified when it's available.</p>
+    <a href="/get-alerts" class="btn">Get Notified</a>
+  </div>
+  {% endif %}
+</section>
+
+<!-- PERMIT TYPES BREAKDOWN -->
+{% if permit_types %}
+<section class="section" style="background: white; max-width: none; padding-left: 32px; padding-right: 32px;">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    <div class="section-header">
+      <h2>Permit Types in {{ city_name }}</h2>
+      <p>Breakdown of building permits by category</p>
+    </div>
+
+    <div class="types-grid">
+      {% for ptype, count in permit_types.items() %}
+      <div class="type-card">
+        <h4>{{ ptype }}</h4>
+        <div class="count">{{ "{:,}".format(count) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- CONTRACTOR CONTEXT -->
+<section class="section">
+  <div class="section-header">
+    <h2>Construction Activity in {{ city_name }}</h2>
+  </div>
+
+  <div class="contractor-context">
+    <p>New building permits in {{ city_name }}, {{ state_name }} indicate upcoming construction projects. Contractors can identify subcontracting opportunities by monitoring recently issued permits for residential renovations, commercial buildouts, and new construction. Early outreach to permit holders often results in higher close rates before projects go to competitive bid.</p>
+  </div>
+</section>
+
+<!-- NEARBY CITIES -->
+{% if nearby_cities %}
+<section class="section" style="background: var(--gray-100); max-width: none; padding-left: 32px; padding-right: 32px;">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    <div class="section-header">
+      <h2>Nearby {{ state_name }} Cities</h2>
+      <p>Explore building permits in other {{ state_name }} cities</p>
+    </div>
+
+    <div class="nearby-cities-grid">
+      {% for city in nearby_cities %}
+      <a href="/permits/{{ state_slug }}/{{ city.city_slug }}" class="nearby-city-link">
+        <div>
+          <div class="name">{{ city.city }}</div>
+          <div class="permits">{{ city.total_permits or 0 }} permits</div>
+        </div>
+        <span class="arrow">&rarr;</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- STATE LINK -->
+<section class="state-link-section">
+  <a href="/permits/{{ state_slug }}" class="state-link">
+    <span>View all {{ state_name }} permits</span>
+    <span>&rarr;</span>
+  </a>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2>Get {{ city_name }} Permit Alerts</h2>
+  <p>Daily email digest of new permits. Be the first contractor to call.</p>
+  <a href="/get-alerts" class="cta-btn">Set Up Free Alerts</a>
+</section>
+
+{% include 'partials/footer.html' %}
+
+</body>
+</html>

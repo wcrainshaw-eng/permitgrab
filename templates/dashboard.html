@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PermitGrab — Construction Permit Leads for Contractors</title>
-<meta name="description" content="Find construction permit leads before your competition. Browse building permits, get contractor contact info, and win more jobs. Free to start.">
+<title>PermitGrab — Building Permit Data for Contractors | Track Permits Nationwide</title>
+<meta name="description" content="Track building permits across 900+ US cities. Find new construction, renovation, and remodeling permits daily. Built for contractors, builders, and remodelers looking for job leads.">
 <link rel="canonical" href="https://permitgrab.com/">
-<meta property="og:title" content="PermitGrab — Construction Permit Leads">
-<meta property="og:description" content="Real-time building permit leads delivered daily. Find who's building, what they're building, and how to reach them.">
+<meta property="og:title" content="PermitGrab — Building Permit Data for Contractors">
+<meta property="og:description" content="Track building permits across 900+ US cities. Find new construction, renovation, and remodeling permits daily. Built for contractors.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://permitgrab.com/">
 <meta property="og:image" content="https://permitgrab.com/static/og-image.png">
@@ -1421,8 +1421,8 @@ footer a:hover { color: white; }
     </nav>
   </div>
   <div class="hero-content">
-    <h1>Turn Building Permits Into <span>Your Next Job</span></h1>
-    <p>Real-time construction permit leads delivered to your inbox. Know who's building, what they're building, and how to reach them — before your competition.</p>
+    <h1>Building Permit Data for <span>Contractors</span></h1>
+    <p>Track building permits across 900+ US cities. Find new construction, renovation, and remodeling permits daily. Be the first contractor to call.</p>
   </div>
   <div class="stats-bar">
     <div class="stat-item">
@@ -1430,16 +1430,16 @@ footer a:hover { color: white; }
       <div class="stat-label">Active Permits</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-trades">13</div>
-      <div class="stat-label">Trade Categories</div>
+      <div class="stat-value" id="stat-cities">{{ city_count | default(900) }}+</div>
+      <div class="stat-label">Cities Covered</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-states">50</div>
+      <div class="stat-label">States</div>
     </div>
     <div class="stat-item">
       <div class="stat-value" id="stat-value">{% if initial_stats.total_value | default(0) >= 1000000000 %}${{ "%.1f" | format((initial_stats.total_value | default(0)) / 1000000000) }}B{% else %}${{ "%.0f" | format((initial_stats.total_value | default(0)) / 1000000) }}M{% endif %}</div>
       <div class="stat-label">Total Project Value</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-value" id="stat-high">{{ "{:,}".format(initial_stats.high_value_count | default(0)) }}</div>
-      <div class="stat-label" id="stat-high-label">High-Value Leads</div>
     </div>
   </div>
 </section>

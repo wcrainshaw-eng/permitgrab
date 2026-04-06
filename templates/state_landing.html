@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ state_name }} Building Permits & Contractor Leads | PermitGrab</title>
-<meta name="description" content="Track building permits across {{ cities | length }} {{ state_name }} cities. Real-time construction permit data for contractors.">
+<meta name="description" content="Browse building permits across {{ cities | length }} cities in {{ state_name }}. Track new construction and renovation permits daily. Built for contractors and builders.">
 <link rel="canonical" href="https://permitgrab.com/permits/{{ state_slug }}">
 <meta property="og:title" content="{{ state_name }} Building Permits | PermitGrab">
 <meta property="og:description" content="Browse {{ total_permits | default(0) | int }} active building permits across {{ cities | length }} {{ state_name }} cities.">
@@ -312,7 +312,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <h2>{{ state_name }} Cities</h2>
   <div class="cities-grid">
     {% for city in cities %}
-    <a href="/permits/{{ city.slug }}" class="city-card">
+    {# V77: Link to new /permits/{state}/{city} SEO format #}
+    <a href="/permits/{{ state_slug }}/{{ city.slug }}" class="city-card">
       <h3>{{ city.name }}</h3>
       <div class="city-card-stats">
         <div class="city-card-stat"><strong>{{ city.permit_count | default(0) }}</strong> {{ "permit" if city.permit_count == 1 else "permits" }}</div>
