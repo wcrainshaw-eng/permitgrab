@@ -4248,6 +4248,76 @@ def admin_city_sources():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/bulk-sources')
+def admin_bulk_sources():
+    """V87: List bulk sources (county/state level)."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import db as permitdb
+        conn = permitdb.get_connection()
+        rows = conn.execute("""
+            SELECT * FROM bulk_sources ORDER BY total_permits_collected DESC LIMIT 100
+        """).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/architecture-stats')
+def admin_architecture_stats():
+    """V87: Get clean architecture statistics."""
+    admin_key = request.headers.get('X-Admin-Key') or request.args.get('key')
+    expected = os.environ.get('ADMIN_KEY', 'permitgrab-reset-2026')
+    if admin_key != expected:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import db as permitdb
+        conn = permitdb.get_connection()
+
+        # Core counts
+        total_cities = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+        cities_with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
+        total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+        linked_permits = conn.execute("SELECT COUNT(*) FROM permits WHERE prod_city_id IS NOT NULL").fetchone()[0]
+
+        # Source counts
+        city_sources = conn.execute("SELECT COUNT(*) FROM city_sources WHERE status = 'active'").fetchone()[0]
+        city_sources_linked = conn.execute("SELECT COUNT(*) FROM city_sources WHERE status = 'active' AND prod_city_id IS NOT NULL").fetchone()[0]
+
+        # Bulk sources (may not exist yet)
+        try:
+            bulk_sources = conn.execute("SELECT COUNT(*) FROM bulk_sources WHERE status = 'active'").fetchone()[0]
+        except Exception:
+            bulk_sources = 0
+
+        return jsonify({
+            'prod_cities': {
+                'total': total_cities,
+                'with_data': cities_with_data,
+                'without_data': total_cities - cities_with_data
+            },
+            'permits': {
+                'total': total_permits,
+                'linked': linked_permits,
+                'unlinked': total_permits - linked_permits,
+                'link_rate': f"{100 * linked_permits // total_permits}%" if total_permits > 0 else "0%"
+            },
+            'sources': {
+                'city_sources': city_sources,
+                'city_sources_linked': city_sources_linked,
+                'bulk_sources': bulk_sources
+            },
+            'architecture': 'V87 - Clean FK-based relationships'
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/discovery-log')
 def admin_discovery_log():
     """V12.54: Recent discovery runs."""

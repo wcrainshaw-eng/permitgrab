@@ -445,6 +445,7 @@ def init_db():
                     ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
                     ("V85 city name canonicalization", lambda: _migrate_canonical_city_names(conn)),
                     ("V86 city linking", lambda: _run_v86_city_linking(conn)),
+                    ("V87 source cleanup", lambda: _run_v87_source_cleanup(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -584,7 +585,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_us_counties_priority ON us_counties(priority);
         CREATE INDEX IF NOT EXISTS idx_us_counties_fips ON us_counties(fips);
 
-        -- city_sources: Discovered data sources (replaces CITY_REGISTRY/BULK_SOURCES)
+        -- city_sources: City-level data sources (1:1 with prod_cities)
+        -- V87: This table is now ONLY for city-level sources, not bulk/county/state
         CREATE TABLE IF NOT EXISTS city_sources (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source_key TEXT UNIQUE NOT NULL,
@@ -611,6 +613,44 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_city_sources_status ON city_sources(status);
         CREATE INDEX IF NOT EXISTS idx_city_sources_platform ON city_sources(platform);
         CREATE INDEX IF NOT EXISTS idx_city_sources_mode ON city_sources(mode);
+
+        -- V87: bulk_sources - County/state/regional data sources that cover multiple cities
+        CREATE TABLE IF NOT EXISTS bulk_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_key TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            scope_type TEXT NOT NULL CHECK (scope_type IN ('county', 'state', 'region', 'multi')),
+            scope_name TEXT NOT NULL,  -- e.g., "Los Angeles County" or "California"
+            state TEXT,
+            platform TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            dataset_id TEXT,
+            field_map TEXT,
+            date_field TEXT,
+            city_field TEXT,  -- Field that identifies which city each permit belongs to
+            limit_per_page INTEGER DEFAULT 2000,
+            status TEXT DEFAULT 'active',
+            consecutive_failures INTEGER DEFAULT 0,
+            last_failure_reason TEXT,
+            last_collected_at TEXT,
+            total_permits_collected INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_bulk_sources_status ON bulk_sources(status);
+        CREATE INDEX IF NOT EXISTS idx_bulk_sources_scope ON bulk_sources(scope_type, state);
+
+        -- V87: bulk_source_coverage - Maps which cities each bulk source covers
+        CREATE TABLE IF NOT EXISTS bulk_source_coverage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bulk_source_id INTEGER NOT NULL REFERENCES bulk_sources(id),
+            prod_city_id INTEGER NOT NULL REFERENCES prod_cities(id),
+            is_primary INTEGER DEFAULT 0,  -- 1 if this is the primary source for the city
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(bulk_source_id, prod_city_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_bulk_coverage_source ON bulk_source_coverage(bulk_source_id);
+        CREATE INDEX IF NOT EXISTS idx_bulk_coverage_city ON bulk_source_coverage(prod_city_id);
 
         -- discovery_runs: Audit log for autonomy engine runs
         CREATE TABLE IF NOT EXISTS discovery_runs (
@@ -779,7 +819,10 @@ def init_db():
     # V86: Add prod_city_id foreign keys and link data
     _run_v86_city_linking(conn)
 
-    print(f"[DB] V86: Database initialized at {DB_PATH}")
+    # V87: Clean up sources - separate bulk from city, remove garbage
+    _run_v87_source_cleanup(conn)
+
+    print(f"[DB] V87: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations_pg(conn):
@@ -1028,6 +1071,183 @@ def _run_v86_city_linking(conn):
 
     elapsed = time.time() - start
     print(f"[V86] City linking migration completed in {elapsed:.1f}s")
+
+
+def _run_v87_source_cleanup(conn):
+    """V87: Clean up sources - separate bulk from city, remove garbage.
+
+    This migration:
+    1. Creates bulk_sources table if needed
+    2. Moves county/state sources from city_sources to bulk_sources
+    3. Deletes garbage entries (dataset names, permit types, etc.)
+    4. Ensures city_sources only has valid city-level sources
+    """
+    import re
+
+    # Step 1: Ensure bulk_sources table exists
+    try:
+        conn.execute("SELECT 1 FROM bulk_sources LIMIT 1")
+    except Exception:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bulk_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_key TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                scope_type TEXT NOT NULL,
+                scope_name TEXT NOT NULL,
+                state TEXT,
+                platform TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                dataset_id TEXT,
+                field_map TEXT,
+                date_field TEXT,
+                city_field TEXT,
+                limit_per_page INTEGER DEFAULT 2000,
+                status TEXT DEFAULT 'active',
+                consecutive_failures INTEGER DEFAULT 0,
+                last_failure_reason TEXT,
+                last_collected_at TEXT,
+                total_permits_collected INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bulk_source_coverage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bulk_source_id INTEGER NOT NULL,
+                prod_city_id INTEGER NOT NULL,
+                is_primary INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(bulk_source_id, prod_city_id)
+            )
+        """)
+        print("[V87] Created bulk_sources and bulk_source_coverage tables")
+
+    conn.commit()
+
+    # Step 2: Define patterns for garbage sources (not real city data)
+    GARBAGE_PATTERNS = [
+        r'^DOB NOW',           # NYC dataset names
+        r'_WGS84$',            # Coordinate system suffixes
+        r'_WFL\d*$',           # Web Feature Layer suffixes
+        r'^Issued\s',          # "Issued Construction", etc.
+        r'^Building$',         # Generic permit types
+        r'^Electrical$',
+        r'^Mechanical$',
+        r'^Plumbing$',
+        r'^Gas$',
+        r'^Roofing$',
+        r'^Sign$',
+        r'^Fence$',
+        r'^Fire$',
+        r'^Demolition$',
+        r'^Permits$',
+        r'^Active Sales Tax',  # Tax data, not permits
+        r'Case History',       # Generic case data
+        r'Table$',             # "CFW Development Permits Table"
+        r'^MapServer',
+        r'^FeatureServer',
+        r'Sewer Data',         # Infrastructure, not building permits
+        r'^new_const',         # Dataset artifacts
+    ]
+
+    # Step 3: Define patterns for county/state sources
+    COUNTY_PATTERNS = [
+        r'\bCounty\b',         # "Los Angeles County", "Lake County"
+        r'\bParish\b',         # Louisiana parishes
+    ]
+
+    # State-level sources (name matches state name)
+    US_STATES = {
+        'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+        'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+        'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+        'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+        'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+        'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+        'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+        'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+        'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+        'West Virginia', 'Wisconsin', 'Wyoming'
+    }
+
+    # Step 4: Process all city_sources
+    sources = conn.execute("""
+        SELECT id, source_key, name, state, platform, endpoint, dataset_id,
+               field_map, date_field, city_field, limit_per_page, status,
+               total_permits_collected, created_at
+        FROM city_sources
+    """).fetchall()
+
+    garbage_deleted = 0
+    moved_to_bulk = 0
+    kept_as_city = 0
+
+    for src in sources:
+        src_id, source_key, name, state, platform, endpoint = src[:6]
+        dataset_id, field_map, date_field, city_field = src[6:10]
+        limit_per_page, status, total_permits, created_at = src[10:14]
+
+        # Check if garbage
+        is_garbage = False
+        for pattern in GARBAGE_PATTERNS:
+            if re.search(pattern, name or '', re.IGNORECASE):
+                is_garbage = True
+                break
+
+        # Also garbage if no state and weird name
+        if not state and name and not any(c.isalpha() for c in name[:3]):
+            is_garbage = True
+
+        if is_garbage:
+            conn.execute("DELETE FROM city_sources WHERE id = ?", (src_id,))
+            garbage_deleted += 1
+            continue
+
+        # Check if county/parish
+        is_county = False
+        for pattern in COUNTY_PATTERNS:
+            if re.search(pattern, name or '', re.IGNORECASE):
+                is_county = True
+                break
+
+        # Check if state-level
+        is_state = name in US_STATES
+
+        if is_county or is_state:
+            # Move to bulk_sources
+            scope_type = 'state' if is_state else 'county'
+            scope_name = name
+
+            try:
+                conn.execute("""
+                    INSERT OR IGNORE INTO bulk_sources
+                    (source_key, name, scope_type, scope_name, state, platform, endpoint,
+                     dataset_id, field_map, date_field, city_field, limit_per_page,
+                     status, total_permits_collected, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (source_key, name, scope_type, scope_name, state, platform, endpoint,
+                      dataset_id, field_map, date_field, city_field, limit_per_page,
+                      status, total_permits, created_at))
+
+                conn.execute("DELETE FROM city_sources WHERE id = ?", (src_id,))
+                moved_to_bulk += 1
+            except Exception as e:
+                print(f"[V87] Error moving {name} to bulk: {e}")
+        else:
+            kept_as_city += 1
+
+    conn.commit()
+
+    print(f"[V87] Source cleanup: {garbage_deleted} garbage deleted, {moved_to_bulk} moved to bulk, {kept_as_city} kept as city sources")
+
+    # Step 5: Report final state
+    city_count = conn.execute("SELECT COUNT(*) FROM city_sources").fetchone()[0]
+    bulk_count = conn.execute("SELECT COUNT(*) FROM bulk_sources").fetchone()[0]
+    prod_count = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+
+    print(f"[V87] Final: {city_count} city sources, {bulk_count} bulk sources, {prod_count} prod_cities")
 
 
 def _run_v33_source_linking(conn):
