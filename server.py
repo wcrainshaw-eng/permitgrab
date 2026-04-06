@@ -2456,6 +2456,165 @@ def admin_fix_broken_configs():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/update-source', methods=['POST'])
+def admin_update_source():
+    """V75: Update a city_sources row via SQL.
+
+    This endpoint allows runtime updates to city_sources without redeploying.
+    Useful for fixing broken configs, updating endpoints, resetting failures, etc.
+
+    POST body:
+    {
+        "source_key": "kansas_city",
+        "updates": {
+            "endpoint": "https://data.kcmo.org/resource/NEW_ID.json",
+            "dataset_id": "NEW_ID",
+            "status": "active",
+            "consecutive_failures": 0,
+            "last_failure_reason": null
+        }
+    }
+
+    Allowed fields to update:
+    - endpoint, dataset_id, platform, date_field, field_map
+    - status, consecutive_failures, last_failure_reason
+    - covers_cities, limit_per_page
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        source_key = data.get('source_key')
+        updates = data.get('updates', {})
+
+        if not source_key:
+            return jsonify({'error': 'source_key is required'}), 400
+
+        if not updates:
+            return jsonify({'error': 'updates object is required'}), 400
+
+        # Whitelist of allowed fields to update
+        allowed_fields = {
+            'endpoint', 'dataset_id', 'platform', 'date_field', 'field_map',
+            'status', 'consecutive_failures', 'last_failure_reason',
+            'covers_cities', 'limit_per_page', 'name', 'state'
+        }
+
+        # Filter to only allowed fields
+        filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
+        if not filtered_updates:
+            return jsonify({'error': f'No valid fields to update. Allowed: {allowed_fields}'}), 400
+
+        conn = permitdb.get_connection()
+
+        # Check if source exists
+        existing = conn.execute(
+            "SELECT source_key FROM city_sources WHERE source_key = ?",
+            (source_key,)
+        ).fetchone()
+
+        if not existing:
+            return jsonify({'error': f'Source {source_key} not found in city_sources'}), 404
+
+        # Build UPDATE query
+        set_clauses = []
+        values = []
+        for field, value in filtered_updates.items():
+            set_clauses.append(f"{field} = ?")
+            # Handle None/null for last_failure_reason
+            values.append(value if value is not None else None)
+
+        values.append(source_key)
+
+        query = f"UPDATE city_sources SET {', '.join(set_clauses)} WHERE source_key = ?"
+        conn.execute(query, values)
+        conn.commit()
+
+        return jsonify({
+            'status': 'success',
+            'source_key': source_key,
+            'fields_updated': list(filtered_updates.keys())
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/cleanup-prod-cities', methods=['POST'])
+def admin_cleanup_prod_cities():
+    """V75: Clean up inflated prod_cities entries.
+
+    This removes or deactivates prod_cities entries that:
+    1. Have never been collected (last_collection IS NULL)
+    2. Have 0 total_permits
+    3. Don't have a matching active city_sources entry
+
+    POST body:
+    {
+        "mode": "deactivate"  // or "delete" (default: deactivate)
+    }
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        mode = data.get('mode', 'deactivate')
+
+        conn = permitdb.get_connection()
+
+        if mode == 'delete':
+            # Delete entries that have never collected and have 0 permits
+            result = conn.execute("""
+                DELETE FROM prod_cities
+                WHERE last_collection IS NULL
+                AND total_permits = 0
+                AND source_id NOT IN (SELECT source_key FROM city_sources WHERE status='active')
+            """)
+            action = 'deleted'
+        else:
+            # Deactivate entries that have never collected and have 0 permits
+            conn.execute("""
+                UPDATE prod_cities SET status = 'inactive'
+                WHERE last_collection IS NULL
+                AND total_permits = 0
+                AND status = 'active'
+                AND source_id NOT IN (SELECT source_key FROM city_sources WHERE status='active')
+            """)
+            action = 'deactivated'
+
+        # Get counts
+        active_count = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE status='active'"
+        ).fetchone()[0]
+        inactive_count = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE status='inactive'"
+        ).fetchone()[0]
+        no_data_count = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE status='active' AND total_permits=0"
+        ).fetchone()[0]
+
+        conn.commit()
+
+        return jsonify({
+            'status': 'success',
+            'action': action,
+            'prod_cities_active': active_count,
+            'prod_cities_inactive': inactive_count,
+            'no_data_count': no_data_count
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/trigger-search', methods=['POST'])
 def admin_trigger_search():
     """V12.54: Manually trigger search for a city or county."""
