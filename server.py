@@ -58,6 +58,503 @@ TRADE_MAPPING = {
     'addition': ['%addition%', '%add on%', '%extension%', '%expand%', '%enlarge%', '%bump out%', '%second story%', '%2nd story%', '%adu%', '%accessory dwelling%', '%guest house%'],
 }
 
+# V79: Blog posts data structure with pre-rendered HTML content
+BLOG_POSTS = [
+    {
+        'slug': 'how-much-does-building-permit-cost-houston',
+        'title': 'How Much Does a Building Permit Cost in Houston, TX? (2026 Guide)',
+        'meta_description': 'Complete 2026 guide to Houston building permit costs. Fee schedules, plan review costs, and tips for contractors and builders.',
+        'date': '2026-04-06',
+        'category': 'permit-costs',
+        'city_link': '/permits/texas/houston',
+        'city_name': 'Houston',
+        'excerpt': 'Houston building permit fees are generally calculated as a percentage of total project value. Here\'s what contractors need to know for 2026.',
+        'content': '''
+<p>If you're a contractor or builder working in Houston, understanding permit costs is essential for accurate bidding and project planning. Houston's permitting system has some unique quirks — including no traditional zoning — that affect how permits work and what you'll pay.</p>
+<p>This guide breaks down everything you need to know about building permit costs in Houston for 2026.</p>
+
+<h2>Houston Building Permit Costs at a Glance</h2>
+<p>Houston building permit fees are generally calculated as a percentage of total project value, plus additional review fees depending on the scope of work.</p>
+<p><strong>Residential permit costs:</strong></p>
+<ul>
+<li>Small projects (under $1,000 in value): approximately $40</li>
+<li>Most residential projects: roughly 1% of total project cost</li>
+<li>A $20,000 bathroom remodel would run about $200 in permit fees</li>
+<li>Plan review and specialized work fees add $200–$500 on top</li>
+</ul>
+<p><strong>Commercial permit costs:</strong></p>
+<ul>
+<li>Range from $500 to $25,000+ depending on project size and complexity</li>
+<li>Calculated based on project valuation and construction type</li>
+<li>Fast Track Review is available for qualifying commercial projects</li>
+</ul>
+<p>These are base fees — your total cost may include plan review surcharges, inspection fees, and specialty permits (electrical, plumbing, mechanical).</p>
+
+<h2>Where to Apply for a Building Permit in Houston</h2>
+<p>All permits go through the <strong>Houston Permitting Center</strong>:</p>
+<ul>
+<li><strong>Address:</strong> 1002 Washington Avenue, Houston, TX 77002</li>
+<li><strong>Hours:</strong> Monday–Friday, 8:00 AM – 5:00 PM (residential plan review intake closes at 3:00 PM)</li>
+<li><strong>Online portal:</strong> iPermits is the primary method for 2026 submissions</li>
+<li><strong>Fee calculator:</strong> Available on the Houston Permitting Center website to estimate your costs before applying</li>
+</ul>
+<p>Most permits can now be submitted online through the iPermits system, which has become the standard for 2026.</p>
+
+<h2>How Long Does It Take to Get a Building Permit in Houston?</h2>
+<p>Processing times vary significantly by project type:</p>
+<ul>
+<li><strong>Express/Fast Track Review:</strong> 5–10 business days for qualifying commercial projects</li>
+<li><strong>Standard commercial plan review:</strong> 2–37 business days for the initial review cycle</li>
+<li><strong>Typical timeline:</strong> 2–6 weeks, though revisions can extend this</li>
+</ul>
+<p>Plan for potential delays if your project involves floodplain areas, historic districts, or requires variance approvals.</p>
+
+<h2>What Documents Do You Need?</h2>
+<p>For a standard residential building permit in Houston, you'll typically need:</p>
+<ul>
+<li>Building Permit Application (submitted online through iPermits)</li>
+<li>New Single Family Prerequisite Checklist (form CE-1301)</li>
+<li>Deed Restrictions Declaration form</li>
+<li>Architectural and engineering plans for applicable projects</li>
+<li>Site plan showing the proposed work</li>
+</ul>
+<p>Commercial projects require additional documentation including structural engineering plans, MEP drawings, and fire safety plans.</p>
+
+<h2>Special Requirements to Know About</h2>
+<p><strong>No zoning:</strong> Houston is famously the only major US city without traditional zoning. Instead, you'll need to navigate deed restrictions, special districts, and overlay zones. This means the Deed Restrictions Declaration form is a required part of every residential permit application.</p>
+<p><strong>Floodplain requirements:</strong> Given Houston's flood history, projects in floodplain areas face stricter building requirements and may need additional engineering documentation and elevation certificates.</p>
+<p><strong>Historic districts:</strong> If your project is in a historic district, you'll need a Certificate of Appropriateness from the Houston Archaeological and Historical Commission before the building permit can be issued.</p>
+<p><strong>TDLR Special Inspections:</strong> These run $40/hour plus travel time — factor this into your project budget.</p>
+'''
+    },
+    {
+        'slug': 'how-much-does-building-permit-cost-los-angeles',
+        'title': 'How Much Does a Building Permit Cost in Los Angeles, CA? (2026 Guide)',
+        'meta_description': 'LA building permit costs for 2026. Plan check fees, development impact fees, school fees, and what contractors need to know.',
+        'date': '2026-04-06',
+        'category': 'permit-costs',
+        'city_link': '/permits/california/los-angeles',
+        'city_name': 'Los Angeles',
+        'excerpt': 'Los Angeles has some of the highest building permit costs in the country. Here\'s what contractors need to budget for in 2026.',
+        'content': '''
+<p>Los Angeles has some of the highest building permit costs in the country. Between plan check fees, development impact fees, school fees, and California's energy code surcharges, permit costs in LA can easily reach five figures for even modest projects. Here's what contractors and builders need to know for 2026.</p>
+
+<h2>LA Building Permit Costs at a Glance</h2>
+<p>Los Angeles permit fees were updated in February 2026 under Ordinance No. 188,796, so make sure any estimates you've seen are current.</p>
+<p><strong>Residential permit costs:</strong></p>
+<ul>
+<li>Range from $10,000 to $50,000+ depending on project location and type</li>
+<li>Includes both the Plan Check Fee (city's design review) and the Permit Issuance Fee</li>
+<li>ADUs under 750 sq ft may qualify for fee exemptions under SB 543</li>
+</ul>
+<p><strong>Commercial permit costs:</strong></p>
+<ul>
+<li>Base fee starts at 0.5% of the first $50,000 in construction valuation, with decreasing rates for higher valuations</li>
+<li>Plan check fee: 85% of the base permit fee (paid separately)</li>
+<li>MEP permits: $150–$1,500</li>
+<li>Fire safety system permits (sprinklers, alarms): $500–$5,000</li>
+<li>Traffic impact studies for large developments: $5,000–$30,000</li>
+</ul>
+<p><strong>California-specific surcharges that add up fast:</strong></p>
+<ul>
+<li>Title 24 Energy Code compliance: 10% permit fee increase</li>
+<li>Disabled access and adaptability (Title 24): 5% permit fee increase</li>
+<li>School development fees: approximately $0.66 per square foot</li>
+<li>California Solar Mandate: can add $8,000–$12,000 to residential projects</li>
+</ul>
+
+<h2>Where to Apply for a Building Permit in LA</h2>
+<p>Permits in the City of Los Angeles go through the <strong>Los Angeles Department of Building and Safety (LADBS)</strong>. Unincorporated areas fall under LA County Building and Safety.</p>
+<ul>
+<li><strong>Online portals:</strong> ePlanLA or PermitLA (requires an Angeleno account)</li>
+<li><strong>Contact:</strong> 311 or the LADBS customer call center</li>
+<li><strong>Fee calculator:</strong> Available on the LADBS website — use this before bidding any project</li>
+</ul>
+
+<h2>How Long Does It Take to Get a Building Permit in LA?</h2>
+<p>This is where LA's reputation earns itself. Processing times are significantly longer than most cities:</p>
+<ul>
+<li><strong>Standard projects:</strong> 4–8 months is typical</li>
+<li><strong>Room additions and second-story additions:</strong> Longer due to structural review requirements</li>
+<li><strong>Pre-approved ADU plans:</strong> 30–60 days (a major improvement thanks to SB 543)</li>
+</ul>
+
+<h2>Special Requirements to Know About</h2>
+<p><strong>Fire zones:</strong> Properties in Very High Fire Hazard Severity Zones face additional requirements for fire-resistant materials, defensible space, and enhanced building standards.</p>
+<p><strong>ADU rules (2026):</strong> California has significantly streamlined ADU permitting. Units under 750 sq ft get fee exemptions, and units under 500 sq ft get additional benefits under SB 543.</p>
+'''
+    },
+    {
+        'slug': 'how-much-does-building-permit-cost-chicago',
+        'title': 'How Much Does a Building Permit Cost in Chicago, IL? (2026 Guide)',
+        'meta_description': 'Chicago building permit costs in 2026. Formula-based fees, fast-track options, and cost breakdowns for contractors.',
+        'date': '2026-04-06',
+        'category': 'permit-costs',
+        'city_link': '/permits/illinois/chicago',
+        'city_name': 'Chicago',
+        'excerpt': 'Chicago\'s building permit system is formula-based with same-day express permits available. Here\'s the full breakdown for 2026.',
+        'content': '''
+<p>Chicago's building permit system is formula-based, which means your costs depend on construction type, occupancy classification, square footage, and project scope. The upside is that the city offers several fast-track programs that can get simple permits issued same-day. Here's the full breakdown for 2026.</p>
+
+<h2>Chicago Building Permit Costs at a Glance</h2>
+<p>Unlike cities with flat fee schedules, Chicago calculates permit fees using a formula that accounts for multiple project variables.</p>
+<p><strong>Residential permit costs:</strong></p>
+<ul>
+<li>Minimum fee: $302 (this applies even for small projects)</li>
+<li>Actual cost is calculated based on construction type, occupancy type, square footage, and scope</li>
+<li>Use the city's online fee calculator to get a project-specific estimate before bidding</li>
+</ul>
+<p><strong>Commercial permit costs:</strong></p>
+<ul>
+<li>Also formula-based with a $302 minimum</li>
+<li>Higher-value and more complex projects incur progressively higher fees</li>
+<li>Large commercial developments can run into the thousands</li>
+</ul>
+<p><strong>Fee waiver:</strong> Long-term senior homeowners (65+) who meet income criteria are exempt from permit fees for repairs and alterations to 1–3 unit residential buildings.</p>
+
+<h2>Where to Apply for a Building Permit in Chicago</h2>
+<p>Permits are handled by the <strong>Department of Buildings, City of Chicago</strong>.</p>
+<ul>
+<li><strong>Online portal:</strong> Inspection, Permitting & Licensing Portal (IPI)</li>
+<li><strong>Email:</strong> dob-info@cityofchicago.org</li>
+<li><strong>Fee calculator:</strong> Available on the city's website — essential for estimating costs</li>
+</ul>
+
+<h2>How Long Does It Take to Get a Building Permit in Chicago?</h2>
+<p>Chicago offers some of the fastest permitting options of any major city:</p>
+<ul>
+<li><strong>Express permits:</strong> Same-day issuance for qualifying simple repairs and improvements</li>
+<li><strong>Self-Certified Permit Program:</strong> 2–3 weeks for eligible projects with architect/engineer certification</li>
+<li><strong>Simple projects:</strong> 7–10 business days</li>
+<li><strong>Complex projects:</strong> 10–14 business days or longer</li>
+</ul>
+
+<h2>Special Requirements to Know About</h2>
+<p><strong>High-rise requirements:</strong> Buildings over 80 feet must include enhanced sprinkler systems, stairway pressurization, and fire command centers.</p>
+<p><strong>Express Permit Program:</strong> Qualifying projects can be permitted same-day through the city's web-enabled system.</p>
+<p><strong>Self-Certified Permit Program:</strong> If you work with an enrolled architect or engineer, eligible projects can be permitted in 2–3 weeks.</p>
+'''
+    },
+    {
+        'slug': 'how-much-does-building-permit-cost-phoenix',
+        'title': 'How Much Does a Building Permit Cost in Phoenix, AZ? (2026 Guide)',
+        'meta_description': 'Phoenix building permit costs for 2026. Electronic plan review, over-the-counter permits, and fee schedules for contractors.',
+        'date': '2026-04-06',
+        'category': 'permit-costs',
+        'city_link': '/permits/arizona/phoenix',
+        'city_name': 'Phoenix',
+        'excerpt': 'Phoenix uses a tiered fee structure with same-day over-the-counter permits for simple projects. Here\'s what to expect in 2026.',
+        'content': '''
+<p>Phoenix is one of the fastest-growing construction markets in the country, and the city's permitting system reflects that with electronic plan review and over-the-counter permits for simple projects. Here's what contractors and builders need to know about permit costs in Phoenix for 2026.</p>
+
+<h2>Phoenix Building Permit Costs at a Glance</h2>
+<p>Phoenix uses a tiered fee structure based on project valuation. The Building Valuation Table was most recently updated on January 20, 2026.</p>
+<p><strong>Residential permit costs:</strong></p>
+<ul>
+<li>Projects under $1,000 in value: $150 minimum</li>
+<li>Projects $1,001–$10,000: $150 plus $9.00 per additional $1,000 in value</li>
+<li>Example: A $50,000 remodel would cost approximately $551 in base permit fees</li>
+<li>Plan review fee: 80–100% of the building permit fee (separate charge)</li>
+<li>Swimming pool permits: $180 minimum plus a $30 aquatics program surcharge</li>
+</ul>
+<p><strong>Commercial permit costs:</strong></p>
+<ul>
+<li>New construction: $5,000–$50,000+ depending on project size</li>
+<li>Tenant improvements: $1,500–$10,000 depending on scope</li>
+<li>Development impact fees: $2,000–$20,000+ depending on location and building size</li>
+</ul>
+
+<h2>Where to Apply for a Building Permit in Phoenix</h2>
+<p>Permits go through the <strong>City of Phoenix Planning and Development Department (PDD)</strong>.</p>
+<ul>
+<li><strong>Online system:</strong> ePlans electronic plan review system</li>
+<li>Over-the-counter permits available for simple residential projects</li>
+</ul>
+
+<h2>How Long Does It Take to Get a Building Permit in Phoenix?</h2>
+<ul>
+<li><strong>Simple residential projects:</strong> Same-day issuance available over the counter</li>
+<li><strong>Standard residential:</strong> 2–4 weeks</li>
+<li><strong>Commercial projects:</strong> 8–14 weeks total (including typical 2–3 correction cycles)</li>
+</ul>
+
+<h2>Special Requirements to Know About</h2>
+<p><strong>Swimming pool permits</strong> carry an additional $30 aquatics program surcharge.</p>
+<p><strong>Reinspection fees</strong> are $150 per inspection for projects under $1,000 that require more than 2 inspections.</p>
+<p><strong>Development impact fees</strong> can be $2,000 to $20,000+ depending on location and building size.</p>
+'''
+    },
+    {
+        'slug': 'how-much-does-building-permit-cost-san-antonio',
+        'title': 'How Much Does a Building Permit Cost in San Antonio, TX? (2026 Guide)',
+        'meta_description': 'San Antonio building permit costs in 2026. What contractors and builders need to know about fees and timelines.',
+        'date': '2026-04-06',
+        'category': 'permit-costs',
+        'city_link': '/permits/texas/san-antonio',
+        'city_name': 'San Antonio',
+        'excerpt': 'San Antonio\'s permit fees are calculated based on project type, square footage, and complexity. Here\'s the 2026 guide.',
+        'content': '''
+<p>San Antonio is one of the fastest-growing cities in Texas, and with that growth comes a lot of construction activity. Whether you're a general contractor working on new residential builds or a commercial builder tackling tenant improvements, here's what you need to know about building permit costs in San Antonio for 2026.</p>
+
+<h2>San Antonio Building Permit Costs at a Glance</h2>
+<p>San Antonio's permit fees are calculated based on project type, square footage, and complexity. The city uses a fee estimator tool rather than publishing flat rates.</p>
+<p><strong>Residential permit costs:</strong></p>
+<ul>
+<li>Fees vary by project type and size</li>
+<li>Calculated based on square footage and scope of work</li>
+<li>Use the city's online fee estimator for accurate quotes</li>
+</ul>
+<p><strong>Commercial permit costs:</strong></p>
+<ul>
+<li>Based on project valuation, square footage, building type, and location</li>
+<li>Projects in historic districts incur additional review fees</li>
+<li>Multi-departmental review (Building, Fire, Planning) can add fees</li>
+</ul>
+
+<h2>Where to Apply for a Building Permit in San Antonio</h2>
+<p>Permits are handled by the <strong>Development Services Department (DSD)</strong> at the Cliff Morton Development and Business Services Center.</p>
+<ul>
+<li><strong>Address:</strong> 1901 S. Alamo St., San Antonio, TX 78204</li>
+<li><strong>Online portal:</strong> San Antonio Permits Portal</li>
+</ul>
+
+<h2>How Long Does It Take to Get a Building Permit in San Antonio?</h2>
+<ul>
+<li><strong>Minor repairs and simple projects:</strong> Same-day review available</li>
+<li><strong>Standard projects:</strong> Multi-departmental review required</li>
+<li><strong>Expedited review:</strong> Available for an additional fee</li>
+</ul>
+<p>Permits are valid for 180 days from issuance.</p>
+
+<h2>Special Requirements to Know About</h2>
+<p><strong>Historic districts:</strong> San Antonio has extensive historic districts. Projects in these areas face additional review requirements from the Historic Preservation Office.</p>
+<p><strong>Multi-departmental review:</strong> San Antonio routes permits through multiple departments (Building, Fire, Planning, and potentially Health, Historic, and Storm Water).</p>
+'''
+    },
+    {
+        'slug': 'find-construction-leads-houston',
+        'title': 'How to Find New Construction Leads in Houston Before Your Competition (2026)',
+        'meta_description': 'How Houston subcontractors find new construction leads before the competition. Permit monitoring, bid boards, and outreach strategies.',
+        'date': '2026-04-06',
+        'category': 'contractor-leads',
+        'city_link': '/permits/texas/houston',
+        'city_name': 'Houston',
+        'excerpt': 'Stop fighting over the same Angi leads. Here\'s how smart Houston contractors find projects before anyone else.',
+        'content': '''
+<p>Every subcontractor in Houston is fighting over the same leads on Angi and HomeAdvisor. By the time you see the job, five other companies have already submitted quotes. There's a better way — and the smartest contractors in Houston have been using it for years.</p>
+
+<h2>The Problem with Traditional Lead Services</h2>
+<p>Services like Angi, Thumbtack, and HomeAdvisor charge $30-75 per lead, and they sell the same lead to 3-5 contractors simultaneously. You're bidding against companies willing to lowball just to win, and you're paying whether you close the deal or not.</p>
+<p>The bigger players use ConstructConnect or Dodge Data, but those start at $500/month and focus on large commercial projects. If you're a specialty sub doing residential and light commercial work, most of what those services show you is irrelevant.</p>
+
+<h2>What Smart Contractors Do Instead</h2>
+<p>The City of Houston processes roughly 8,000-10,000 building permits every month. Every single one of those permits is a project that needs subcontractors. And the permit filing is public record — it tells you the project address, the scope of work, the general contractor's name, and often the estimated project value.</p>
+<p>The contractors who see that permit filing on Day 1 and pick up the phone have a massive advantage over everyone who finds out about it two weeks later through word of mouth or a job board.</p>
+
+<h2>How Building Permit Monitoring Works</h2>
+<p>Here's what a typical workflow looks like for an electrical subcontractor in Houston:</p>
+<ol>
+<li><strong>Set up alerts</strong> for new commercial and large residential permits in your service area</li>
+<li><strong>Filter by trade</strong> — focus on permits that include electrical work</li>
+<li><strong>Review daily</strong> — every morning, check the 5-10 new permits that match your criteria</li>
+<li><strong>Make the call</strong> — contact the GC listed on the permit to introduce your company</li>
+<li><strong>Track results</strong> — log which contacts led to bid invitations and which projects you won</li>
+</ol>
+
+<h2>What Houston Permit Data Tells You</h2>
+<p>Houston is unique in the construction world — it's the largest U.S. city without a traditional zoning code. A Houston building permit typically includes the project address, the type of work, the permit category, the contractor of record, and in many cases the estimated project value and square footage.</p>
+
+<h2>The Numbers That Matter</h2>
+<p>Houston's construction market is one of the most active in the country. In any given week, there are hundreds of new commercial permits filed. Compare paying $50 per shared lead on HomeAdvisor to permit monitoring which gives you 10-20x the volume at a fraction of the cost.</p>
+'''
+    },
+    {
+        'slug': 'find-commercial-bid-opportunities-atlanta',
+        'title': 'The Subcontractor\'s Guide to Finding Commercial Bid Opportunities in Atlanta (2026)',
+        'meta_description': 'Guide for Atlanta subcontractors finding commercial bid opportunities. Beltline projects, county monitoring, and data center builds.',
+        'date': '2026-04-06',
+        'category': 'contractor-leads',
+        'city_link': '/permits/georgia/atlanta',
+        'city_name': 'Atlanta',
+        'excerpt': 'Atlanta\'s construction market is booming. Here\'s how subcontractors can find commercial projects before the competition.',
+        'content': '''
+<p>Atlanta's construction market is booming. Between the continued expansion around the Beltline, massive mixed-use developments in Midtown, and a wave of data center and logistics facility construction across the metro, there's more work available in the Atlanta market right now than at any point in the last decade.</p>
+
+<h2>Atlanta's Construction Landscape in 2026</h2>
+<p>Metro Atlanta consistently ranks in the top 5 nationally for construction activity. The city is experiencing growth across every sector: multifamily residential along the Beltline corridor, office-to-residential conversions in Downtown and Buckhead, industrial and warehouse development along I-85 and I-20, and institutional projects.</p>
+
+<h2>Why Most Subs Miss the Best Opportunities</h2>
+<p>The typical subcontractor relies on word of mouth, plan room services, and cold calls. The problem with plan rooms is timing — by the time a project hits BuildingConnected or iSqFt, the GC has already selected their preferred subcontractors for most trades.</p>
+
+<h2>The Permit Advantage</h2>
+<p>Building permits solve the timing problem. In Atlanta, when a GC files for a building permit, the project is real. That 2-4 week window between permit filing and plan room posting is the most valuable window for subcontractor outreach.</p>
+
+<h2>How to Use Permit Data for Business Development</h2>
+<p><strong>Morning routine (15 minutes):</strong> Review new permits matching your trade and project size criteria.</p>
+<p><strong>Outreach (30 minutes):</strong> Call or email the GC on each flagged permit. Your pitch: "I saw you just filed for the tenant improvement at 200 Peachtree — we're a local mechanical contractor and we'd love to be on the bid list."</p>
+<p><strong>Follow-up:</strong> Track which GCs responded and which sent you plans.</p>
+
+<h2>Atlanta-Specific Tips</h2>
+<p><strong>Watch the Beltline and Westside:</strong> These areas are generating a disproportionate share of permit filings.</p>
+<p><strong>Don't ignore the counties:</strong> Cobb, Gwinnett, and DeKalb each have more construction activity than many mid-size cities.</p>
+<p><strong>Data centers are the hidden opportunity:</strong> North Georgia has become a major data center market with massive $50M-500M projects.</p>
+'''
+    },
+    {
+        'slug': 'permitgrab-vs-constructconnect',
+        'title': 'PermitGrab vs. ConstructConnect: Which Is Right for Your Contracting Business?',
+        'meta_description': 'PermitGrab vs ConstructConnect comparison for contractors. Features, pricing ($150 vs $500-2000+), and which is right for your business.',
+        'date': '2026-04-06',
+        'category': 'contractor-leads',
+        'city_link': None,
+        'city_name': None,
+        'excerpt': 'An honest comparison of permit monitoring vs. plan room services for contractors at different stages of growth.',
+        'content': '''
+<p>If you're a contractor looking for construction lead services, you've probably come across ConstructConnect (formerly iSqFt and CMD). It's one of the biggest names in construction data. But at $500-2,000+ per month, it's priced for mid-to-large firms with dedicated estimating departments.</p>
+
+<h2>What ConstructConnect Does Well</h2>
+<p>ConstructConnect is a comprehensive construction intelligence platform. It provides access to project plans and specifications, bid management tools, takeoff software, and a massive database of commercial projects. If you're a GC or large subcontractor bidding on $1M+ commercial projects, ConstructConnect is purpose-built for your workflow.</p>
+
+<h2>Where ConstructConnect Falls Short for Small Subs</h2>
+<p><strong>Price:</strong> At $500-2,000/month, that's $6,000-24,000/year. For a sub doing $1-3M in annual revenue, that's a significant line item.</p>
+<p><strong>Project mix:</strong> ConstructConnect focuses heavily on commercial and institutional projects. If your bread and butter is residential and light commercial, most of the database isn't relevant to you.</p>
+<p><strong>Timing:</strong> Small and mid-size commercial projects often don't get posted to plan rooms at all.</p>
+
+<h2>What Permit Monitoring Offers Instead</h2>
+<p><strong>Coverage of small and mid-size projects:</strong> The residential renovation, the 3,000 sqft office build-out — these projects require building permits but don't show up in plan rooms.</p>
+<p><strong>Speed:</strong> Permit filings happen at the start of a project's construction phase.</p>
+<p><strong>Price:</strong> At $150/month, permit monitoring is 70-90% less expensive than ConstructConnect.</p>
+
+<h2>Head-to-Head Comparison</h2>
+<p><strong>Best for large commercial subs ($5M+ revenue):</strong> ConstructConnect.</p>
+<p><strong>Best for specialty subs doing residential and light commercial ($500K-5M revenue):</strong> Permit monitoring.</p>
+
+<h2>Cost Per Lead Comparison</h2>
+<p><strong>ConstructConnect</strong> at $1,000/month surfaces 30-50 relevant projects per month = $20-33 per lead.</p>
+<p><strong>Permit monitoring</strong> at $150/month surfaces 100-300 relevant permits per month = $0.50-1.50 per lead.</p>
+<p>The difference in cost per lead is 20-60x.</p>
+'''
+    },
+    {
+        'slug': 'hvac-contractors-find-commercial-clients',
+        'title': '5 Ways HVAC Contractors Find New Commercial Clients (Beyond Angi and HomeAdvisor)',
+        'meta_description': '5 strategies HVAC contractors use to find commercial clients beyond Angi and HomeAdvisor. GC relationships, permit monitoring, and more.',
+        'date': '2026-04-06',
+        'category': 'trade-guides',
+        'city_link': None,
+        'city_name': None,
+        'excerpt': 'Stop relying on platforms designed for homeowners replacing a furnace. Here are five strategies for finding commercial HVAC work.',
+        'content': '''
+<p>If you're an HVAC contractor still relying on Angi or HomeAdvisor for your commercial pipeline, you're leaving money on the table. Those platforms are designed for homeowners replacing a furnace, not for GCs awarding $200K mechanical contracts.</p>
+
+<h2>1. Building Permit Monitoring</h2>
+<p>This is the most underused lead generation strategy in the mechanical trades. Every commercial construction project starts with a building permit filing — and that filing is public record.</p>
+<p>The math works: a mid-size metro might have 50-100 commercial permits filed per week. If 20% involve significant HVAC scope, that's 10-20 potential leads per week. At a 10% conversion rate, that's 1-2 new bid opportunities per week.</p>
+
+<h2>2. GC Relationship Building (The Long Game)</h2>
+<p>Identify the 20-30 most active GCs in your metro area, then systematically introduce yourself. Don't lead with a sales pitch — lead with value.</p>
+<p>Most successful commercial HVAC companies get 60-80% of their revenue from fewer than 10 GC relationships.</p>
+
+<h2>3. Plan Rooms and Bid Boards</h2>
+<p>For larger commercial projects, plans are posted in digital plan rooms like iSqFt, BuildingConnected, and PlanHub. These run $200-800/month and are worth it if you're pursuing projects over $1M.</p>
+
+<h2>4. MCA and SMACNA</h2>
+<p>Your local Mechanical Contractors Association or SMACNA chapter hosts bid-letting events, provides labor market data, and connects subs with GCs specifically looking for qualified mechanical contractors.</p>
+
+<h2>5. Owner-Direct Marketing for Service and Retrofit</h2>
+<p>Not all HVAC revenue comes from new construction. Target commercial property owners with energy efficiency proposals. Permit data helps identify buildings with recent renovations but no corresponding mechanical permits — likely candidates for retrofit work.</p>
+
+<h2>The Common Thread</h2>
+<p>All five strategies are proactive. You're identifying specific projects, specific GCs, and specific buildings where your services are needed — and reaching out before the competition knows the opportunity exists.</p>
+'''
+    },
+    {
+        'slug': 'roofing-companies-permit-data-pipeline',
+        'title': 'How Smart Roofing Companies Use Permit Data to Fill Their Pipeline',
+        'meta_description': 'How smart roofing companies use building permit data to fill their pipeline. New construction, re-roofing, and renovation permits.',
+        'date': '2026-04-06',
+        'category': 'trade-guides',
+        'city_link': None,
+        'city_name': None,
+        'excerpt': 'The roofing companies pulling away from the pack are competing on information, not just price.',
+        'content': '''
+<p>Roofing is one of the most competitive trades in residential construction. If you're running a roofing business in 2026, competing on price alone is a race to the bottom. The companies pulling away from the pack are the ones competing on information.</p>
+
+<h2>The Roofing Lead Problem</h2>
+<p>Storm chasing is feast-or-famine. Door-to-door canvassing has 2-5% conversion rates. Google Ads cost $50-150 per click in competitive markets. Referrals are unpredictable. What all these channels have in common is that you're reaching homeowners who may or may not need a roof right now.</p>
+
+<h2>What If You Knew Exactly Who Needs a Roof?</h2>
+<p><strong>New construction permits</strong> mean a house being built that will need a roof in 60-90 days.</p>
+<p><strong>Re-roofing permits</strong> tell you a homeowner has already decided to replace their roof.</p>
+<p><strong>Renovation and addition permits</strong> signal homeowners investing in their property — often revealing aging roofs that need replacement.</p>
+
+<h2>The Builder Relationship Play</h2>
+<p>In any metro, 80% of new homes are built by 20-30 production builders. When a builder pulls permits for 15 new lots, that's 15 roofs they need in the next 3-6 months. Time your outreach to when they're making subcontracting decisions.</p>
+
+<h2>Competitive Intelligence</h2>
+<p>Permit data tells you what your competitors are doing. If a competitor is listed on 30 permits this month, you know they're growing — and you can see which builders they work with.</p>
+
+<h2>The Numbers</h2>
+<p>A residential roofing company monitoring permits will identify 50-100 relevant leads per month. At 5-10% conversion and $12,000-18,000 average job value, that's $30,000-180,000 monthly revenue from permit-sourced leads. The subscription cost is $150/month — a 200:1 ROI at the low end.</p>
+'''
+    },
+    {
+        'slug': 'solar-installers-building-permit-alerts',
+        'title': 'The Solar Installer\'s Secret Weapon: Building Permit Alerts',
+        'meta_description': 'How solar installers use building permit alerts to find qualified leads at $0.15-0.19 per lead vs $75-150 for Google Ads.',
+        'date': '2026-04-06',
+        'category': 'trade-guides',
+        'city_link': None,
+        'city_name': None,
+        'excerpt': 'There\'s a free, public data source that identifies the most qualified solar prospects — and almost nobody in the industry is using it.',
+        'content': '''
+<p>The solar industry spends an obscene amount of money acquiring customers. The average cost per lead ranges from $50 to $200, and the average cost to acquire a customer is north of $3,000. Meanwhile, there's a free, public data source that identifies the most qualified solar prospects — and almost nobody is using it.</p>
+
+<h2>Why Roofing Permits Are the Best Solar Leads</h2>
+<p>A homeowner who just got a new roof has eliminated the #1 objection to solar: "my roof is too old." Their roof is brand new, structurally sound, and warranty-intact. The close rate on new-roof homeowners is dramatically higher than cold leads from any other source.</p>
+
+<h2>Beyond Roofing: Other Permit Types</h2>
+<p><strong>New construction permits:</strong> Homeowners making all their major systems decisions right now. Solar is easiest during construction.</p>
+<p><strong>Addition permits:</strong> Someone adding square footage isn't planning to sell next year — and their electricity bill is about to increase.</p>
+<p><strong>Electrical panel upgrades:</strong> Often a prerequisite for solar. If someone is already upgrading, the marginal cost of adding solar drops significantly.</p>
+<p><strong>Pool permits:</strong> Pool equipment can add $100-200/month to an electric bill — making solar an easy sell.</p>
+
+<h2>The Economics</h2>
+<p>Phoenix averages 400-600 roofing permits per month. Add new construction, additions, and electrical upgrades: 800-1,000 relevant permits per month.</p>
+<p>Permit monitoring costs $150/month = roughly $0.15-0.19 per lead. Compare to:</p>
+<ul>
+<li>Google Ads solar leads: $75-150 per lead</li>
+<li>Lead aggregators: $50-100 per lead</li>
+<li>Door-to-door: $30-60 per lead</li>
+</ul>
+<p>Even if only 10% of permit leads are reachable and interested, your effective cost per qualified lead is $1.50-1.90. That's 30-50x cheaper than Google Ads.</p>
+
+<h2>What Your Competitors Are Doing</h2>
+<p>Large national solar companies already monitor permit filings with automated systems. But they have massive overhead and slow response times. A local installer who calls homeowners the same week their roof is completed will beat a national company every time.</p>
+'''
+    }
+]
+
+# V79: Helper function to get blog posts by category
+def get_blog_posts_by_category(category):
+    return [p for p in BLOG_POSTS if p['category'] == category]
+
+# V79: Helper function to get blog posts for a specific city
+def get_blog_posts_for_city(city_link):
+    return [p for p in BLOG_POSTS if p.get('city_link') == city_link]
+
+# V79: Helper function to get related posts (same category, excluding current)
+def get_related_posts(current_slug, limit=3):
+    current = next((p for p in BLOG_POSTS if p['slug'] == current_slug), None)
+    if not current:
+        return []
+    same_category = [p for p in BLOG_POSTS if p['category'] == current['category'] and p['slug'] != current_slug]
+    if len(same_category) < limit:
+        # Add posts from other categories
+        other = [p for p in BLOG_POSTS if p['category'] != current['category'] and p['slug'] != current_slug]
+        same_category.extend(other[:limit - len(same_category)])
+    return same_category[:limit]
+
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -5673,6 +6170,53 @@ def api_top_contractors():
     })
 
 
+# ===========================
+# V79: BLOG SYSTEM
+# ===========================
+
+@app.route('/blog')
+def blog_index():
+    """V79: Blog index page listing all posts by category."""
+    footer_cities = get_cities_with_data()
+
+    # Group posts by category
+    categories = {
+        'permit-costs': {
+            'title': 'Permit Cost Guides',
+            'posts': get_blog_posts_by_category('permit-costs')
+        },
+        'contractor-leads': {
+            'title': 'Finding Construction Leads',
+            'posts': get_blog_posts_by_category('contractor-leads')
+        },
+        'trade-guides': {
+            'title': 'Trade-Specific Guides',
+            'posts': get_blog_posts_by_category('trade-guides')
+        }
+    }
+
+    return render_template('blog_index.html',
+                           categories=categories,
+                           all_posts=BLOG_POSTS,
+                           footer_cities=footer_cities)
+
+
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    """V79: Individual blog post page."""
+    post = next((p for p in BLOG_POSTS if p['slug'] == slug), None)
+    if not post:
+        abort(404)
+
+    footer_cities = get_cities_with_data()
+    related_posts = get_related_posts(slug, limit=3)
+
+    return render_template('blog_post.html',
+                           post=post,
+                           related_posts=related_posts,
+                           footer_cities=footer_cities)
+
+
 @app.route('/contractors')
 def contractors_page():
     """Render the Contractors Intelligence page."""
@@ -8824,6 +9368,10 @@ def state_city_landing(state_slug, city_slug):
 
     footer_cities = get_cities_with_data()
 
+    # V79: Get relevant blog posts for this city
+    city_link = f"/permits/{state_slug}/{city_slug}"
+    city_blog_posts = get_blog_posts_for_city(city_link)
+
     return render_template('city_landing_v77.html',
         city_name=display_name,
         city_slug=city_slug,
@@ -8846,6 +9394,7 @@ def state_city_landing(state_slug, city_slug):
         robots_directive=robots_directive,
         canonical_url=canonical_url,
         footer_cities=footer_cities,
+        blog_posts=city_blog_posts,
     )
 
 
@@ -9336,21 +9885,25 @@ def sitemap_trades():
 
 @app.route('/sitemap-blog.xml')
 def sitemap_blog():
-    """V28: Sitemap for blog posts."""
-    today = datetime.now().strftime('%Y-%m-%d')
+    """V79: Sitemap for blog posts — uses BLOG_POSTS data structure."""
     urls = []
 
-    blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
-    if os.path.exists(blog_dir):
-        for filename in os.listdir(blog_dir):
-            if filename.endswith('.md'):
-                slug = filename.replace('.md', '')
-                urls.append({
-                    'loc': f"{SITE_URL}/blog/{slug}",
-                    'changefreq': 'monthly',
-                    'priority': '0.6',
-                    'lastmod': today
-                })
+    # Add blog index page
+    urls.append({
+        'loc': f"{SITE_URL}/blog",
+        'changefreq': 'weekly',
+        'priority': '0.7',
+        'lastmod': '2026-04-06'
+    })
+
+    # Add all blog posts
+    for post in BLOG_POSTS:
+        urls.append({
+            'loc': f"{SITE_URL}/blog/{post['slug']}",
+            'changefreq': 'monthly',
+            'priority': '0.6',
+            'lastmod': post['date']
+        })
 
     return Response(_generate_sitemap_xml(urls), mimetype='application/xml')
 

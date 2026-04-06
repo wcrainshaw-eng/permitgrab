@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ post.title }} | PermitGrab Blog</title>
-<meta name="description" content="{{ post.excerpt }}">
+<meta name="description" content="{{ post.meta_description or post.excerpt }}">
 <link rel="canonical" href="https://permitgrab.com/blog/{{ post.slug }}">
 <meta property="og:title" content="{{ post.title }}">
 <meta property="og:description" content="{{ post.excerpt }}">
@@ -23,6 +23,18 @@
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 {% include 'partials/analytics.html' %}
+<!-- V79: BreadcrumbList schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://permitgrab.com/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://permitgrab.com/blog"},
+    {"@type": "ListItem", "position": 3, "name": "{{ post.title }}"}
+  ]
+}
+</script>
 <!-- V13.9: Enhanced Article schema with dateModified -->
 <script type="application/ld+json">
 {
@@ -125,22 +137,46 @@ article h1 { font-size: 36px; font-weight: 800; color: var(--gray-900); margin-b
 
 <div class="main">
   <div class="breadcrumb">
-    <a href="/blog">&larr; Back to Blog</a>
+    <a href="/">Home</a> &rarr; <a href="/blog">Blog</a> &rarr; <span style="color: var(--gray-700);">{{ post.title[:40] }}{% if post.title|length > 40 %}...{% endif %}</span>
   </div>
 
   <article>
     <h1>{{ post.title }}</h1>
-    <div class="meta">By {{ post.author }} &bull; {{ post.date }}</div>
+    <div class="meta">By {{ post.author or 'PermitGrab Team' }} &bull; {{ post.date }}</div>
     <div class="content">
       {{ post.content | safe }}
     </div>
   </article>
+
+  <!-- V79: City-specific CTA if post has a city_link -->
+  {% if post.city_link and post.city_name %}
+  <div class="cta-box" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);">
+    <h3>Track Live Permits in {{ post.city_name }}</h3>
+    <p>Monitor new construction projects, renovations, and building permits updated daily.</p>
+    <a href="{{ post.city_link }}" class="cta-btn">View {{ post.city_name }} Permits &rarr;</a>
+  </div>
+  {% endif %}
 
   <div class="cta-box">
     <h3>Ready to Find More Construction Leads?</h3>
     <p>PermitGrab delivers fresh building permit leads daily with contact info and lead scores.</p>
     <a href="/signup" class="cta-btn">Start Free &rarr;</a>
   </div>
+
+  <!-- V79: Related posts -->
+  {% if related_posts %}
+  <div style="margin-top: 48px;">
+    <h3 style="font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 24px;">Related Articles</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px;">
+      {% for rpost in related_posts %}
+      <a href="/blog/{{ rpost.slug }}" style="background: white; border-radius: 8px; padding: 20px; text-decoration: none; color: inherit; border: 1px solid var(--gray-200); transition: all .2s;">
+        <div style="font-size: 12px; color: var(--gray-500); margin-bottom: 8px;">{{ rpost.date }}</div>
+        <div style="font-size: 15px; font-weight: 600; color: var(--gray-900); line-height: 1.4;">{{ rpost.title }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 {% include 'partials/footer.html' %}
