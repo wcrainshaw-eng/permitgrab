@@ -444,6 +444,7 @@ def init_db():
                     ("Bulk city deactivation", lambda: _deactivate_bulk_covered_cities(conn)),
                     ("ArcGIS date formats", lambda: _fix_arcgis_date_formats(conn)),
                     ("V85 city name canonicalization", lambda: _migrate_canonical_city_names(conn)),
+                    ("V86 city linking", lambda: _run_v86_city_linking(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -775,7 +776,10 @@ def init_db():
     # V64: Add enhanced staleness tracking columns
     _run_v64_staleness_columns(conn)
 
-    print(f"[DB] V64: Database initialized at {DB_PATH}")
+    # V86: Add prod_city_id foreign keys and link data
+    _run_v86_city_linking(conn)
+
+    print(f"[DB] V86: Database initialized at {DB_PATH}")
 
 
 def _run_v18_migrations_pg(conn):
@@ -894,6 +898,136 @@ def _run_v64_staleness_columns(conn):
                 pass  # Column may already exist
 
     conn.commit()
+
+
+def _run_v86_city_linking(conn):
+    """V86: Add prod_city_id foreign keys to city_sources and permits.
+
+    This creates a clean architecture where:
+    - Every source explicitly belongs to a city (via prod_city_id FK)
+    - Every permit explicitly belongs to a city (via prod_city_id FK)
+    - Counts are computed directly from FK relationships
+
+    This replaces the flaky name-based matching that caused 700+ cities to show 0 permits.
+    """
+    import time
+    start = time.time()
+
+    # Step 1: Add prod_city_id column to city_sources if not exists
+    try:
+        cursor = conn.execute("PRAGMA table_info(city_sources)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+    except Exception:
+        try:
+            cursor = conn.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'city_sources'
+            """)
+            existing_cols = {row[0] if isinstance(row, tuple) else row['column_name'] for row in cursor}
+        except Exception:
+            existing_cols = set()
+
+    if 'prod_city_id' not in existing_cols:
+        try:
+            conn.execute("ALTER TABLE city_sources ADD COLUMN prod_city_id INTEGER REFERENCES prod_cities(id)")
+            print("[V86] Added city_sources.prod_city_id column")
+        except Exception as e:
+            print(f"[V86] city_sources.prod_city_id may already exist: {e}")
+
+    # Step 2: Add prod_city_id column to permits if not exists
+    try:
+        cursor = conn.execute("PRAGMA table_info(permits)")
+        permit_cols = {row[1] for row in cursor.fetchall()}
+    except Exception:
+        try:
+            cursor = conn.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'permits'
+            """)
+            permit_cols = {row[0] if isinstance(row, tuple) else row['column_name'] for row in cursor}
+        except Exception:
+            permit_cols = set()
+
+    if 'prod_city_id' not in permit_cols:
+        try:
+            conn.execute("ALTER TABLE permits ADD COLUMN prod_city_id INTEGER REFERENCES prod_cities(id)")
+            print("[V86] Added permits.prod_city_id column")
+        except Exception as e:
+            print(f"[V86] permits.prod_city_id may already exist: {e}")
+
+    conn.commit()
+
+    # Step 3: Create indexes for the new FK columns
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_city_sources_prod_city ON city_sources(prod_city_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_permits_prod_city ON permits(prod_city_id)")
+        conn.commit()
+        print("[V86] Created indexes for prod_city_id columns")
+    except Exception as e:
+        print(f"[V86] Index creation note: {e}")
+
+    # Step 4: Build canonical name -> prod_city_id lookup
+    prod_cities = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+    city_lookup = {}  # (canonical_lower, state) -> prod_city_id
+    for row in prod_cities:
+        canonical, _ = canonicalize_city_name(row[1], row[2] or '')
+        key = (canonical.lower(), (row[2] or '').upper())
+        city_lookup[key] = row[0]
+    print(f"[V86] Built lookup for {len(city_lookup)} prod_cities")
+
+    # Step 5: Link city_sources to prod_cities
+    sources = conn.execute("""
+        SELECT id, name, state FROM city_sources WHERE prod_city_id IS NULL
+    """).fetchall()
+
+    linked_sources = 0
+    for row in sources:
+        canonical, is_garbage = canonicalize_city_name(row[1], row[2] or '')
+        if is_garbage:
+            continue
+        key = (canonical.lower(), (row[2] or '').upper())
+        if key in city_lookup:
+            conn.execute("UPDATE city_sources SET prod_city_id = ? WHERE id = ?",
+                        (city_lookup[key], row[0]))
+            linked_sources += 1
+
+    conn.commit()
+    print(f"[V86] Linked {linked_sources} city_sources to prod_cities")
+
+    # Step 6: Link permits to prod_cities (in batches for performance)
+    # First check how many need linking
+    unlinked = conn.execute("SELECT COUNT(*) FROM permits WHERE prod_city_id IS NULL").fetchone()[0]
+    if unlinked == 0:
+        print("[V86] All permits already linked")
+    else:
+        print(f"[V86] Linking {unlinked:,} permits to prod_cities...")
+
+        # Get distinct city/state combos from permits that need linking
+        combos = conn.execute("""
+            SELECT DISTINCT city, state FROM permits
+            WHERE prod_city_id IS NULL AND city IS NOT NULL
+        """).fetchall()
+
+        linked_permits = 0
+        for city, state in combos:
+            canonical, is_garbage = canonicalize_city_name(city, state or '')
+            if is_garbage:
+                continue
+            key = (canonical.lower(), (state or '').upper())
+            if key in city_lookup:
+                prod_city_id = city_lookup[key]
+                result = conn.execute("""
+                    UPDATE permits SET prod_city_id = ?
+                    WHERE city = ? AND (state = ? OR (state IS NULL AND ? IS NULL))
+                    AND prod_city_id IS NULL
+                """, (prod_city_id, city, state, state))
+                linked_permits += result.rowcount
+
+        conn.commit()
+        print(f"[V86] Linked {linked_permits:,} permits to prod_cities")
+
+    elapsed = time.time() - start
+    print(f"[V86] City linking migration completed in {elapsed:.1f}s")
 
 
 def _run_v33_source_linking(conn):
@@ -1352,65 +1486,71 @@ def _migrate_canonical_city_names(conn):
 
 
 def _sync_prod_city_counts(conn):
-    """V34: Sync prod_cities.total_permits with actual permit counts in DB.
+    """V86: Sync prod_cities.total_permits using FK relationship.
 
-    This runs on startup after data cleanup to ensure prod_cities.total_permits
-    reflects reality. Fast because it uses the indexed permits(city) column.
+    This uses the prod_city_id foreign key on permits for accurate counting.
+    Much simpler and more reliable than name-based matching.
     """
     try:
-        # V35: Clean prod_cities names before syncing counts
-        prod_all = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
-        for row in prod_all:
-            cleaned = clean_city_name_for_prod(row['city'], row['state'])
-            if cleaned != row['city']:
-                # Check if the cleaned name already exists (would violate UNIQUE constraint)
-                existing = conn.execute(
-                    "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
-                    (cleaned, row['state'])
-                ).fetchone()
-                if existing:
-                    # Duplicate — delete the corrupt entry
-                    conn.execute("DELETE FROM prod_cities WHERE id = ?", (row['id'],))
-                    print(f"[V35] Deleted duplicate prod_city: '{row['city']}' ('{cleaned}' already exists)")
-                else:
-                    conn.execute("UPDATE prod_cities SET city = ? WHERE id = ?", (cleaned, row['id']))
-                    print(f"[V35] Cleaned prod_city name: '{row['city']}' → '{cleaned}'")
+        # V86: Check if prod_city_id column exists (indicates V86 migration ran)
+        try:
+            conn.execute("SELECT prod_city_id FROM permits LIMIT 1")
+            has_fk = True
+        except Exception:
+            has_fk = False
 
-        conn.commit()
+        if has_fk:
+            # V86: Use FK-based counting - simple and reliable
+            result = conn.execute("""
+                UPDATE prod_cities SET total_permits = (
+                    SELECT COUNT(*) FROM permits WHERE permits.prod_city_id = prod_cities.id
+                )
+            """)
+            conn.commit()
 
-        # V85: Get actual counts per city from permits table, then canonicalize
-        actual = conn.execute("""
-            SELECT city, state, COUNT(*) as cnt
-            FROM permits
-            WHERE city IS NOT NULL AND city != ''
-            GROUP BY city, state
-        """).fetchall()
+            # Get stats
+            with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
+            total_counted = conn.execute("SELECT SUM(total_permits) FROM prod_cities").fetchone()[0] or 0
+            total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+            linked_permits = conn.execute("SELECT COUNT(*) FROM permits WHERE prod_city_id IS NOT NULL").fetchone()[0]
 
-        # V85: Build count map using canonical names (merge variants)
-        count_map = {}  # canonical_name_lower -> count
-        for r in actual:
-            canonical, is_garbage = canonicalize_city_name(r['city'], r['state'] or '')
-            if is_garbage:
-                continue
-            key = canonical.lower()
-            count_map[key] = count_map.get(key, 0) + r['cnt']
+            print(f"[V86] Synced prod_cities: {with_data} cities have data")
+            print(f"[V86] Permits: {linked_permits:,}/{total_permits:,} linked ({total_counted:,} counted)")
+        else:
+            # Fallback to old name-based matching for backwards compatibility
+            # V85: Get actual counts per city from permits table, then canonicalize
+            actual = conn.execute("""
+                SELECT city, state, COUNT(*) as cnt
+                FROM permits
+                WHERE city IS NOT NULL AND city != ''
+                GROUP BY city, state
+            """).fetchall()
 
-        # Update each prod_city using canonical name matching
-        prod = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
-        updated = 0
-        for row in prod:
-            # V85: Canonicalize prod_city name for matching
-            canonical_prod, _ = canonicalize_city_name(row['city'], row['state'] or '')
-            actual_count = count_map.get(canonical_prod.lower(), 0)
-            conn.execute(
-                "UPDATE prod_cities SET total_permits = ? WHERE id = ?",
-                (actual_count, row['id'])
-            )
-            updated += 1
+            # V85: Build count map using canonical names (merge variants)
+            count_map = {}  # canonical_name_lower -> count
+            for r in actual:
+                canonical, is_garbage = canonicalize_city_name(r['city'], r['state'] or '')
+                if is_garbage:
+                    continue
+                key = canonical.lower()
+                count_map[key] = count_map.get(key, 0) + r['cnt']
 
-        conn.commit()
-        nonzero = sum(1 for r in prod if count_map.get(canonicalize_city_name(r['city'], r['state'] or '')[0].lower(), 0) > 0)
-        print(f"[V34] Synced {updated} prod_cities permit counts ({nonzero} have data)")
+            # Update each prod_city using canonical name matching
+            prod = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+            updated = 0
+            for row in prod:
+                # V85: Canonicalize prod_city name for matching
+                canonical_prod, _ = canonicalize_city_name(row['city'], row['state'] or '')
+                actual_count = count_map.get(canonical_prod.lower(), 0)
+                conn.execute(
+                    "UPDATE prod_cities SET total_permits = ? WHERE id = ?",
+                    (actual_count, row['id'])
+                )
+                updated += 1
+
+            conn.commit()
+            nonzero = sum(1 for r in prod if count_map.get(canonicalize_city_name(r['city'], r['state'] or '')[0].lower(), 0) > 0)
+            print(f"[V34] Synced {updated} prod_cities permit counts ({nonzero} have data)")
 
         # V35: Auto-reactivate paused cities that now have data
         reactivated = conn.execute("""
@@ -1492,6 +1632,30 @@ def upsert_permits(permits, source_city_key=None):
         print(f"[V85] Canonicalized {canonicalized} city names")
     if filtered_garbage > 0:
         print(f"[V85] Filtered {filtered_garbage} permits with garbage city names")
+
+    # V86: Build prod_city_id lookup for FK assignment
+    try:
+        conn_tmp = get_connection()
+        prod_rows = conn_tmp.execute(
+            "SELECT id, city, state FROM prod_cities"
+        ).fetchall()
+        _city_to_prod_id = {}  # (canonical_lower, state_upper) -> prod_city_id
+        for r in prod_rows:
+            canonical, _ = canonicalize_city_name(r['city'], r['state'] or '')
+            key = (canonical.lower(), (r['state'] or '').upper())
+            _city_to_prod_id[key] = r['id']
+    except Exception as e:
+        print(f"[V86] Prod city lookup warning: {e}")
+        _city_to_prod_id = {}
+
+    # V86: Assign prod_city_id to each permit
+    for p in permits:
+        city = p.get('city', '').strip() if p.get('city') else ''
+        state = p.get('state', '').strip() if p.get('state') else ''
+        if city:
+            canonical, _ = canonicalize_city_name(city, state)
+            key = (canonical.lower(), state.upper())
+            p['_prod_city_id'] = _city_to_prod_id.get(key)
 
     # V19: Pre-filter to check for existing permits by address+city+state+filing_date
     # This prevents duplicates even when permit_number differs
@@ -1626,7 +1790,7 @@ def upsert_permits(permits, source_city_key=None):
                 status, filing_date, issued_date, date,
                 contact_name, contact_phone, contact_email, owner_name,
                 contractor_name, square_feet, lifecycle_label,
-                source_city_key, collected_at, updated_at
+                source_city_key, collected_at, updated_at, prod_city_id
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
@@ -1634,7 +1798,7 @@ def upsert_permits(permits, source_city_key=None):
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?,
-                ?, ?, ?
+                ?, ?, ?, ?
             )
         """, (
             pn, p.get('city'), p.get('state'), p.get('address'), p.get('zip'),
@@ -1643,7 +1807,8 @@ def upsert_permits(permits, source_city_key=None):
             p.get('status'), p.get('filing_date'), p.get('issued_date'), p.get('date'),
             p.get('contact_name'), p.get('contact_phone'), p.get('contact_email'), p.get('owner_name'),
             p.get('contractor_name'), p.get('square_feet'), p.get('lifecycle_label'),
-            source_city_key or p.get('source_bulk') or p.get('source_city') or p.get('source_city_key'), now, now
+            source_city_key or p.get('source_bulk') or p.get('source_city') or p.get('source_city_key'), now, now,
+            p.get('_prod_city_id')
         ))
 
     conn.commit()
