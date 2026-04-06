@@ -4579,6 +4579,73 @@ def admin_activate_city_sources():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/reactivate-from-configs', methods=['POST'])
+def admin_reactivate_from_configs():
+    """V84: Reactivate city_sources based on active configs in city_configs.py.
+
+    This fixes the issue where sources were mass-deactivated by V35 but have
+    valid active configs. It reactivates sources where:
+    1. The source_key matches a key in CITY_REGISTRY or BULK_SOURCES
+    2. The config has active=True (or no active field, defaulting to True)
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from city_configs import CITY_REGISTRY, BULK_SOURCES
+
+        # Build set of active config keys
+        active_config_keys = set()
+        for key, cfg in CITY_REGISTRY.items():
+            if cfg.get('active', True):  # Default True if not specified
+                active_config_keys.add(key)
+        for key, cfg in BULK_SOURCES.items():
+            if cfg.get('active', True):
+                active_config_keys.add(key)
+
+        conn = permitdb.get_connection()
+
+        # Get current inactive sources
+        inactive_sources = conn.execute("""
+            SELECT source_key FROM city_sources WHERE status = 'inactive'
+        """).fetchall()
+        inactive_keys = {r['source_key'] for r in inactive_sources}
+
+        # Find which ones should be reactivated
+        to_reactivate = inactive_keys & active_config_keys
+
+        if to_reactivate:
+            # Reactivate them
+            placeholders = ','.join(['?' for _ in to_reactivate])
+            conn.execute(f"""
+                UPDATE city_sources
+                SET status = 'active',
+                    last_failure_reason = 'v84_reactivated_from_config',
+                    consecutive_failures = 0
+                WHERE source_key IN ({placeholders})
+            """, list(to_reactivate))
+            conn.commit()
+
+        # Get final counts
+        active_count = conn.execute("SELECT COUNT(*) as cnt FROM city_sources WHERE status='active'").fetchone()
+        inactive_count = conn.execute("SELECT COUNT(*) as cnt FROM city_sources WHERE status='inactive'").fetchone()
+
+        return jsonify({
+            'status': 'success',
+            'reactivated': len(to_reactivate),
+            'active_configs_count': len(active_config_keys),
+            'city_sources_active': active_count['cnt'] if isinstance(active_count, dict) else active_count[0],
+            'city_sources_inactive': inactive_count['cnt'] if isinstance(inactive_count, dict) else inactive_count[0],
+            'message': f'Reactivated {len(to_reactivate)} sources from active configs'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/reset-failures', methods=['POST'])
 def admin_reset_failures():
     """V72: Reset consecutive_failures for a city or all cities.
