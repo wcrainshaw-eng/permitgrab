@@ -47,7 +47,12 @@ def is_valid_state(state):
 
 # V15: Helper function to get source config from either CITY_REGISTRY or BULK_SOURCES
 def _get_source_config(source_id):
-    """V15: Look up config by source_id, trying city_source_db first, then direct dict lookup."""
+    """V15: Look up config by source_id, trying city_source_db first, then direct dict lookup.
+
+    V74: Added fallback for slug/key mismatch - if lookup fails with hyphen format (kansas-city),
+    try underscore format (kansas_city). This fixes prod_cities using slug while CITY_REGISTRY
+    uses underscore keys.
+    """
     # Try city_source_db (SQLite) first
     config = get_city_config(source_id)
     if config:
@@ -74,6 +79,20 @@ def _get_source_config(source_id):
         config['_source_type'] = 'city'
         config['active'] = True
         return config
+
+    # V74: Slug/key mismatch fallback - try converting hyphen to underscore
+    # e.g., 'kansas-city' -> 'kansas_city'
+    underscore_id = source_id.replace('-', '_')
+    if underscore_id != source_id:
+        if underscore_id in CITY_REGISTRY:
+            config = CITY_REGISTRY[underscore_id].copy()
+            config['_source_type'] = 'city'
+            config['active'] = True
+            return config
+        if underscore_id in BULK_SOURCES:
+            config = BULK_SOURCES[underscore_id].copy()
+            config['_source_type'] = 'bulk'
+            return config
 
     return None
 
@@ -2264,7 +2283,7 @@ def collect_single_city(city_slug, days_back=7):
         }
 
 
-def collect_refresh(days_back=7, platform_filter=None, include_scrapers=False):
+def collect_refresh(days_back=7, platform_filter=None, include_scrapers=True):  # V74: Default to True
     """
     V12.50: Delta collection. Fetch recent permits and upsert into SQLite.
     No risk of data loss — INSERT OR REPLACE only touches rows we're updating.
@@ -2496,7 +2515,7 @@ def _find_registry_config_for_city(city_name, state):
     return None
 
 
-def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, include_scrapers=False):
+def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, include_scrapers=True):  # V74: Default to True
     """Inner implementation of collect_all (called with lock held).
 
     V12.33: additive_mode controls whether we save incrementally:
@@ -2522,8 +2541,9 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
         return source_platform == platform_filter
 
     # V64: Helper to check if we should skip scrapers
+    # V74: Also skip CKAN if include_scrapers is False
     def should_skip_scraper(source_platform):
-        if source_platform == 'accela' and not include_scrapers:
+        if source_platform in ('accela', 'ckan') and not include_scrapers:
             return True
         return False
 

@@ -856,8 +856,14 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
-    "seminole_county_fl": {
-        "agency_code": "SEMINOLE",
+    "seminole_county_fl": {  # Legacy key - kept for backwards compatibility
+        "agency_code": "SEMINOLECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "seminoleco": {  # V73: Fixed - was SEMINOLE but that endpoint is now dead
+        "agency_code": "SEMINOLECO",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
@@ -887,12 +893,7 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
     # V72 Batch 7: More NY and other state cities
-    "rochester_ny": {
-        "agency_code": "ROCHESTER_NY",
-        "module": "Building",
-        "tab_name": "HOME",
-        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=HOME",
-    },
+    # V74: rochester_ny config moved to V74 section with correct agency_code "ROCHESTER"
     "nyc_dob": {
         "agency_code": "NYCDOB",
         "module": "Building",
@@ -1033,8 +1034,14 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
-    "cobb_county_ga": {
-        "agency_code": "COBB",
+    "cobb_county_ga": {  # Legacy key - kept for backwards compatibility
+        "agency_code": "COBBCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "cobbco": {  # V73: Fixed - was COBB but that endpoint is now 404
+        "agency_code": "COBBCO",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
@@ -1151,8 +1158,8 @@ ACCELA_CONFIGS = {
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
-    "sahuarita_az": {
-        "agency_code": "SAHUARITA",
+    "tos": {  # V73: Fixed - was sahuarita_az with wrong agency code
+        "agency_code": "TOS",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
@@ -1788,6 +1795,403 @@ ACCELA_CONFIGS = {
     },
     "cor": {
         "agency_code": "COR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: New Accela cities (8 new)
+    "perris": {
+        "agency_code": "PERRIS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "menifee": {
+        "agency_code": "MENIFEE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "paloalto": {
+        "agency_code": "PALOALTO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "santaclara": {
+        "agency_code": "SANTACLARA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "hollywood": {
+        "agency_code": "HOLLYWOOD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "brownsville": {
+        "agency_code": "BROWNSVILLE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "pharr": {
+        "agency_code": "PHARR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "clarkco": {
+        "agency_code": "CLARKCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lancaster": {
+        "agency_code": "LANCASTER",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "nogales": {
+        "agency_code": "NOGALES",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "slc": {
+        "agency_code": "SLC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "loveland": {
+        "agency_code": "LOVELAND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "longmont": {
+        "agency_code": "LONGMONT",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Southern US Accela (batch 3)
+    "concord": {
+        "agency_code": "CONCORD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "mecklenburg": {
+        "agency_code": "MECKLENBURG",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "columbus_ga": {
+        "agency_code": "COLUMBUS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "madison_al": {
+        "agency_code": "MADISON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "franklin_tn": {
+        "agency_code": "FRANKLIN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 4 (5 new)
+    "richmond_tx": {
+        "agency_code": "RICHMOND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "deland": {
+        "agency_code": "DELAND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "grandrapids": {
+        "agency_code": "GRANDRAPIDS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "rochester_mi": {
+        "agency_code": "ROCHESTER",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "goodyear": {
+        "agency_code": "GOODYEAR",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 5 - CA counties + VA/OR (7 new)
+    "sonomaco": {
+        "agency_code": "SONOMACO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "solanoco": {
+        "agency_code": "SOLANOCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "butteco": {
+        "agency_code": "BUTTECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "chesapeake": {
+        "agency_code": "CHESAPEAKE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "placerco": {
+        "agency_code": "PLACERCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "kernco": {
+        "agency_code": "KERNCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "albany_or": {
+        "agency_code": "ALBANY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 6 - FL/GA counties + CA (5 new)
+    "nassau": {
+        "agency_code": "NASSAU",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "pinellas": {
+        "agency_code": "PINELLAS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "coweta": {
+        "agency_code": "COWETA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "gwinnett": {
+        "agency_code": "GWINNETT",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "tulareco": {
+        "agency_code": "TULARECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 7
+    "osceola": {
+        "agency_code": "OSCEOLA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 8 - CO/NM/MN
+    "golden": {
+        "agency_code": "GOLDEN",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lascruces": {
+        "agency_code": "LASCRUCES",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "maplewood": {
+        "agency_code": "MAPLEWOOD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 9 - OH/IL/CT
+    "cincinnati": {
+        "agency_code": "CINCINNATI",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "evanston": {
+        "agency_code": "EVANSTON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "hartford": {
+        "agency_code": "HARTFORD",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 10
+    "elpaso": {
+        "agency_code": "ELPASO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 11 - 7 new jurisdictions
+    "columbus_oh": {
+        "agency_code": "COLUMBUS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "humboldt": {
+        "agency_code": "HUMBOLDT",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "kansas": {
+        "agency_code": "KANSAS",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "madison_wi": {
+        "agency_code": "MADISON",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "manatee": {
+        "agency_code": "MANATEE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "richmond_va": {
+        "agency_code": "RICHMOND",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "rochester_ny": {
+        "agency_code": "ROCHESTER",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 12
+    "dallastx": {
+        "agency_code": "DALLASTX",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V74: Accela batch 13 - Counties
+    "adamsco": {
+        "agency_code": "ADAMSCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "hamiltoncounty": {
+        "agency_code": "HAMILTONCOUNTY",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lakeco": {
+        "agency_code": "LAKECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "shelbyco": {
+        "agency_code": "SHELBYCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # V73: New Accela counties (batch 17)
+    "kingco": {
+        "agency_code": "KINGCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "sbco": {
+        "agency_code": "SBCO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "cooper": {
+        "agency_code": "COOPER",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "lakeco": {
+        "agency_code": "LAKECO",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "hull": {
+        "agency_code": "HULL",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "plum": {
+        "agency_code": "PLUM",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "nogales": {
+        "agency_code": "NOGALES",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "dupage": {
+        "agency_code": "DUPAGE",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "adamsco": {
+        "agency_code": "ADAMSCO",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",

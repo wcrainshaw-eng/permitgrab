@@ -294,7 +294,7 @@ def admin_force_collection():
     days_back = min(int(data.get('days_back', 7)), 90)
     platform_filter = data.get('platform')
     city_slug = data.get('city_slug')
-    include_scrapers = data.get('include_scrapers', False)
+    include_scrapers = data.get('include_scrapers', True)  # V74: Default to True so Accela/CKAN get collected
 
     if city_slug:
         # Synchronous single-city mode (fast enough)
@@ -2310,6 +2310,146 @@ def admin_reset_failures():
                 'message': f'Reset consecutive_failures for {city_slug}'
             })
 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+def fix_known_broken_configs():
+    """V75: Fix known broken city_sources configs via SQL UPDATE statements.
+
+    This function runs SQL updates against the SQLite database to fix:
+    1. High-failure cities (reset consecutive_failures, reactivate)
+    2. Platform mismatches (e.g., Rochester listed as socrata but actually accela)
+    3. Slug/key mismatches between prod_cities and city_sources
+
+    IMPORTANT: Python dict changes (BULK_SOURCES, CITY_REGISTRY) do NOT affect
+    runtime behavior. The collector reads from city_sources table in SQLite.
+    """
+    try:
+        conn = permitdb.get_connection()
+        fixes_applied = []
+
+        # =================================================================
+        # FIX 1: Reset high-failure cities in city_sources
+        # =================================================================
+        high_failure_cities = [
+            'san_antonio', 'pittsburgh', 'fort_worth', 'washington_dc',
+            'atlanta', 'bloomington_in', 'honolulu', 'kansas_city', 'round_rock'
+        ]
+
+        for city_key in high_failure_cities:
+            result = conn.execute(
+                "SELECT source_key FROM city_sources WHERE source_key = ?",
+                (city_key,)
+            ).fetchone()
+            if result:
+                conn.execute("""
+                    UPDATE city_sources
+                    SET consecutive_failures = 0,
+                        last_failure_reason = NULL,
+                        status = 'active'
+                    WHERE source_key = ?
+                """, (city_key,))
+                fixes_applied.append(f"Reset failures for {city_key} in city_sources")
+
+        # =================================================================
+        # FIX 2: Rochester - update to Accela platform
+        # =================================================================
+        # Rochester NY uses Accela, not Socrata. Update both city_sources and prod_cities.
+        conn.execute("""
+            UPDATE city_sources
+            SET platform = 'accela',
+                endpoint = 'https://aca-prod.accela.com/ROCHESTER/Cap/CapHome.aspx?module=Building&TabName=Building',
+                consecutive_failures = 0,
+                last_failure_reason = NULL,
+                status = 'active'
+            WHERE source_key = 'rochester_ny'
+        """)
+        fixes_applied.append("Updated rochester_ny to Accela platform in city_sources")
+
+        # Also update prod_cities source_type
+        conn.execute("""
+            UPDATE prod_cities
+            SET source_type = 'accela'
+            WHERE city_slug = 'rochester' AND source_type = 'socrata'
+        """)
+        fixes_applied.append("Updated rochester source_type to accela in prod_cities")
+
+        # =================================================================
+        # FIX 3: Ensure slug/key mappings work
+        # =================================================================
+        # For cities where prod_cities uses hyphen (kansas-city) but city_sources
+        # uses underscore (kansas_city), ensure there's a covers_cities mapping
+        # or rename the source_key. For now, add covers_cities entries.
+
+        # Check if kansas_city exists in city_sources
+        kc_result = conn.execute(
+            "SELECT source_key, covers_cities FROM city_sources WHERE source_key = 'kansas_city'"
+        ).fetchone()
+        if kc_result:
+            # Add kansas-city to covers_cities if not already there
+            covers = kc_result[1] if kc_result[1] else ''
+            if 'kansas-city' not in covers:
+                new_covers = f"{covers},kansas-city" if covers else "kansas-city"
+                conn.execute(
+                    "UPDATE city_sources SET covers_cities = ? WHERE source_key = 'kansas_city'",
+                    (new_covers,)
+                )
+                fixes_applied.append("Added kansas-city to covers_cities for kansas_city")
+
+        # =================================================================
+        # FIX 4: Reset all consecutive_failures in prod_cities for affected cities
+        # =================================================================
+        affected_slugs = [
+            'san-antonio', 'pittsburgh', 'fort-worth', 'washington-dc',
+            'atlanta', 'bloomington-in', 'honolulu', 'kansas-city', 'round-rock',
+            'rochester', 'milwaukee', 'indianapolis', 'oklahoma-city'
+        ]
+        conn.execute(f"""
+            UPDATE prod_cities
+            SET consecutive_failures = 0, consecutive_no_new = 0
+            WHERE city_slug IN ({','.join('?' for _ in affected_slugs)})
+        """, affected_slugs)
+        fixes_applied.append(f"Reset failures in prod_cities for {len(affected_slugs)} cities")
+
+        conn.commit()
+        print(f"[V75] fix_known_broken_configs applied {len(fixes_applied)} fixes:")
+        for fix in fixes_applied:
+            print(f"  - {fix}")
+
+        return fixes_applied
+
+    except Exception as e:
+        import traceback
+        print(f"[V75] fix_known_broken_configs error: {e}")
+        traceback.print_exc()
+        return [f"ERROR: {str(e)}"]
+
+
+@app.route('/api/admin/fix-broken-configs', methods=['POST'])
+def admin_fix_broken_configs():
+    """V75: Apply known fixes to broken city_sources configs.
+
+    This endpoint runs SQL UPDATE statements to fix:
+    - High-failure cities (reset failures, reactivate)
+    - Platform mismatches (e.g., Rochester socrata -> accela)
+    - Slug/key mismatches
+
+    POST body: {} (no parameters needed)
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        fixes = fix_known_broken_configs()
+        return jsonify({
+            'status': 'success',
+            'fixes_applied': fixes,
+            'count': len(fixes)
+        })
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -9250,6 +9390,14 @@ def start_collectors():
 
     # V12.2: Test network connectivity before starting threads
     _test_outbound_connectivity()
+
+    # V75: Apply known fixes to broken city_sources configs
+    print(f"[{datetime.now()}] V75: Applying known config fixes...")
+    try:
+        fixes = fix_known_broken_configs()
+        print(f"[{datetime.now()}] V75: Applied {len(fixes)} config fixes")
+    except Exception as e:
+        print(f"[{datetime.now()}] V75: Config fix error (non-fatal): {e}")
 
     print(f"[{datetime.now()}] V67: Starting background collectors with staggered init...")
 
