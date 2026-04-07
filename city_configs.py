@@ -11765,31 +11765,6 @@ CITY_REGISTRY = {
         "notes": "V12.32: Deactivated â covered by nj_statewide bulk source",
     },
 
-    "cambridge_ma": {
-        "name": "Cambridge",
-        "state": "MA",
-        "slug": "cambridge-ma",
-        "lat": 42.364,
-        "lon": -71.104,
-        "platform": "socrata",
-        "endpoint": "https://data.cambridgema.gov/resource/9qm7-wbdc.json",
-        "dataset_id": "9qm7-wbdc",
-        "description": "Building Permits - Cambridge MA Open Data (Socrata)",
-        "date_field": "issue_date",
-        "field_map": {
-            "permit_number": "id",
-            "permit_type": "permit_type",
-            "address": "full_address",
-            "filing_date": "applicant_submit_date",
-            "status": "status",
-            "estimated_cost": "total_cost_of_construction",
-            "description": "isd_approved_description",
-        },
-        "date_field": "issue_date",
-        "limit": 2000,
-        "active": True,
-        "notes": "V54: Deactivated â duplicate of 'cambridge' which has richer field map.",
-    },
 
     "quincy_ma": {
         "name": "Quincy",
