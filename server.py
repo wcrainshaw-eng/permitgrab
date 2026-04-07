@@ -3904,6 +3904,73 @@ def admin_purge_orphaned_permits():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
+@app.route('/api/admin/v93-cleanup', methods=['POST'])
+def admin_v93_cleanup():
+    """V93: Comprehensive data cleanup - fix state corruption and create missing cities.
+
+    This endpoint runs three cleanup operations:
+    1. Fix TX/OK/LA state corruption in existing permits
+    2. Create prod_cities entries for cities in permits but not in prod_cities
+    3. Re-link permits to prod_city_ids
+
+    Body (optional):
+      {"dry_run": true} - Preview changes without making them
+      {"step": "state"} - Only run state cleanup
+      {"step": "cities"} - Only run missing cities creation
+      {"step": "relink"} - Only run permit relinking
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        data = request.get_json() or {}
+        dry_run = data.get('dry_run', False)
+        step = data.get('step')  # Optional: run only one step
+
+        if step == 'state':
+            result = permitdb.run_v93_state_cleanup(dry_run=dry_run)
+            return jsonify({'step': 'state', 'result': result})
+        elif step == 'cities':
+            result = permitdb.run_v93_create_missing_prod_cities(dry_run=dry_run)
+            return jsonify({'step': 'cities', 'result': result})
+        elif step == 'relink':
+            result = permitdb.run_v93_relink_permits(dry_run=dry_run)
+            return jsonify({'step': 'relink', 'result': result})
+        else:
+            # Run all steps
+            result = permitdb.run_v93_full_cleanup(dry_run=dry_run)
+
+            # Get final stats
+            conn = permitdb.get_connection()
+            cities_with_data = conn.execute(
+                "SELECT COUNT(*) as cnt FROM prod_cities WHERE total_permits > 0 AND status = 'active'"
+            ).fetchone()['cnt']
+            total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+
+            # State breakdown
+            state_breakdown = conn.execute("""
+                SELECT state, COUNT(DISTINCT city) as cities
+                FROM prod_cities
+                WHERE total_permits > 0 AND status = 'active'
+                GROUP BY state
+                ORDER BY COUNT(DISTINCT city) DESC
+                LIMIT 20
+            """).fetchall()
+
+            result['final_stats'] = {
+                'cities_with_data': cities_with_data,
+                'total_permits': total_permits,
+                'top_states': [{'state': r['state'], 'cities': r['cities']} for r in state_breakdown],
+            }
+
+            return jsonify(result)
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 # ===========================
 # V12.53: ADMIN EMAIL ENDPOINTS
 # ===========================

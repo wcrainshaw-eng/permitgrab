@@ -2100,6 +2100,352 @@ def _sync_prod_city_counts(conn):
 
 
 # ---------------------------------------------------------------------------
+# V93: Comprehensive Data Cleanup - State Fixes + Missing Cities
+# ---------------------------------------------------------------------------
+
+def run_v93_state_cleanup(dry_run=False):
+    """V93: Fix TX/OK/LA state corruption in existing permits.
+
+    This runs the same logic as V34/V35 but as an on-demand endpoint
+    (not at startup which caused hangs).
+
+    Returns dict with stats about what was fixed.
+    """
+    conn = get_connection()
+    stats = {
+        'ok_to_tx': 0,
+        'la_to_ca': 0,
+        'prod_cities_corrected': 0,
+        'other_fixes': 0,
+        'dry_run': dry_run,
+    }
+
+    try:
+        # 1. Fix OK→TX: Texas bulk source had state="OK" in config
+        ACTUALLY_OKLAHOMA = {
+            'warr acres', 'oklahoma city', 'tulsa', 'norman', 'edmond',
+            'broken arrow', 'moore', 'midwest city', 'enid', 'stillwater',
+            'lawton', 'muskogee', 'bartlesville', 'bethany', 'del city',
+            'yukon', 'mustang', 'shawnee', 'bixby', 'jenks', 'owasso',
+            'sand springs', 'sapulpa', 'claremore', 'ponca city', 'duncan',
+            'ardmore', 'ada', 'mcalester', 'durant', 'tahlequah', 'el reno',
+            'guthrie', 'chickasha', 'okmulgee', 'altus', 'pryor creek',
+        }
+
+        ok_cities = conn.execute(
+            "SELECT DISTINCT city, COUNT(*) as cnt FROM permits WHERE state = 'OK' GROUP BY city"
+        ).fetchall()
+
+        for row in ok_cities:
+            city_name = row['city'] or ''
+            if city_name.lower().strip() not in ACTUALLY_OKLAHOMA:
+                if dry_run:
+                    print(f"[V93 DRY] Would fix {row['cnt']} permits: {city_name} OK → TX")
+                    stats['ok_to_tx'] += row['cnt']
+                else:
+                    result = conn.execute(
+                        "UPDATE permits SET state = 'TX' WHERE city = ? AND state = 'OK'",
+                        (city_name,)
+                    )
+                    if result.rowcount > 0:
+                        print(f"[V93] Fixed {result.rowcount} permits: {city_name} OK → TX")
+                        stats['ok_to_tx'] += result.rowcount
+
+        # 2. Fix LA→CA: LA County bulk source tagged CA cities as Louisiana
+        ACTUALLY_LOUISIANA = {
+            'orleans', 'new orleans', 'baton rouge', 'cameron parish', 'shreveport',
+            'lafayette', 'lake charles', 'kenner', 'bossier city', 'slidell',
+            'houma', 'hammond', 'monroe', 'alexandria', 'natchitoches', 'opelousas',
+            'ruston', 'sulphur', 'zachary', 'west monroe', 'denham springs',
+            'pineville', 'bogalusa', 'crowley', 'minden', 'abbeville', 'thibodaux',
+            'eunice', 'rayne', 'morgan city', 'covington', 'mandeville', 'gonzales',
+            'metairie', 'marrero', 'harvey', 'chalmette', 'gretna', 'westwego',
+            'terrytown', 'avondale', 'estelle', 'river ridge', 'destrehan', 'arabi',
+            'luling', 'laplace', 'prairieville', 'central', 'youngsville',
+            'breaux bridge', 'scott', 'carencro', 'broussard', 'new iberia',
+            'jennings', 'leesville', 'marksville', 'ville platte', 'deridder',
+            'tallulah', 'winnfield', 'jonesboro', 'grambling', 'bastrop', 'oakdale',
+            'welsh', 'church point', 'st. martinville', 'kaplan', 'jeanerette',
+            'patterson', 'franklin', 'berwick', 'lutcher', 'gramercy', 'reserve',
+            'hahnville', 'belle chasse', 'jefferson',
+        }
+
+        la_cities = conn.execute(
+            "SELECT DISTINCT city, COUNT(*) as cnt FROM permits WHERE state = 'LA' GROUP BY city"
+        ).fetchall()
+
+        for row in la_cities:
+            city_name = row['city'] or ''
+            if city_name.lower().strip() not in ACTUALLY_LOUISIANA:
+                if dry_run:
+                    print(f"[V93 DRY] Would fix {row['cnt']} permits: {city_name} LA → CA")
+                    stats['la_to_ca'] += row['cnt']
+                else:
+                    result = conn.execute(
+                        "UPDATE permits SET state = 'CA' WHERE city = ? AND state = 'LA'",
+                        (city_name,)
+                    )
+                    if result.rowcount > 0:
+                        print(f"[V93] Fixed {result.rowcount} permits: {city_name} LA → CA")
+                        stats['la_to_ca'] += result.rowcount
+
+        # 3. Use prod_cities as authoritative source for all other state corrections
+        prod_rows = conn.execute(
+            "SELECT city, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+        ).fetchall()
+        city_to_state = {r['city'].lower(): r['state'] for r in prod_rows}
+
+        # Find permits where city exists in prod_cities but state doesn't match
+        mismatched = conn.execute("""
+            SELECT DISTINCT p.city, p.state, COUNT(*) as cnt
+            FROM permits p
+            WHERE p.city IS NOT NULL AND p.city != ''
+              AND EXISTS (SELECT 1 FROM prod_cities pc WHERE LOWER(pc.city) = LOWER(p.city) AND pc.state != p.state)
+            GROUP BY p.city, p.state
+        """).fetchall()
+
+        for row in mismatched:
+            city_name = row['city']
+            wrong_state = row['state']
+            correct_state = city_to_state.get(city_name.lower())
+            if correct_state and correct_state != wrong_state:
+                if dry_run:
+                    print(f"[V93 DRY] Would fix {row['cnt']} permits: {city_name} {wrong_state} → {correct_state}")
+                    stats['prod_cities_corrected'] += row['cnt']
+                else:
+                    result = conn.execute(
+                        "UPDATE permits SET state = ? WHERE city = ? AND state = ?",
+                        (correct_state, city_name, wrong_state)
+                    )
+                    if result.rowcount > 0:
+                        print(f"[V93] Fixed {result.rowcount} permits: {city_name} {wrong_state} → {correct_state}")
+                        stats['prod_cities_corrected'] += result.rowcount
+
+        if not dry_run:
+            conn.commit()
+
+        stats['total_fixed'] = stats['ok_to_tx'] + stats['la_to_ca'] + stats['prod_cities_corrected']
+        print(f"[V93] State cleanup complete: {stats['total_fixed']} total permits {'would be ' if dry_run else ''}fixed")
+        return stats
+
+    except Exception as e:
+        print(f"[V93] State cleanup error: {e}")
+        import traceback
+        traceback.print_exc()
+        if not dry_run:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        stats['error'] = str(e)
+        return stats
+
+
+def run_v93_create_missing_prod_cities(dry_run=False):
+    """V93: Create prod_cities entries for cities that exist in permits but not in prod_cities.
+
+    This unlocks bulk-sourced cities (NJ statewide, Cook County, etc.) that have data
+    but weren't in prod_cities so they weren't being counted or shown.
+
+    Returns dict with stats.
+    """
+    conn = get_connection()
+    stats = {
+        'cities_found': 0,
+        'cities_created': 0,
+        'dry_run': dry_run,
+        'new_cities': [],
+    }
+
+    try:
+        # Find all (city, state) combinations in permits that don't exist in prod_cities
+        missing = conn.execute("""
+            SELECT p.city, p.state, COUNT(*) as permit_count
+            FROM permits p
+            WHERE p.city IS NOT NULL AND p.city != ''
+              AND p.state IS NOT NULL AND p.state != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM prod_cities pc
+                  WHERE LOWER(pc.city) = LOWER(p.city) AND pc.state = p.state
+              )
+            GROUP BY LOWER(p.city), p.state
+            HAVING COUNT(*) >= 5
+            ORDER BY COUNT(*) DESC
+        """).fetchall()
+
+        stats['cities_found'] = len(missing)
+        print(f"[V93] Found {len(missing)} cities in permits that aren't in prod_cities")
+
+        for row in missing:
+            city_name = row['city']
+            state = row['state']
+            permit_count = row['permit_count']
+
+            # Generate slug
+            slug_base = city_name.lower().strip()
+            slug_base = re.sub(r'[^a-z0-9]+', '-', slug_base).strip('-')
+            slug = f"{slug_base}-{state.lower()}"
+
+            if dry_run:
+                print(f"[V93 DRY] Would create: {city_name}, {state} (slug: {slug}, permits: {permit_count})")
+                stats['new_cities'].append({
+                    'city': city_name,
+                    'state': state,
+                    'slug': slug,
+                    'permits': permit_count
+                })
+            else:
+                # Check if slug already exists (collision)
+                existing = conn.execute(
+                    "SELECT id FROM prod_cities WHERE city_slug = ?", (slug,)
+                ).fetchone()
+
+                if existing:
+                    print(f"[V93] Slug collision for {city_name}, {state} - slug '{slug}' exists")
+                    continue
+
+                conn.execute("""
+                    INSERT INTO prod_cities (city, state, city_slug, status, source_type, source_id, added_by, total_permits)
+                    VALUES (?, ?, ?, 'active', 'bulk', 'v93_auto', 'v93_migration', ?)
+                """, (city_name, state, slug, permit_count))
+
+                stats['cities_created'] += 1
+                stats['new_cities'].append({
+                    'city': city_name,
+                    'state': state,
+                    'slug': slug,
+                    'permits': permit_count
+                })
+                print(f"[V93] Created prod_city: {city_name}, {state} ({permit_count} permits)")
+
+        if not dry_run:
+            conn.commit()
+
+        print(f"[V93] Create missing cities complete: {stats['cities_created']} cities {'would be ' if dry_run else ''}created")
+        return stats
+
+    except Exception as e:
+        print(f"[V93] Create missing cities error: {e}")
+        import traceback
+        traceback.print_exc()
+        if not dry_run:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        stats['error'] = str(e)
+        return stats
+
+
+def run_v93_relink_permits(dry_run=False):
+    """V93: Re-run prod_city_id assignment for all permits.
+
+    After creating new prod_cities entries, this links permits to them.
+
+    Returns dict with stats.
+    """
+    conn = get_connection()
+    stats = {
+        'permits_checked': 0,
+        'permits_linked': 0,
+        'dry_run': dry_run,
+    }
+
+    try:
+        # Build lookup: (city_lower, state_upper) -> prod_city_id
+        prod_rows = conn.execute(
+            "SELECT id, city, state FROM prod_cities WHERE status = 'active'"
+        ).fetchall()
+
+        city_to_id = {}
+        for r in prod_rows:
+            # Canonicalize for matching
+            canonical, _ = canonicalize_city_name(r['city'], r['state'] or '')
+            key = (canonical.lower(), (r['state'] or '').upper())
+            city_to_id[key] = r['id']
+
+        print(f"[V93] Built lookup with {len(city_to_id)} prod_cities")
+
+        # Find permits with NULL prod_city_id that could be linked
+        unlinked = conn.execute("""
+            SELECT id, city, state FROM permits
+            WHERE prod_city_id IS NULL
+              AND city IS NOT NULL AND city != ''
+              AND state IS NOT NULL AND state != ''
+        """).fetchall()
+
+        stats['permits_checked'] = len(unlinked)
+        print(f"[V93] Found {len(unlinked)} unlinked permits to check")
+
+        # Batch update
+        updates = []
+        for row in unlinked:
+            canonical, _ = canonicalize_city_name(row['city'], row['state'] or '')
+            key = (canonical.lower(), (row['state'] or '').upper())
+            prod_id = city_to_id.get(key)
+            if prod_id:
+                updates.append((prod_id, row['id']))
+
+        stats['permits_linked'] = len(updates)
+
+        if dry_run:
+            print(f"[V93 DRY] Would link {len(updates)} permits to prod_cities")
+        else:
+            # Execute in batches
+            batch_size = 1000
+            for i in range(0, len(updates), batch_size):
+                batch = updates[i:i+batch_size]
+                conn.executemany(
+                    "UPDATE permits SET prod_city_id = ? WHERE id = ?",
+                    batch
+                )
+                if (i + batch_size) % 10000 == 0:
+                    print(f"[V93] Linked {i + len(batch)}/{len(updates)} permits...")
+
+            conn.commit()
+            print(f"[V93] Linked {len(updates)} permits to prod_cities")
+
+        # Now sync the counts
+        if not dry_run:
+            _sync_prod_city_counts(conn)
+
+        return stats
+
+    except Exception as e:
+        print(f"[V93] Relink permits error: {e}")
+        import traceback
+        traceback.print_exc()
+        if not dry_run:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        stats['error'] = str(e)
+        return stats
+
+
+def run_v93_full_cleanup(dry_run=False):
+    """V93: Run all cleanup steps in sequence.
+
+    1. Fix state corruption (TX/OK/LA)
+    2. Create missing prod_cities from permit data
+    3. Re-link permits to prod_city_ids
+
+    Returns combined stats.
+    """
+    print(f"[V93] Starting full cleanup (dry_run={dry_run})...")
+
+    results = {
+        'state_cleanup': run_v93_state_cleanup(dry_run=dry_run),
+        'create_cities': run_v93_create_missing_prod_cities(dry_run=dry_run),
+        'relink_permits': run_v93_relink_permits(dry_run=dry_run),
+    }
+
+    print(f"[V93] Full cleanup complete!")
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Permit CRUD — replaces load_permits(), atomic_write_json(permits.json), etc.
 # ---------------------------------------------------------------------------
 
