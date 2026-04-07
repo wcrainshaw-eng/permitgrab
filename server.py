@@ -2384,7 +2384,8 @@ _collectors_manually_started = False
 
 @app.before_request
 def _deferred_startup():
-    """V69: Mark startup done but DO NOT start any background threads."""
+    """V69: Mark startup done but DO NOT start any background threads.
+    V93: Email scheduler is now auto-started (doesn't need Postgres)."""
     global _startup_done
     if _startup_done:
         return
@@ -2393,6 +2394,14 @@ def _deferred_startup():
     print(f"[{datetime.now()}] V70: Server starting — Postgres DISABLED, SQLite only")
     print(f"[{datetime.now()}] V70: POST /api/admin/enable-postgres to enable Postgres pool")
     print(f"[{datetime.now()}] V70: POST /api/admin/start-collectors to start background threads")
+
+    # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
+    try:
+        email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
+        email_thread.start()
+        print(f"[{datetime.now()}] V93: Email scheduler thread started automatically")
+    except Exception as e:
+        print(f"[{datetime.now()}] [ERROR] Email scheduler failed to start: {e}")
 
 
 # V13.1: Jinja filter for human-readable date formatting
