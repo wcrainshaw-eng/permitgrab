@@ -32,15 +32,3 @@ services:
       name: permitgrab-data
       mountPath: /var/data
       sizeGB: 1
-
-  # V93: Cron job for daily digest - uses Render's cron service type
-  # Fixes issue where daemon thread doesn't run when app is spun down due to inactivity
-  - type: cron
-    name: permitgrab-digest
-    schedule: "0 12 * * *"  # 12:00 UTC = 7:00 AM ET (winter) / 8:00 AM ET (summer)
-    runtime: python
-    buildCommand: pip install requests
-    startCommand: python scripts/send_digest_cron.py
-    envVars:
-      - key: ADMIN_KEY
-        sync: false  # Set this manually in Render dashboard
