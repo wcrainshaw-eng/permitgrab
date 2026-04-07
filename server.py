@@ -3961,6 +3961,82 @@ def admin_v93_cleanup():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
+@app.route('/api/admin/v93-harvest-cities', methods=['POST'])
+def admin_v93_harvest_cities():
+    """V93: Lightweight endpoint to harvest cities from permits into prod_cities.
+
+    Only creates prod_cities entries for cities that exist in permits but not in prod_cities.
+    Much faster than full V93 cleanup - no state fixing or permit relinking.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        conn = permitdb.get_connection()
+
+        # Find cities in permits that don't have prod_cities entries
+        missing = conn.execute("""
+            SELECT p.city, p.state, COUNT(*) as permit_count
+            FROM permits p
+            LEFT JOIN prod_cities pc ON LOWER(p.city) = LOWER(pc.city) AND p.state = pc.state
+            WHERE pc.id IS NULL
+              AND p.city IS NOT NULL AND p.city != ''
+              AND p.state IS NOT NULL AND p.state != ''
+              AND LENGTH(p.city) >= 2
+            GROUP BY p.city, p.state
+            HAVING COUNT(*) >= 5
+            ORDER BY COUNT(*) DESC
+            LIMIT 500
+        """).fetchall()
+
+        created = 0
+        import re
+        for row in missing:
+            city_name = row['city'] if hasattr(row, 'keys') else row[0]
+            state = row['state'] if hasattr(row, 'keys') else row[1]
+            permit_count = row['permit_count'] if hasattr(row, 'keys') else row[2]
+
+            # Skip garbage
+            if not city_name or any(x in city_name.lower() for x in ['test', 'unknown', 'n/a', 'none', 'null']):
+                continue
+
+            # Generate slug
+            slug = re.sub(r'[^a-z0-9]+', '-', city_name.lower()).strip('-')
+            slug_with_state = f"{slug}-{state.lower()}"
+
+            # Check if slug exists
+            existing = conn.execute(
+                "SELECT id FROM prod_cities WHERE city_slug = ? OR city_slug = ?",
+                (slug, slug_with_state)
+            ).fetchone()
+
+            if not existing:
+                conn.execute("""
+                    INSERT INTO prod_cities (city, state, city_slug, status, source_type, source_id, added_by, total_permits)
+                    VALUES (?, ?, ?, 'active', 'bulk', 'v93_harvest', 'v93_harvest_endpoint', ?)
+                """, (city_name, state, slug_with_state, permit_count))
+                created += 1
+
+        conn.commit()
+
+        # Get updated counts
+        total = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+        with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
+
+        return jsonify({
+            'status': 'success',
+            'cities_found': len(missing),
+            'cities_created': created,
+            'total_prod_cities': total,
+            'cities_with_data': with_data
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 # ===========================
 # V12.53: ADMIN EMAIL ENDPOINTS
 # ===========================
