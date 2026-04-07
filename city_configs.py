@@ -687,6 +687,41 @@ CITY_REGISTRY = {
         "active": True,  # V43: Deactivated â ALL Atlanta ArcGIS datasets stale (latest Jan 2026). Accela entry is the live source. Zero permits ever collected from this endpoint.
     },
 
+    # V91 - Virginia Beach, VA - Added 2026-04-06 - Current data through Apr 2026
+    "virginia_beach": {
+        "name": "Virginia Beach",
+        "state": "VA",
+        "slug": "virginia-beach",
+        "lat": 36.852,
+        "lon": -75.978,
+        "platform": "arcgis",
+        "endpoint": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0/query",
+        "dataset_id": "Building_Permits_Applications_view",
+        "description": "Building Permits Applications - City of Virginia Beach",
+        "field_map": {
+            "permit_number": "PermitNumber",
+            "permit_type": "PermitType",
+            "work_type": "WorkType",
+            "construction_type": "ConstructionType",
+            "address": "StreetAddress",
+            "address_unit": "AddressUnit",
+            "city": "City",
+            "state": "State",
+            "zip": "Zip",
+            "filing_date": "ApplicationDate",
+            "issue_date": "IssueDate",
+            "final_date": "FinalDate",
+            "status": "Status",
+            "description": "WorkDesc",
+            "parcel": "GPIN",
+        },
+        "date_field": "IssueDate",
+        "date_format": "epoch",
+        "limit": 2000,
+        "active": True,
+        "notes": "V91: Added Virginia Beach - current data through Apr 2026",
+    },
+
     # V23 AUDIT: 2026-03-28 - ACTIVE - Verified working with Mar 2026 data
     "nashville": {
         "name": "Nashville",
