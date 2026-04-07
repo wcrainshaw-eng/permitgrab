@@ -449,6 +449,7 @@ def init_db():
                     ("V88 expand cities", lambda: _run_v88_expand_cities(conn)),
                     ("V89 purge broken", lambda: _run_v89_purge_broken_sources(conn)),
                     ("V90 rebuild cities", lambda: _run_v90_rebuild_cities(conn)),
+                    ("V93 state and city cleanup", lambda: _run_v93_state_and_city_cleanup(conn)),
                     ("Prod city count sync", lambda: _sync_prod_city_counts(conn)),
                     ("V64 staleness columns", lambda: _run_v64_staleness_columns(conn)),
                 ]
@@ -1563,6 +1564,230 @@ def _run_v90_rebuild_cities(conn):
     total = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
     with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
     print(f"[V90] Rebuild complete: {total} cities ({with_data} with data), added {added}, updated {updated}")
+
+
+def _run_v93_state_and_city_cleanup(conn):
+    """V93: Clean up state corruption and create missing prod_cities for bulk sources.
+
+    1. Fix TX/OK/LA state corruption from misconfigured bulk sources
+    2. Create prod_cities entries for cities in permits that aren't tracked
+    3. Re-link permits to prod_cities via prod_city_id
+    4. This unlocks NJ statewide (550 municipalities) and Cook County (125+ cities)
+    """
+    import re
+
+    stats = {
+        'ok_to_tx': 0,
+        'la_to_ca': 0,
+        'other_state_fixes': 0,
+        'cities_created': 0,
+        'permits_linked': 0,
+    }
+
+    # ===== STEP 1: Fix OK→TX state corruption =====
+    # A Texas bulk source had state="OK" in its config
+    ACTUALLY_OKLAHOMA = {
+        'warr acres', 'oklahoma city', 'tulsa', 'norman', 'edmond',
+        'broken arrow', 'moore', 'midwest city', 'enid', 'stillwater',
+        'lawton', 'muskogee', 'bartlesville', 'bethany', 'del city',
+        'yukon', 'mustang', 'shawnee', 'bixby', 'jenks', 'owasso',
+        'sand springs', 'sapulsa', 'claremore', 'ponca city', 'duncan',
+        'ardmore', 'ada', 'mcalester', 'durant', 'tahlequah', 'el reno',
+        'guthrie', 'chickasha', 'okmulgee', 'altus', 'pryor creek',
+        'woodward', 'weatherford', 'elk city', 'guymon', 'miami',
+    }
+
+    ok_cities = conn.execute(
+        "SELECT DISTINCT city FROM permits WHERE state = 'OK'"
+    ).fetchall()
+
+    for row in ok_cities:
+        city_name = row[0] if isinstance(row, tuple) else row['city']
+        if city_name and city_name.lower().strip() not in ACTUALLY_OKLAHOMA:
+            result = conn.execute(
+                "UPDATE permits SET state = 'TX' WHERE city = ? AND state = 'OK'",
+                (city_name,)
+            )
+            if result.rowcount > 0:
+                stats['ok_to_tx'] += result.rowcount
+                print(f"[V93] {city_name}: OK → TX ({result.rowcount} permits)")
+
+    # ===== STEP 2: Fix LA→CA state corruption =====
+    # LA County bulk source tagged CA cities as Louisiana
+    ACTUALLY_LOUISIANA = {
+        'orleans', 'new orleans', 'baton rouge', 'shreveport', 'lafayette',
+        'lake charles', 'kenner', 'bossier city', 'slidell', 'houma',
+        'hammond', 'monroe', 'alexandria', 'natchitoches', 'opelousas',
+        'ruston', 'sulphur', 'zachary', 'west monroe', 'denham springs',
+        'pineville', 'bogalusa', 'crowley', 'minden', 'abbeville', 'thibodaux',
+        'eunice', 'rayne', 'morgan city', 'covington', 'mandeville', 'gonzales',
+        'metairie', 'marrero', 'harvey', 'chalmette', 'gretna', 'westwego',
+        'terrytown', 'avondale', 'estelle', 'river ridge', 'destrehan', 'arabi',
+        'luling', 'laplace', 'prairieville', 'central', 'youngsville',
+        'breaux bridge', 'scott', 'carencro', 'broussard', 'new iberia',
+        'jennings', 'leesville', 'marksville', 'ville platte', 'deridder',
+        'tallulah', 'winnfield', 'jonesboro', 'grambling', 'bastrop', 'oakdale',
+        'cameron parish',
+    }
+
+    la_cities = conn.execute(
+        "SELECT DISTINCT city FROM permits WHERE state = 'LA'"
+    ).fetchall()
+
+    for row in la_cities:
+        city_name = row[0] if isinstance(row, tuple) else row['city']
+        if city_name and city_name.lower().strip() not in ACTUALLY_LOUISIANA:
+            result = conn.execute(
+                "UPDATE permits SET state = 'CA' WHERE city = ? AND state = 'LA'",
+                (city_name,)
+            )
+            if result.rowcount > 0:
+                stats['la_to_ca'] += result.rowcount
+                print(f"[V93] {city_name}: LA → CA ({result.rowcount} permits)")
+
+    conn.commit()
+
+    # ===== STEP 3: Fix states using prod_cities as truth =====
+    # Build authoritative city→state map from prod_cities
+    prod_rows = conn.execute(
+        "SELECT LOWER(city) as city_lower, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+    ).fetchall()
+    city_to_state = {}
+    for r in prod_rows:
+        city_lower = r[0] if isinstance(r, tuple) else r['city_lower']
+        state = r[1] if isinstance(r, tuple) else r['state']
+        city_to_state[city_lower] = state
+
+    # Fix permits where city exists in prod_cities but state doesn't match
+    for city_lower, correct_state in city_to_state.items():
+        result = conn.execute("""
+            UPDATE permits SET state = ?
+            WHERE LOWER(city) = ? AND state != ? AND state IS NOT NULL AND state != ''
+        """, (correct_state, city_lower, correct_state))
+        if result.rowcount > 0:
+            stats['other_state_fixes'] += result.rowcount
+
+    conn.commit()
+    print(f"[V93] State fixes: OK→TX={stats['ok_to_tx']}, LA→CA={stats['la_to_ca']}, other={stats['other_state_fixes']}")
+
+    # ===== STEP 4: Create prod_cities for bulk-sourced cities =====
+    # Find all (city, state) pairs in permits that don't have a prod_cities entry
+    orphan_cities = conn.execute("""
+        SELECT p.city, p.state, COUNT(*) as cnt
+        FROM permits p
+        LEFT JOIN prod_cities pc ON LOWER(p.city) = LOWER(pc.city) AND p.state = pc.state
+        WHERE pc.id IS NULL
+          AND p.city IS NOT NULL AND p.city != ''
+          AND p.state IS NOT NULL AND p.state != ''
+        GROUP BY p.city, p.state
+        HAVING cnt >= 5
+        ORDER BY cnt DESC
+    """).fetchall()
+
+    print(f"[V93] Found {len(orphan_cities)} cities with permits but no prod_cities entry")
+
+    for row in orphan_cities:
+        city_name = row[0] if isinstance(row, tuple) else row['city']
+        state = row[1] if isinstance(row, tuple) else row['state']
+        cnt = row[2] if isinstance(row, tuple) else row['cnt']
+
+        # Skip garbage
+        if not city_name or len(city_name) < 2:
+            continue
+        if any(re.search(p, city_name.lower()) for p in GARBAGE_CITY_PATTERNS):
+            continue
+
+        # Create slug
+        slug = re.sub(r'[^a-z0-9]+', '-', city_name.lower()).strip('-')
+        slug_with_state = f"{slug}-{state.lower()}"
+
+        # Check if slug already exists
+        existing = conn.execute(
+            "SELECT id FROM prod_cities WHERE city_slug = ? OR city_slug = ?",
+            (slug, slug_with_state)
+        ).fetchone()
+
+        if not existing:
+            conn.execute("""
+                INSERT INTO prod_cities (city, state, city_slug, status, source_id, added_by, total_permits)
+                VALUES (?, ?, ?, 'active', 'bulk_harvest', 'v93_cleanup', ?)
+            """, (city_name, state, slug_with_state, cnt))
+            stats['cities_created'] += 1
+
+    conn.commit()
+    print(f"[V93] Created {stats['cities_created']} new prod_cities entries")
+
+    # ===== STEP 5: Re-link permits to prod_cities =====
+    # Rebuild the prod_city_id FK for all permits
+    try:
+        # Get fresh mapping
+        prod_rows = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+        city_state_to_id = {}
+        for r in prod_rows:
+            pid = r[0] if isinstance(r, tuple) else r['id']
+            city = r[1] if isinstance(r, tuple) else r['city']
+            state = r[2] if isinstance(r, tuple) else r['state']
+            key = (city.lower(), (state or '').upper())
+            city_state_to_id[key] = pid
+
+        # Update permits in batches
+        unlinked = conn.execute("""
+            SELECT permit_number, city, state FROM permits
+            WHERE prod_city_id IS NULL AND city IS NOT NULL AND city != ''
+        """).fetchall()
+
+        linked = 0
+        for row in unlinked:
+            pnum = row[0] if isinstance(row, tuple) else row['permit_number']
+            city = row[1] if isinstance(row, tuple) else row['city']
+            state = row[2] if isinstance(row, tuple) else row['state']
+            key = (city.lower(), (state or '').upper())
+
+            if key in city_state_to_id:
+                conn.execute(
+                    "UPDATE permits SET prod_city_id = ? WHERE permit_number = ?",
+                    (city_state_to_id[key], pnum)
+                )
+                linked += 1
+
+            if linked % 10000 == 0 and linked > 0:
+                conn.commit()
+                print(f"[V93] Linked {linked} permits...")
+
+        conn.commit()
+        stats['permits_linked'] = linked
+        print(f"[V93] Linked {linked} permits to prod_cities")
+
+    except Exception as e:
+        print(f"[V93] Permit linking error: {e}")
+
+    # ===== STEP 6: Sync prod_city counts =====
+    _sync_prod_city_counts(conn)
+
+    # Final stats
+    total_cities = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+    cities_with_data = conn.execute("SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0").fetchone()[0]
+    total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+    linked_permits = conn.execute("SELECT COUNT(*) FROM permits WHERE prod_city_id IS NOT NULL").fetchone()[0]
+
+    print(f"[V93] COMPLETE: {cities_with_data} cities with data (of {total_cities} total)")
+    print(f"[V93] Permits: {linked_permits:,}/{total_permits:,} linked")
+
+    return stats
+
+
+def run_v93_cleanup():
+    """Public function to run V93 cleanup (for admin endpoint)."""
+    conn = get_connection()
+    try:
+        stats = _run_v93_state_and_city_cleanup(conn)
+        conn.commit()
+        return stats
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 
 def _run_v33_source_linking(conn):

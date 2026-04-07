@@ -3908,63 +3908,53 @@ def admin_purge_orphaned_permits():
 def admin_v93_cleanup():
     """V93: Comprehensive data cleanup - fix state corruption and create missing cities.
 
-    This endpoint runs three cleanup operations:
+    This endpoint runs the full V93 cleanup:
     1. Fix TX/OK/LA state corruption in existing permits
     2. Create prod_cities entries for cities in permits but not in prod_cities
     3. Re-link permits to prod_city_ids
+    4. Sync prod_city counts
 
-    Body (optional):
-      {"dry_run": true} - Preview changes without making them
-      {"step": "state"} - Only run state cleanup
-      {"step": "cities"} - Only run missing cities creation
-      {"step": "relink"} - Only run permit relinking
+    Expected result: City count should jump from ~1,268 to ~1,800+
     """
     valid, error = check_admin_key()
     if not valid:
         return error
 
     try:
-        data = request.get_json() or {}
-        dry_run = data.get('dry_run', False)
-        step = data.get('step')  # Optional: run only one step
+        # Run the full V93 cleanup
+        stats = permitdb.run_v93_cleanup()
 
-        if step == 'state':
-            result = permitdb.run_v93_state_cleanup(dry_run=dry_run)
-            return jsonify({'step': 'state', 'result': result})
-        elif step == 'cities':
-            result = permitdb.run_v93_create_missing_prod_cities(dry_run=dry_run)
-            return jsonify({'step': 'cities', 'result': result})
-        elif step == 'relink':
-            result = permitdb.run_v93_relink_permits(dry_run=dry_run)
-            return jsonify({'step': 'relink', 'result': result})
-        else:
-            # Run all steps
-            result = permitdb.run_v93_full_cleanup(dry_run=dry_run)
+        # Get final stats
+        conn = permitdb.get_connection()
+        cities_with_data = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE total_permits > 0"
+        ).fetchone()[0]
+        total_cities = conn.execute("SELECT COUNT(*) FROM prod_cities").fetchone()[0]
+        total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+        linked_permits = conn.execute("SELECT COUNT(*) FROM permits WHERE prod_city_id IS NOT NULL").fetchone()[0]
 
-            # Get final stats
-            conn = permitdb.get_connection()
-            cities_with_data = conn.execute(
-                "SELECT COUNT(*) as cnt FROM prod_cities WHERE total_permits > 0 AND status = 'active'"
-            ).fetchone()['cnt']
-            total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+        # State breakdown
+        state_breakdown = conn.execute("""
+            SELECT state, COUNT(*) as cities
+            FROM prod_cities
+            WHERE total_permits > 0
+            GROUP BY state
+            ORDER BY COUNT(*) DESC
+            LIMIT 20
+        """).fetchall()
 
-            # State breakdown
-            state_breakdown = conn.execute("""
-                SELECT state, COUNT(DISTINCT city) as cities
-                FROM prod_cities
-                WHERE total_permits > 0 AND status = 'active'
-                GROUP BY state
-                ORDER BY COUNT(DISTINCT city) DESC
-                LIMIT 20
-            """).fetchall()
-
-            result['final_stats'] = {
+        return jsonify({
+            'status': 'success',
+            'cleanup_stats': stats,
+            'final_stats': {
                 'cities_with_data': cities_with_data,
+                'total_cities': total_cities,
                 'total_permits': total_permits,
-                'top_states': [{'state': r['state'], 'cities': r['cities']} for r in state_breakdown],
+                'linked_permits': linked_permits,
+                'link_rate': f"{linked_permits/total_permits*100:.1f}%" if total_permits > 0 else "0%",
+                'top_states': [{'state': r[0], 'cities': r[1]} for r in state_breakdown],
             }
-
-            return jsonify(result)
+        })
 
     except Exception as e:
         import traceback
