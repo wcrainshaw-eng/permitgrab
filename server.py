@@ -3816,6 +3816,95 @@ def admin_fix_prod_cities():
 
 
 # ===========================
+# V91: ORPHANED PERMITS CLEANUP
+# ===========================
+
+@app.route('/api/admin/purge-orphaned-permits', methods=['POST'])
+def admin_purge_orphaned_permits():
+    """V91: Delete permits from sources that no longer exist in CITY_REGISTRY or BULK_SOURCES.
+
+    This fixes the issue where historical bulk sources collected permits, then the sources
+    were removed from configs, but the permits remained and got incorrectly linked to cities.
+
+    Body (optional): {"dry_run": true} to preview without deleting
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from city_configs import CITY_REGISTRY, BULK_SOURCES
+
+        data = request.get_json() or {}
+        dry_run = data.get('dry_run', False)
+
+        # Build set of all valid source keys
+        valid_sources = set(CITY_REGISTRY.keys()) | set(BULK_SOURCES.keys())
+
+        conn = permitdb.get_connection()
+
+        # Find orphaned source_city_key values
+        orphaned = conn.execute("""
+            SELECT DISTINCT source_city_key, COUNT(*) as cnt
+            FROM permits
+            WHERE source_city_key IS NOT NULL
+              AND source_city_key != ''
+            GROUP BY source_city_key
+        """).fetchall()
+
+        orphaned_sources = []
+        total_orphaned_permits = 0
+        for row in orphaned:
+            source_key = row['source_city_key']
+            count = row['cnt']
+            if source_key not in valid_sources:
+                orphaned_sources.append({'source': source_key, 'permits': count})
+                total_orphaned_permits += count
+
+        if dry_run:
+            return jsonify({
+                'dry_run': True,
+                'orphaned_sources': orphaned_sources,
+                'total_permits_to_delete': total_orphaned_permits,
+                'valid_sources_count': len(valid_sources),
+            })
+
+        # Delete orphaned permits
+        deleted = 0
+        for item in orphaned_sources:
+            result = conn.execute(
+                "DELETE FROM permits WHERE source_city_key = ?",
+                (item['source'],)
+            )
+            deleted += result.rowcount
+
+        conn.commit()
+
+        # Re-run V86 city linking for any remaining unlinked permits
+        permitdb._run_v86_city_linking(conn)
+
+        # Re-sync counts
+        permitdb._sync_prod_city_counts(conn)
+
+        # Get updated stats
+        cities_with_data = conn.execute(
+            "SELECT COUNT(*) as cnt FROM prod_cities WHERE total_permits > 0"
+        ).fetchone()['cnt']
+        total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+
+        return jsonify({
+            'deleted': deleted,
+            'orphaned_sources_cleaned': len(orphaned_sources),
+            'orphaned_sources': orphaned_sources,
+            'cities_with_data_now': cities_with_data,
+            'total_permits_remaining': total_permits,
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+# ===========================
 # V12.53: ADMIN EMAIL ENDPOINTS
 # ===========================
 
