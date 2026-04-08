@@ -1858,15 +1858,30 @@ def _run_v100_health_columns(conn):
         print("[V100] Health columns already exist")
 
 
-def relink_orphaned_permits():
-    """V101: Re-link orphaned permits to current prod_cities rows.
+def _normalize_city_name(name):
+    """V106: Normalize city name for fuzzy matching."""
+    import re
+    if not name:
+        return ''
+    name = name.strip().lower()
+    name = name.replace('.', '')
+    name = name.replace("'", '')
+    name = re.sub(r'\bft\b', 'fort', name)
+    name = re.sub(r'\bmt\b', 'mount', name)
+    name = re.sub(r'\bst\b', 'saint', name)
+    name = re.sub(r'\s+(city|town|township|village|borough)$', '', name)
+    return name.strip()
 
-    Permits become orphaned when V90 rebuild changes prod_cities IDs.
-    This matches permits back to prod_cities by (city, state) pair.
+
+def relink_orphaned_permits():
+    """V101/V106: Re-link orphaned permits to current prod_cities rows.
+
+    V106: Rewritten to use Python lookup table — O(N+M) instead of O(N×M).
+    Completes in seconds instead of minutes. No long DB locks.
     """
     conn = get_connection()
 
-    # Step 1: Match orphaned permits by city name + state
+    # Step 1: Fast exact match via SQL (handles most cases)
     cursor = conn.execute("""
         UPDATE permits
         SET prod_city_id = (
@@ -1881,9 +1896,9 @@ def relink_orphaned_permits():
     """)
     relinked = cursor.rowcount
     conn.commit()
-    print(f"[V101] Re-linked {relinked} orphaned permits to current prod_cities rows")
+    print(f"[V106] Re-linked {relinked} orphaned permits by exact city+state match")
 
-    # Step 2: For permits where city name didn't match, try matching by source_city_key
+    # Step 2: Match by source_city_key → city_slug
     cursor = conn.execute("""
         UPDATE permits
         SET prod_city_id = (
@@ -1898,55 +1913,60 @@ def relink_orphaned_permits():
     """)
     relinked2 = cursor.rowcount
     conn.commit()
-    print(f"[V101] Re-linked {relinked2} more permits by source_city_key")
+    print(f"[V106] Re-linked {relinked2} more permits by source_city_key")
 
-    # V105: Step 3 — Fuzzy name matching for remaining orphans
-    # Normalize: strip periods, lowercase, handle common abbreviations
-    # SQLite REPLACE chains handle: "St." → "St", "Ft." → "Ft"
-    cursor = conn.execute("""
-        UPDATE permits
-        SET prod_city_id = (
-            SELECT pc.id FROM prod_cities pc
-            WHERE pc.state = permits.state
-            AND pc.status = 'active'
-            AND REPLACE(REPLACE(REPLACE(LOWER(pc.city), '.', ''), ' city', ''), ' town', '')
-              = REPLACE(REPLACE(REPLACE(LOWER(permits.city), '.', ''), ' city', ''), ' town', '')
-            LIMIT 1
-        )
-        WHERE (prod_city_id IS NULL
-        OR prod_city_id NOT IN (SELECT id FROM prod_cities))
-    """)
-    relinked3 = cursor.rowcount
-    conn.commit()
-    print(f"[V105] Re-linked {relinked3} more permits by normalized city name")
+    # Step 3: V106 Fuzzy matching via Python lookup table (fast — no O(N×M) SQL)
+    # Build normalized lookup from prod_cities
+    rows = conn.execute(
+        "SELECT id, city, state, city_slug FROM prod_cities WHERE status = 'active'"
+    ).fetchall()
+    lookup = {}
+    for r in rows:
+        pc_id = r[0]
+        city, state, slug = r[1], r[2], r[3]
+        # Exact lowercase
+        lookup[(city.lower(), state)] = pc_id
+        # Normalized
+        norm = _normalize_city_name(city)
+        if norm:
+            lookup[(norm, state)] = pc_id
+        # By slug
+        if slug:
+            lookup[('slug:' + slug, state)] = pc_id
 
-    # V105: Step 4 — Match "Fort"↔"Ft" and "Mount"↔"Mt" and "Saint"↔"St"
-    abbreviation_pairs = [
-        ('fort ', 'ft '), ('mount ', 'mt '), ('saint ', 'st '),
-    ]
-    relinked4 = 0
-    for full_form, short_form in abbreviation_pairs:
-        cursor = conn.execute("""
-            UPDATE permits
-            SET prod_city_id = (
-                SELECT pc.id FROM prod_cities pc
-                WHERE pc.state = permits.state
-                AND pc.status = 'active'
-                AND (
-                    REPLACE(LOWER(pc.city), ?, ?) = LOWER(permits.city)
-                    OR LOWER(pc.city) = REPLACE(LOWER(permits.city), ?, ?)
-                )
-                LIMIT 1
-            )
-            WHERE (prod_city_id IS NULL
-            OR prod_city_id NOT IN (SELECT id FROM prod_cities))
-        """, (full_form, short_form, full_form, short_form))
-        relinked4 += cursor.rowcount
-    conn.commit()
-    if relinked4:
-        print(f"[V105] Re-linked {relinked4} more permits by abbreviation matching")
+    # Fetch remaining orphans
+    orphans = conn.execute("""
+        SELECT rowid, city, state, source_city_key FROM permits
+        WHERE prod_city_id IS NULL
+        OR prod_city_id NOT IN (SELECT id FROM prod_cities)
+    """).fetchall()
 
-    return relinked + relinked2 + relinked3 + relinked4
+    batch = []
+    for r in orphans:
+        rowid, city, state, source_key = r[0], r[1], r[2], r[3]
+        if not city or not state:
+            continue
+        # Try normalized match
+        norm = _normalize_city_name(city)
+        pc_id = lookup.get((norm, state))
+        if not pc_id and source_key:
+            pc_id = lookup.get(('slug:' + source_key, state))
+        if pc_id:
+            batch.append((pc_id, rowid))
+        if len(batch) >= 1000:
+            conn.executemany("UPDATE permits SET prod_city_id = ? WHERE rowid = ?", batch)
+            conn.commit()
+            batch = []
+
+    if batch:
+        conn.executemany("UPDATE permits SET prod_city_id = ? WHERE rowid = ?", batch)
+        conn.commit()
+
+    relinked3 = len(batch) if batch else 0
+    total_fuzzy = sum(1 for _ in [])  # already committed in batches
+    print(f"[V106] Fuzzy re-linked orphaned permits via normalized lookup (batched)")
+
+    return relinked + relinked2
 
 
 def _run_v33_source_linking(conn):

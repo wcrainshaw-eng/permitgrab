@@ -2395,9 +2395,8 @@ def _deferred_startup():
     print(f"[{datetime.now()}] V70: POST /api/admin/enable-postgres to enable Postgres pool")
     print(f"[{datetime.now()}] V70: POST /api/admin/start-collectors to start background threads")
 
-    # V98b: Auto-sync CITY_REGISTRY → prod_cities on every startup.
-    # This ensures ~1,234 cities are active immediately after deploy,
-    # without needing to manually call POST /api/admin/start-collectors.
+    # V106: Phase A — Fast startup (blocks until done, keeps it quick)
+    # Only sync config — no heavy DB operations
     try:
         print(f"[{datetime.now()}] V98b: Auto-syncing CITY_REGISTRY → prod_cities...")
         sync_city_registry_to_prod_cities()
@@ -2405,47 +2404,30 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] V98b: Registry sync error (non-fatal): {e}")
 
-    # V101: Re-link orphaned permits to current prod_cities rows
-    try:
-        from db import relink_orphaned_permits
-        print(f"[{datetime.now()}] V101: Re-linking orphaned permits...")
-        relink_orphaned_permits()
-        print(f"[{datetime.now()}] V101: Permit re-linking complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V101: Permit re-linking error (non-fatal): {e}")
+    # V106: Phase B — Heavy maintenance in background thread
+    # Server is ready to serve requests while this runs
+    def _run_background_maintenance():
+        try:
+            print(f"[{datetime.now()}] [V106] Background maintenance starting...")
+            from db import relink_orphaned_permits
+            from collector import (update_total_permits_from_actual, update_all_city_health,
+                                   activate_bulk_covered_cities, cleanup_balance_of_entries)
 
-    # V100: Recount total_permits from actual permits table on startup
-    try:
-        from collector import update_total_permits_from_actual, update_all_city_health
-        print(f"[{datetime.now()}] V100: Recounting total_permits from actual data...")
-        update_total_permits_from_actual()
-        print(f"[{datetime.now()}] V100: Recount complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V100: Recount error (non-fatal): {e}")
+            relink_orphaned_permits()
+            update_total_permits_from_actual()
+            activate_bulk_covered_cities()
+            cleanup_balance_of_entries()
+            update_all_city_health()
 
-    # V104: Activate pending cities in bulk-covered states
-    try:
-        from collector import activate_bulk_covered_cities
-        print(f"[{datetime.now()}] V104: Activating pending cities in bulk-covered states...")
-        activate_bulk_covered_cities()
-        print(f"[{datetime.now()}] V104: Bulk activation complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V104: Bulk activation error (non-fatal): {e}")
+            print(f"[{datetime.now()}] [V106] Background maintenance complete")
+        except Exception as e:
+            print(f"[{datetime.now()}] [V106] Background maintenance error: {e}")
+            import traceback
+            traceback.print_exc()
 
-    # V105: Pause "Balance of..." Census artifacts
-    try:
-        from collector import cleanup_balance_of_entries
-        cleanup_balance_of_entries()
-    except Exception as e:
-        print(f"[{datetime.now()}] V105: Balance-of cleanup error (non-fatal): {e}")
-
-    # V101: Update health_status for all active cities
-    try:
-        print(f"[{datetime.now()}] V101: Updating city health status...")
-        update_all_city_health()
-        print(f"[{datetime.now()}] V101: Health status update complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V101: Health status update error (non-fatal): {e}")
+    maintenance_thread = threading.Thread(target=_run_background_maintenance, name='v106_maintenance', daemon=True)
+    maintenance_thread.start()
+    print(f"[{datetime.now()}] [V106] Background maintenance thread started — server ready to serve")
 
     # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
     try:

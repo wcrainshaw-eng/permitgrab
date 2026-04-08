@@ -101,9 +101,29 @@ def _get_source_config(source_id):
 
 # V100: Update total_permits counter from actual permits table
 def update_total_permits_from_actual():
-    """Recount total_permits and permits_last_30d from actual permits table for all active cities."""
+    """V106: Recount total_permits and permits_last_30d — optimized with GROUP BY.
+    Uses prod_city_id for fast counting, falls back to city+state for unlinked."""
     conn = permitdb.get_connection()
     try:
+        # V106: Fast path — count by prod_city_id (set by relink)
+        counts = conn.execute("""
+            SELECT prod_city_id,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN filing_date >= date('now', '-30 days') THEN 1 ELSE 0 END) as last_30
+            FROM permits
+            WHERE prod_city_id IS NOT NULL
+            GROUP BY prod_city_id
+        """).fetchall()
+
+        if counts:
+            conn.executemany(
+                "UPDATE prod_cities SET total_permits = ?, permits_last_30d = ? WHERE id = ?",
+                [(r[1], r[2], r[0]) for r in counts]
+            )
+            conn.commit()
+            print(f"[V106] Updated total_permits for {len(counts)} cities via prod_city_id")
+
+        # Fallback for cities not yet linked by prod_city_id — use city+state match
         updated = conn.execute("""
             UPDATE prod_cities SET total_permits = (
                 SELECT COUNT(*) FROM permits
@@ -118,23 +138,13 @@ def update_total_permits_from_actual():
                 AND permits.state = prod_cities.state
             )
         """).rowcount
-
-        # V101: Also update permits_last_30d for all active cities with data
-        conn.execute("""
-            UPDATE prod_cities SET permits_last_30d = (
-                SELECT COUNT(*) FROM permits
-                WHERE permits.city = prod_cities.city
-                AND permits.state = prod_cities.state
-                AND permits.filing_date >= date('now', '-30 days')
-            )
-            WHERE status = 'active' AND total_permits > 0
-        """)
-
         conn.commit()
-        print(f"[V100] Updated total_permits for {updated} cities from actual permit counts")
-        return updated
+        if updated:
+            print(f"[V106] Updated {updated} more cities via city+state fallback")
+
+        return len(counts) + updated
     except Exception as e:
-        print(f"[V100] Error updating total_permits: {e}")
+        print(f"[V106] Error updating total_permits: {e}")
         return 0
 
 
