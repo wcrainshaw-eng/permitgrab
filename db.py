@@ -761,6 +761,16 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_started ON scraper_runs(run_started_at);
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_status ON scraper_runs(status);
 
+        -- V108: Pipeline run tracking
+        CREATE TABLE IF NOT EXISTS pipeline_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            started_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT,
+            results_json TEXT,
+            cities_processed INTEGER DEFAULT 0,
+            cities_succeeded INTEGER DEFAULT 0
+        );
+
         -- V17: system_state for tracking daily tasks (discovery, etc.)
         CREATE TABLE IF NOT EXISTS system_state (
             key TEXT PRIMARY KEY,
@@ -1833,6 +1843,9 @@ def _run_v100_health_columns(conn):
         ("earliest_permit_date", "TEXT"),
         ("latest_permit_date", "TEXT"),
         ("days_since_new_data", "INTEGER"),
+        # V108: Pipeline tracking columns
+        ("pipeline_checked_at", "TEXT"),
+        ("backfill_status", "TEXT DEFAULT 'pending'"),
     ]
 
     added = 0

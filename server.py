@@ -2855,6 +2855,57 @@ def admin_activate_bulk_cities():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/run-pipeline', methods=['POST'])
+def admin_run_pipeline():
+    """V108: Run the city onboarding pipeline (background thread)."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    data = request.json or {}
+    min_pop = data.get('min_population', 50000)
+    batch_size = data.get('batch_size', 25)
+
+    def run():
+        try:
+            from city_onboarding import run_city_pipeline
+            run_city_pipeline(min_population=min_pop, batch_size=batch_size)
+        except Exception as e:
+            print(f"[PIPELINE] Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+    return jsonify({
+        'status': 'started',
+        'min_population': min_pop,
+        'batch_size': batch_size,
+        'message': f'Processing up to {batch_size} cities with pop >= {min_pop:,}'
+    }), 200
+
+
+@app.route('/api/admin/pipeline-status')
+def admin_pipeline_status():
+    """V108: Get latest pipeline run results."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        runs = conn.execute("""
+            SELECT id, started_at, completed_at, cities_processed, cities_succeeded
+            FROM pipeline_runs ORDER BY started_at DESC LIMIT 5
+        """).fetchall()
+        return jsonify({
+            'runs': [{'id': r[0], 'started_at': r[1], 'completed_at': r[2],
+                       'processed': r[3], 'succeeded': r[4]} for r in runs]
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/city-health')
 def admin_city_health():
     """V100: City health dashboard data."""

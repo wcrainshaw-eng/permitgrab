@@ -8,6 +8,7 @@ V24: Initial implementation supporting 8 cities.
 import asyncio
 import csv
 import io
+import json
 import os
 import re
 import time
@@ -2281,7 +2282,7 @@ async def scrape_accela_permits(city_key, days_back=1):
 
     try:
         print(f"    [Accela] Navigating to {agency} search page...")
-        await page.goto(search_url, wait_until="networkidle", timeout=30000)
+        await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(2000)  # Let ASP.NET finish rendering
 
         # ---- STEP 1: Set date range ----
@@ -2384,22 +2385,40 @@ async def scrape_accela_permits(city_key, days_back=1):
                 continue
 
         if not search_btn:
+            # V108: Final fallback — JavaScript click on anything with "Search" text
+            try:
+                clicked = await page.evaluate("""
+                    () => {
+                        const elements = document.querySelectorAll('input, a, button');
+                        for (const el of elements) {
+                            const text = (el.value || el.textContent || '').trim().toLowerCase();
+                            if (text === 'search') {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                """)
+                if clicked:
+                    search_btn = True
+                    print(f"    [Accela] Clicked Search via JavaScript fallback on {agency}")
+            except Exception:
+                pass
+
+        if not search_btn:
             # V107: Log what elements ARE on the page for diagnosis
             try:
-                elements = await page.query_selector_all('button, input[type="submit"], input[type="button"], a.ACA_SmButton, a.ACA_LgButton, a[id*="btn"]')
-                button_info = []
-                for el in elements[:20]:
-                    try:
-                        tag = await el.evaluate('e => e.tagName')
-                        el_id = await el.get_attribute('id') or ''
-                        el_text = (await el.inner_text())[:50] if await el.inner_text() else ''
-                        el_value = await el.get_attribute('value') or ''
-                        el_class = await el.get_attribute('class') or ''
-                        visible = await el.is_visible()
-                        button_info.append(f"{tag}[id={el_id},text={el_text},val={el_value},cls={el_class[:30]},vis={visible}]")
-                    except:
-                        continue
-                print(f"    [ACCELA] {agency} portal elements found: {'; '.join(button_info[:10])}")
+                button_info = await page.evaluate("""
+                    () => Array.from(document.querySelectorAll(
+                        'input[type="submit"], input[type="button"], button, a.ACA_SmButton, a.ACA_LgButton, a[id*="btn"]'
+                    )).slice(0, 15).map(e => ({
+                        tag: e.tagName, type: e.type || '', id: e.id || '',
+                        value: e.value || '', text: (e.textContent || '').trim().substring(0, 40),
+                        cls: (e.className || '').substring(0, 30)
+                    }))
+                """)
+                print(f"    [ACCELA] {agency} portal elements: {json.dumps(button_info)}")
             except:
                 pass
             await page.screenshot(path=f"/tmp/accela_debug_{agency}.png")
