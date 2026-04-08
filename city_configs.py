@@ -1822,8 +1822,8 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V72: Reactivated - endpoint confirmed working with permits through 2016+
-        "notes": "V72: Reactivated - ArcGIS FeatureServer confirmed working. Data from 2009-present via KIVA (2009-Sept 2016) and POSSE LMS (Sept 2016-present).",
+        "active": False,  # V103: Deactivated — stale since April 2024, never_worked in prod, 0 permits collected
+        "notes": "V103: Deactivated. ArcGIS endpoint stale since 2024 despite V72 reactivation. 0 permits ever collected.",
     },
 
     "cleveland": {

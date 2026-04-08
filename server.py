@@ -6327,6 +6327,11 @@ def sync_city_registry_to_prod_cities():
                         if cs_key in by_citystate:
                             row = by_citystate[cs_key]
             if row and row.get('status') == 'active':
+                # V103: Don't pause if the row's source_id points to a DIFFERENT active entry
+                row_source = row.get('source_id', '')
+                if row_source and row_source != city_key and row_source in by_source:
+                    # This row is linked to another (possibly active) source — don't pause
+                    continue
                 conn.execute(
                     "UPDATE prod_cities SET status = 'paused' WHERE id = ?",
                     (row['id'],)
@@ -11852,8 +11857,8 @@ def city_trade_landing(city_slug, trade_slug):
     month_ago = (now - timedelta(days=30)).isoformat()
     week_ago = (now - timedelta(days=7)).isoformat()
 
-    monthly_count = len([p for p in matching_permits if p.get('filing_date', '') >= month_ago])
-    weekly_count = len([p for p in matching_permits if p.get('filing_date', '') >= week_ago])
+    monthly_count = len([p for p in matching_permits if (p.get('filing_date') or '') >= month_ago])
+    weekly_count = len([p for p in matching_permits if (p.get('filing_date') or '') >= week_ago])
 
     values = [p.get('estimated_cost', 0) for p in matching_permits if p.get('estimated_cost')]
     avg_value = int(sum(values) / len(values)) if values else 0
