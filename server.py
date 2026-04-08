@@ -6073,47 +6073,114 @@ def is_data_loading():
 
 
 def sync_city_registry_to_prod_cities():
-    """V57: Authoritative sync — prod_cities mirrors CITY_REGISTRY exactly.
+    """V95: Complete sync — CITY_REGISTRY + BULK_SOURCES → prod_cities + city_sources.
 
-    Rules:
-    - If a city_key is active in CITY_REGISTRY → it MUST be active in prod_cities
-    - If a city_key is NOT active in CITY_REGISTRY → it MUST NOT be in prod_cities
-    - source_type is always updated to match the current config
-    - Orphan rows (source_id not in ANY CITY_REGISTRY key) are deleted
-    - No more 'paused' status — you pull or you don't exist in the tracker
+    V95 FIXES:
+    - NO DELETES: Never delete prod_cities rows. Deactivate via status='paused' if needed.
+    - Syncs to city_sources: All active configs get city_sources entries for collector.
+    - Handles pending rows: Activates pending rows that match CITY_REGISTRY entries.
+    - Syncs BULK_SOURCES: Bulk sources also get city_sources entries.
 
-    V66: Fixed connection leak — connection is now properly released in finally block.
+    Runs on every startup. Must be idempotent and fast (< 30 seconds).
     """
-    from city_configs import CITY_REGISTRY
+    import json
+    from city_configs import CITY_REGISTRY, BULK_SOURCES
+    from city_source_db import upsert_city_source
 
-    added = 0
-    updated = 0
-    deleted = 0
-    conn = None  # V66: Initialize to None for finally block
+    result = {
+        'prod_activated': 0,
+        'prod_created': 0,
+        'prod_updated': 0,
+        'cs_created': 0,
+        'cs_updated': 0,
+        'errors': 0
+    }
+    conn = None
 
     try:
+        print(f"[V95] Starting registry sync...")
         conn = permitdb.get_connection()
 
-        # Step 1: Build the set of active city_keys from CITY_REGISTRY
+        # =================================================================
+        # STEP 1: CITY_REGISTRY → city_sources
+        # =================================================================
+        print(f"[V95] Phase 1: Syncing CITY_REGISTRY → city_sources...")
+        for city_key, config in CITY_REGISTRY.items():
+            if not config.get('active', False):
+                continue
+            try:
+                upsert_city_source({
+                    'source_key': city_key,
+                    'name': config.get('name', city_key),
+                    'state': config.get('state', ''),
+                    'platform': config.get('platform', ''),
+                    'mode': 'city',
+                    'endpoint': config.get('endpoint', ''),
+                    'dataset_id': config.get('dataset_id', ''),
+                    'field_map': config.get('field_map', {}),
+                    'date_field': config.get('date_field', ''),
+                    'city_field': config.get('city_field', ''),
+                    'limit_per_page': config.get('limit', 2000),
+                    'status': 'active'
+                })
+                result['cs_created'] += 1
+            except Exception as e:
+                print(f"  [V95] WARN: city_sources upsert failed for {city_key}: {e}")
+                result['errors'] += 1
+
+        # =================================================================
+        # STEP 2: BULK_SOURCES → city_sources
+        # =================================================================
+        print(f"[V95] Phase 2: Syncing BULK_SOURCES → city_sources...")
+        for source_key, config in BULK_SOURCES.items():
+            if not config.get('active', True):  # BULK_SOURCES default to active
+                continue
+            try:
+                upsert_city_source({
+                    'source_key': source_key,
+                    'name': config.get('name', source_key),
+                    'state': config.get('state', ''),
+                    'platform': config.get('platform', ''),
+                    'mode': 'bulk',
+                    'endpoint': config.get('endpoint', ''),
+                    'dataset_id': config.get('dataset_id', ''),
+                    'field_map': config.get('field_map', {}),
+                    'date_field': config.get('date_field', ''),
+                    'city_field': config.get('city_field', ''),
+                    'limit_per_page': config.get('limit', 50000),
+                    'status': 'active'
+                })
+                result['cs_created'] += 1
+            except Exception as e:
+                print(f"  [V95] WARN: city_sources upsert failed for bulk {source_key}: {e}")
+                result['errors'] += 1
+
+        # =================================================================
+        # STEP 3: CITY_REGISTRY → prod_cities
+        # =================================================================
+        print(f"[V95] Phase 3: Syncing CITY_REGISTRY → prod_cities...")
+
+        # Build lookup of existing prod_cities
+        existing_by_source = {}
+        existing_by_slug = {}
+        for row in conn.execute("SELECT id, city_slug, source_id, source_type, status FROM prod_cities"):
+            if row['source_id']:
+                existing_by_source[row['source_id']] = row
+            if row['city_slug']:
+                existing_by_slug[row['city_slug']] = row
+
+        # Build set of active keys
         active_keys = set()
         for city_key, config in CITY_REGISTRY.items():
             if config.get('active', False):
                 active_keys.add(city_key)
 
-        # Step 2: Get all existing prod_cities rows
-        existing_by_source = {}
-        existing_by_slug = {}
-        for row in conn.execute("SELECT id, city_slug, source_id, source_type, status FROM prod_cities"):
-            existing_by_source[row['source_id']] = row
-            existing_by_slug[row['city_slug']] = row
-
-        # Step 3: Upsert active configs into prod_cities
+        # Process each active CITY_REGISTRY entry
         for city_key in active_keys:
             config = CITY_REGISTRY[city_key]
             city_name = config.get('name', '')
             state = config.get('state', '')
             platform = config.get('platform', '')
-            slug = config.get('slug', city_name.lower().replace(' ', '-'))
 
             if not city_name or not state:
                 continue
@@ -6121,36 +6188,34 @@ def sync_city_registry_to_prod_cities():
             try:
                 normalized_slug = permitdb.normalize_city_slug(city_name)
             except Exception:
-                normalized_slug = slug
+                normalized_slug = config.get('slug', city_key)
 
+            # Case 1: source_id already matches — just ensure active
             if city_key in existing_by_source:
-                # Exists with matching source_id — update source_type and ensure active
                 row = existing_by_source[city_key]
                 if row['status'] != 'active' or row['source_type'] != platform:
                     conn.execute("""
-                        UPDATE prod_cities SET status = 'active',
-                            source_type = ?,
-                            notes = 'V57: Synced — active in CITY_REGISTRY'
+                        UPDATE prod_cities SET status = 'active', source_type = ?,
+                            notes = 'V95: Activated — matches CITY_REGISTRY'
                         WHERE source_id = ?
                     """, (platform, city_key))
-                    updated += 1
-                    print(f"  [V57] Updated {city_key} -> active, source_type={platform}")
-                # else: already active with correct source_type, skip
+                    result['prod_activated'] += 1
 
+            # Case 2: slug exists (maybe pending from v90_rebuild) — activate it
             elif normalized_slug in existing_by_slug:
-                # Slug exists but under a different source_id — update the row to point to new source
-                old_row = existing_by_slug[normalized_slug]
+                row = existing_by_slug[normalized_slug]
                 conn.execute("""
                     UPDATE prod_cities SET source_id = ?, source_type = ?,
                         status = 'active',
-                        notes = ?
+                        notes = 'V95: Activated pending row — matched CITY_REGISTRY'
                     WHERE id = ?
-                """, (city_key, platform, f'V57: Updated source from {old_row["source_id"]} to {city_key}', old_row['id']))
-                updated += 1
-                print(f"  [V57] Repointed {normalized_slug}: {old_row['source_id']} -> {city_key}")
+                """, (city_key, platform, row['id']))
+                result['prod_activated'] += 1
+                # Update lookup so we don't double-process
+                existing_by_source[city_key] = row
 
+            # Case 3: brand new city — insert
             else:
-                # Brand new city — insert
                 try:
                     permitdb.upsert_prod_city(
                         city=city_name,
@@ -6160,32 +6225,48 @@ def sync_city_registry_to_prod_cities():
                         source_id=city_key,
                         source_scope='city',
                         status='active',
-                        added_by='v57_sync',
-                        notes='V57: Auto-synced from CITY_REGISTRY'
+                        added_by='v95_sync',
+                        notes='V95: Auto-synced from CITY_REGISTRY'
                     )
-                    added += 1
-                    print(f"  [V57] Added {city_key} ({city_name}, {state})")
+                    result['prod_created'] += 1
                 except Exception as e:
-                    print(f"  [V57] Error adding {city_key}: {e}")
+                    print(f"  [V95] ERROR: Failed to add {city_key}: {e}")
+                    result['errors'] += 1
 
-        # Step 4: Delete any prod_cities row whose source_id is NOT an active key
-        # This removes: paused cities, orphans, and deactivated configs
-        rows_to_delete = conn.execute(
-            "SELECT id, city_slug, source_id, status FROM prod_cities"
-        ).fetchall()
+        # =================================================================
+        # STEP 4: Deactivate (NOT delete) inactive CITY_REGISTRY entries
+        # =================================================================
+        # Only deactivate rows that have a source_id matching an INACTIVE config
+        # Do NOT touch pending rows from v90_rebuild (they have different source_ids)
+        for city_key, config in CITY_REGISTRY.items():
+            if config.get('active', False):
+                continue  # Skip active configs
+            if city_key in existing_by_source:
+                row = existing_by_source[city_key]
+                if row['status'] == 'active':
+                    conn.execute("""
+                        UPDATE prod_cities SET status = 'paused',
+                            notes = 'V95: Paused — inactive in CITY_REGISTRY'
+                        WHERE source_id = ?
+                    """, (city_key,))
+                    result['prod_updated'] += 1
 
-        for row in rows_to_delete:
-            if row['source_id'] not in active_keys:
-                conn.execute("DELETE FROM prod_cities WHERE id = ?", (row['id'],))
-                deleted += 1
-                print(f"  [V57] Deleted {row['city_slug']} (source_id={row['source_id']}, was {row['status']})")
+        # =================================================================
+        # NO STEP 5: We do NOT delete any rows. Ever.
+        # Pending rows from v90_rebuild etc. are left alone.
+        # =================================================================
 
         conn.commit()
-        print(f"[V57] Sync complete: {added} added, {updated} updated, {deleted} deleted. "
-              f"Active keys in CITY_REGISTRY: {len(active_keys)}")
+
+        print(f"[V95] Sync complete: "
+              f"prod_cities: {result['prod_activated']} activated, {result['prod_created']} created, {result['prod_updated']} paused | "
+              f"city_sources: {result['cs_created']} synced | "
+              f"errors: {result['errors']}")
+
+        return result
 
     except Exception as e:
-        print(f"[V57] Sync error: {e}")
+        print(f"[V95] Sync error: {e}")
         import traceback
         traceback.print_exc()
         if conn:
@@ -6193,8 +6274,8 @@ def sync_city_registry_to_prod_cities():
                 conn.rollback()
             except Exception:
                 pass
+        return result
     finally:
-        # V66: Always release connection back to pool
         if conn:
             try:
                 conn.close()

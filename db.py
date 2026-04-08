@@ -3254,17 +3254,17 @@ def get_prod_cities(status='active', min_permits=1):
 
 
 def get_prod_city_count():
-    """V15/V34: Get count of active prod cities WITH actual permits.
+    """V95: Get count of ALL active prod cities.
 
-    V34: Only counts active cities where total_permits > 0.
-    The total_permits column is synced with actual DB counts
-    during startup via _sync_prod_city_counts().
-    V70: Returns 0 if Postgres unavailable.
+    V95: Count all active cities, not just those with permits.
+    This ensures newly-activated cities from CITY_REGISTRY are counted
+    immediately, even before their first collection run.
+    V70: Returns 0 if database unavailable.
     """
     try:
         conn = get_connection()
         row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active' AND total_permits > 0"
+            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active'"
         ).fetchone()
         return row['cnt'] if row else 0
     except Exception:
