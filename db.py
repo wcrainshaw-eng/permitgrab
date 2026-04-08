@@ -1502,13 +1502,18 @@ def _run_v90_rebuild_cities(conn):
     top_20k_keys = {(c[0].lower(), c[1]) for c in clean_cities}
 
     deleted = 0
-    all_prod = conn.execute("SELECT id, city, state FROM prod_cities").fetchall()
+    # V99: Also load source_id so we can preserve synced cities
+    all_prod = conn.execute("SELECT id, city, state, source_id FROM prod_cities").fetchall()
     for row in all_prod:
-        pid, city, state = row
+        pid, city, state, source_id = row
         key = (city.lower(), state)
 
         # Keep if has data
         if pid in preserve_ids:
+            continue
+
+        # V99: Keep if has source_id (synced from CITY_REGISTRY)
+        if source_id:
             continue
 
         # Keep if in top 20K
@@ -1521,6 +1526,12 @@ def _run_v90_rebuild_cities(conn):
 
     conn.commit()
     print(f"[V90] Deleted {deleted} cities not in top 20K and without data")
+
+    # V99: Report how many synced cities were preserved
+    synced_preserved = conn.execute(
+        "SELECT COUNT(*) FROM prod_cities WHERE source_id IS NOT NULL AND source_id != ''"
+    ).fetchone()[0]
+    print(f"[V90] Preserved {synced_preserved} synced cities (have source_id)")
 
     # Step 7: Add/update cities from top 20K
     added = 0

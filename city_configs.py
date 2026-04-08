@@ -684,7 +684,7 @@ CITY_REGISTRY = {
         "date_field": "Opend",
         "date_format": "epoch",
         "limit": 2000,
-        "active": True,  # V43: Deactivated â ALL Atlanta ArcGIS datasets stale (latest Jan 2026). Accela entry is the live source. Zero permits ever collected from this endpoint.
+        "active": False,  # V99: Actually deactivated — ArcGIS endpoint dead since Jan 2026
     },
 
     # V91 - Virginia Beach, VA - Added 2026-04-06 - Current data through Apr 2026
@@ -5433,7 +5433,7 @@ CITY_REGISTRY = {
     "atlanta_ga": {
         "name": "Atlanta",
         "state": "GA",
-        "slug": "atlanta-ga",
+        "slug": "atlanta",
         "lat": 33.749,
         "lon": -84.388,
         "platform": "accela",

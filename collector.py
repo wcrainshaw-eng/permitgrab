@@ -1270,6 +1270,9 @@ def fetch_permits(city_key, days_back=30):
         print(f"  [SKIP] Inactive city: {city_key}")
         return [], "skip"
 
+    # V99: Ensure 'name' key exists to prevent KeyError
+    config.setdefault('name', city_key)
+
     platform = config.get("platform", "socrata")
     print(f"  Fetching {config['name']} permits (last {days_back} days) via {platform}...")
 
@@ -1479,8 +1482,8 @@ def normalize_permit(raw_record, city_key):
 
     return {
         "id": f"{city_key}_{permit_num}",
-        "city": config["name"],
-        "state": config["state"],
+        "city": config.get("name", city_key),
+        "state": config.get("state", ""),
         "permit_number": sanitize_string(permit_num),
         "permit_type": sanitize_string(get_field("permit_type")),
         "work_type": sanitize_string(get_field("work_type")),
@@ -1819,6 +1822,9 @@ def fetch_permit_history(city_key, years_back=1):
         print(f"  [SKIP] Inactive city: {city_key}")
         return []
 
+    # V99: Ensure 'name' key exists to prevent KeyError
+    config.setdefault('name', city_key)
+
     platform = config.get("platform", "socrata")
     print(f"  Fetching {config['name']} permit history (last {years_back} years)...")
 
@@ -1896,7 +1902,7 @@ def collect_permit_history(years_back=1):
         if batch:
             _flush_history_batch(batch)
 
-        stats[city_key] = {"raw": len(raw), "indexed": city_count, "city_name": config["name"]}
+        stats[city_key] = {"raw": len(raw), "indexed": city_count, "city_name": config.get("name", city_key)}
         time.sleep(RATE_LIMIT_DELAY)
 
     # Print summary
@@ -2056,7 +2062,10 @@ def sync_city_registry_to_prod():
             batch_skipped = 0
 
             for key in batch_keys:
-                config = CITY_REGISTRY[key]
+                config = CITY_REGISTRY.get(key)
+                if not config:
+                    result['errors'] += 1
+                    continue
                 city_name = config.get('name', '')
                 state = config.get('state', '')
                 platform = config.get('platform', '')
