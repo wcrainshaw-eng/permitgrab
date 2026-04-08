@@ -936,8 +936,8 @@ CITY_REGISTRY = {
         "date_field": "ISSUEDATE",
         "date_format": "string",
         "limit": 2000,
-        "active": True,
-        "notes": "V91: Updated to 'Building Permits Under Inspection' dataset - has current 2025-2026 data.",
+        "active": False,  # V102: Deactivated — CKAN resource not found (404). 36 runs with 0 permits. Need new resource ID.
+        "notes": "V102: Deactivated. CKAN resource 761b7ae8 dead, 89ccdad9 also returns 0 permits. Need to find current dataset on data.sanjoseca.gov.",
     },
 
     # V23 AUDIT: 2026-03-28 - STALE - County data from 2017, City portal access denied
@@ -1709,8 +1709,8 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "date",
         "limit": 2000,
-        "active": True,  # V43/V50: Activated â FeatureServer endpoint confirmed live. Has CaseNumber, Address, IssuedDate, Cost. Pop 660K.
-        "notes": "V63: Changed date_format from epoch to date to fix query errors. IssuedDate is esriFieldTypeDate.",
+        "active": False,  # V102: Deactivated â endpoint serves Baltimore data, not Las Vegas. ArcGIS org 0MSEUqKaxRlEPj5g is Baltimore City.
+        "notes": "V102: Deactivated. Endpoint confirmed to serve Baltimore City permits, not Las Vegas. Need correct Las Vegas ArcGIS service URL.",
     },
 
     "orlando": {
@@ -4994,8 +4994,8 @@ CITY_REGISTRY = {
         },
         "date_field": "year",
         "limit": 2000,
-        "active": True,
-        "notes": "Historical data 2000-2009",
+        "active": False,  # V102: Deactivated — historical 2000-2009 data only, causes source_id overwrite on Kansas City MO
+        "notes": "Historical data 2000-2009. Deactivated V102.",
     },
 
     "little_rock": {

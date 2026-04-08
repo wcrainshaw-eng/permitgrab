@@ -22,12 +22,14 @@ import db as permitdb  # V12.50: SQLite database layer
 from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication
 
 # V24: Accela scraper (Playwright-based)
+# V102: Catch all exceptions, not just ImportError — playwright or deps may fail differently
 try:
     from accela_scraper import fetch_accela
     ACCELA_AVAILABLE = True
-except ImportError:
+    print("[V102] Accela scraper loaded successfully — ACCELA_AVAILABLE = True")
+except Exception as e:
     ACCELA_AVAILABLE = False
-    print("[V24] Playwright/accela_scraper not available - Accela cities will be skipped")
+    print(f"[V24] Playwright/accela_scraper not available - Accela cities will be skipped: {e}")
 
 # V18: Valid US state/territory codes for validation
 VALID_US_STATES = {

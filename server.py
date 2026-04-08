@@ -6258,21 +6258,31 @@ def sync_city_registry_to_prod_cities():
                     result['prod_activated'] += 1
                 continue
 
-            # Match 2: by slug
+            # Match 2: by slug (V102: also verify state matches to prevent cross-state mislinks)
             if slug in by_slug:
                 row = by_slug[slug]
-                conn.execute(
-                    "UPDATE prod_cities SET status = ?, source_id = ?, source_type = ? WHERE id = ?",
-                    ('active', city_key, platform, row['id'])
-                )
-                result['prod_activated'] += 1
-                by_source[city_key] = row  # prevent double-match
-                continue
+                row_state = row.get('state', '')
+                if row_state and state and row_state != state:
+                    pass  # V102: State mismatch — don't link (e.g., long_beach_nj vs Long Beach CA)
+                else:
+                    conn.execute(
+                        "UPDATE prod_cities SET status = ?, source_id = ?, source_type = ? WHERE id = ?",
+                        ('active', city_key, platform, row['id'])
+                    )
+                    result['prod_activated'] += 1
+                    by_source[city_key] = row  # prevent double-match
+                    continue
 
             # Match 3: by city+state
             cs_key = (name.lower(), state)
             if cs_key in by_citystate:
                 row = by_citystate[cs_key]
+                # V102: Don't overwrite source_id if already set to a different active entry
+                existing_source = row.get('source_id', '')
+                if existing_source and existing_source != city_key and existing_source in by_source:
+                    # Already linked to another source — skip to avoid overwrite
+                    result['already_active'] += 1
+                    continue
                 conn.execute(
                     "UPDATE prod_cities SET status = ?, source_id = ?, source_type = ?, city_slug = ? WHERE id = ?",
                     ('active', city_key, platform, slug, row['id'])
@@ -6296,18 +6306,32 @@ def sync_city_registry_to_prod_cities():
 
         # =================================================================
         # STEP 4: Deactivate inactive CITY_REGISTRY entries (no deletes)
+        # V102: Also check by slug and city+state, not just by_source
         # =================================================================
         for city_key, config in CITY_REGISTRY.items():
             if config.get('active', False):
                 continue
+            # V102: Find the matching prod_cities row by source_id, slug, or city+state
+            row = None
             if city_key in by_source:
                 row = by_source[city_key]
-                if row.get('status') == 'active':
-                    conn.execute(
-                        "UPDATE prod_cities SET status = 'paused' WHERE id = ?",
-                        (row['id'],)
-                    )
-                    result['prod_updated'] += 1
+            else:
+                slug = config.get('slug', city_key)
+                if slug in by_slug:
+                    row = by_slug[slug]
+                else:
+                    name = config.get('name', '')
+                    state = config.get('state', '')
+                    if name and state:
+                        cs_key = (name.lower(), state)
+                        if cs_key in by_citystate:
+                            row = by_citystate[cs_key]
+            if row and row.get('status') == 'active':
+                conn.execute(
+                    "UPDATE prod_cities SET status = 'paused' WHERE id = ?",
+                    (row['id'],)
+                )
+                result['prod_updated'] += 1
 
         conn.commit()
 
