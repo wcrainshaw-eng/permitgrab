@@ -2395,6 +2395,16 @@ def _deferred_startup():
     print(f"[{datetime.now()}] V70: POST /api/admin/enable-postgres to enable Postgres pool")
     print(f"[{datetime.now()}] V70: POST /api/admin/start-collectors to start background threads")
 
+    # V98b: Auto-sync CITY_REGISTRY → prod_cities on every startup.
+    # This ensures ~1,234 cities are active immediately after deploy,
+    # without needing to manually call POST /api/admin/start-collectors.
+    try:
+        print(f"[{datetime.now()}] V98b: Auto-syncing CITY_REGISTRY → prod_cities...")
+        sync_city_registry_to_prod_cities()
+        print(f"[{datetime.now()}] V98b: Registry sync complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V98b: Registry sync error (non-fatal): {e}")
+
     # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
     try:
         email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
