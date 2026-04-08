@@ -2383,6 +2383,46 @@ _startup_done = False
 _collectors_manually_started = False
 
 @app.before_request
+def _cleanup_v108_pipeline_damage():
+    """V109b: One-time cleanup of V108 pipeline garbage permits + reset affected cities."""
+    try:
+        conn = permitdb.get_connection()
+        # Delete any remaining pipeline permits
+        deleted = conn.execute("""
+            DELETE FROM permits WHERE permit_number LIKE 'PL-%' OR permit_number LIKE 'ARC-%'
+        """).rowcount
+        if deleted:
+            print(f"[V109b] Deleted {deleted} pipeline garbage permits")
+
+        # Reset the 6 known bad cities
+        bad_slugs = ['oklahoma-city', 'milwaukee', 'kansas-city', 'fullerton-ca', 'torrance-ca', 'warren']
+        for slug in bad_slugs:
+            row = conn.execute(
+                "SELECT id FROM prod_cities WHERE city_slug = ?", (slug,)
+            ).fetchone()
+            if not row:
+                continue
+            actual = conn.execute(
+                "SELECT COUNT(*) FROM permits WHERE source_city_key = ?", (slug,)
+            ).fetchone()[0]
+            if actual == 0:
+                conn.execute("""
+                    UPDATE prod_cities SET total_permits = 0, source_id = NULL,
+                    source_type = NULL, health_status = 'never_worked', backfill_status = 'pending'
+                    WHERE city_slug = ?
+                """, (slug,))
+                print(f"[V109b] Reset {slug}: pipeline damage cleaned")
+
+        # Clear pipeline_progress for bad cities so they get re-processed
+        conn.execute("""
+            DELETE FROM pipeline_progress WHERE city_slug IN
+            ('oklahoma-city','milwaukee','kansas-city','fullerton-ca','torrance-ca','warren')
+        """)
+        conn.commit()
+    except Exception as e:
+        print(f"[V109b] Cleanup error (non-fatal): {e}")
+
+
 def _deferred_startup():
     """V69: Mark startup done but DO NOT start any background threads.
     V93: Email scheduler is now auto-started (doesn't need Postgres)."""
@@ -2414,15 +2454,18 @@ def _deferred_startup():
                                    activate_bulk_covered_cities, cleanup_balance_of_entries,
                                    cleanup_source_id_mismatches, pause_tiny_no_endpoint_cities)
 
+            # V109b: One-time cleanup of V108 pipeline damage
+            _cleanup_v108_pipeline_damage()
+
             relink_orphaned_permits()
             update_total_permits_from_actual()
             activate_bulk_covered_cities()
             cleanup_balance_of_entries()
-            cleanup_source_id_mismatches()       # V107: Clear cross-state source_id links
-            pause_tiny_no_endpoint_cities()       # V107: Pause <25K pop no_endpoint cities
+            cleanup_source_id_mismatches()
+            pause_tiny_no_endpoint_cities()
             update_all_city_health()
 
-            print(f"[{datetime.now()}] [V107] Background maintenance complete")
+            print(f"[{datetime.now()}] [V109b] Background maintenance complete")
         except Exception as e:
             print(f"[{datetime.now()}] [V106] Background maintenance error: {e}")
             import traceback
@@ -2908,25 +2951,56 @@ def admin_pipeline_status():
 
 @app.route('/api/admin/cleanup-pipeline', methods=['POST'])
 def admin_cleanup_pipeline():
-    """V109: Remove all permits inserted by the pipeline (source='pipeline')."""
+    """V109b: Remove pipeline permits AND reset affected prod_cities metadata."""
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
         conn = permitdb.get_connection()
-        # Find affected cities
-        affected = conn.execute(
-            "SELECT DISTINCT source_city_key FROM permits WHERE source_city_key IS NOT NULL AND collected_at IS NOT NULL"
-        ).fetchall()
-        # Delete pipeline permits (identified by source_city_key + recent collected_at pattern)
-        deleted = conn.execute("DELETE FROM permits WHERE source_city_key IN (SELECT DISTINCT source_city_key FROM permits) AND permit_number LIKE 'PL-%' OR permit_number LIKE 'ARC-%'").rowcount
+
+        # Find affected city slugs BEFORE deleting
+        affected_rows = conn.execute("""
+            SELECT DISTINCT source_city_key FROM permits
+            WHERE permit_number LIKE 'PL-%' OR permit_number LIKE 'ARC-%'
+        """).fetchall()
+        affected_slugs = [r[0] for r in affected_rows if r[0]]
+
+        # Delete pipeline permits
+        deleted = conn.execute("""
+            DELETE FROM permits
+            WHERE permit_number LIKE 'PL-%' OR permit_number LIKE 'ARC-%'
+        """).rowcount
         conn.commit()
 
-        # Recount affected cities
-        from collector import update_total_permits_from_actual
-        update_total_permits_from_actual()
+        # Reset affected prod_cities
+        reset_count = 0
+        for slug in affected_slugs:
+            actual = conn.execute(
+                "SELECT COUNT(*) FROM permits WHERE source_city_key = ?", (slug,)
+            ).fetchone()[0]
+            if actual == 0:
+                conn.execute("""
+                    UPDATE prod_cities SET
+                        total_permits = 0, source_id = NULL, source_type = NULL,
+                        health_status = 'never_worked', backfill_status = 'pending'
+                    WHERE city_slug = ? AND source_id LIKE '%:%'
+                """, (slug,))
+                reset_count += conn.total_changes
+            else:
+                conn.execute(
+                    "UPDATE prod_cities SET total_permits = ? WHERE city_slug = ?",
+                    (actual, slug))
 
-        return jsonify({'status': 'ok', 'deleted_permits': deleted}), 200
+        # Also clear pipeline_progress for affected cities
+        if affected_slugs:
+            placeholders = ','.join('?' * len(affected_slugs))
+            conn.execute(f"DELETE FROM pipeline_progress WHERE city_slug IN ({placeholders})", affected_slugs)
+
+        conn.commit()
+        return jsonify({
+            'status': 'ok', 'deleted_permits': deleted,
+            'cities_affected': len(affected_slugs), 'cities_reset': reset_count
+        }), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
