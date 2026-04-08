@@ -2384,43 +2384,49 @@ _collectors_manually_started = False
 
 @app.before_request
 def _cleanup_v108_pipeline_damage():
-    """V109b: One-time cleanup of V108 pipeline garbage permits + reset affected cities."""
+    """V110: One-time cleanup — uses system_state flag to run only ONCE."""
     try:
         conn = permitdb.get_connection()
-        # Delete any remaining pipeline permits
+
+        # Check if already done
+        row = conn.execute("SELECT value FROM system_state WHERE key = 'v110_cleanup_done'").fetchone()
+        if row:
+            return  # Already cleaned up
+
+        # Delete pipeline garbage permits
         deleted = conn.execute("""
             DELETE FROM permits WHERE permit_number LIKE 'PL-%' OR permit_number LIKE 'ARC-%'
         """).rowcount
-        if deleted:
-            print(f"[V109b] Deleted {deleted} pipeline garbage permits")
 
-        # Reset the 6 known bad cities
-        bad_slugs = ['oklahoma-city', 'milwaukee', 'kansas-city', 'fullerton-ca', 'torrance-ca', 'warren']
+        # Reset all bad cities (V108 originals + V109b NJ garbage)
+        bad_slugs = [
+            'oklahoma-city', 'milwaukee', 'kansas-city',
+            'fullerton-ca', 'torrance-ca', 'warren',
+            'jersey-city', 'paterson', 'elizabeth',
+        ]
         for slug in bad_slugs:
-            row = conn.execute(
-                "SELECT id FROM prod_cities WHERE city_slug = ?", (slug,)
-            ).fetchone()
-            if not row:
-                continue
-            actual = conn.execute(
-                "SELECT COUNT(*) FROM permits WHERE source_city_key = ?", (slug,)
-            ).fetchone()[0]
-            if actual == 0:
-                conn.execute("""
-                    UPDATE prod_cities SET total_permits = 0, source_id = NULL,
-                    source_type = NULL, health_status = 'never_worked', backfill_status = 'pending'
-                    WHERE city_slug = ?
-                """, (slug,))
-                print(f"[V109b] Reset {slug}: pipeline damage cleaned")
+            conn.execute("""
+                UPDATE prod_cities SET total_permits = 0, source_id = NULL,
+                source_type = NULL, health_status = 'never_worked', backfill_status = 'pending'
+                WHERE city_slug = ? AND (total_permits = 0 OR source_id LIKE '%:%')
+            """, (slug,))
 
-        # Clear pipeline_progress for bad cities so they get re-processed
+        # Clear ALL pipeline_progress for a fresh V110 rerun
+        conn.execute("DELETE FROM pipeline_progress")
+
+        # Mark as done so this never runs again
         conn.execute("""
-            DELETE FROM pipeline_progress WHERE city_slug IN
-            ('oklahoma-city','milwaukee','kansas-city','fullerton-ca','torrance-ca','warren')
+            INSERT OR REPLACE INTO system_state (key, value, updated_at)
+            VALUES ('v110_cleanup_done', 'true', datetime('now'))
         """)
         conn.commit()
+
+        if deleted:
+            print(f"[V110] One-time cleanup: deleted {deleted} pipeline permits, reset {len(bad_slugs)} cities")
+        else:
+            print(f"[V110] One-time cleanup: no pipeline permits found, reset {len(bad_slugs)} cities")
     except Exception as e:
-        print(f"[V109b] Cleanup error (non-fatal): {e}")
+        print(f"[V110] Cleanup error (non-fatal): {e}")
 
 
 def _deferred_startup():

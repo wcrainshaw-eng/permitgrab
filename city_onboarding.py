@@ -58,55 +58,68 @@ def _is_relevant_socrata_domain(domain, city, state):
         return True
     if f"data.{state_lower}.gov" in domain_lower:
         return True
-    # County-level domains for the right state
     if f"county{state_lower}" in domain_lower or f"{state_lower}county" in domain_lower:
+        return True
+    # V110: Match data.XX.gov pattern for 2-letter state abbreviations
+    if re.match(r'^data\.[a-z]{2}\.gov$', domain_lower) and domain_lower.split('.')[1] == state_lower:
         return True
     return False
 
 
-def _validate_pulled_data(records, city, state, field_map):
-    """V109: Verify pulled data actually belongs to this city before inserting."""
+def _classify_socrata_domain(domain, city, state):
+    """V110: Classify domain as city-specific, state, or county portal."""
+    domain_lower = domain.lower()
+    city_lower = city.lower().replace(' ', '').replace('.', '').replace("'", "")
+
+    # State portals: data.XX.gov or known state domains
+    if re.match(r'^data\.[a-z]{2}\.gov$', domain_lower):
+        return 'state'
+    state_name = STATE_NAMES.get(state.upper(), '')
+    if state_name and state_name in domain_lower and city_lower not in domain_lower:
+        return 'state'
+
+    # County portals
+    if 'county' in domain_lower:
+        return 'county'
+
+    # City-specific: domain contains city name
+    if city_lower in domain_lower.replace('.', '').replace('-', ''):
+        return 'city'
+    if f"cityof{city_lower}" in domain_lower.replace('.', '').replace('-', ''):
+        return 'city'
+
+    return 'unknown'
+
+
+def _validate_pulled_data(records, city, state, field_map, domain_type='city'):
+    """V110: Verify pulled data belongs to this city. Stricter for state/county portals."""
     if not records:
         return False, "no records"
 
-    address_field = field_map.get('address_field', '')
+    # V110: State/county portals with no city field = REJECT
     city_field = field_map.get('city_field', '')
+    if domain_type in ('state', 'county', 'unknown') and not city_field:
+        return False, f"{domain_type} portal with no city field — can't verify data belongs to {city}"
+
     city_lower = city.lower()
-    city_variations = [city_lower, city_lower.replace('fort ', 'ft '),
-                       city_lower.replace('saint ', 'st '), city_lower.replace('mount ', 'mt ')]
+    sample = records[:50]
+    matches = 0
 
-    city_matches = 0
-    sample_size = min(len(records), 50)
+    for record in sample:
+        record_text = ' '.join(str(v) for v in record.values()).lower()
+        if city_lower in record_text:
+            matches += 1
 
-    for record in records[:sample_size]:
-        if city_field:
-            val = str(record.get(city_field, '')).lower()
-            if any(v in val for v in city_variations):
-                city_matches += 1
-                continue
-        if address_field:
-            val = str(record.get(address_field, '')).lower()
-            if any(v in val for v in city_variations):
-                city_matches += 1
-                continue
-        # Check state
-        for key in record:
-            if key.lower() in ('state', 'state_code'):
-                if str(record[key]).upper().strip() == state.upper():
-                    city_matches += 1
-                break
+    match_rate = matches / len(sample) if sample else 0
 
-    match_rate = city_matches / sample_size if sample_size > 0 else 0
+    # V110: Higher threshold for state/county portals
+    threshold = 0.5 if domain_type in ('state', 'county', 'unknown') else 0.1
+    print(f"[PIPELINE]     Validation: {matches}/{len(sample)} mention '{city}' ({match_rate:.0%}, threshold {threshold:.0%})")
 
-    if not city_field and match_rate == 0:
-        return True, "city-specific portal (no city field)"
-
-    if match_rate >= 0.5:
-        return True, f"city match rate: {match_rate:.0%}"
-    elif match_rate >= 0.1:
-        return True, f"partial match: {match_rate:.0%}"
+    if match_rate >= threshold:
+        return True, f"match rate: {match_rate:.0%}"
     else:
-        return False, f"match rate too low: {match_rate:.0%} — likely wrong dataset"
+        return False, f"match rate {match_rate:.0%} below {threshold:.0%} threshold"
 
 
 def _save_pipeline_progress(slug, status, source_found='', permits_inserted=0, error=''):
@@ -320,13 +333,20 @@ def _socrata_pull_6months(domain, dataset_id, city, state, slug):
         if not date_field:
             return {'permits_inserted': 0, 'error': 'no date field detected'}
 
+        # V110: Classify domain and require city field for state/county portals
+        domain_type = _classify_socrata_domain(domain, city, state)
+        city_field = field_map.get('city_field')
+
+        if domain_type in ('state', 'county', 'unknown') and not city_field:
+            return {'permits_inserted': 0, 'error': f'{domain_type} portal with no city field — cannot filter'}
+
         # Build query
         where = f"{date_field} >= '{SIX_MONTHS_AGO}'"
-        city_field = field_map.get('city_field')
         if city_field:
             variations = _get_city_name_variations(city)
-            city_filter = " OR ".join([f"{city_field} = '{v}'" for v in variations])
+            city_filter = " OR ".join([f"upper({city_field}) = '{v.upper()}'" for v in variations])
             where = f"({where}) AND ({city_filter})"
+            print(f"[PIPELINE]     Filtering {domain_type} portal by city: {city_field}='{city}'")
 
         # Pull with pagination
         all_records = []
@@ -350,8 +370,8 @@ def _socrata_pull_6months(domain, dataset_id, city, state, slug):
         if not all_records:
             return {'permits_inserted': 0, 'error': 'no records returned'}
 
-        # V109: Validate data belongs to this city before inserting
-        is_valid, reason = _validate_pulled_data(all_records, city, state, field_map)
+        # V109/V110: Validate data belongs to this city before inserting
+        is_valid, reason = _validate_pulled_data(all_records, city, state, field_map, domain_type)
         if not is_valid:
             print(f"[PIPELINE]     REJECTED: {reason}")
             return {'permits_inserted': 0, 'error': f'validation failed: {reason}'}
