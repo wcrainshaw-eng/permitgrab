@@ -2935,6 +2935,37 @@ def admin_run_pipeline():
     }), 200
 
 
+@app.route('/api/admin/run-search-pipeline', methods=['POST'])
+def admin_run_search_pipeline():
+    """V111: Run the DuckDuckGo-search-powered city pipeline."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    data = request.json or {}
+    min_pop = data.get('min_population', 100000)
+    batch_size = data.get('batch_size', 25)
+
+    def run():
+        try:
+            from city_onboarding import run_search_pipeline
+            run_search_pipeline(min_population=min_pop, batch_size=batch_size)
+        except Exception as e:
+            print(f"[PIPELINE] Search pipeline error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+    return jsonify({
+        'status': 'started',
+        'min_population': min_pop,
+        'batch_size': batch_size,
+        'message': f'Searching up to {batch_size} cities with pop >= {min_pop:,}'
+    }), 200
+
+
 @app.route('/api/admin/pipeline-status')
 def admin_pipeline_status():
     """V108: Get latest pipeline run results."""

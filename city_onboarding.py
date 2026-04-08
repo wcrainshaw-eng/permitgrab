@@ -719,3 +719,289 @@ def _mark_city_no_source(slug):
     """, (slug,))
     conn.commit()
     print(f"[PIPELINE]   NO SOURCE: {slug}")
+
+
+# ================================================================
+# V111: SEARCH-POWERED PIPELINE (DuckDuckGo + URL patterns)
+# ================================================================
+
+def run_search_pipeline(min_population=100000, batch_size=25):
+    """V111: Process cities by population, using web search to find data sources."""
+    conn = permitdb.get_connection()
+
+    rows = conn.execute("""
+        SELECT pc.city_slug, pc.city, pc.state, pc.population, pc.id as prod_city_id
+        FROM prod_cities pc
+        LEFT JOIN pipeline_progress pp ON pc.city_slug = pp.city_slug
+        WHERE pc.population >= ?
+        AND (pc.total_permits = 0 OR pc.total_permits IS NULL)
+        AND pc.status = 'active'
+        AND pc.city NOT LIKE 'Balance of%%'
+        AND (pp.status IS NULL OR pp.status = 'error')
+        ORDER BY pc.population DESC
+        LIMIT ?
+    """, (min_population, batch_size)).fetchall()
+
+    print(f"[PIPELINE] V111 Search pipeline: {len(rows)} cities to process")
+    results = []
+
+    for row in rows:
+        slug, city, state, pop, pc_id = row[0], row[1], row[2], row[3], row[4]
+        print(f"\n[PIPELINE] === {city}, {state} (pop {pop:,}, slug: {slug}) ===")
+
+        # Search for sources
+        candidates = _search_city_sources(city, state)
+
+        if not candidates:
+            print(f"[PIPELINE]   No candidates found")
+            _save_pipeline_progress(slug, 'no_source', error='no candidates from search')
+            results.append({'city': city, 'state': state, 'status': 'NO_SOURCE'})
+            time.sleep(1)
+            continue
+
+        # Test each candidate
+        found = False
+        for candidate in candidates:
+            success, count = _test_candidate(candidate, slug, city, state, pc_id)
+            if success and count >= 10:
+                _save_pipeline_progress(slug, 'done',
+                                        source_found=candidate.get('url', '')[:200],
+                                        permits_inserted=count)
+                results.append({'city': city, 'state': state, 'status': 'DONE',
+                                'permits': count, 'source': candidate.get('url', '')[:100]})
+                found = True
+                break
+
+        if not found:
+            _save_pipeline_progress(slug, 'no_source',
+                                    error=f'tested {len(candidates)} candidates, none worked')
+            results.append({'city': city, 'state': state, 'status': 'NO_SOURCE',
+                            'candidates_tried': len(candidates)})
+
+        time.sleep(1)
+
+    done = sum(1 for r in results if r.get('status') == 'DONE')
+    print(f"\n[PIPELINE] V111 complete: {done}/{len(results)} cities got data")
+
+    # Log run
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("""
+            INSERT INTO pipeline_runs (started_at, completed_at, results_json, cities_processed, cities_succeeded)
+            VALUES (datetime('now'), datetime('now'), ?, ?, ?)
+        """, (json.dumps(results), len(results), done))
+        conn.commit()
+    except Exception:
+        pass
+
+    return results
+
+
+def _search_city_sources(city, state):
+    """V111: Search for data sources using URL patterns + DuckDuckGo."""
+    candidates = []
+
+    # Phase 1: Try known URL patterns (free, instant)
+    candidates.extend(_try_url_patterns(city, state))
+
+    # Phase 2: DuckDuckGo search
+    try:
+        from duckduckgo_search import DDGS
+        ddgs = DDGS()
+        queries = [
+            f'"{city}" "{state}" building permits open data',
+            f'"{city}" {state} building permits socrata OR arcgis',
+        ]
+        for q in queries:
+            try:
+                results = ddgs.text(q, max_results=10)
+                for r in results:
+                    url = r.get('href', r.get('link', ''))
+                    title = r.get('title', '')
+                    parsed = _classify_search_url(url, title, city, state)
+                    if parsed:
+                        candidates.append(parsed)
+                time.sleep(1)
+            except Exception as e:
+                print(f"[PIPELINE]   Search error: {e}")
+    except ImportError:
+        print("[PIPELINE]   duckduckgo-search not installed, skipping web search")
+
+    # Deduplicate
+    seen = set()
+    unique = []
+    for c in candidates:
+        key = c.get('dataset_id', c['url'])
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+
+    print(f"[PIPELINE]   Found {len(unique)} candidates")
+    return unique
+
+
+def _try_url_patterns(city, state):
+    """V111: Probe known open data portal URL patterns."""
+    candidates = []
+    city_slug = city.lower().replace(' ', '').replace('.', '').replace("'", "")
+
+    # Socrata portal patterns
+    for domain in [f"data.{city_slug}.gov", f"data.cityof{city_slug}.org",
+                   f"opendata.{city_slug}.gov", f"data.{city_slug}{state.lower()}.gov"]:
+        try:
+            resp = requests.head(f"https://{domain}", timeout=5, allow_redirects=True)
+            if resp.status_code == 200:
+                print(f"[PIPELINE]   URL pattern hit: {domain}")
+                # Search this portal for permit datasets
+                try:
+                    cat_resp = requests.get(
+                        f"https://{domain}/api/catalog/v1?q=building+permits&limit=5", timeout=8)
+                    if cat_resp.status_code == 200:
+                        for ds in cat_resp.json().get('results', []):
+                            resource = ds.get('resource', {})
+                            ds_id = resource.get('id')
+                            ds_name = resource.get('name', '')
+                            if ds_id and any(kw in ds_name.lower() for kw in ['permit', 'building', 'construction']):
+                                candidates.append({
+                                    'url': f"https://{domain}/resource/{ds_id}.json",
+                                    'platform': 'socrata', 'domain': domain,
+                                    'dataset_id': ds_id, 'title': ds_name,
+                                    'source': 'url_pattern'
+                                })
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    return candidates
+
+
+def _classify_search_url(url, title, city, state):
+    """V111: Classify a search result URL by platform."""
+    url_lower = url.lower()
+    city_first_word = city.lower().split()[0]
+
+    # Must be somewhat relevant
+    text = (url_lower + ' ' + title.lower())
+    if city_first_word not in text:
+        return None
+
+    # Socrata dataset link
+    socrata_match = re.search(r'([\w.-]+\.(?:gov|org|com))/(?:resource|d)/([\w]{4}-[\w]{4})', url_lower)
+    if socrata_match:
+        domain = socrata_match.group(1)
+        dataset_id = socrata_match.group(2)
+        # V110: Validate domain relevance
+        if not _is_relevant_socrata_domain(domain, city, state):
+            return None
+        return {'url': url, 'platform': 'socrata', 'domain': domain,
+                'dataset_id': dataset_id, 'title': title, 'source': 'search'}
+
+    # ArcGIS FeatureServer/MapServer
+    arcgis_match = re.search(r'(https?://[^/]+/[^\s]+(?:Feature|Map)Server/\d+)', url, re.IGNORECASE)
+    if arcgis_match:
+        return {'url': arcgis_match.group(1), 'platform': 'arcgis',
+                'title': title, 'source': 'search'}
+
+    # ArcGIS Hub
+    if 'hub.arcgis.com' in url_lower:
+        return {'url': url, 'platform': 'arcgis_hub', 'title': title, 'source': 'search'}
+
+    return None
+
+
+def _test_candidate(candidate, slug, city, state, prod_city_id):
+    """V111: Test a candidate source — pull data, validate, save if good."""
+    platform = candidate.get('platform', '')
+    print(f"[PIPELINE]   Testing {platform}: {candidate.get('title', candidate['url'][:60])}")
+
+    try:
+        if platform == 'socrata' and candidate.get('dataset_id'):
+            return _test_socrata(candidate, slug, city, state, prod_city_id)
+        elif platform == 'arcgis':
+            result = _arcgis_pull_6months(candidate['url'], city, state, slug)
+            if result and result.get('permits_inserted', 0) >= 10:
+                _mark_city_done(slug, result)
+                return True, result['permits_inserted']
+        return False, 0
+    except Exception as e:
+        print(f"[PIPELINE]   Test failed: {e}")
+        return False, 0
+
+
+def _test_socrata(candidate, slug, city, state, prod_city_id):
+    """V111: Test a specific Socrata dataset."""
+    domain = candidate['domain']
+    dataset_id = candidate['dataset_id']
+
+    domain_type = _classify_socrata_domain(domain, city, state)
+
+    # Get metadata
+    try:
+        meta = requests.get(f"https://{domain}/api/views/{dataset_id}.json", timeout=10).json()
+        columns = meta.get('columns', [])
+        col_names = [c['fieldName'] for c in columns]
+        col_types = {c['fieldName']: c.get('dataTypeName', '') for c in columns}
+    except Exception:
+        return False, 0
+
+    field_map = _auto_detect_fields(col_names, col_types)
+    date_field = field_map.get('date_field')
+    if not date_field:
+        print(f"[PIPELINE]     No date field detected")
+        return False, 0
+
+    city_field = field_map.get('city_field')
+    if domain_type in ('state', 'county', 'unknown') and not city_field:
+        print(f"[PIPELINE]     REJECT: {domain_type} portal, no city field")
+        return False, 0
+
+    # Build query
+    six_months = (datetime.utcnow() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
+    where = f"{date_field} >= '{six_months}'"
+    if city_field:
+        variations = _get_city_name_variations(city)
+        city_filter = " OR ".join([f"upper({city_field}) = '{v.upper()}'" for v in variations])
+        where = f"({where}) AND ({city_filter})"
+        print(f"[PIPELINE]     Filtering by {city_field}='{city}'")
+
+    # Pull
+    url = f"https://{domain}/resource/{dataset_id}.json?$where={where}&$limit=5000&$order=:id"
+    try:
+        resp = requests.get(url, timeout=30)
+        if resp.status_code != 200:
+            return False, 0
+        records = resp.json()
+    except Exception:
+        return False, 0
+
+    if not records or len(records) < 10:
+        print(f"[PIPELINE]     Only {len(records) if records else 0} records")
+        return False, 0
+
+    # Validate
+    is_valid, reason = _validate_pulled_data(records, city, state, field_map, domain_type)
+    if not is_valid:
+        print(f"[PIPELINE]     REJECTED: {reason}")
+        return False, 0
+    print(f"[PIPELINE]     VALIDATED: {reason}")
+
+    # Save permits
+    inserted = _insert_permits(slug, city, state, records, field_map, 'socrata')
+    if inserted >= 10:
+        # Update prod_cities
+        conn = permitdb.get_connection()
+        conn.execute("""
+            UPDATE prod_cities SET
+                source_id = ?, source_type = 'socrata',
+                total_permits = (SELECT COUNT(*) FROM permits WHERE source_city_key = ?),
+                health_status = 'collecting', backfill_status = 'complete',
+                last_successful_collection = datetime('now'),
+                pipeline_checked_at = datetime('now')
+            WHERE city_slug = ?
+        """, (f"{domain}:{dataset_id}", slug, slug))
+        conn.commit()
+        print(f"[PIPELINE]   SUCCESS: {city} — {inserted} permits from {domain}:{dataset_id}")
+        return True, inserted
+
+    return False, 0
