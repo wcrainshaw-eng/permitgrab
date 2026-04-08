@@ -2405,14 +2405,31 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] V98b: Registry sync error (non-fatal): {e}")
 
+    # V101: Re-link orphaned permits to current prod_cities rows
+    try:
+        from db import relink_orphaned_permits
+        print(f"[{datetime.now()}] V101: Re-linking orphaned permits...")
+        relink_orphaned_permits()
+        print(f"[{datetime.now()}] V101: Permit re-linking complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V101: Permit re-linking error (non-fatal): {e}")
+
     # V100: Recount total_permits from actual permits table on startup
     try:
-        from collector import update_total_permits_from_actual
+        from collector import update_total_permits_from_actual, update_all_city_health
         print(f"[{datetime.now()}] V100: Recounting total_permits from actual data...")
         update_total_permits_from_actual()
         print(f"[{datetime.now()}] V100: Recount complete")
     except Exception as e:
         print(f"[{datetime.now()}] V100: Recount error (non-fatal): {e}")
+
+    # V101: Update health_status for all active cities
+    try:
+        print(f"[{datetime.now()}] V101: Updating city health status...")
+        update_all_city_health()
+        print(f"[{datetime.now()}] V101: Health status update complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V101: Health status update error (non-fatal): {e}")
 
     # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
     try:

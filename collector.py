@@ -99,7 +99,7 @@ def _get_source_config(source_id):
 
 # V100: Update total_permits counter from actual permits table
 def update_total_permits_from_actual():
-    """Recount total_permits from actual permits table for all active cities."""
+    """Recount total_permits and permits_last_30d from actual permits table for all active cities."""
     conn = permitdb.get_connection()
     try:
         updated = conn.execute("""
@@ -116,6 +116,18 @@ def update_total_permits_from_actual():
                 AND permits.state = prod_cities.state
             )
         """).rowcount
+
+        # V101: Also update permits_last_30d for all active cities with data
+        conn.execute("""
+            UPDATE prod_cities SET permits_last_30d = (
+                SELECT COUNT(*) FROM permits
+                WHERE permits.city = prod_cities.city
+                AND permits.state = prod_cities.state
+                AND permits.filing_date >= date('now', '-30 days')
+            )
+            WHERE status = 'active' AND total_permits > 0
+        """)
+
         conn.commit()
         print(f"[V100] Updated total_permits for {updated} cities from actual permit counts")
         return updated
@@ -243,6 +255,55 @@ def update_permit_date_ranges():
     except Exception as e:
         print(f"[V100] Error updating permit date ranges: {e}")
         return 0
+
+
+# V101: Simple bulk health status update based on prod_cities data
+def update_all_city_health():
+    """V101: Set health_status for all active cities based on current data."""
+    conn = permitdb.get_connection()
+    try:
+        # Cities with recent data = collecting
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'collecting'
+            WHERE status = 'active' AND total_permits > 0
+            AND newest_permit_date >= date('now', '-7 days')
+        """)
+
+        # Cities with data but stale = stale
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'stale'
+            WHERE status = 'active' AND total_permits > 0
+            AND (newest_permit_date < date('now', '-7 days') OR newest_permit_date IS NULL)
+        """)
+
+        # Cities with no data and no source = no_endpoint
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'no_endpoint'
+            WHERE status = 'active' AND (total_permits = 0 OR total_permits IS NULL)
+            AND (source_id IS NULL OR source_id = '')
+        """)
+
+        # Cities with no data but have source = never_worked
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'never_worked'
+            WHERE status = 'active' AND (total_permits = 0 OR total_permits IS NULL)
+            AND source_id IS NOT NULL AND source_id != ''
+        """)
+
+        conn.commit()
+
+        # Report
+        stats = conn.execute("""
+            SELECT health_status, COUNT(*) as cnt
+            FROM prod_cities WHERE status = 'active'
+            GROUP BY health_status ORDER BY cnt DESC
+        """).fetchall()
+        for row in stats:
+            print(f"[V101] Health: {row[0]} = {row[1]}")
+        return stats
+    except Exception as e:
+        print(f"[V101] Error updating city health: {e}")
+        return []
 
 
 # V15: Helper function for logging collection runs to scraper_runs table
@@ -1176,6 +1237,7 @@ def collect_bulk_source(source_key, config, days_back=90):
     V12.31: Collect permits from a bulk source and split by city.
     Returns dict of {city_slug: [permits]} and stats.
     """
+    config.setdefault('name', source_key)
     print(f"\n  === BULK SOURCE: {config['name']} ===")
 
     platform = config.get("platform", "socrata")
@@ -2725,7 +2787,7 @@ def collect_single_source(source_key, source_type='bulk'):
             for city_slug, permits in city_permits.items():
                 new_permits.extend(permits)
             stats[source_key] = source_stats
-            print(f"  ✓ {config['name']}: {len(new_permits)} permits")
+            print(f"  ✓ {config.get('name', source_key)}: {len(new_permits)} permits")
 
         else:  # city
             config = get_city_config(source_key)
@@ -2742,7 +2804,7 @@ def collect_single_source(source_key, source_type='bulk'):
                 except Exception:
                     continue
             stats[source_key] = {"raw": len(raw), "normalized": len(new_permits), "status": fetch_status}
-            print(f"  ✓ {config['name']}: {len(new_permits)} permits")
+            print(f"  ✓ {config.get('name', source_key)}: {len(new_permits)} permits")
 
         # V12.50: Upsert to SQLite
         if new_permits:
@@ -3146,7 +3208,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
                 bulk_stats[source_key] = source_stats
                 total_permits = source_stats.get('total_normalized', 0)
-                print(f"  ✓ {config['name']}: {total_permits} permits from {source_stats.get('cities_with_permits', 0)} cities")
+                print(f"  ✓ {config.get('name', source_key)}: {total_permits} permits from {source_stats.get('cities_with_permits', 0)} cities")
 
                 # V15: Log bulk source success to scraper_runs
                 duration_ms = int((time.time() - start_time) * 1000)
@@ -3161,7 +3223,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 )
 
             except Exception as e:
-                print(f"  ✗ {config['name']}: ERROR - {str(e)[:100]}")
+                print(f"  ✗ {config.get('name', source_key)}: ERROR - {str(e)[:100]}")
                 bulk_stats[source_key] = {"status": f"error: {str(e)[:100]}"}
                 # V15: Log bulk source error to scraper_runs
                 duration_ms = int((time.time() - start_time) * 1000)

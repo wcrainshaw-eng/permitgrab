@@ -12542,8 +12542,8 @@ CITY_REGISTRY = {
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": False,  # V62: Deactivated - no individual permit data available
-        "notes": "V62: Deactivated. Houston provides aggregated monthly data, not individual permits.",
+        "active": True,  # V101: Reactivated — gets data from TX bulk Socrata sources. 3,913 permits orphaned without active row.
+        "notes": "V101: No individual endpoint, but receives permits from TX bulk sources. Must be active for permit linking.",
     },
 
     # =========================================================================

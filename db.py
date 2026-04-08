@@ -1532,6 +1532,13 @@ def _run_v90_rebuild_cities(conn):
         if key in top_20k_keys:
             continue
 
+        # V101: Don't delete if permits reference this prod_city_id
+        has_permits = conn.execute(
+            "SELECT 1 FROM permits WHERE prod_city_id = ? LIMIT 1", (pid,)
+        ).fetchone()
+        if has_permits:
+            continue
+
         # Delete
         conn.execute("DELETE FROM prod_cities WHERE id = ?", (pid,))
         deleted += 1
@@ -1849,6 +1856,51 @@ def _run_v100_health_columns(conn):
         print(f"[V100] Added {added} health columns to prod_cities")
     else:
         print("[V100] Health columns already exist")
+
+
+def relink_orphaned_permits():
+    """V101: Re-link orphaned permits to current prod_cities rows.
+
+    Permits become orphaned when V90 rebuild changes prod_cities IDs.
+    This matches permits back to prod_cities by (city, state) pair.
+    """
+    conn = get_connection()
+
+    # Step 1: Match orphaned permits by city name + state
+    cursor = conn.execute("""
+        UPDATE permits
+        SET prod_city_id = (
+            SELECT pc.id FROM prod_cities pc
+            WHERE pc.city = permits.city
+            AND pc.state = permits.state
+            AND pc.status = 'active'
+            LIMIT 1
+        )
+        WHERE prod_city_id IS NULL
+        OR prod_city_id NOT IN (SELECT id FROM prod_cities)
+    """)
+    relinked = cursor.rowcount
+    conn.commit()
+    print(f"[V101] Re-linked {relinked} orphaned permits to current prod_cities rows")
+
+    # Step 2: For permits where city name didn't match, try matching by source_city_key
+    cursor = conn.execute("""
+        UPDATE permits
+        SET prod_city_id = (
+            SELECT pc.id FROM prod_cities pc
+            WHERE pc.city_slug = permits.source_city_key
+            AND pc.status = 'active'
+            LIMIT 1
+        )
+        WHERE (prod_city_id IS NULL
+        OR prod_city_id NOT IN (SELECT id FROM prod_cities))
+        AND source_city_key IS NOT NULL
+    """)
+    relinked2 = cursor.rowcount
+    conn.commit()
+    print(f"[V101] Re-linked {relinked2} more permits by source_city_key")
+
+    return relinked + relinked2
 
 
 def _run_v33_source_linking(conn):
