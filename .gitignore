@@ -1,5 +1,7 @@
 # Data files
 data/*.json
+data/*.db*
+instance/*.db
 
 # Python
 __pycache__/
