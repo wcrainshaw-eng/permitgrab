@@ -6156,9 +6156,14 @@ def sync_city_registry_to_prod_cities():
                 result['errors'] += 1
 
         # =================================================================
-        # STEP 3: CITY_REGISTRY → prod_cities (V97 REWRITE)
+        # STEP 3: CITY_REGISTRY → prod_cities (V98 FIX)
         # =================================================================
         print(f"[V97] Phase 3: Syncing CITY_REGISTRY → prod_cities...")
+
+        # V98: Re-acquire connection — upsert_city_source() in Phase 1/2
+        # closes the thread-local conn (V66 conn.close()), so the original
+        # conn from line 6102 is dead by now.
+        conn = permitdb.get_connection()
 
         # V97: Build THREE lookups upfront for fast matching
         by_source = {}
