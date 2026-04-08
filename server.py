@@ -2432,6 +2432,13 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] V104: Bulk activation error (non-fatal): {e}")
 
+    # V105: Pause "Balance of..." Census artifacts
+    try:
+        from collector import cleanup_balance_of_entries
+        cleanup_balance_of_entries()
+    except Exception as e:
+        print(f"[{datetime.now()}] V105: Balance-of cleanup error (non-fatal): {e}")
+
     # V101: Update health_status for all active cities
     try:
         print(f"[{datetime.now()}] V101: Updating city health status...")

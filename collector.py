@@ -260,6 +260,23 @@ def update_permit_date_ranges():
 
 
 # V101: Simple bulk health status update based on prod_cities data
+def cleanup_balance_of_entries():
+    """V105: Pause 'Balance of...' entries — Census artifacts, not real cities."""
+    conn = permitdb.get_connection()
+    try:
+        paused = conn.execute("""
+            UPDATE prod_cities SET status = 'paused', notes = 'V105: Census balance-of area, not a real city'
+            WHERE status = 'active' AND city LIKE 'Balance of%'
+        """).rowcount
+        conn.commit()
+        if paused:
+            print(f"[V105] Paused {paused} 'Balance of...' entries")
+        return paused
+    except Exception as e:
+        print(f"[V105] Error cleaning up balance-of entries: {e}")
+        return 0
+
+
 def update_all_city_health():
     """V101/V104: Set health_status for all active cities based on current data."""
     conn = permitdb.get_connection()
@@ -275,11 +292,19 @@ def update_all_city_health():
             )
         """)
 
-        # Cities with data but no recent collection success = stale
+        # V105: Cities with data but no individual source = "has_data" (bulk-linked)
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'has_data'
+            WHERE status = 'active' AND total_permits > 0
+            AND health_status != 'collecting'
+            AND (source_id IS NULL OR source_id = '')
+        """)
+
+        # Cities with data AND a source but no recent collection = stale
         conn.execute("""
             UPDATE prod_cities SET health_status = 'stale'
             WHERE status = 'active' AND total_permits > 0
-            AND health_status != 'collecting'
+            AND health_status NOT IN ('collecting', 'has_data')
         """)
 
         # Cities with no data and no source = no_endpoint

@@ -1900,7 +1900,53 @@ def relink_orphaned_permits():
     conn.commit()
     print(f"[V101] Re-linked {relinked2} more permits by source_city_key")
 
-    return relinked + relinked2
+    # V105: Step 3 — Fuzzy name matching for remaining orphans
+    # Normalize: strip periods, lowercase, handle common abbreviations
+    # SQLite REPLACE chains handle: "St." → "St", "Ft." → "Ft"
+    cursor = conn.execute("""
+        UPDATE permits
+        SET prod_city_id = (
+            SELECT pc.id FROM prod_cities pc
+            WHERE pc.state = permits.state
+            AND pc.status = 'active'
+            AND REPLACE(REPLACE(REPLACE(LOWER(pc.city), '.', ''), ' city', ''), ' town', '')
+              = REPLACE(REPLACE(REPLACE(LOWER(permits.city), '.', ''), ' city', ''), ' town', '')
+            LIMIT 1
+        )
+        WHERE (prod_city_id IS NULL
+        OR prod_city_id NOT IN (SELECT id FROM prod_cities))
+    """)
+    relinked3 = cursor.rowcount
+    conn.commit()
+    print(f"[V105] Re-linked {relinked3} more permits by normalized city name")
+
+    # V105: Step 4 — Match "Fort"↔"Ft" and "Mount"↔"Mt" and "Saint"↔"St"
+    abbreviation_pairs = [
+        ('fort ', 'ft '), ('mount ', 'mt '), ('saint ', 'st '),
+    ]
+    relinked4 = 0
+    for full_form, short_form in abbreviation_pairs:
+        cursor = conn.execute("""
+            UPDATE permits
+            SET prod_city_id = (
+                SELECT pc.id FROM prod_cities pc
+                WHERE pc.state = permits.state
+                AND pc.status = 'active'
+                AND (
+                    REPLACE(LOWER(pc.city), ?, ?) = LOWER(permits.city)
+                    OR LOWER(pc.city) = REPLACE(LOWER(permits.city), ?, ?)
+                )
+                LIMIT 1
+            )
+            WHERE (prod_city_id IS NULL
+            OR prod_city_id NOT IN (SELECT id FROM prod_cities))
+        """, (full_form, short_form, full_form, short_form))
+        relinked4 += cursor.rowcount
+    conn.commit()
+    if relinked4:
+        print(f"[V105] Re-linked {relinked4} more permits by abbreviation matching")
+
+    return relinked + relinked2 + relinked3 + relinked4
 
 
 def _run_v33_source_linking(conn):
