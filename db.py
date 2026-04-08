@@ -1551,13 +1551,10 @@ def _run_v90_rebuild_cities(conn):
 
     conn.commit()
 
-    # Step 8: Update status based on data
-    conn.execute("""
-        UPDATE prod_cities SET status = 'active' WHERE total_permits > 0
-    """)
-    conn.execute("""
-        UPDATE prod_cities SET status = 'pending' WHERE total_permits = 0 OR total_permits IS NULL
-    """)
+    # Step 8: REMOVED in V98 — status is now controlled by
+    # sync_city_registry_to_prod_cities(), not by permit counts.
+    # The old logic reset all cities without permits to 'pending',
+    # undoing the sync function's work on every startup.
     conn.commit()
 
     # Final stats
