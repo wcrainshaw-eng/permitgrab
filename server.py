@@ -6073,38 +6073,38 @@ def is_data_loading():
 
 
 def sync_city_registry_to_prod_cities():
-    """V95: Complete sync — CITY_REGISTRY + BULK_SOURCES → prod_cities + city_sources.
+    """V97: Complete sync — CITY_REGISTRY + BULK_SOURCES → prod_cities + city_sources.
 
-    V95 FIXES:
-    - NO DELETES: Never delete prod_cities rows. Deactivate via status='paused' if needed.
-    - Syncs to city_sources: All active configs get city_sources entries for collector.
-    - Handles pending rows: Activates pending rows that match CITY_REGISTRY entries.
-    - Syncs BULK_SOURCES: Bulk sources also get city_sources entries.
+    V97 FIXES (replaces broken V95/V96 logic):
+    - Builds THREE lookups upfront: by_source, by_slug, by_citystate
+    - Uses config.get('slug', city_key) for slug — NOT normalize_city_slug()
+    - Direct SQL INSERT instead of upsert_prod_city() which was failing silently
+    - Tracks already_active to avoid unnecessary updates
+    - NO DELETES: Never delete prod_cities rows.
 
     Runs on every startup. Must be idempotent and fast (< 30 seconds).
     """
-    import json
     from city_configs import CITY_REGISTRY, BULK_SOURCES
     from city_source_db import upsert_city_source
 
     result = {
+        'already_active': 0,
         'prod_activated': 0,
         'prod_created': 0,
         'prod_updated': 0,
         'cs_created': 0,
-        'cs_updated': 0,
         'errors': 0
     }
     conn = None
 
     try:
-        print(f"[V95] Starting registry sync...")
+        print(f"[V97] Starting registry sync...")
         conn = permitdb.get_connection()
 
         # =================================================================
         # STEP 1: CITY_REGISTRY → city_sources
         # =================================================================
-        print(f"[V95] Phase 1: Syncing CITY_REGISTRY → city_sources...")
+        print(f"[V97] Phase 1: Syncing CITY_REGISTRY → city_sources...")
         for city_key, config in CITY_REGISTRY.items():
             if not config.get('active', False):
                 continue
@@ -6125,15 +6125,15 @@ def sync_city_registry_to_prod_cities():
                 })
                 result['cs_created'] += 1
             except Exception as e:
-                print(f"  [V95] WARN: city_sources upsert failed for {city_key}: {e}")
+                print(f"  [V97] WARN: city_sources upsert failed for {city_key}: {e}")
                 result['errors'] += 1
 
         # =================================================================
         # STEP 2: BULK_SOURCES → city_sources
         # =================================================================
-        print(f"[V95] Phase 2: Syncing BULK_SOURCES → city_sources...")
+        print(f"[V97] Phase 2: Syncing BULK_SOURCES → city_sources...")
         for source_key, config in BULK_SOURCES.items():
-            if not config.get('active', True):  # BULK_SOURCES default to active
+            if not config.get('active', True):
                 continue
             try:
                 upsert_city_source({
@@ -6152,139 +6152,121 @@ def sync_city_registry_to_prod_cities():
                 })
                 result['cs_created'] += 1
             except Exception as e:
-                print(f"  [V95] WARN: city_sources upsert failed for bulk {source_key}: {e}")
+                print(f"  [V97] WARN: city_sources upsert failed for bulk {source_key}: {e}")
                 result['errors'] += 1
 
         # =================================================================
-        # STEP 3: CITY_REGISTRY → prod_cities
+        # STEP 3: CITY_REGISTRY → prod_cities (V97 REWRITE)
         # =================================================================
-        print(f"[V95] Phase 3: Syncing CITY_REGISTRY → prod_cities...")
+        print(f"[V97] Phase 3: Syncing CITY_REGISTRY → prod_cities...")
 
-        # Build lookup of existing prod_cities
-        existing_by_source = {}
-        existing_by_slug = {}
-        for row in conn.execute("SELECT id, city_slug, source_id, source_type, status FROM prod_cities"):
-            if row['source_id']:
-                existing_by_source[row['source_id']] = row
-            if row['city_slug']:
-                existing_by_slug[row['city_slug']] = row
-
-        # Build set of active keys
-        active_keys = set()
-        for city_key, config in CITY_REGISTRY.items():
-            if config.get('active', False):
-                active_keys.add(city_key)
+        # V97: Build THREE lookups upfront for fast matching
+        by_source = {}
+        by_slug = {}
+        by_citystate = {}
+        for row in conn.execute("SELECT id, city_slug, source_id, city, state, status FROM prod_cities"):
+            row_dict = dict(row) if hasattr(row, 'keys') else {
+                'id': row[0], 'city_slug': row[1], 'source_id': row[2],
+                'city': row[3], 'state': row[4], 'status': row[5]
+            }
+            if row_dict['source_id']:
+                by_source[row_dict['source_id']] = row_dict
+            if row_dict['city_slug']:
+                by_slug[row_dict['city_slug']] = row_dict
+            city_lower = row_dict['city'].lower() if row_dict['city'] else ''
+            state_val = row_dict['state'] or ''
+            by_citystate[(city_lower, state_val)] = row_dict
 
         # Process each active CITY_REGISTRY entry
-        for city_key in active_keys:
-            config = CITY_REGISTRY[city_key]
-            city_name = config.get('name', '')
-            state = config.get('state', '')
-            platform = config.get('platform', '')
-
-            if not city_name or not state:
+        for city_key, config in CITY_REGISTRY.items():
+            if not config.get('active', False):
                 continue
 
-            try:
-                normalized_slug = permitdb.normalize_city_slug(city_name)
-            except Exception:
-                normalized_slug = config.get('slug', city_key)
+            name = config.get('name', '')
+            state = config.get('state', '')
+            platform = config.get('platform', '')
+            # V97: Use slug from config, fallback to city_key — NOT normalize_city_slug()
+            slug = config.get('slug', city_key)
 
-            # Case 1: source_id already matches — just ensure active
-            if city_key in existing_by_source:
-                row = existing_by_source[city_key]
-                if row['status'] != 'active' or row['source_type'] != platform:
-                    conn.execute("""
-                        UPDATE prod_cities SET status = 'active', source_type = ?,
-                            notes = 'V95: Activated — matches CITY_REGISTRY'
-                        WHERE source_id = ?
-                    """, (platform, city_key))
-                    result['prod_activated'] += 1
+            if not name or not state:
+                continue
 
-            # Case 2: slug exists (maybe pending from v90_rebuild) — activate it
-            elif normalized_slug in existing_by_slug:
-                row = existing_by_slug[normalized_slug]
-                conn.execute("""
-                    UPDATE prod_cities SET source_id = ?, source_type = ?,
-                        status = 'active',
-                        notes = 'V95: Activated pending row — matched CITY_REGISTRY'
-                    WHERE id = ?
-                """, (city_key, platform, row['id']))
-                result['prod_activated'] += 1
-                # Update lookup so we don't double-process
-                existing_by_source[city_key] = row
-
-            # Case 3 (V96): city+state exists under different slug — update slug and activate
-            # This fixes 155 cities that failed UNIQUE constraint because city+state
-            # already existed (from v90_rebuild) but with a different slug format.
-            else:
-                # Check if city+state already exists
-                existing_row = conn.execute("""
-                    SELECT id, city_slug, source_id, status FROM prod_cities
-                    WHERE LOWER(city) = LOWER(?) AND state = ?
-                """, (city_name, state)).fetchone()
-
-                if existing_row:
-                    # Update existing row to use CITY_REGISTRY slug and activate
-                    conn.execute("""
-                        UPDATE prod_cities SET city_slug = ?, source_id = ?, source_type = ?,
-                            status = 'active',
-                            notes = 'V96: Updated slug — city+state matched CITY_REGISTRY'
-                        WHERE id = ?
-                    """, (normalized_slug, city_key, platform, existing_row['id']))
-                    result['prod_activated'] += 1
-                    # Update lookups
-                    existing_by_source[city_key] = existing_row
-                    existing_by_slug[normalized_slug] = existing_row
-
-                # Case 4: brand new city — insert
+            # Match 1: by source_id (most reliable)
+            if city_key in by_source:
+                row = by_source[city_key]
+                if row['status'] == 'active':
+                    result['already_active'] += 1
                 else:
-                    try:
-                        permitdb.upsert_prod_city(
-                            city=city_name,
-                            state=state,
-                            city_slug=normalized_slug,
-                            source_type=platform,
-                            source_id=city_key,
-                            source_scope='city',
-                            status='active',
-                            added_by='v95_sync',
-                            notes='V95: Auto-synced from CITY_REGISTRY'
-                        )
-                        result['prod_created'] += 1
-                    except Exception as e:
-                        print(f"  [V95] ERROR: Failed to add {city_key}: {e}")
-                        result['errors'] += 1
+                    conn.execute(
+                        "UPDATE prod_cities SET status = ?, source_type = ? WHERE id = ?",
+                        ('active', platform, row['id'])
+                    )
+                    result['prod_activated'] += 1
+                continue
+
+            # Match 2: by slug
+            if slug in by_slug:
+                row = by_slug[slug]
+                conn.execute(
+                    "UPDATE prod_cities SET status = ?, source_id = ?, source_type = ? WHERE id = ?",
+                    ('active', city_key, platform, row['id'])
+                )
+                result['prod_activated'] += 1
+                by_source[city_key] = row  # prevent double-match
+                continue
+
+            # Match 3: by city+state
+            cs_key = (name.lower(), state)
+            if cs_key in by_citystate:
+                row = by_citystate[cs_key]
+                conn.execute(
+                    "UPDATE prod_cities SET status = ?, source_id = ?, source_type = ?, city_slug = ? WHERE id = ?",
+                    ('active', city_key, platform, slug, row['id'])
+                )
+                result['prod_activated'] += 1
+                by_source[city_key] = row
+                continue
+
+            # Match 4: INSERT new city (V97: direct SQL, not upsert_prod_city)
+            try:
+                conn.execute("""
+                    INSERT INTO prod_cities (city, state, city_slug, source_id, source_type, status, added_by)
+                    VALUES (?, ?, ?, ?, ?, 'active', 'v97_sync')
+                """, (name, state, slug, city_key, platform))
+                result['prod_created'] += 1
+                by_source[city_key] = {'id': -1}  # prevent double-match
+                by_citystate[cs_key] = {'id': -1}
+            except Exception as e:
+                print(f"  [V97] ERROR: Failed to insert {city_key} ({name}, {state}): {e}")
+                result['errors'] += 1
 
         # =================================================================
-        # STEP 4: Deactivate (NOT delete) inactive CITY_REGISTRY entries
+        # STEP 4: Deactivate inactive CITY_REGISTRY entries (no deletes)
         # =================================================================
-        # Only deactivate rows that have a source_id matching an INACTIVE config
-        # Do NOT touch pending rows from v90_rebuild (they have different source_ids)
         for city_key, config in CITY_REGISTRY.items():
             if config.get('active', False):
-                continue  # Skip active configs
-            if city_key in existing_by_source:
-                row = existing_by_source[city_key]
-                if row['status'] == 'active':
-                    conn.execute("""
-                        UPDATE prod_cities SET status = 'paused',
-                            notes = 'V95: Paused — inactive in CITY_REGISTRY'
-                        WHERE source_id = ?
-                    """, (city_key,))
+                continue
+            if city_key in by_source:
+                row = by_source[city_key]
+                if row.get('status') == 'active':
+                    conn.execute(
+                        "UPDATE prod_cities SET status = 'paused' WHERE id = ?",
+                        (row['id'],)
+                    )
                     result['prod_updated'] += 1
-
-        # =================================================================
-        # NO STEP 5: We do NOT delete any rows. Ever.
-        # Pending rows from v90_rebuild etc. are left alone.
-        # =================================================================
 
         conn.commit()
 
-        print(f"[V95] Sync complete: "
-              f"prod_cities: {result['prod_activated']} activated, {result['prod_created']} created, {result['prod_updated']} paused | "
-              f"city_sources: {result['cs_created']} synced | "
-              f"errors: {result['errors']}")
+        # V97: Log actual count for verification
+        actual_active = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE status = 'active'"
+        ).fetchone()[0]
+
+        print(f"[V97] Sync complete: "
+              f"already_active={result['already_active']}, activated={result['prod_activated']}, "
+              f"created={result['prod_created']}, paused={result['prod_updated']}, errors={result['errors']} | "
+              f"city_sources={result['cs_created']} | "
+              f"ACTUAL ACTIVE: {actual_active}")
 
         return result
 
