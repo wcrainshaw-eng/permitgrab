@@ -269,6 +269,69 @@ def update_permit_date_ranges():
         return 0
 
 
+# V107: Clean up source_id state mismatches
+def cleanup_source_id_mismatches():
+    """V107: Clear source_ids where the source's state doesn't match the city's state.
+    E.g., long_beach_nj assigned to Long Beach CA."""
+    from city_configs import CITY_REGISTRY
+    conn = permitdb.get_connection()
+    try:
+        # Build state map from CITY_REGISTRY
+        source_states = {}
+        for key, cfg in CITY_REGISTRY.items():
+            state = cfg.get('state', '')
+            if state:
+                source_states[key] = state
+
+        # Find mismatches
+        rows = conn.execute("""
+            SELECT id, city, state, source_id FROM prod_cities
+            WHERE source_id IS NOT NULL AND source_id != '' AND status = 'active'
+        """).fetchall()
+
+        cleared = 0
+        for r in rows:
+            pc_id, city, state, source_id = r[0], r[1], r[2], r[3]
+            source_state = source_states.get(source_id, '')
+            if source_state and state and source_state != state:
+                conn.execute("""
+                    UPDATE prod_cities SET source_id = NULL, source_type = NULL,
+                    health_status = 'no_endpoint'
+                    WHERE id = ?
+                """, (pc_id,))
+                cleared += 1
+                if cleared <= 10:
+                    print(f"[V107] Cleared mismatched source_id '{source_id}' ({source_state}) from {city}, {state}")
+
+        if cleared:
+            conn.commit()
+            print(f"[V107] Cleared {cleared} source_id state mismatches")
+        return cleared
+    except Exception as e:
+        print(f"[V107] Error cleaning source_id mismatches: {e}")
+        return 0
+
+
+# V107: Pause tiny no_endpoint cities
+def pause_tiny_no_endpoint_cities():
+    """V107: Pause no_endpoint cities under 25K population — not worth pursuing."""
+    conn = permitdb.get_connection()
+    try:
+        paused = conn.execute("""
+            UPDATE prod_cities SET status = 'paused'
+            WHERE health_status = 'no_endpoint'
+            AND status = 'active'
+            AND (population < 25000 OR population IS NULL)
+        """).rowcount
+        conn.commit()
+        if paused:
+            print(f"[V107] Paused {paused} tiny no_endpoint cities (pop < 25K)")
+        return paused
+    except Exception as e:
+        print(f"[V107] Error pausing tiny cities: {e}")
+        return 0
+
+
 # V101: Simple bulk health status update based on prod_cities data
 def cleanup_balance_of_entries():
     """V105: Pause 'Balance of...' entries — Census artifacts, not real cities."""
@@ -2959,7 +3022,8 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
     prod_cities_list = []
     try:
         if permitdb.prod_cities_table_exists():
-            prod_cities_list = permitdb.get_prod_cities(status='active')
+            # V107: Include 0-permit cities so Accela/new cities get collected
+            prod_cities_list = permitdb.get_prod_cities(status='active', min_permits=0)
             if prod_cities_list:
                 use_prod_cities = True
                 print("=" * 60)

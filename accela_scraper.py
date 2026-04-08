@@ -2384,7 +2384,24 @@ async def scrape_accela_permits(city_key, days_back=1):
                 continue
 
         if not search_btn:
-            # Save screenshot for debugging
+            # V107: Log what elements ARE on the page for diagnosis
+            try:
+                elements = await page.query_selector_all('button, input[type="submit"], input[type="button"], a.ACA_SmButton, a.ACA_LgButton, a[id*="btn"]')
+                button_info = []
+                for el in elements[:20]:
+                    try:
+                        tag = await el.evaluate('e => e.tagName')
+                        el_id = await el.get_attribute('id') or ''
+                        el_text = (await el.inner_text())[:50] if await el.inner_text() else ''
+                        el_value = await el.get_attribute('value') or ''
+                        el_class = await el.get_attribute('class') or ''
+                        visible = await el.is_visible()
+                        button_info.append(f"{tag}[id={el_id},text={el_text},val={el_value},cls={el_class[:30]},vis={visible}]")
+                    except:
+                        continue
+                print(f"    [ACCELA] {agency} portal elements found: {'; '.join(button_info[:10])}")
+            except:
+                pass
             await page.screenshot(path=f"/tmp/accela_debug_{agency}.png")
             raise Exception(f"Could not find/click Search button on {agency} portal. Debug screenshot saved.")
 

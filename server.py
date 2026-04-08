@@ -2411,15 +2411,18 @@ def _deferred_startup():
             print(f"[{datetime.now()}] [V106] Background maintenance starting...")
             from db import relink_orphaned_permits
             from collector import (update_total_permits_from_actual, update_all_city_health,
-                                   activate_bulk_covered_cities, cleanup_balance_of_entries)
+                                   activate_bulk_covered_cities, cleanup_balance_of_entries,
+                                   cleanup_source_id_mismatches, pause_tiny_no_endpoint_cities)
 
             relink_orphaned_permits()
             update_total_permits_from_actual()
             activate_bulk_covered_cities()
             cleanup_balance_of_entries()
+            cleanup_source_id_mismatches()       # V107: Clear cross-state source_id links
+            pause_tiny_no_endpoint_cities()       # V107: Pause <25K pop no_endpoint cities
             update_all_city_health()
 
-            print(f"[{datetime.now()}] [V106] Background maintenance complete")
+            print(f"[{datetime.now()}] [V107] Background maintenance complete")
         except Exception as e:
             print(f"[{datetime.now()}] [V106] Background maintenance error: {e}")
             import traceback

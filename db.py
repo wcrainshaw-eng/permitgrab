@@ -3398,20 +3398,21 @@ def get_prod_cities(status='active', min_permits=1):
     """
     conn = get_connection()
 
+    # V107: Order by population DESC so biggest cities (incl. 0-permit Accela) get processed first
     if status:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
                    source_type, source_id, consecutive_failures, last_error
             FROM prod_cities
             WHERE status = ? AND total_permits >= ?
-            ORDER BY total_permits DESC
+            ORDER BY population DESC, total_permits DESC
         """, (status, min_permits))
     else:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
                    source_type, source_id, consecutive_failures, last_error
             FROM prod_cities
-            ORDER BY total_permits DESC
+            ORDER BY population DESC, total_permits DESC
         """)
 
     cities = []
@@ -3433,21 +3434,18 @@ def get_prod_cities(status='active', min_permits=1):
 
 
 def get_prod_city_count():
-    """V95: Get count of ALL active prod cities.
+    """V107: Count cities with actual permit data — not all active cities.
 
-    V95: Count all active cities, not just those with permits.
-    This ensures newly-activated cities from CITY_REGISTRY are counted
-    immediately, even before their first collection run.
-    V70: Returns 0 if database unavailable.
+    V95 counted all active cities (10K+) which was misleading.
+    V107: Only count cities with total_permits > 0 — these are real.
     """
     try:
         conn = get_connection()
         row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active'"
+            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active' AND total_permits > 0"
         ).fetchone()
         return row['cnt'] if row else 0
     except Exception:
-        # V70: Pool not initialized → return 0
         return 0
 
 
