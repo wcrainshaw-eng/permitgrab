@@ -771,6 +771,16 @@ def init_db():
             cities_succeeded INTEGER DEFAULT 0
         );
 
+        -- V109: Pipeline progress tracking (survives restarts)
+        CREATE TABLE IF NOT EXISTS pipeline_progress (
+            city_slug TEXT PRIMARY KEY,
+            status TEXT,
+            source_found TEXT,
+            permits_inserted INTEGER DEFAULT 0,
+            error_message TEXT,
+            processed_at TEXT
+        );
+
         -- V17: system_state for tracking daily tasks (discovery, etc.)
         CREATE TABLE IF NOT EXISTS system_state (
             key TEXT PRIMARY KEY,

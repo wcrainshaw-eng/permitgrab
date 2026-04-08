@@ -2906,6 +2906,55 @@ def admin_pipeline_status():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/cleanup-pipeline', methods=['POST'])
+def admin_cleanup_pipeline():
+    """V109: Remove all permits inserted by the pipeline (source='pipeline')."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        # Find affected cities
+        affected = conn.execute(
+            "SELECT DISTINCT source_city_key FROM permits WHERE source_city_key IS NOT NULL AND collected_at IS NOT NULL"
+        ).fetchall()
+        # Delete pipeline permits (identified by source_city_key + recent collected_at pattern)
+        deleted = conn.execute("DELETE FROM permits WHERE source_city_key IN (SELECT DISTINCT source_city_key FROM permits) AND permit_number LIKE 'PL-%' OR permit_number LIKE 'ARC-%'").rowcount
+        conn.commit()
+
+        # Recount affected cities
+        from collector import update_total_permits_from_actual
+        update_total_permits_from_actual()
+
+        return jsonify({'status': 'ok', 'deleted_permits': deleted}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/pipeline-progress')
+def admin_pipeline_progress():
+    """V109: Get pipeline progress summary."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        summary = conn.execute("""
+            SELECT status, COUNT(*) as cnt, SUM(permits_inserted) as total_permits
+            FROM pipeline_progress GROUP BY status
+        """).fetchall()
+        recent = conn.execute("""
+            SELECT city_slug, status, permits_inserted, processed_at, error_message
+            FROM pipeline_progress ORDER BY processed_at DESC LIMIT 50
+        """).fetchall()
+        return jsonify({
+            'summary': [{'status': r[0], 'count': r[1], 'permits': r[2]} for r in summary],
+            'recent': [{'slug': r[0], 'status': r[1], 'permits': r[2], 'at': r[3], 'error': r[4]} for r in recent]
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/city-health')
 def admin_city_health():
     """V100: City health dashboard data."""

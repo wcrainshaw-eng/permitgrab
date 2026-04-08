@@ -20,6 +20,108 @@ import db as permitdb
 SIX_MONTHS_AGO = (datetime.utcnow() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
 SIX_MONTHS_DATE = (datetime.utcnow() - timedelta(days=180)).strftime('%Y-%m-%d')
 
+STATE_NAMES = {
+    'AL': 'alabama', 'AK': 'alaska', 'AZ': 'arizona', 'AR': 'arkansas',
+    'CA': 'california', 'CO': 'colorado', 'CT': 'connecticut', 'DE': 'delaware',
+    'FL': 'florida', 'GA': 'georgia', 'HI': 'hawaii', 'ID': 'idaho',
+    'IL': 'illinois', 'IN': 'indiana', 'IA': 'iowa', 'KS': 'kansas',
+    'KY': 'kentucky', 'LA': 'louisiana', 'ME': 'maine', 'MD': 'maryland',
+    'MA': 'massachusetts', 'MI': 'michigan', 'MN': 'minnesota', 'MS': 'mississippi',
+    'MO': 'missouri', 'MT': 'montana', 'NE': 'nebraska', 'NV': 'nevada',
+    'NH': 'newhampshire', 'NJ': 'newjersey', 'NM': 'newmexico', 'NY': 'newyork',
+    'NC': 'northcarolina', 'ND': 'northdakota', 'OH': 'ohio', 'OK': 'oklahoma',
+    'OR': 'oregon', 'PA': 'pennsylvania', 'RI': 'rhodeisland', 'SC': 'southcarolina',
+    'SD': 'southdakota', 'TN': 'tennessee', 'TX': 'texas', 'UT': 'utah',
+    'VT': 'vermont', 'VA': 'virginia', 'WA': 'washington', 'WV': 'westvirginia',
+    'WI': 'wisconsin', 'WY': 'wyoming',
+}
+
+
+# ================================================================
+# V109: SOURCE VALIDATION
+# ================================================================
+
+def _is_relevant_socrata_domain(domain, city, state):
+    """V109: Only accept Socrata datasets from domains matching the target city/state."""
+    domain_lower = domain.lower()
+    city_lower = city.lower().replace(' ', '').replace('.', '').replace("'", "")
+    state_lower = state.lower()
+    state_name = STATE_NAMES.get(state.upper(), '')
+
+    if city_lower in domain_lower:
+        return True
+    if f"cityof{city_lower}" in domain_lower:
+        return True
+    if state_name and state_name in domain_lower:
+        return True
+    if f"data.{state_lower}." in domain_lower:
+        return True
+    if f"data.{state_lower}.gov" in domain_lower:
+        return True
+    # County-level domains for the right state
+    if f"county{state_lower}" in domain_lower or f"{state_lower}county" in domain_lower:
+        return True
+    return False
+
+
+def _validate_pulled_data(records, city, state, field_map):
+    """V109: Verify pulled data actually belongs to this city before inserting."""
+    if not records:
+        return False, "no records"
+
+    address_field = field_map.get('address_field', '')
+    city_field = field_map.get('city_field', '')
+    city_lower = city.lower()
+    city_variations = [city_lower, city_lower.replace('fort ', 'ft '),
+                       city_lower.replace('saint ', 'st '), city_lower.replace('mount ', 'mt ')]
+
+    city_matches = 0
+    sample_size = min(len(records), 50)
+
+    for record in records[:sample_size]:
+        if city_field:
+            val = str(record.get(city_field, '')).lower()
+            if any(v in val for v in city_variations):
+                city_matches += 1
+                continue
+        if address_field:
+            val = str(record.get(address_field, '')).lower()
+            if any(v in val for v in city_variations):
+                city_matches += 1
+                continue
+        # Check state
+        for key in record:
+            if key.lower() in ('state', 'state_code'):
+                if str(record[key]).upper().strip() == state.upper():
+                    city_matches += 1
+                break
+
+    match_rate = city_matches / sample_size if sample_size > 0 else 0
+
+    if not city_field and match_rate == 0:
+        return True, "city-specific portal (no city field)"
+
+    if match_rate >= 0.5:
+        return True, f"city match rate: {match_rate:.0%}"
+    elif match_rate >= 0.1:
+        return True, f"partial match: {match_rate:.0%}"
+    else:
+        return False, f"match rate too low: {match_rate:.0%} — likely wrong dataset"
+
+
+def _save_pipeline_progress(slug, status, source_found='', permits_inserted=0, error=''):
+    """V109: Save per-city pipeline progress for resume support."""
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("""
+            INSERT OR REPLACE INTO pipeline_progress
+            (city_slug, status, source_found, permits_inserted, error_message, processed_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        """, (slug, status, source_found, permits_inserted, error[:500] if error else ''))
+        conn.commit()
+    except Exception:
+        pass
+
 
 # ================================================================
 # MAIN PIPELINE
@@ -30,15 +132,17 @@ def run_city_pipeline(min_population=50000, batch_size=25):
     For each: find source → pull 6 months → if data lands, city is done."""
     conn = permitdb.get_connection()
 
+    # V109: Skip cities already processed by pipeline (resume support)
     rows = conn.execute("""
-        SELECT city_slug, city, state, population, source_type, source_id
-        FROM prod_cities
-        WHERE population >= ?
-        AND (total_permits = 0 OR total_permits IS NULL)
-        AND status = 'active'
-        AND city NOT LIKE 'Balance of%%'
-        AND (pipeline_checked_at IS NULL OR pipeline_checked_at < datetime('now', '-7 days'))
-        ORDER BY population DESC
+        SELECT pc.city_slug, pc.city, pc.state, pc.population, pc.source_type, pc.source_id
+        FROM prod_cities pc
+        LEFT JOIN pipeline_progress pp ON pc.city_slug = pp.city_slug
+        WHERE pc.population >= ?
+        AND (pc.total_permits = 0 OR pc.total_permits IS NULL)
+        AND pc.status = 'active'
+        AND pc.city NOT LIKE 'Balance of%%'
+        AND (pp.status IS NULL OR pp.status = 'error')
+        ORDER BY pc.population DESC
         LIMIT ?
     """, (min_population, batch_size)).fetchall()
 
@@ -55,6 +159,7 @@ def run_city_pipeline(min_population=50000, batch_size=25):
 
         if source and source.get('permits_inserted', 0) > 0:
             _mark_city_done(slug, source)
+            _save_pipeline_progress(slug, 'done', source.get('source_id', ''), source['permits_inserted'])
             results.append({
                 'city': city, 'state': state, 'pop': pop,
                 'status': 'DONE', 'source': source.get('source_id', ''),
@@ -62,10 +167,11 @@ def run_city_pipeline(min_population=50000, batch_size=25):
             })
         else:
             _mark_city_no_source(slug)
+            err = source.get('error') if source else 'nothing found'
+            _save_pipeline_progress(slug, 'no_source', error=err)
             results.append({
                 'city': city, 'state': state, 'pop': pop,
-                'status': 'NO_SOURCE',
-                'error': source.get('error') if source else 'nothing found'
+                'status': 'NO_SOURCE', 'error': err
             })
 
         time.sleep(1)  # Rate limit between cities
@@ -118,11 +224,22 @@ def try_socrata(city, state, slug):
         dataset_id = dr['dataset_id']
         name = dr.get('name', '')
 
+        # V109: CRITICAL — only accept domains matching this city/state
+        if not _is_relevant_socrata_domain(domain, city, state):
+            print(f"[PIPELINE]     SKIP irrelevant domain: {domain} for {city}, {state}")
+            continue
+
         name_lower = name.lower()
         if not any(kw in name_lower for kw in ['permit', 'building', 'construction', 'development']):
             continue
 
-        print(f"[PIPELINE]     Found: {name} on {domain} ({dataset_id})")
+        # V109: Skip aggregate/census datasets
+        skip_kw = ['census', 'age of building', 'vacancy', 'rent', 'median', 'count', 'summary', 'aggregate']
+        if any(kw in name_lower for kw in skip_kw):
+            print(f"[PIPELINE]     SKIP aggregate: {name}")
+            continue
+
+        print(f"[PIPELINE]     RELEVANT: {name} on {domain} ({dataset_id})")
 
         result = _socrata_pull_6months(domain, dataset_id, city, state, slug)
         if result and result.get('permits_inserted', 0) > 0:
@@ -233,6 +350,13 @@ def _socrata_pull_6months(domain, dataset_id, city, state, slug):
         if not all_records:
             return {'permits_inserted': 0, 'error': 'no records returned'}
 
+        # V109: Validate data belongs to this city before inserting
+        is_valid, reason = _validate_pulled_data(all_records, city, state, field_map)
+        if not is_valid:
+            print(f"[PIPELINE]     REJECTED: {reason}")
+            return {'permits_inserted': 0, 'error': f'validation failed: {reason}'}
+        print(f"[PIPELINE]     VALIDATED: {reason}")
+
         # Insert into permits table
         inserted = _insert_permits(slug, city, state, all_records, field_map, 'socrata')
         print(f"[PIPELINE]     Socrata pull: {len(all_records)} found, {inserted} inserted")
@@ -265,6 +389,13 @@ def try_arcgis(city, state, slug):
             if not any(kw in title for kw in ['permit', 'building', 'construction']):
                 continue
 
+            # V109: Check if title/URL contains the city or state name
+            city_lower = city.lower()
+            state_name = STATE_NAMES.get(state.upper(), '')
+            if not (city_lower in title or (state_name and state_name in title)):
+                print(f"[PIPELINE]     SKIP irrelevant ArcGIS: {ds.get('title', '')}")
+                continue
+
             api_url = None
             for dist in ds.get('distribution', []):
                 access_url = dist.get('accessURL', '')
@@ -274,7 +405,7 @@ def try_arcgis(city, state, slug):
             if not api_url:
                 continue
 
-            print(f"[PIPELINE]     Found: {ds.get('title')} at {api_url}")
+            print(f"[PIPELINE]     RELEVANT ArcGIS: {ds.get('title')} at {api_url}")
             result = _arcgis_pull_6months(api_url, city, state, slug)
             if result and result.get('permits_inserted', 0) > 0:
                 return result
