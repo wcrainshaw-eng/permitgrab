@@ -2405,6 +2405,15 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] V98b: Registry sync error (non-fatal): {e}")
 
+    # V100: Recount total_permits from actual permits table on startup
+    try:
+        from collector import update_total_permits_from_actual
+        print(f"[{datetime.now()}] V100: Recounting total_permits from actual data...")
+        update_total_permits_from_actual()
+        print(f"[{datetime.now()}] V100: Recount complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V100: Recount error (non-fatal): {e}")
+
     # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
     try:
         email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
@@ -2796,6 +2805,86 @@ def admin_start_collectors():
             'message': 'Background collectors started in separate thread'
         }), 200
 
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/recount-permits', methods=['POST'])
+def admin_recount_permits():
+    """V100: Recount total_permits from actual permits table."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from collector import update_total_permits_from_actual
+        updated = update_total_permits_from_actual()
+        return jsonify({'status': 'ok', 'updated': updated}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/city-health')
+def admin_city_health():
+    """V100: City health dashboard data."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+
+        summary = conn.execute("""
+            SELECT health_status, COUNT(*) as cnt,
+                   SUM(total_permits) as permits,
+                   AVG(days_since_new_data) as avg_days_stale
+            FROM prod_cities
+            WHERE status = 'active'
+            GROUP BY health_status
+            ORDER BY cnt DESC
+        """).fetchall()
+
+        stale = conn.execute("""
+            SELECT city, state, city_slug, total_permits, latest_permit_date,
+                   days_since_new_data, last_failure_reason, source_type
+            FROM prod_cities
+            WHERE status = 'active' AND health_status = 'stale'
+            ORDER BY total_permits DESC
+            LIMIT 50
+        """).fetchall()
+
+        never_worked = conn.execute("""
+            SELECT source_type, COUNT(*) as cnt
+            FROM prod_cities
+            WHERE status = 'active' AND health_status = 'never_worked'
+            GROUP BY source_type
+            ORDER BY cnt DESC
+        """).fetchall()
+
+        # SQLite rows support index access; convert to dicts
+        summary_list = []
+        for r in summary:
+            summary_list.append({
+                'health_status': r[0], 'cnt': r[1],
+                'permits': r[2], 'avg_days_stale': round(r[3], 1) if r[3] else None
+            })
+
+        stale_list = []
+        for r in stale:
+            stale_list.append({
+                'city': r[0], 'state': r[1], 'city_slug': r[2],
+                'total_permits': r[3], 'latest_permit_date': r[4],
+                'days_since_new_data': r[5], 'last_failure_reason': r[6],
+                'source_type': r[7]
+            })
+
+        nw_list = []
+        for r in never_worked:
+            nw_list.append({'source_type': r[0], 'cnt': r[1]})
+
+        return jsonify({
+            'summary': summary_list,
+            'stale_cities': stale_list,
+            'never_worked_by_platform': nw_list
+        }), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -12765,12 +12854,11 @@ def run_initial_collection():
             except Exception as e:
                 print(f"[{datetime.now()}] V12.57: Could not clear lock: {e}")
 
-        print(f"[{datetime.now()}] V72.1: Running initial REFRESH collection (7 days)...")
-
-        # V12.57: Quick 7-day refresh instead of 365-day full rebuild
+        # V100: 180-day lookback for initial collection to ensure 6-month backfill
         # V72.1: Disabled include_scrapers to prevent memory crash on Render
+        print(f"[{datetime.now()}] V100: Running initial collection (180 days for backfill)...")
         from collector import collect_refresh
-        collect_refresh(days_back=7)
+        collect_refresh(days_back=180)
 
         # Violation collection
         try:

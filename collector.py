@@ -97,6 +97,154 @@ def _get_source_config(source_id):
     return None
 
 
+# V100: Update total_permits counter from actual permits table
+def update_total_permits_from_actual():
+    """Recount total_permits from actual permits table for all active cities."""
+    conn = permitdb.get_connection()
+    try:
+        updated = conn.execute("""
+            UPDATE prod_cities SET total_permits = (
+                SELECT COUNT(*) FROM permits
+                WHERE permits.city = prod_cities.city
+                AND permits.state = prod_cities.state
+            )
+            WHERE status = 'active'
+            AND (total_permits = 0 OR total_permits IS NULL)
+            AND EXISTS (
+                SELECT 1 FROM permits
+                WHERE permits.city = prod_cities.city
+                AND permits.state = prod_cities.state
+            )
+        """).rowcount
+        conn.commit()
+        print(f"[V100] Updated total_permits for {updated} cities from actual permit counts")
+        return updated
+    except Exception as e:
+        print(f"[V100] Error updating total_permits: {e}")
+        return 0
+
+
+# V100: Update health_status for all active cities based on collection history
+def update_city_health():
+    """V100: Update health_status for all active cities based on collection history."""
+    conn = permitdb.get_connection()
+    try:
+        # 1. Cities with recent successful collection → "collecting"
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'collecting'
+            WHERE status = 'active' AND id IN (
+                SELECT DISTINCT p.id FROM prod_cities p
+                JOIN scraper_runs sr ON sr.city_slug = p.city_slug
+                WHERE sr.status IN ('success', 'no_new')
+                AND sr.run_started_at > datetime('now', '-7 days')
+                AND p.total_permits > 0
+            )
+        """)
+
+        # 2. Cities that WERE collecting but stopped → "stale"
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'stale'
+            WHERE status = 'active'
+            AND total_permits > 0
+            AND health_status != 'collecting'
+            AND id IN (
+                SELECT DISTINCT p.id FROM prod_cities p
+                JOIN scraper_runs sr ON sr.city_slug = p.city_slug
+                WHERE sr.status = 'success'
+            )
+        """)
+
+        # 3. Cities with 3+ attempts but ZERO successes → "never_worked"
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'never_worked'
+            WHERE status = 'active'
+            AND (total_permits = 0 OR total_permits IS NULL)
+            AND health_status NOT IN ('collecting', 'stale', 'bulk_only')
+            AND id IN (
+                SELECT p.id FROM prod_cities p
+                JOIN scraper_runs sr ON sr.city_slug = p.city_slug
+                GROUP BY p.id
+                HAVING COUNT(*) >= 3 AND SUM(CASE WHEN sr.status = 'success' THEN 1 ELSE 0 END) = 0
+            )
+        """)
+
+        # 4. Cities with fewer than 3 attempts → "new"
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'new'
+            WHERE status = 'active'
+            AND (total_permits = 0 OR total_permits IS NULL)
+            AND health_status NOT IN ('collecting', 'stale', 'bulk_only', 'never_worked')
+            AND id IN (
+                SELECT p.id FROM prod_cities p
+                LEFT JOIN scraper_runs sr ON sr.city_slug = p.city_slug
+                GROUP BY p.id
+                HAVING COUNT(sr.id) < 3
+            )
+        """)
+
+        # 5. Cities with 5+ consecutive failures → "error"
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'error'
+            WHERE status = 'active' AND consecutive_failures >= 5
+            AND health_status NOT IN ('collecting')
+        """)
+
+        # 6. Cities with no source → "no_endpoint"
+        conn.execute("""
+            UPDATE prod_cities SET health_status = 'no_endpoint'
+            WHERE status = 'active'
+            AND (source_id IS NULL OR source_id = '')
+            AND (source_type IS NULL OR source_type = '')
+            AND health_status = 'unknown'
+        """)
+
+        conn.commit()
+
+        # Report
+        stats = conn.execute("""
+            SELECT health_status, COUNT(*) as cnt
+            FROM prod_cities WHERE status = 'active'
+            GROUP BY health_status ORDER BY cnt DESC
+        """).fetchall()
+        for row in stats:
+            print(f"[V100] Health: {row[0]} = {row[1]}")
+        return stats
+    except Exception as e:
+        print(f"[V100] Error updating city health: {e}")
+        return []
+
+
+# V100: Update earliest/latest permit dates for active cities
+def update_permit_date_ranges():
+    """V100: Update earliest/latest permit dates and days_since_new_data."""
+    conn = permitdb.get_connection()
+    try:
+        updated = conn.execute("""
+            UPDATE prod_cities SET
+                earliest_permit_date = (
+                    SELECT MIN(filing_date) FROM permits
+                    WHERE permits.city = prod_cities.city AND permits.state = prod_cities.state
+                ),
+                latest_permit_date = (
+                    SELECT MAX(filing_date) FROM permits
+                    WHERE permits.city = prod_cities.city AND permits.state = prod_cities.state
+                ),
+                days_since_new_data = CAST(
+                    julianday('now') - julianday((
+                        SELECT MAX(filing_date) FROM permits
+                        WHERE permits.city = prod_cities.city AND permits.state = prod_cities.state
+                    )) AS INTEGER
+                )
+            WHERE status = 'active' AND total_permits > 0
+        """).rowcount
+        conn.commit()
+        print(f"[V100] Updated permit date ranges for {updated} cities")
+        return updated
+    except Exception as e:
+        print(f"[V100] Error updating permit date ranges: {e}")
+        return 0
+
+
 # V15: Helper function for logging collection runs to scraper_runs table
 def _log_v15_collection(city_key, city_name, state, permits_found, permits_inserted,
                         status, error_message=None, duration_ms=None):
@@ -150,6 +298,20 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
         if not city_slug:
             city_slug = permitdb.normalize_city_slug(city_name) if city_name else city_key.replace('_', '-')
 
+        # V100: Reclassify 'no_new' → 'empty' for cities with zero permits
+        if status == 'no_new' and city_slug:
+            try:
+                row = conn.execute(
+                    "SELECT total_permits FROM prod_cities WHERE city_slug = ?",
+                    (city_slug,)
+                ).fetchone()
+                if row:
+                    tp = row['total_permits'] if isinstance(row, dict) else row[0]
+                    if not tp or tp == 0:
+                        status = 'empty'
+            except Exception:
+                pass
+
         # Log to scraper_runs
         permitdb.log_scraper_run(
             source_name=city_key,
@@ -168,6 +330,27 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
         # Update prod_cities if this city exists there
         is_prod, _ = permitdb.is_prod_city(city_slug)
         if is_prod:
+            # V100: Track consecutive failures and successful collection timestamps
+            if status in ('success', 'no_new'):
+                conn.execute("""
+                    UPDATE prod_cities SET
+                        consecutive_failures = 0,
+                        last_successful_collection = datetime('now')
+                    WHERE city_slug = ?
+                """, (city_slug,))
+                conn.execute("""
+                    UPDATE prod_cities SET first_successful_collection = datetime('now')
+                    WHERE city_slug = ? AND first_successful_collection IS NULL
+                """, (city_slug,))
+            elif status == 'error':
+                conn.execute("""
+                    UPDATE prod_cities SET
+                        consecutive_failures = consecutive_failures + 1,
+                        last_failure_reason = ?
+                    WHERE city_slug = ?
+                """, ((error_message or '')[:200], city_slug))
+            conn.commit()
+
             if status in ('success', 'no_new'):
                 # V71: ALWAYS recalculate newest_permit_date from actual permits
                 # even when permits_found=0 (no_new). This fixes freshness tracking.
@@ -2706,6 +2889,12 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
         print(f"    Bulk sources collected: {len(bulk_sources_collected)}")
 
+        # V100: Update total_permits counters after bulk collection
+        try:
+            update_total_permits_from_actual()
+        except Exception as e:
+            print(f"[V100] Recount error after Phase 1 (non-fatal): {e}")
+
         # V16 PHASE 2: Collect from individual city sources (not bulk, not bulk_harvest)
         print("\n  [V16] Phase 2: Individual city collection")
         # V35: Don't skip bulk_harvest cities if they have an individual config
@@ -2918,6 +3107,15 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             print(f"  [V59] Phase 3 complete: {len(missed_cities)} cities processed")
 
         print(f"\n  V15 collection complete: {len(all_permits)} permits from {len(prod_cities_list)} sources")
+
+        # V100: Post-collection health updates
+        try:
+            update_total_permits_from_actual()
+            update_permit_date_ranges()
+            update_city_health()
+        except Exception as e:
+            print(f"[V100] Post-collection health update error (non-fatal): {e}")
+
         # Return early - don't run legacy collection
         return all_permits, {**stats, **bulk_stats}
 
