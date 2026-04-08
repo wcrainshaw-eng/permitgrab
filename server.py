@@ -6214,24 +6214,47 @@ def sync_city_registry_to_prod_cities():
                 # Update lookup so we don't double-process
                 existing_by_source[city_key] = row
 
-            # Case 3: brand new city — insert
+            # Case 3 (V96): city+state exists under different slug — update slug and activate
+            # This fixes 155 cities that failed UNIQUE constraint because city+state
+            # already existed (from v90_rebuild) but with a different slug format.
             else:
-                try:
-                    permitdb.upsert_prod_city(
-                        city=city_name,
-                        state=state,
-                        city_slug=normalized_slug,
-                        source_type=platform,
-                        source_id=city_key,
-                        source_scope='city',
-                        status='active',
-                        added_by='v95_sync',
-                        notes='V95: Auto-synced from CITY_REGISTRY'
-                    )
-                    result['prod_created'] += 1
-                except Exception as e:
-                    print(f"  [V95] ERROR: Failed to add {city_key}: {e}")
-                    result['errors'] += 1
+                # Check if city+state already exists
+                existing_row = conn.execute("""
+                    SELECT id, city_slug, source_id, status FROM prod_cities
+                    WHERE LOWER(city) = LOWER(?) AND state = ?
+                """, (city_name, state)).fetchone()
+
+                if existing_row:
+                    # Update existing row to use CITY_REGISTRY slug and activate
+                    conn.execute("""
+                        UPDATE prod_cities SET city_slug = ?, source_id = ?, source_type = ?,
+                            status = 'active',
+                            notes = 'V96: Updated slug — city+state matched CITY_REGISTRY'
+                        WHERE id = ?
+                    """, (normalized_slug, city_key, platform, existing_row['id']))
+                    result['prod_activated'] += 1
+                    # Update lookups
+                    existing_by_source[city_key] = existing_row
+                    existing_by_slug[normalized_slug] = existing_row
+
+                # Case 4: brand new city — insert
+                else:
+                    try:
+                        permitdb.upsert_prod_city(
+                            city=city_name,
+                            state=state,
+                            city_slug=normalized_slug,
+                            source_type=platform,
+                            source_id=city_key,
+                            source_scope='city',
+                            status='active',
+                            added_by='v95_sync',
+                            notes='V95: Auto-synced from CITY_REGISTRY'
+                        )
+                        result['prod_created'] += 1
+                    except Exception as e:
+                        print(f"  [V95] ERROR: Failed to add {city_key}: {e}")
+                        result['errors'] += 1
 
         # =================================================================
         # STEP 4: Deactivate (NOT delete) inactive CITY_REGISTRY entries

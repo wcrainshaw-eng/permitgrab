@@ -105,10 +105,50 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
     V71: ALWAYS recalculate newest_permit_date from actual permits, even when
     permits_found=0 (no_new case). This fixes the bug where 431 cities showed
     'no_data' despite having real permits.
+
+    V96: Look up city_slug from prod_cities to ensure scraper_runs uses the same
+    slug format. This fixes the "ghost city" problem where 910+ cities appeared
+    uncollected because scraper_runs used different slug formats (e.g., tx_houston
+    vs houston, dallas-tx vs dallas).
     """
     try:
-        # Generate city slug
-        city_slug = city_name.lower().replace(' ', '-').replace(',', '') if city_name else city_key
+        # V96: Look up the actual city_slug from prod_cities to ensure consistency
+        city_slug = None
+        conn = permitdb.get_connection()
+
+        # Try 1: Look up by source_id (most reliable for CITY_REGISTRY entries)
+        if city_key:
+            row = conn.execute(
+                "SELECT city_slug FROM prod_cities WHERE source_id = ? AND status = 'active'",
+                (city_key,)
+            ).fetchone()
+            if row:
+                city_slug = row['city_slug'] if isinstance(row, dict) else row[0]
+
+        # Try 2: Look up by city name + state
+        if not city_slug and city_name and state:
+            row = conn.execute(
+                "SELECT city_slug FROM prod_cities WHERE LOWER(city) = LOWER(?) AND state = ? AND status = 'active'",
+                (city_name, state)
+            ).fetchone()
+            if row:
+                city_slug = row['city_slug'] if isinstance(row, dict) else row[0]
+
+        # Try 3: Look up by normalized slug (handles underscore vs hyphen)
+        if not city_slug and city_name:
+            # Generate candidate slug and check both formats
+            candidate = permitdb.normalize_city_slug(city_name)
+            candidate_underscore = candidate.replace('-', '_')
+            row = conn.execute(
+                "SELECT city_slug FROM prod_cities WHERE (city_slug = ? OR city_slug = ?) AND status = 'active'",
+                (candidate, candidate_underscore)
+            ).fetchone()
+            if row:
+                city_slug = row['city_slug'] if isinstance(row, dict) else row[0]
+
+        # Fallback: use normalize_city_slug for consistent format
+        if not city_slug:
+            city_slug = permitdb.normalize_city_slug(city_name) if city_name else city_key.replace('_', '-')
 
         # Log to scraper_runs
         permitdb.log_scraper_run(
@@ -900,9 +940,36 @@ def slugify_city_name(city_name, state):
     V12.31: Convert a city name to a URL-safe slug.
     e.g., "Newark City" -> "newark", "East Orange" -> "east-orange"
     V18: Normalizes city names first to prevent duplicates (Ft -> Fort, etc.)
+    V96: Look up slug from prod_cities first to ensure consistency. This fixes the
+    ghost city problem where slugs like "dallas-tx" didn't match prod_cities "dallas".
     """
     if not city_name:
         return None
+
+    # V96: First try to find this city in prod_cities and use its slug
+    try:
+        conn = permitdb.get_connection()
+
+        # Try exact name + state match
+        row = conn.execute(
+            "SELECT city_slug FROM prod_cities WHERE LOWER(city) = LOWER(?) AND state = ? AND status = 'active'",
+            (city_name, state)
+        ).fetchone()
+        if row:
+            return row['city_slug'] if isinstance(row, dict) else row[0]
+
+        # V18: Normalize city name first (Ft -> Fort, St -> Saint, etc.)
+        name = normalize_city_name(city_name)
+
+        # Try normalized name + state match
+        row = conn.execute(
+            "SELECT city_slug FROM prod_cities WHERE LOWER(city) = LOWER(?) AND state = ? AND status = 'active'",
+            (name, state)
+        ).fetchone()
+        if row:
+            return row['city_slug'] if isinstance(row, dict) else row[0]
+    except Exception:
+        pass  # Fall through to slug generation
 
     # V18: Normalize city name first (Ft -> Fort, St -> Saint, etc.)
     name = normalize_city_name(city_name)
@@ -916,8 +983,9 @@ def slugify_city_name(city_name, state):
     slug = re.sub(r'[^a-z0-9]+', '-', name.lower())
     slug = slug.strip('-')
 
-    # Add state suffix for disambiguation
-    return f"{slug}-{state.lower()}" if slug else None
+    # V96: Don't add state suffix - prod_cities doesn't use them
+    # Previously: return f"{slug}-{state.lower()}" if slug else None
+    return slug if slug else None
 
 
 def collect_bulk_source(source_key, config, days_back=90):
