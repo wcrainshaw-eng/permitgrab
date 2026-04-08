@@ -2423,6 +2423,15 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] V100: Recount error (non-fatal): {e}")
 
+    # V104: Activate pending cities in bulk-covered states
+    try:
+        from collector import activate_bulk_covered_cities
+        print(f"[{datetime.now()}] V104: Activating pending cities in bulk-covered states...")
+        activate_bulk_covered_cities()
+        print(f"[{datetime.now()}] V104: Bulk activation complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V104: Bulk activation error (non-fatal): {e}")
+
     # V101: Update health_status for all active cities
     try:
         print(f"[{datetime.now()}] V101: Updating city health status...")
@@ -2836,6 +2845,20 @@ def admin_recount_permits():
         from collector import update_total_permits_from_actual
         updated = update_total_permits_from_actual()
         return jsonify({'status': 'ok', 'updated': updated}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/activate-bulk-cities', methods=['POST'])
+def admin_activate_bulk_cities():
+    """V104: Activate pending cities in states covered by bulk sources."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from collector import activate_bulk_covered_cities
+        activated = activate_bulk_covered_cities()
+        return jsonify({'status': 'ok', 'activated': activated}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

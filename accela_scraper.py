@@ -2331,38 +2331,57 @@ async def scrape_accela_permits(city_key, days_back=1):
         # ---- STEP 3: Click Search ----
         print(f"    [Accela] Submitting search...")
 
-        # Try multiple selectors for the Search button
+        # V104: Expanded selector list for portal compatibility
+        # Different Accela portals use different button IDs/classes/layouts
         search_selectors = [
             'a[id*="btnNewSearch"]',
             'input[id*="btnNewSearch"]',
             '#ctl00_PlaceHolderMain_btnNewSearch',
+            '#ctl00_PlaceHolderMain_btnSearch',
+            '#ctl00_PlaceHolderMain_GeneralSearchForm_btnSearch',
+            'a[id*="btnSearch"]',
+            'input[id*="btnSearch"]',
             'a.ACA_LgButton:has-text("Search")',
             'a.ACA_SmButton:has-text("Search")',
+            'a.ACA_LgButton:has-text("Submit")',
             'a[title="Search"]',
-            'input[value="Search"]',
+            'input[type="submit"][value="Search"]',
+            'input[type="button"][value="Search"]',
+            'input[value="Submit"]',
             'button:has-text("Search")',
+            'button:has-text("Submit")',
             # Generic fallback - any link with Search text in the main content area
             '#ctl00_PlaceHolderMain a:has-text("Search")',
+            '#ctl00_PlaceHolderMain input[type="submit"]',
         ]
 
         search_btn = None
         for sel in search_selectors:
-            search_btn = await page.query_selector(sel)
-            if search_btn:
-                # Scroll into view and wait for visibility
-                await search_btn.scroll_into_view_if_needed()
+            try:
+                btn = await page.query_selector(sel)
+                if not btn:
+                    continue
+                # V104: Check visibility before attempting click
+                is_visible = await btn.is_visible()
+                if not is_visible:
+                    continue
+                # Scroll into view and wait
+                await btn.scroll_into_view_if_needed()
                 await page.wait_for_timeout(500)
                 try:
-                    await search_btn.click(timeout=10000)
+                    await btn.click(timeout=10000)
+                    search_btn = btn
                     break
-                except Exception as click_err:
+                except Exception:
                     # Try JavaScript click as fallback
                     try:
-                        await page.evaluate('(el) => el.click()', search_btn)
+                        await page.evaluate('(el) => el.click()', btn)
+                        search_btn = btn
                         break
                     except:
-                        search_btn = None
                         continue
+            except Exception:
+                continue
 
         if not search_btn:
             # Save screenshot for debugging

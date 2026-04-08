@@ -261,21 +261,25 @@ def update_permit_date_ranges():
 
 # V101: Simple bulk health status update based on prod_cities data
 def update_all_city_health():
-    """V101: Set health_status for all active cities based on current data."""
+    """V101/V104: Set health_status for all active cities based on current data."""
     conn = permitdb.get_connection()
     try:
-        # Cities with recent data = collecting
+        # V104: Cities with recent data OR recent successful collection = collecting
+        # A city returning no_new is still healthy if it has data and collection ran recently
         conn.execute("""
             UPDATE prod_cities SET health_status = 'collecting'
             WHERE status = 'active' AND total_permits > 0
-            AND newest_permit_date >= date('now', '-7 days')
+            AND (
+                newest_permit_date >= date('now', '-7 days')
+                OR last_successful_collection >= datetime('now', '-7 days')
+            )
         """)
 
-        # Cities with data but stale = stale
+        # Cities with data but no recent collection success = stale
         conn.execute("""
             UPDATE prod_cities SET health_status = 'stale'
             WHERE status = 'active' AND total_permits > 0
-            AND (newest_permit_date < date('now', '-7 days') OR newest_permit_date IS NULL)
+            AND health_status != 'collecting'
         """)
 
         # Cities with no data and no source = no_endpoint
@@ -306,6 +310,50 @@ def update_all_city_health():
     except Exception as e:
         print(f"[V101] Error updating city health: {e}")
         return []
+
+
+# V104: Activate pending cities in states covered by BULK_SOURCES
+def activate_bulk_covered_cities():
+    """V104: Activate pending prod_cities in states that have active BULK_SOURCES.
+    These cities likely already have permits from Phase 1 bulk collection.
+    Also relinks any permits and recounts totals."""
+    from city_configs import BULK_SOURCES
+
+    # Find all states covered by active bulk sources
+    bulk_states = set()
+    for key, cfg in BULK_SOURCES.items():
+        if cfg.get('active', True) and cfg.get('state'):
+            bulk_states.add(cfg['state'])
+
+    if not bulk_states:
+        print("[V104] No active bulk sources found")
+        return 0
+
+    conn = permitdb.get_connection()
+    try:
+        placeholders = ','.join('?' * len(bulk_states))
+        states_list = sorted(bulk_states)
+
+        # Activate pending cities in bulk-covered states
+        activated = conn.execute(f"""
+            UPDATE prod_cities SET status = 'active', added_by = 'v104_bulk_activate'
+            WHERE status = 'pending' AND state IN ({placeholders})
+        """, states_list).rowcount
+        conn.commit()
+        print(f"[V104] Activated {activated} pending cities in bulk-covered states: {', '.join(states_list)}")
+
+        if activated > 0:
+            # Relink permits for newly activated cities
+            from db import relink_orphaned_permits
+            relink_orphaned_permits()
+
+            # Recount totals
+            update_total_permits_from_actual()
+
+        return activated
+    except Exception as e:
+        print(f"[V104] Error activating bulk-covered cities: {e}")
+        return 0
 
 
 # V15: Helper function for logging collection runs to scraper_runs table
