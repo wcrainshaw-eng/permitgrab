@@ -2422,11 +2422,26 @@ def _cleanup_v108_pipeline_damage():
         conn.commit()
 
         if deleted:
-            print(f"[V110] One-time cleanup: deleted {deleted} pipeline permits, reset {len(bad_slugs)} cities")
+            print(f"[V110] One-time cleanup: deleted {deleted} pipeline permits, reset {len(bad_slugs)} cities", flush=True)
         else:
-            print(f"[V110] One-time cleanup: no pipeline permits found, reset {len(bad_slugs)} cities")
+            print(f"[V110] One-time cleanup: no pipeline permits found, reset {len(bad_slugs)} cities", flush=True)
     except Exception as e:
-        print(f"[V110] Cleanup error (non-fatal): {e}")
+        print(f"[V110] Cleanup error (non-fatal): {e}", flush=True)
+
+    # V111b: Clear stale pipeline_progress so search pipeline retries all cities
+    try:
+        conn = permitdb.get_connection()
+        row = conn.execute("SELECT value FROM system_state WHERE key = 'v111b_progress_cleared'").fetchone()
+        if not row:
+            conn.execute("DELETE FROM pipeline_progress")
+            conn.execute("""
+                INSERT OR REPLACE INTO system_state (key, value, updated_at)
+                VALUES ('v111b_progress_cleared', 'true', datetime('now'))
+            """)
+            conn.commit()
+            print("[V111b] Cleared stale pipeline_progress for search retry", flush=True)
+    except Exception as e:
+        print(f"[V111b] Progress clear error (non-fatal): {e}", flush=True)
 
 
 def _deferred_startup():
@@ -2933,6 +2948,56 @@ def admin_run_pipeline():
         'batch_size': batch_size,
         'message': f'Processing up to {batch_size} cities with pop >= {min_pop:,}'
     }), 200
+
+
+@app.route('/api/admin/test-search', methods=['POST'])
+def admin_test_search():
+    """V111b: Test the search pipeline for a single city without saving."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    data = request.json or {}
+    city = data.get('city', 'Oakland')
+    state = data.get('state', 'CA')
+
+    results = {'city': city, 'state': state, 'url_pattern_hits': [],
+               'search_candidates': [], 'raw_search_results': [], 'errors': []}
+
+    # Phase 1: URL patterns
+    try:
+        from city_onboarding import _try_url_patterns
+        url_hits = _try_url_patterns(city, state)
+        results['url_pattern_hits'] = [{'url': h['url'], 'platform': h.get('platform', ''),
+                                         'title': h.get('title', '')} for h in url_hits]
+    except Exception as e:
+        results['errors'].append(f"URL pattern error: {str(e)}")
+
+    # Phase 2: DuckDuckGo search
+    try:
+        from duckduckgo_search import DDGS
+        from city_onboarding import _classify_search_url
+        ddgs = DDGS()
+        for q in [f'"{city}" "{state}" building permits open data',
+                  f'"{city}" {state} building permits socrata OR arcgis']:
+            try:
+                for r in ddgs.text(q, max_results=5):
+                    url = r.get('href', r.get('link', ''))
+                    title = r.get('title', '')
+                    results['raw_search_results'].append({'query': q, 'title': title,
+                                                          'url': url, 'snippet': r.get('body', '')[:100]})
+                    classified = _classify_search_url(url, title, city, state)
+                    if classified:
+                        results['search_candidates'].append({'url': url, 'platform': classified['platform'],
+                                                              'title': title})
+            except Exception as e:
+                results['errors'].append(f"Search error: {str(e)[:100]}")
+    except ImportError:
+        results['errors'].append("duckduckgo-search not installed")
+    except Exception as e:
+        results['errors'].append(f"DDG error: {str(e)}")
+
+    return jsonify(results), 200
 
 
 @app.route('/api/admin/run-search-pipeline', methods=['POST'])

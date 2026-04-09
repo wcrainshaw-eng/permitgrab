@@ -12,10 +12,16 @@ Usage:
 import json
 import re
 import requests
+import sys
 import time
 from datetime import datetime, timedelta
 
 import db as permitdb
+
+
+def _log(msg):
+    """V111b: Print with flush so logs appear in Render/gunicorn."""
+    print(msg, flush=True)
 
 SIX_MONTHS_AGO = (datetime.utcnow() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
 SIX_MONTHS_DATE = (datetime.utcnow() - timedelta(days=180)).strftime('%Y-%m-%d')
@@ -114,7 +120,7 @@ def _validate_pulled_data(records, city, state, field_map, domain_type='city'):
 
     # V110: Higher threshold for state/county portals
     threshold = 0.5 if domain_type in ('state', 'county', 'unknown') else 0.1
-    print(f"[PIPELINE]     Validation: {matches}/{len(sample)} mention '{city}' ({match_rate:.0%}, threshold {threshold:.0%})")
+    _log(f"[PIPELINE]     Validation: {matches}/{len(sample)} mention '{city}' ({match_rate:.0%}, threshold {threshold:.0%})")
 
     if match_rate >= threshold:
         return True, f"match rate: {match_rate:.0%}"
@@ -199,7 +205,7 @@ def run_city_pipeline(min_population=50000, batch_size=25):
               sum(1 for r in results if r['status'] == 'DONE')))
         conn.commit()
     except Exception as e:
-        print(f"[PIPELINE] Error logging run: {e}")
+        _log(f"[PIPELINE] Error logging run: {e}")
 
     done = sum(1 for r in results if r['status'] == 'DONE')
     print(f"\n[PIPELINE] Complete: {done}/{len(results)} cities got data")
@@ -228,7 +234,7 @@ def find_working_source(city, state, slug):
 
 def try_socrata(city, state, slug):
     """Search Socrata Discovery API for building permits, then pull 6 months."""
-    print(f"[PIPELINE]   Trying Socrata for {city}, {state}...")
+    _log(f"[PIPELINE]   Trying Socrata for {city}, {state}...")
 
     discovery_results = _socrata_discovery_search(city, state)
 
@@ -239,7 +245,7 @@ def try_socrata(city, state, slug):
 
         # V109: CRITICAL — only accept domains matching this city/state
         if not _is_relevant_socrata_domain(domain, city, state):
-            print(f"[PIPELINE]     SKIP irrelevant domain: {domain} for {city}, {state}")
+            _log(f"[PIPELINE]     SKIP irrelevant domain: {domain} for {city}, {state}")
             continue
 
         name_lower = name.lower()
@@ -249,10 +255,10 @@ def try_socrata(city, state, slug):
         # V109: Skip aggregate/census datasets
         skip_kw = ['census', 'age of building', 'vacancy', 'rent', 'median', 'count', 'summary', 'aggregate']
         if any(kw in name_lower for kw in skip_kw):
-            print(f"[PIPELINE]     SKIP aggregate: {name}")
+            _log(f"[PIPELINE]     SKIP aggregate: {name}")
             continue
 
-        print(f"[PIPELINE]     RELEVANT: {name} on {domain} ({dataset_id})")
+        _log(f"[PIPELINE]     RELEVANT: {name} on {domain} ({dataset_id})")
 
         result = _socrata_pull_6months(domain, dataset_id, city, state, slug)
         if result and result.get('permits_inserted', 0) > 0:
@@ -278,7 +284,7 @@ def try_socrata(city, state, slug):
                 ds_name = resource.get('name', '').lower()
                 dataset_id = resource.get('id')
                 if any(kw in ds_name for kw in ['permit', 'building', 'construction']):
-                    print(f"[PIPELINE]     Found on {domain}: {resource.get('name')} ({dataset_id})")
+                    _log(f"[PIPELINE]     Found on {domain}: {resource.get('name')} ({dataset_id})")
                     result = _socrata_pull_6months(domain, dataset_id, city, state, slug)
                     if result and result.get('permits_inserted', 0) > 0:
                         return result
@@ -310,7 +316,7 @@ def _socrata_discovery_search(city, state):
                         })
             time.sleep(0.3)
     except Exception as e:
-        print(f"[PIPELINE]     Socrata discovery error: {e}")
+        _log(f"[PIPELINE]     Socrata discovery error: {e}")
     return results
 
 
@@ -346,7 +352,7 @@ def _socrata_pull_6months(domain, dataset_id, city, state, slug):
             variations = _get_city_name_variations(city)
             city_filter = " OR ".join([f"upper({city_field}) = '{v.upper()}'" for v in variations])
             where = f"({where}) AND ({city_filter})"
-            print(f"[PIPELINE]     Filtering {domain_type} portal by city: {city_field}='{city}'")
+            _log(f"[PIPELINE]     Filtering {domain_type} portal by city: {city_field}='{city}'")
 
         # Pull with pagination
         all_records = []
@@ -373,13 +379,13 @@ def _socrata_pull_6months(domain, dataset_id, city, state, slug):
         # V109/V110: Validate data belongs to this city before inserting
         is_valid, reason = _validate_pulled_data(all_records, city, state, field_map, domain_type)
         if not is_valid:
-            print(f"[PIPELINE]     REJECTED: {reason}")
+            _log(f"[PIPELINE]     REJECTED: {reason}")
             return {'permits_inserted': 0, 'error': f'validation failed: {reason}'}
-        print(f"[PIPELINE]     VALIDATED: {reason}")
+        _log(f"[PIPELINE]     VALIDATED: {reason}")
 
         # Insert into permits table
         inserted = _insert_permits(slug, city, state, all_records, field_map, 'socrata')
-        print(f"[PIPELINE]     Socrata pull: {len(all_records)} found, {inserted} inserted")
+        _log(f"[PIPELINE]     Socrata pull: {len(all_records)} found, {inserted} inserted")
         return {
             'permits_inserted': inserted,
             'source_id': f"{domain}:{dataset_id}",
@@ -395,7 +401,7 @@ def _socrata_pull_6months(domain, dataset_id, city, state, slug):
 
 def try_arcgis(city, state, slug):
     """Search ArcGIS Hub for building permit data."""
-    print(f"[PIPELINE]   Trying ArcGIS for {city}, {state}...")
+    _log(f"[PIPELINE]   Trying ArcGIS for {city}, {state}...")
     try:
         search_url = (f"https://hub.arcgis.com/api/feed/dcat-us/1.1"
                       f"?q={city}+{state}+building+permits")
@@ -413,7 +419,7 @@ def try_arcgis(city, state, slug):
             city_lower = city.lower()
             state_name = STATE_NAMES.get(state.upper(), '')
             if not (city_lower in title or (state_name and state_name in title)):
-                print(f"[PIPELINE]     SKIP irrelevant ArcGIS: {ds.get('title', '')}")
+                _log(f"[PIPELINE]     SKIP irrelevant ArcGIS: {ds.get('title', '')}")
                 continue
 
             api_url = None
@@ -425,13 +431,13 @@ def try_arcgis(city, state, slug):
             if not api_url:
                 continue
 
-            print(f"[PIPELINE]     RELEVANT ArcGIS: {ds.get('title')} at {api_url}")
+            _log(f"[PIPELINE]     RELEVANT ArcGIS: {ds.get('title')} at {api_url}")
             result = _arcgis_pull_6months(api_url, city, state, slug)
             if result and result.get('permits_inserted', 0) > 0:
                 return result
 
     except Exception as e:
-        print(f"[PIPELINE]     ArcGIS search error: {e}")
+        _log(f"[PIPELINE]     ArcGIS search error: {e}")
     return None
 
 
@@ -497,7 +503,7 @@ def _arcgis_pull_6months(api_url, city, state, slug):
         # Insert
         field_names = [f['name'] for f in fields]
         inserted = _insert_arcgis_permits(slug, city, state, all_features, field_names)
-        print(f"[PIPELINE]     ArcGIS pull: {len(all_features)} found, {inserted} inserted")
+        _log(f"[PIPELINE]     ArcGIS pull: {len(all_features)} found, {inserted} inserted")
         return {
             'permits_inserted': inserted,
             'source_id': api_url,
@@ -690,7 +696,7 @@ def _update_city_counters(slug):
         """, (slug, slug, slug, slug, slug))
         conn.commit()
     except Exception as e:
-        print(f"[PIPELINE] Error updating counters for {slug}: {e}")
+        _log(f"[PIPELINE] Error updating counters for {slug}: {e}")
 
 
 def _mark_city_done(slug, result):
@@ -707,7 +713,7 @@ def _mark_city_done(slug, result):
         WHERE city_slug = ?
     """, (source_id, source_type, slug))
     conn.commit()
-    print(f"[PIPELINE]   DONE: {slug} — {result.get('permits_inserted', 0)} permits")
+    _log(f"[PIPELINE]   DONE: {slug} — {result.get('permits_inserted', 0)} permits")
 
 
 def _mark_city_no_source(slug):
@@ -718,7 +724,7 @@ def _mark_city_no_source(slug):
         WHERE city_slug = ?
     """, (slug,))
     conn.commit()
-    print(f"[PIPELINE]   NO SOURCE: {slug}")
+    _log(f"[PIPELINE]   NO SOURCE: {slug}")
 
 
 # ================================================================
@@ -742,7 +748,7 @@ def run_search_pipeline(min_population=100000, batch_size=25):
         LIMIT ?
     """, (min_population, batch_size)).fetchall()
 
-    print(f"[PIPELINE] V111 Search pipeline: {len(rows)} cities to process")
+    _log(f"[PIPELINE] V111 Search pipeline: {len(rows)} cities to process")
     results = []
 
     for row in rows:
@@ -753,7 +759,7 @@ def run_search_pipeline(min_population=100000, batch_size=25):
         candidates = _search_city_sources(city, state)
 
         if not candidates:
-            print(f"[PIPELINE]   No candidates found")
+            _log(f"[PIPELINE]   No candidates found")
             _save_pipeline_progress(slug, 'no_source', error='no candidates from search')
             results.append({'city': city, 'state': state, 'status': 'NO_SOURCE'})
             time.sleep(1)
@@ -823,7 +829,7 @@ def _search_city_sources(city, state):
                         candidates.append(parsed)
                 time.sleep(1)
             except Exception as e:
-                print(f"[PIPELINE]   Search error: {e}")
+                _log(f"[PIPELINE]   Search error: {e}")
     except ImportError:
         print("[PIPELINE]   duckduckgo-search not installed, skipping web search")
 
@@ -836,7 +842,7 @@ def _search_city_sources(city, state):
             seen.add(key)
             unique.append(c)
 
-    print(f"[PIPELINE]   Found {len(unique)} candidates")
+    _log(f"[PIPELINE]   Found {len(unique)} candidates")
     return unique
 
 
@@ -851,7 +857,7 @@ def _try_url_patterns(city, state):
         try:
             resp = requests.head(f"https://{domain}", timeout=5, allow_redirects=True)
             if resp.status_code == 200:
-                print(f"[PIPELINE]   URL pattern hit: {domain}")
+                _log(f"[PIPELINE]   URL pattern hit: {domain}")
                 # Search this portal for permit datasets
                 try:
                     cat_resp = requests.get(
@@ -903,9 +909,25 @@ def _classify_search_url(url, title, city, state):
         return {'url': arcgis_match.group(1), 'platform': 'arcgis',
                 'title': title, 'source': 'search'}
 
-    # ArcGIS Hub
-    if 'hub.arcgis.com' in url_lower:
+    # ArcGIS Hub / opendata
+    if 'hub.arcgis.com' in url_lower or 'opendata.arcgis.com' in url_lower:
         return {'url': url, 'platform': 'arcgis_hub', 'title': title, 'source': 'search'}
+
+    # Accela portals
+    if 'accela.com' in url_lower:
+        return {'url': url, 'platform': 'accela', 'title': title, 'source': 'search'}
+
+    # V111b: Catch city open data portals (data.{city}.gov, opendata.{city}.gov)
+    city_slug = city.lower().replace(' ', '').replace('.', '').replace("'", "")
+    if re.match(r'https?://(?:data|opendata)\.[\w-]+\.gov/?', url_lower):
+        if city_slug in url_lower.replace('.', '').replace('-', ''):
+            return {'url': url, 'platform': 'portal', 'title': title, 'source': 'search'}
+
+    # V111b: Generic open data with permit keywords in title
+    permit_keywords = ['permit', 'building', 'construction']
+    if any(kw in title.lower() for kw in permit_keywords):
+        if any(kw in url_lower for kw in ['.gov', 'opendata', 'data.']):
+            return {'url': url, 'platform': 'portal', 'title': title, 'source': 'search'}
 
     return None
 
@@ -913,7 +935,7 @@ def _classify_search_url(url, title, city, state):
 def _test_candidate(candidate, slug, city, state, prod_city_id):
     """V111: Test a candidate source — pull data, validate, save if good."""
     platform = candidate.get('platform', '')
-    print(f"[PIPELINE]   Testing {platform}: {candidate.get('title', candidate['url'][:60])}")
+    _log(f"[PIPELINE]   Testing {platform}: {candidate.get('title', candidate['url'][:60])}")
 
     try:
         if platform == 'socrata' and candidate.get('dataset_id'):
@@ -923,9 +945,12 @@ def _test_candidate(candidate, slug, city, state, prod_city_id):
             if result and result.get('permits_inserted', 0) >= 10:
                 _mark_city_done(slug, result)
                 return True, result['permits_inserted']
+        elif platform == 'portal':
+            # V111b: Explore a portal — search its catalog for permit datasets
+            return _explore_portal(candidate, slug, city, state, prod_city_id)
         return False, 0
     except Exception as e:
-        print(f"[PIPELINE]   Test failed: {e}")
+        _log(f"[PIPELINE]   Test failed: {e}")
         return False, 0
 
 
@@ -948,12 +973,12 @@ def _test_socrata(candidate, slug, city, state, prod_city_id):
     field_map = _auto_detect_fields(col_names, col_types)
     date_field = field_map.get('date_field')
     if not date_field:
-        print(f"[PIPELINE]     No date field detected")
+        _log(f"[PIPELINE]     No date field detected")
         return False, 0
 
     city_field = field_map.get('city_field')
     if domain_type in ('state', 'county', 'unknown') and not city_field:
-        print(f"[PIPELINE]     REJECT: {domain_type} portal, no city field")
+        _log(f"[PIPELINE]     REJECT: {domain_type} portal, no city field")
         return False, 0
 
     # Build query
@@ -963,7 +988,7 @@ def _test_socrata(candidate, slug, city, state, prod_city_id):
         variations = _get_city_name_variations(city)
         city_filter = " OR ".join([f"upper({city_field}) = '{v.upper()}'" for v in variations])
         where = f"({where}) AND ({city_filter})"
-        print(f"[PIPELINE]     Filtering by {city_field}='{city}'")
+        _log(f"[PIPELINE]     Filtering by {city_field}='{city}'")
 
     # Pull
     url = f"https://{domain}/resource/{dataset_id}.json?$where={where}&$limit=5000&$order=:id"
@@ -976,15 +1001,15 @@ def _test_socrata(candidate, slug, city, state, prod_city_id):
         return False, 0
 
     if not records or len(records) < 10:
-        print(f"[PIPELINE]     Only {len(records) if records else 0} records")
+        _log(f"[PIPELINE]     Only {len(records) if records else 0} records")
         return False, 0
 
     # Validate
     is_valid, reason = _validate_pulled_data(records, city, state, field_map, domain_type)
     if not is_valid:
-        print(f"[PIPELINE]     REJECTED: {reason}")
+        _log(f"[PIPELINE]     REJECTED: {reason}")
         return False, 0
-    print(f"[PIPELINE]     VALIDATED: {reason}")
+    _log(f"[PIPELINE]     VALIDATED: {reason}")
 
     # Save permits
     inserted = _insert_permits(slug, city, state, records, field_map, 'socrata')
@@ -1001,7 +1026,49 @@ def _test_socrata(candidate, slug, city, state, prod_city_id):
             WHERE city_slug = ?
         """, (f"{domain}:{dataset_id}", slug, slug))
         conn.commit()
-        print(f"[PIPELINE]   SUCCESS: {city} — {inserted} permits from {domain}:{dataset_id}")
+        _log(f"[PIPELINE]   SUCCESS: {city} — {inserted} permits from {domain}:{dataset_id}")
         return True, inserted
+
+    return False, 0
+
+
+def _explore_portal(candidate, slug, city, state, prod_city_id):
+    """V111b: Explore a data portal — search its catalog for permit datasets."""
+    url = candidate.get('url', '')
+    # Extract domain from URL
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        domain = parsed.netloc
+    except Exception:
+        return False, 0
+
+    if not domain:
+        return False, 0
+
+    _log(f"[PIPELINE]     Exploring portal: {domain}")
+
+    # Try Socrata catalog API
+    try:
+        cat_url = f"https://{domain}/api/catalog/v1?q=building+permits&limit=10"
+        resp = requests.get(cat_url, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            for ds in data.get('results', []):
+                resource = ds.get('resource', {})
+                ds_id = resource.get('id')
+                ds_name = resource.get('name', '')
+                if ds_id and any(kw in ds_name.lower() for kw in ['permit', 'building', 'construction']):
+                    _log(f"[PIPELINE]     Found dataset: {ds_name} ({ds_id})")
+                    test_candidate = {
+                        'url': f"https://{domain}/resource/{ds_id}.json",
+                        'platform': 'socrata', 'domain': domain,
+                        'dataset_id': ds_id, 'title': ds_name, 'source': 'portal_explore'
+                    }
+                    success, count = _test_socrata(test_candidate, slug, city, state, prod_city_id)
+                    if success:
+                        return True, count
+    except Exception as e:
+        _log(f"[PIPELINE]     Portal catalog error: {e}")
 
     return False, 0
