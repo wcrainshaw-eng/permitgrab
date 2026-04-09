@@ -3754,6 +3754,154 @@ def admin_v122_add_batch2():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v122-batch2-fix', methods=['POST'])
+def admin_v122_batch2_fix():
+    """V122: Fix slugs, test endpoints live, debug St. Paul. SYNCHRONOUS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        import requests as http_req
+        from datetime import datetime as dt, timedelta
+        conn = permitdb.get_connection()
+        results = []
+        six_months_ago_ms = int((dt.utcnow() - timedelta(days=180)).timestamp() * 1000)
+
+        cities_to_fix = [
+            {'slug': 'irving-tx', 'platform': 'arcgis',
+             'endpoint': 'https://services3.arcgis.com/OfsJXUlu8pSkbl7B/arcgis/rest/services/Residential_Permits_Issued_Feb_15_2022_Present/FeatureServer/0',
+             'date_field': 'Issued_Date'},
+            {'slug': 'boise-city-id', 'platform': 'arcgis',
+             'endpoint': 'https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/Housing_OpenData/FeatureServer/0',
+             'date_field': 'IssuedDate'},
+        ]
+
+        for city in cities_to_fix:
+            slug = city['slug']
+            ep = city['endpoint']
+            df = city['date_field']
+            cr = {'city_slug': slug, 'steps': []}
+
+            row = conn.execute("SELECT city_slug, status FROM cities WHERE city_slug=?", (slug,)).fetchone()
+            if not row:
+                cr['steps'].append({'step': 'slug_check', 'error': f'{slug} NOT FOUND'})
+                results.append(cr)
+                continue
+            cr['steps'].append({'step': 'slug_check', 'status': 'found'})
+
+            # Test endpoint with epoch millis
+            try:
+                count_url = f"{ep}/query"
+                resp = http_req.get(count_url, params={'where': f'{df} >= {six_months_ago_ms}', 'returnCountOnly': 'true', 'f': 'json'}, timeout=15)
+                data = resp.json()
+                count = data.get('count', 0)
+
+                if count == 0:
+                    date_str = (dt.utcnow() - timedelta(days=180)).strftime('%Y-%m-%d')
+                    resp = http_req.get(count_url, params={'where': f"{df} >= '{date_str}'", 'returnCountOnly': 'true', 'f': 'json'}, timeout=15)
+                    data = resp.json()
+                    count = data.get('count', 0)
+                    cr['steps'].append({'step': 'endpoint_test', 'format': 'date_string', 'records_6mo': count})
+                else:
+                    cr['steps'].append({'step': 'endpoint_test', 'format': 'epoch_millis', 'records_6mo': count})
+
+                if count == 0:
+                    cr['steps'].append({'step': 'skip', 'reason': '0 records'})
+                    results.append(cr)
+                    continue
+            except Exception as e:
+                cr['steps'].append({'step': 'endpoint_test', 'error': str(e)[:200]})
+                results.append(cr)
+                continue
+
+            # Update config — pending, not active (verify first)
+            r = conn.execute("UPDATE cities SET platform=?, endpoint=?, date_field=?, status='pending', updated_at=datetime('now') WHERE city_slug=?",
+                             (city['platform'], ep, df, slug))
+            conn.commit()
+            cr['steps'].append({'step': 'config_update', 'updated': r.rowcount})
+            results.append(cr)
+
+        # Skip stale boise-id-accela
+        r = conn.execute("UPDATE cities SET status='skip', updated_at=datetime('now') WHERE city_slug='boise-id-accela'")
+        conn.commit()
+        results.append({'city_slug': 'boise-id-accela', 'action': 'mark_skip', 'updated': r.rowcount})
+
+        # DC population fix
+        r = conn.execute("UPDATE cities SET population=702250, updated_at=datetime('now') WHERE city_slug='washington-dc'")
+        conn.commit()
+        results.append({'city_slug': 'washington-dc', 'action': 'pop_fix', 'updated': r.rowcount})
+
+        # St. Paul debug — test 3 date formats + sample record
+        sp_debug = {'city_slug': 'saint-paul', 'debug_steps': []}
+        sp_ep = 'https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0'
+        try:
+            for test_name, where in [
+                ('epoch_millis', f'ISSUEDATE >= {six_months_ago_ms}'),
+                ('date_string', f"ISSUEDATE >= '{(dt.utcnow() - timedelta(days=180)).strftime('%Y-%m-%d')}'"),
+                ('timestamp_kw', f"ISSUEDATE >= timestamp '{(dt.utcnow() - timedelta(days=180)).strftime('%Y-%m-%d')} 00:00:00'"),
+            ]:
+                resp = http_req.get(f'{sp_ep}/query', params={'where': where, 'returnCountOnly': 'true', 'f': 'json'}, timeout=15)
+                sp_debug['debug_steps'].append({'test': test_name, 'result': resp.json()})
+
+            # Sample record
+            resp = http_req.get(f'{sp_ep}/query', params={'where': '1=1', 'outFields': '*', 'resultRecordCount': '1', 'orderByFields': 'OBJECTID DESC', 'f': 'json'}, timeout=15)
+            data = resp.json()
+            if data.get('features'):
+                attrs = data['features'][0]['attributes']
+                sp_debug['debug_steps'].append({'test': 'sample', 'fields': list(attrs.keys())[:15], 'sample': {k: attrs[k] for k in list(attrs.keys())[:10]}})
+        except Exception as e:
+            sp_debug['debug_steps'].append({'error': str(e)[:200]})
+        results.append(sp_debug)
+
+        return jsonify({'batch2_fix_results': results}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v122-batch2-verify', methods=['POST'])
+def admin_v122_batch2_verify():
+    """V122: Verify permits loaded, activate only if >= 10 permits. SYNCHRONOUS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        slugs = ['irving-tx', 'boise-city-id', 'saint-paul']
+        results = []
+
+        for slug in slugs:
+            row = conn.execute("""
+                SELECT COUNT(*) as cnt, MIN(date) as earliest, MAX(date) as latest
+                FROM permits WHERE source_city_key=?
+            """, (slug,)).fetchone()
+            cnt = row[0] if row else 0
+            earliest = row[1] if row else None
+            latest = row[2] if row else None
+
+            run = conn.execute("""
+                SELECT status, permits_found, permits_inserted, run_completed_at, error_message
+                FROM scraper_runs WHERE city_slug=? ORDER BY run_completed_at DESC LIMIT 1
+            """, (slug,)).fetchone()
+
+            cr = {'city_slug': slug, 'permits_in_table': cnt,
+                  'date_range': {'earliest': earliest, 'latest': latest},
+                  'last_run': dict(zip(['status','found','inserted','completed','error'], run)) if run else None,
+                  'activated': False}
+
+            if cnt >= 10:
+                conn.execute("UPDATE cities SET status='active', updated_at=datetime('now') WHERE city_slug=?", (slug,))
+                conn.commit()
+                cr['activated'] = True
+
+            results.append(cr)
+
+        return jsonify({'verification_results': results}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
