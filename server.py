@@ -5325,6 +5325,25 @@ def admin_test_and_backfill():
                 'test_records': len(test_raw),
             }), 500
 
+        # V126: Save config to city_sources BEFORE normalizing so normalize_permit can find it
+        try:
+            from city_source_db import upsert_city_source
+            import json as _json
+            upsert_city_source({
+                'source_key': city_key,
+                'name': config.get('name', city_key),
+                'state': config.get('state', ''),
+                'platform': platform,
+                'endpoint': config.get('endpoint', ''),
+                'dataset_id': config.get('dataset_id', ''),
+                'date_field': config.get('date_field', ''),
+                'field_map': config.get('field_map', {}),
+                'mode': 'city',
+                'status': 'active',
+            })
+        except Exception as e:
+            print(f"[V126] Warning: could not save config to city_sources: {e}", flush=True)
+
         # Step 3: NORMALIZE — convert raw records to our schema
         normalized = []
         for record in raw:
