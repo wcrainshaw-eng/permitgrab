@@ -3394,119 +3394,115 @@ def admin_fix_v119_cities():
 
 @app.route('/api/admin/v122-migrate', methods=['POST'])
 def admin_v122_migrate():
-    """V122: One-time migration to populate the cities table from existing data."""
+    """V122: Populate the cities table from existing data. Runs SYNCHRONOUSLY."""
     valid, error = check_admin_key()
     if not valid:
         return error
+    try:
+        conn = permitdb.get_connection()
 
-    def run():
-        try:
-            conn = permitdb.get_connection()
-            print("V122: Starting migration...", flush=True)
+        # Ensure table exists
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS cities (
+                city_slug TEXT PRIMARY KEY, city TEXT NOT NULL, state TEXT NOT NULL,
+                population INTEGER DEFAULT 0, platform TEXT, endpoint TEXT,
+                dataset_id TEXT, date_field TEXT, field_map TEXT, scraper_config TEXT,
+                status TEXT DEFAULT 'pending', last_collected_at TEXT, last_success_at TEXT,
+                last_error TEXT, permits_total INTEGER DEFAULT 0, permits_7d INTEGER DEFAULT 0,
+                last_run_permits_found INTEGER DEFAULT 0, last_run_permits_inserted INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), notes TEXT
+            )
+        """)
+        conn.commit()
 
-            # Ensure cities table exists
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS cities (
-                    city_slug TEXT PRIMARY KEY, city TEXT NOT NULL, state TEXT NOT NULL,
-                    population INTEGER DEFAULT 0, platform TEXT, endpoint TEXT,
-                    dataset_id TEXT, date_field TEXT, field_map TEXT, scraper_config TEXT,
-                    status TEXT DEFAULT 'pending', last_collected_at TEXT, last_success_at TEXT,
-                    last_error TEXT, permits_total INTEGER DEFAULT 0, permits_7d INTEGER DEFAULT 0,
-                    last_run_permits_found INTEGER DEFAULT 0, last_run_permits_inserted INTEGER DEFAULT 0,
-                    created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), notes TEXT
-                )
-            """)
-            conn.commit()
+        # Step A: Populate ALL from prod_cities
+        step_a = conn.execute("""
+            INSERT OR IGNORE INTO cities (city_slug, city, state, population, status)
+            SELECT city_slug, city, state, population, 'pending'
+            FROM prod_cities
+        """).rowcount
+        conn.commit()
 
-            # Step 3: Migrate fresh cities (have 7-day data) with their config
-            step3 = conn.execute("""
-                INSERT OR IGNORE INTO cities (
-                    city_slug, city, state, population, platform, endpoint, dataset_id,
-                    date_field, field_map, status, permits_total, last_collected_at,
-                    created_at, updated_at
-                )
-                SELECT
-                    pc.city_slug, pc.city, pc.state, pc.population,
-                    COALESCE(cs.platform, pc.source_type),
-                    COALESCE(cs.endpoint, pc.source_endpoint),
-                    cs.dataset_id, cs.date_field, cs.field_map,
-                    'active',
-                    COALESCE(pc.total_permits, 0),
-                    (SELECT MAX(collected_at) FROM permits WHERE source_city_key = pc.city_slug),
-                    datetime('now'), datetime('now')
-                FROM prod_cities pc
-                LEFT JOIN city_sources cs ON cs.source_key = pc.source_id
-                WHERE pc.city_slug IN (
-                    SELECT DISTINCT source_city_key FROM permits
-                    WHERE collected_at > datetime('now', '-7 days') AND source_city_key IS NOT NULL
-                )
-            """).rowcount
-            conn.commit()
-            print(f"V122: Step 3 — migrated {step3} fresh cities", flush=True)
+        # Step B: Add config from city_sources (join on source_key = city_slug)
+        step_b = conn.execute("""
+            UPDATE cities SET
+                platform = (SELECT cs.platform FROM city_sources cs WHERE cs.source_key = cities.city_slug),
+                endpoint = (SELECT cs.endpoint FROM city_sources cs WHERE cs.source_key = cities.city_slug),
+                dataset_id = (SELECT cs.dataset_id FROM city_sources cs WHERE cs.source_key = cities.city_slug),
+                date_field = (SELECT cs.date_field FROM city_sources cs WHERE cs.source_key = cities.city_slug),
+                field_map = (SELECT cs.field_map FROM city_sources cs WHERE cs.source_key = cities.city_slug)
+            WHERE EXISTS (SELECT 1 FROM city_sources cs WHERE cs.source_key = cities.city_slug)
+        """).rowcount
+        conn.commit()
 
-            # Step 4a: Add remaining prod_cities as pending
-            step4a = conn.execute("""
-                INSERT OR IGNORE INTO cities (city_slug, city, state, population, status, created_at, updated_at)
-                SELECT city_slug, city, state, population, 'pending', datetime('now'), datetime('now')
-                FROM prod_cities WHERE city_slug NOT IN (SELECT city_slug FROM cities)
-            """).rowcount
-            conn.commit()
-            print(f"V122: Step 4a — added {step4a} remaining prod_cities", flush=True)
+        # Step B2: Also try joining on source_key = prod_cities.source_id for mismatched keys
+        step_b2 = conn.execute("""
+            UPDATE cities SET
+                platform = COALESCE(cities.platform, (SELECT cs.platform FROM city_sources cs JOIN prod_cities pc ON cs.source_key = pc.source_id WHERE pc.city_slug = cities.city_slug)),
+                endpoint = COALESCE(cities.endpoint, (SELECT cs.endpoint FROM city_sources cs JOIN prod_cities pc ON cs.source_key = pc.source_id WHERE pc.city_slug = cities.city_slug)),
+                dataset_id = COALESCE(cities.dataset_id, (SELECT cs.dataset_id FROM city_sources cs JOIN prod_cities pc ON cs.source_key = pc.source_id WHERE pc.city_slug = cities.city_slug)),
+                date_field = COALESCE(cities.date_field, (SELECT cs.date_field FROM city_sources cs JOIN prod_cities pc ON cs.source_key = pc.source_id WHERE pc.city_slug = cities.city_slug)),
+                field_map = COALESCE(cities.field_map, (SELECT cs.field_map FROM city_sources cs JOIN prod_cities pc ON cs.source_key = pc.source_id WHERE pc.city_slug = cities.city_slug))
+            WHERE cities.platform IS NULL
+            AND EXISTS (SELECT 1 FROM city_sources cs JOIN prod_cities pc ON cs.source_key = pc.source_id WHERE pc.city_slug = cities.city_slug)
+        """).rowcount
+        conn.commit()
 
-            # Step 4b: Add us_cities >= 10K population
-            step4b = conn.execute("""
-                INSERT OR IGNORE INTO cities (city_slug, city, state, population, status, created_at, updated_at)
-                SELECT slug, city, state, population, 'pending', datetime('now'), datetime('now')
-                FROM us_cities WHERE slug NOT IN (SELECT city_slug FROM cities) AND population >= 10000
-            """).rowcount
-            conn.commit()
-            print(f"V122: Step 4b — added {step4b} us_cities", flush=True)
+        # Step C: Mark fresh cities as active + count permits
+        step_c = conn.execute("""
+            UPDATE cities SET
+                status = 'active',
+                permits_7d = (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug AND collected_at > datetime('now', '-7 days')),
+                permits_total = (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug)
+            WHERE city_slug IN (
+                SELECT DISTINCT source_city_key FROM permits WHERE collected_at > datetime('now', '-7 days') AND source_city_key IS NOT NULL
+            )
+        """).rowcount
+        conn.commit()
 
-            # Step 6: Clean contaminated cities
-            for slug in ['bakersfield', 'chesapeake', 'fontana', 'santa-ana', 'toledo']:
-                conn.execute("UPDATE cities SET status='pending', platform=NULL, endpoint=NULL, dataset_id=NULL, notes='V122: contaminated data cleaned' WHERE city_slug=?", (slug,))
-            conn.commit()
-            print("V122: Step 6 — cleaned 5 contaminated cities", flush=True)
+        # Step D: Add us_cities >= 10K not already present
+        step_d = conn.execute("""
+            INSERT OR IGNORE INTO cities (city_slug, city, state, population, status)
+            SELECT slug, city, state, population, 'pending'
+            FROM us_cities WHERE slug NOT IN (SELECT city_slug FROM cities) AND population >= 10000
+        """).rowcount
+        conn.commit()
 
-            # Step 7: Insert verified endpoints
-            verified = [
-                ('las-vegas', 'socrata', 'https://opendata.lasvegasnevada.gov/resource/wpyf-qpia.json', 'wpyf-qpia', 'Socrata verified'),
-                ('albuquerque', 'arcgis', 'https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0', None, 'MapServer verified'),
-                ('milwaukee', 'ckan', 'https://data.milwaukee.gov/api/3/action/datastore_search', '828e9630-d7cb-42e4-960e-964eae916397', 'CKAN verified'),
-                ('virginia-beach', 'arcgis', 'https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0', None, 'ArcGIS FeatureServer verified'),
-                ('gilbert', 'arcgis', 'https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3', None, 'ArcGIS MapServer verified'),
-            ]
-            for slug, platform, endpoint, ds_id, note in verified:
-                conn.execute("""
-                    UPDATE cities SET platform=?, endpoint=?, dataset_id=?, status='active',
-                    notes=?, updated_at=datetime('now') WHERE city_slug=?
-                """, (platform, endpoint, ds_id, note, slug))
-            conn.commit()
-            print(f"V122: Step 7 — configured {len(verified)} verified endpoints", flush=True)
+        # Step E: Set verified endpoints
+        verified = [
+            ('las-vegas', 'socrata', 'https://opendata.lasvegasnevada.gov/resource/wpyf-qpia.json', 'wpyf-qpia'),
+            ('albuquerque', 'arcgis', 'https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0', None),
+            ('milwaukee', 'ckan', 'https://data.milwaukee.gov/api/3/action/datastore_search', '828e9630-d7cb-42e4-960e-964eae916397'),
+            ('virginia-beach', 'arcgis', 'https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0', None),
+            ('gilbert', 'arcgis', 'https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3', None),
+        ]
+        for slug, plat, ep, ds in verified:
+            conn.execute("UPDATE cities SET platform=?, endpoint=?, dataset_id=?, status='active', updated_at=datetime('now') WHERE city_slug=?",
+                         (plat, ep, ds, slug))
+        conn.commit()
 
-            # Update permits_7d for all cities
-            conn.execute("""
-                UPDATE cities SET permits_7d = (
-                    SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug
-                    AND collected_at > datetime('now', '-7 days')
-                ) WHERE status = 'active'
-            """)
-            conn.commit()
+        # Clean contaminated
+        for slug in ['bakersfield', 'chesapeake', 'fontana', 'santa-ana', 'toledo']:
+            conn.execute("UPDATE cities SET status='pending', platform=NULL, endpoint=NULL, notes='V122 cleaned' WHERE city_slug=?", (slug,))
+        conn.commit()
 
-            # Final counts
-            total = conn.execute("SELECT COUNT(*) FROM cities").fetchone()[0]
-            active = conn.execute("SELECT COUNT(*) FROM cities WHERE status='active'").fetchone()[0]
-            fresh = conn.execute("SELECT COUNT(*) FROM cities WHERE permits_7d > 0").fetchone()[0]
-            print(f"V122: Migration complete. Total={total}, Active={active}, Fresh={fresh}", flush=True)
+        # Final counts
+        total = conn.execute("SELECT COUNT(*) FROM cities").fetchone()[0]
+        active = conn.execute("SELECT COUNT(*) FROM cities WHERE status='active'").fetchone()[0]
+        fresh = conn.execute("SELECT COUNT(*) FROM cities WHERE permits_7d > 0").fetchone()[0]
+        with_config = conn.execute("SELECT COUNT(*) FROM cities WHERE platform IS NOT NULL").fetchone()[0]
 
-        except Exception as e:
-            print(f"V122: Migration error: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
+        return jsonify({
+            'status': 'completed',
+            'steps': {'a_prod_cities': step_a, 'b_config': step_b, 'b2_config_alt': step_b2,
+                      'c_fresh_active': step_c, 'd_us_cities': step_d, 'e_verified': len(verified)},
+            'totals': {'total': total, 'active': active, 'fresh_7d': fresh, 'with_config': with_config}
+        }), 200
 
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
-    return jsonify({'status': 'started', 'message': 'V122 migration running in background'}), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/admin/config-audit')
