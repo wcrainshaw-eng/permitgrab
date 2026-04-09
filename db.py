@@ -761,6 +761,34 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_started ON scraper_runs(run_started_at);
         CREATE INDEX IF NOT EXISTS idx_scraper_runs_status ON scraper_runs(status);
 
+        -- V122: Single master cities table
+        CREATE TABLE IF NOT EXISTS cities (
+            city_slug TEXT PRIMARY KEY,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            population INTEGER DEFAULT 0,
+            platform TEXT,
+            endpoint TEXT,
+            dataset_id TEXT,
+            date_field TEXT,
+            field_map TEXT,
+            scraper_config TEXT,
+            status TEXT DEFAULT 'pending',
+            last_collected_at TEXT,
+            last_success_at TEXT,
+            last_error TEXT,
+            permits_total INTEGER DEFAULT 0,
+            permits_7d INTEGER DEFAULT 0,
+            last_run_permits_found INTEGER DEFAULT 0,
+            last_run_permits_inserted INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            notes TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_cities_status ON cities(status);
+        CREATE INDEX IF NOT EXISTS idx_cities_population ON cities(population);
+        CREATE INDEX IF NOT EXISTS idx_cities_platform ON cities(platform);
+
         -- V108: Pipeline run tracking
         CREATE TABLE IF NOT EXISTS pipeline_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

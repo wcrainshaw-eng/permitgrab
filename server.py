@@ -2778,6 +2778,30 @@ def _fix_socrata_addresses():
     print(f"[V12.57] Fixed {fixed_addr} addresses, {fixed_desc} descriptions.", flush=True)
 
 
+@app.route('/api/admin/collect-v122', methods=['POST'])
+def admin_collect_v122():
+    """V122: Run collection from the cities table with per-city insert."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.json or {}
+    days_back = data.get('days_back', 7)
+    include_scrapers = data.get('include_scrapers', True)
+
+    def run():
+        try:
+            from collector import collect_v122
+            collect_v122(days_back=days_back, include_scrapers=include_scrapers)
+        except Exception as e:
+            print(f"V122 collection error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'days_back': days_back, 'include_scrapers': include_scrapers}), 200
+
+
 @app.route('/api/admin/force-collection', methods=['POST'])
 def admin_force_collection():
     """V64: Force collection — runs ALL platforms, supports filtering.
@@ -3366,6 +3390,123 @@ def admin_fix_v119_cities():
         return jsonify({'status': 'complete', 'fixes': fixes}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/v122-migrate', methods=['POST'])
+def admin_v122_migrate():
+    """V122: One-time migration to populate the cities table from existing data."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    def run():
+        try:
+            conn = permitdb.get_connection()
+            print("V122: Starting migration...", flush=True)
+
+            # Ensure cities table exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS cities (
+                    city_slug TEXT PRIMARY KEY, city TEXT NOT NULL, state TEXT NOT NULL,
+                    population INTEGER DEFAULT 0, platform TEXT, endpoint TEXT,
+                    dataset_id TEXT, date_field TEXT, field_map TEXT, scraper_config TEXT,
+                    status TEXT DEFAULT 'pending', last_collected_at TEXT, last_success_at TEXT,
+                    last_error TEXT, permits_total INTEGER DEFAULT 0, permits_7d INTEGER DEFAULT 0,
+                    last_run_permits_found INTEGER DEFAULT 0, last_run_permits_inserted INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), notes TEXT
+                )
+            """)
+            conn.commit()
+
+            # Step 3: Migrate fresh cities (have 7-day data) with their config
+            step3 = conn.execute("""
+                INSERT OR IGNORE INTO cities (
+                    city_slug, city, state, population, platform, endpoint, dataset_id,
+                    date_field, field_map, status, permits_total, last_collected_at,
+                    created_at, updated_at
+                )
+                SELECT
+                    pc.city_slug, pc.city, pc.state, pc.population,
+                    COALESCE(cs.platform, pc.source_type),
+                    COALESCE(cs.endpoint, pc.source_endpoint),
+                    cs.dataset_id, cs.date_field, cs.field_map,
+                    'active',
+                    COALESCE(pc.total_permits, 0),
+                    (SELECT MAX(collected_at) FROM permits WHERE source_city_key = pc.city_slug),
+                    datetime('now'), datetime('now')
+                FROM prod_cities pc
+                LEFT JOIN city_sources cs ON cs.source_key = pc.source_id
+                WHERE pc.city_slug IN (
+                    SELECT DISTINCT source_city_key FROM permits
+                    WHERE collected_at > datetime('now', '-7 days') AND source_city_key IS NOT NULL
+                )
+            """).rowcount
+            conn.commit()
+            print(f"V122: Step 3 — migrated {step3} fresh cities", flush=True)
+
+            # Step 4a: Add remaining prod_cities as pending
+            step4a = conn.execute("""
+                INSERT OR IGNORE INTO cities (city_slug, city, state, population, status, created_at, updated_at)
+                SELECT city_slug, city, state, population, 'pending', datetime('now'), datetime('now')
+                FROM prod_cities WHERE city_slug NOT IN (SELECT city_slug FROM cities)
+            """).rowcount
+            conn.commit()
+            print(f"V122: Step 4a — added {step4a} remaining prod_cities", flush=True)
+
+            # Step 4b: Add us_cities >= 10K population
+            step4b = conn.execute("""
+                INSERT OR IGNORE INTO cities (city_slug, city, state, population, status, created_at, updated_at)
+                SELECT slug, city, state, population, 'pending', datetime('now'), datetime('now')
+                FROM us_cities WHERE slug NOT IN (SELECT city_slug FROM cities) AND population >= 10000
+            """).rowcount
+            conn.commit()
+            print(f"V122: Step 4b — added {step4b} us_cities", flush=True)
+
+            # Step 6: Clean contaminated cities
+            for slug in ['bakersfield', 'chesapeake', 'fontana', 'santa-ana', 'toledo']:
+                conn.execute("UPDATE cities SET status='pending', platform=NULL, endpoint=NULL, dataset_id=NULL, notes='V122: contaminated data cleaned' WHERE city_slug=?", (slug,))
+            conn.commit()
+            print("V122: Step 6 — cleaned 5 contaminated cities", flush=True)
+
+            # Step 7: Insert verified endpoints
+            verified = [
+                ('las-vegas', 'socrata', 'https://opendata.lasvegasnevada.gov/resource/wpyf-qpia.json', 'wpyf-qpia', 'Socrata verified'),
+                ('albuquerque', 'arcgis', 'https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0', None, 'MapServer verified'),
+                ('milwaukee', 'ckan', 'https://data.milwaukee.gov/api/3/action/datastore_search', '828e9630-d7cb-42e4-960e-964eae916397', 'CKAN verified'),
+                ('virginia-beach', 'arcgis', 'https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0', None, 'ArcGIS FeatureServer verified'),
+                ('gilbert', 'arcgis', 'https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3', None, 'ArcGIS MapServer verified'),
+            ]
+            for slug, platform, endpoint, ds_id, note in verified:
+                conn.execute("""
+                    UPDATE cities SET platform=?, endpoint=?, dataset_id=?, status='active',
+                    notes=?, updated_at=datetime('now') WHERE city_slug=?
+                """, (platform, endpoint, ds_id, note, slug))
+            conn.commit()
+            print(f"V122: Step 7 — configured {len(verified)} verified endpoints", flush=True)
+
+            # Update permits_7d for all cities
+            conn.execute("""
+                UPDATE cities SET permits_7d = (
+                    SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug
+                    AND collected_at > datetime('now', '-7 days')
+                ) WHERE status = 'active'
+            """)
+            conn.commit()
+
+            # Final counts
+            total = conn.execute("SELECT COUNT(*) FROM cities").fetchone()[0]
+            active = conn.execute("SELECT COUNT(*) FROM cities WHERE status='active'").fetchone()[0]
+            fresh = conn.execute("SELECT COUNT(*) FROM cities WHERE permits_7d > 0").fetchone()[0]
+            print(f"V122: Migration complete. Total={total}, Active={active}, Fresh={fresh}", flush=True)
+
+        except Exception as e:
+            print(f"V122: Migration error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'message': 'V122 migration running in background'}), 200
 
 
 @app.route('/api/admin/config-audit')

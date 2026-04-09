@@ -2775,6 +2775,139 @@ def collect_single_city(city_slug, days_back=7):
         }
 
 
+def collect_v122(days_back=7, include_scrapers=True):
+    """V122: Collect from cities table. Insert permits AFTER EACH CITY (not batched).
+    This fixes the Accela bug where permits were lost if the process died before batch upsert."""
+    if not _acquire_lock():
+        print("[V122] Collection already running, skipping", flush=True)
+        return
+
+    try:
+        conn = permitdb.get_connection()
+
+        # Read active cities from the cities table — sorted by population DESC
+        rows = conn.execute("""
+            SELECT city_slug, city, state, platform, endpoint, dataset_id,
+                   date_field, field_map, scraper_config
+            FROM cities
+            WHERE status = 'active' AND platform IS NOT NULL AND endpoint IS NOT NULL
+            ORDER BY population DESC
+        """).fetchall()
+
+        print(f"[V122] Collecting from {len(rows)} active cities", flush=True)
+        total_found = 0
+        total_inserted = 0
+        cities_collected = 0
+
+        for row in rows:
+            slug = row[0]
+            city_name, state, platform = row[1], row[2], row[3]
+            endpoint, dataset_id = row[4], row[5]
+            date_field = row[6]
+
+            # Parse field_map from JSON
+            import json as _json
+            try:
+                field_map = _json.loads(row[7]) if row[7] else {}
+            except (ValueError, TypeError):
+                field_map = {}
+
+            # Skip Accela/scraper platforms if not included
+            if platform in ('accela', 'viewpoint', 'energov') and not include_scrapers:
+                continue
+
+            # Build config dict that fetch_permits expects
+            config = {
+                'name': city_name, 'state': state, 'platform': platform,
+                'endpoint': endpoint, 'dataset_id': dataset_id or '',
+                'date_field': date_field or '', 'field_map': field_map,
+                'slug': slug, 'active': True, 'limit': 2000,
+            }
+
+            # For Accela, add required keys
+            if platform == 'accela':
+                try:
+                    scraper_cfg = _json.loads(row[8]) if row[8] else {}
+                except (ValueError, TypeError):
+                    scraper_cfg = {}
+                config['_accela_city_key'] = scraper_cfg.get('city_key', slug.replace('-', '_'))
+                config['agency_code'] = scraper_cfg.get('agency_code', '')
+
+            start_time = time.time()
+            try:
+                raw, fetch_status = fetch_permits(slug, days_back)
+                if fetch_status != 'success' or not raw:
+                    # Log the run
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    conn.execute("""
+                        UPDATE cities SET last_collected_at=datetime('now'),
+                        last_error=?, updated_at=datetime('now') WHERE city_slug=?
+                    """, (fetch_status, slug))
+                    conn.commit()
+                    continue
+
+                # Normalize permits
+                city_permits = []
+                for record in raw:
+                    try:
+                        normalized = normalize_permit(record, slug)
+                        if normalized and normalized.get('permit_number'):
+                            city_permits.append(normalized)
+                    except Exception:
+                        continue
+
+                # INSERT IMMEDIATELY — don't wait for batch
+                if city_permits:
+                    inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=slug)
+                    total_inserted += inserted_count
+                    total_found += len(city_permits)
+                    cities_collected += 1
+                    print(f"  ✓ {city_name}: {len(city_permits)} found, {inserted_count} inserted", flush=True)
+
+                    # Update tracking in cities table
+                    conn.execute("""
+                        UPDATE cities SET
+                            last_collected_at=datetime('now'),
+                            last_success_at=datetime('now'),
+                            last_run_permits_found=?,
+                            last_run_permits_inserted=?,
+                            permits_total=(SELECT COUNT(*) FROM permits WHERE source_city_key=?),
+                            permits_7d=(SELECT COUNT(*) FROM permits WHERE source_city_key=? AND collected_at>datetime('now','-7 days')),
+                            last_error=NULL,
+                            updated_at=datetime('now')
+                        WHERE city_slug=?
+                    """, (len(city_permits), inserted_count, slug, slug, slug))
+                    conn.commit()
+
+                    # Log to scraper_runs for backwards compat
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    _log_v15_collection(
+                        city_key=slug, city_name=city_name, state=state,
+                        permits_found=len(city_permits), permits_inserted=inserted_count,
+                        status='success', duration_ms=duration_ms
+                    )
+                else:
+                    conn.execute("""
+                        UPDATE cities SET last_collected_at=datetime('now'),
+                        last_run_permits_found=0, updated_at=datetime('now') WHERE city_slug=?
+                    """, (slug,))
+                    conn.commit()
+
+            except Exception as e:
+                print(f"  ✗ {city_name}: {str(e)[:100]}", flush=True)
+                conn.execute("""
+                    UPDATE cities SET last_collected_at=datetime('now'),
+                    last_error=?, updated_at=datetime('now') WHERE city_slug=?
+                """, (str(e)[:500], slug))
+                conn.commit()
+
+            time.sleep(0.5)  # Rate limit between cities
+
+        print(f"[V122] Collection complete: {cities_collected} cities, {total_found} found, {total_inserted} inserted", flush=True)
+    finally:
+        _release_lock()
+
+
 def collect_refresh(days_back=7, platform_filter=None, include_scrapers=True):  # V74: Default to True
     """
     V12.50: Delta collection. Fetch recent permits and upsert into SQLite.
