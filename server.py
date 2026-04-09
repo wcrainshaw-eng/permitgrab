@@ -3034,6 +3034,105 @@ def admin_test_sweep_sources():
     return jsonify({'status': 'testing_started', 'message': 'Testing up to 500 pending sources'}), 200
 
 
+@app.route('/api/admin/refresh-bulk-tracking', methods=['POST'])
+def admin_refresh_bulk_tracking():
+    """V118: Batch-update last_successful_collection for bulk-fed cities."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        # Step 1: Aggregate recent permits into temp table
+        conn.execute("DROP TABLE IF EXISTS _bulk_freshness")
+        conn.execute("""
+            CREATE TEMP TABLE _bulk_freshness AS
+            SELECT lower(city) as city_lower, lower(state) as state_lower,
+                   max(collected_at) as last_collected, count(*) as permit_count
+            FROM permits WHERE collected_at > datetime('now', '-45 days')
+            GROUP BY lower(city), lower(state) HAVING count(*) > 0
+        """)
+
+        # Step 2: Update prod_cities from temp table (subquery for SQLite compat)
+        updated = conn.execute("""
+            UPDATE prod_cities SET
+                last_successful_collection = (
+                    SELECT bf.last_collected FROM _bulk_freshness bf
+                    WHERE lower(prod_cities.city) = bf.city_lower
+                    AND lower(prod_cities.state) = bf.state_lower
+                ),
+                health_status = CASE
+                    WHEN (SELECT bf.last_collected FROM _bulk_freshness bf
+                          WHERE lower(prod_cities.city) = bf.city_lower
+                          AND lower(prod_cities.state) = bf.state_lower) > datetime('now', '-7 days')
+                    THEN 'collecting' ELSE 'has_data' END,
+                data_freshness = 'fresh'
+            WHERE prod_cities.status IN ('active', 'pending')
+            AND EXISTS (
+                SELECT 1 FROM _bulk_freshness bf
+                WHERE lower(prod_cities.city) = bf.city_lower
+                AND lower(prod_cities.state) = bf.state_lower
+                AND (prod_cities.last_successful_collection IS NULL
+                     OR prod_cities.last_successful_collection < bf.last_collected)
+            )
+        """).rowcount
+
+        conn.execute("DROP TABLE IF EXISTS _bulk_freshness")
+        conn.commit()
+
+        fresh_7d = conn.execute("""
+            SELECT count(*) FROM prod_cities
+            WHERE population >= 12907 AND last_successful_collection > datetime('now', '-7 days')
+        """).fetchone()[0]
+
+        print(f"V118: Refreshed bulk tracking: {updated} updated, fresh_7d={fresh_7d}", flush=True)
+        return jsonify({'status': 'complete', 'tracking_updated': updated, 'fresh_7d_count': fresh_7d}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/pause-never-worked', methods=['POST'])
+def admin_pause_never_worked():
+    """V118: Pause cities with source assignments that never produced data."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        paused = conn.execute("""
+            UPDATE prod_cities SET status = 'paused',
+                pause_reason = 'V118: source never produced data'
+            WHERE status = 'active' AND health_status = 'never_worked'
+            AND total_permits = 0 AND last_successful_collection IS NULL
+            AND source_type IS NOT NULL
+        """).rowcount
+        conn.commit()
+
+        active = conn.execute("SELECT count(*) FROM prod_cities WHERE status = 'active'").fetchone()[0]
+        print(f"V118: Paused {paused} never-worked cities, {active} remaining active", flush=True)
+        return jsonify({'status': 'complete', 'paused': paused, 'remaining_active': active}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/create-permits-index', methods=['POST'])
+def admin_create_permits_index():
+    """V118: Create index for fast city/state/collected_at lookups."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_permits_city_state_collected
+            ON permits(city, state, collected_at)
+        """)
+        conn.commit()
+        print("V118: Created permits city/state/collected_at index", flush=True)
+        return jsonify({'status': 'complete'}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/activate-sweep-sources', methods=['POST'])
 def admin_activate_sweep_sources():
     """V117: Bridge confirmed sweep_sources into prod_cities for collection."""

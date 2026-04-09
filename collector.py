@@ -350,6 +350,34 @@ def cleanup_balance_of_entries():
         return 0
 
 
+def _propagate_bulk_to_cities():
+    """V118: After bulk collection, update child cities' last_successful_collection."""
+    conn = permitdb.get_connection()
+    try:
+        updated = conn.execute("""
+            UPDATE prod_cities SET
+                last_successful_collection = (
+                    SELECT max(p.collected_at) FROM permits p
+                    WHERE lower(p.city) = lower(prod_cities.city)
+                    AND lower(p.state) = lower(prod_cities.state)
+                    AND p.collected_at > datetime('now', '-12 hours')
+                ),
+                health_status = 'collecting', data_freshness = 'fresh'
+            WHERE prod_cities.status = 'active'
+            AND EXISTS (
+                SELECT 1 FROM permits p
+                WHERE lower(p.city) = lower(prod_cities.city)
+                AND lower(p.state) = lower(prod_cities.state)
+                AND p.collected_at > datetime('now', '-12 hours')
+            )
+        """).rowcount
+        conn.commit()
+        if updated:
+            print(f"[V118] Propagated bulk collection to {updated} child cities", flush=True)
+    except Exception as e:
+        print(f"[V118] Propagation error: {e}", flush=True)
+
+
 def update_all_city_health():
     """V101/V104: Set health_status for all active cities based on current data."""
     conn = permitdb.get_connection()
@@ -3105,6 +3133,12 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             update_total_permits_from_actual()
         except Exception as e:
             print(f"[V100] Recount error after Phase 1 (non-fatal): {e}")
+
+        # V118: Propagate bulk collection results to individual cities
+        try:
+            _propagate_bulk_to_cities()
+        except Exception as e:
+            print(f"[V118] Bulk propagation error (non-fatal): {e}", flush=True)
 
         # V16 PHASE 2: Collect from individual city sources (not bulk, not bulk_harvest)
         print("\n  [V16] Phase 2: Individual city collection")
