@@ -2382,7 +2382,6 @@ app.wsgi_app = HealthCheckMiddleware(app.wsgi_app)
 _startup_done = False
 _collectors_manually_started = False
 
-@app.before_request
 def _try_discover_source(city_name, state, slug):
     """V120: Try to auto-discover a working permit data source for a city."""
     import requests as req
@@ -2521,6 +2520,7 @@ def _cleanup_v108_pipeline_damage():
         print(f"[V111b] Progress clear error (non-fatal): {e}", flush=True)
 
 
+@app.before_request
 def _deferred_startup():
     """V69: Mark startup done but DO NOT start any background threads.
     V93: Email scheduler is now auto-started (doesn't need Postgres)."""
