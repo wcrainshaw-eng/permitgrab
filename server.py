@@ -3649,6 +3649,23 @@ def admin_v122_fix_endpoints():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v122-deactivate-stale', methods=['POST'])
+def admin_v122_deactivate_stale():
+    """V122: Set active cities with 0 fresh permits back to pending."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        deactivated = conn.execute("UPDATE cities SET status = 'pending' WHERE status = 'active' AND permits_7d = 0").rowcount
+        conn.commit()
+        still_active = conn.execute("SELECT COUNT(*) FROM cities WHERE status = 'active'").fetchone()[0]
+        return jsonify({'deactivated': deactivated, 'still_active': still_active}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
