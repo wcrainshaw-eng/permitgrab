@@ -3902,6 +3902,80 @@ def admin_v122_batch2_verify():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v123-onboard', methods=['POST'])
+def admin_v123_onboard():
+    """V123: Onboard batch — reactivate configured cities + skip dead ends."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        results = []
+
+        # Cities with existing platform+endpoint — just reactivate
+        reactivate = [
+            'chicago-il', 'dallas-tx', 'fort-worth', 'indianapolis', 'oklahoma-city',
+            'el-paso-tx', 'detroit-mi-accela', 'baltimore-md-accela', 'milwaukee',
+            'albuquerque', 'las-vegas', 'mesa-az-accela', 'colorado-springs',
+            'san-diego', 'miami', 'san-jose',
+        ]
+        for slug in reactivate:
+            r = conn.execute("UPDATE cities SET status='active', updated_at=datetime('now') WHERE city_slug=? AND platform IS NOT NULL", (slug,))
+            results.append({'city_slug': slug, 'action': 'reactivate', 'updated': r.rowcount})
+        conn.commit()
+
+        # Fresno — configure Accela (portal confirmed at aca-prod.accela.com/FRESNO)
+        r = conn.execute("""
+            UPDATE cities SET platform='accela',
+                endpoint='https://aca-prod.accela.com/FRESNO/Cap/CapHome.aspx?module=Building&TabName=Building',
+                status='active', updated_at=datetime('now')
+            WHERE city_slug='fresno-ca'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'fresno-ca', 'action': 'accela_config', 'updated': r.rowcount})
+
+        # Irving TX + Boise ID — correct slugs from batch2
+        r = conn.execute("""
+            UPDATE cities SET platform='arcgis',
+                endpoint='https://services3.arcgis.com/OfsJXUlu8pSkbl7B/arcgis/rest/services/Residential_Permits_Issued_Feb_15_2022_Present/FeatureServer/0',
+                date_field='Issued_Date', status='active', updated_at=datetime('now')
+            WHERE city_slug='irving-tx'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'irving-tx', 'action': 'arcgis_config', 'updated': r.rowcount})
+
+        r = conn.execute("""
+            UPDATE cities SET platform='arcgis',
+                endpoint='https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/Housing_OpenData/FeatureServer/0',
+                date_field='IssuedDate', status='active', updated_at=datetime('now')
+            WHERE city_slug='boise-city-id'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'boise-city-id', 'action': 'arcgis_config', 'updated': r.rowcount})
+
+        # St. Paul — ArcGIS
+        r = conn.execute("""
+            UPDATE cities SET platform='arcgis',
+                endpoint='https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0',
+                date_field='ISSUEDATE', status='active', updated_at=datetime('now')
+            WHERE city_slug='saint-paul'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'saint-paul', 'action': 'arcgis_config', 'updated': r.rowcount})
+
+        # Skip cities with no usable API
+        for slug in ['houston-tx', 'jacksonville-fl', 'balance-of-hempstead-ny', 'boise-id-accela']:
+            r = conn.execute("UPDATE cities SET status='skip', notes='V123: no public permit API', updated_at=datetime('now') WHERE city_slug=?", (slug,))
+            results.append({'city_slug': slug, 'action': 'skip', 'updated': r.rowcount})
+        conn.commit()
+
+        active = conn.execute("SELECT COUNT(*) FROM cities WHERE status='active'").fetchone()[0]
+        return jsonify({'results': results, 'total_active': active}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
