@@ -3221,41 +3221,53 @@ def admin_create_permits_index():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-@app.route('/api/admin/add-major-cities', methods=['POST'])
-def admin_add_major_cities():
-    """V119: Add 5 verified major city sources — San Jose, DC, Las Vegas, Albuquerque, St. Paul."""
+@app.route('/api/admin/add-verified-cities', methods=['POST'])
+def admin_add_verified_cities():
+    """V121: Add cities with manually verified and tested endpoints."""
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
         conn = permitdb.get_connection()
 
-        # Define the 5 cities with verified endpoints
+        # V121: Verified and tested endpoints (manually confirmed data is correct)
         cities = [
-            {
-                'source_key': 'san-jose-ca-ckan', 'slug': 'san-jose',
-                'name': 'San Jose', 'state': 'CA', 'platform': 'ckan',
-                'endpoint': 'https://data.sanjoseca.gov/api/3/action/datastore_search',
-                'dataset_id': '761b7ae8-3be1-4ad6-923d-c7af6404a904',
-            },
+            # V119 originals (DC confirmed working with 2K+ permits)
             {
                 'source_key': 'dc-arcgis', 'slug': 'washington',
                 'name': 'Washington', 'state': 'DC', 'platform': 'arcgis',
                 'endpoint': 'https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/DCRA/FeatureServer/4',
                 'dataset_id': '',
             },
+            # V121: Milwaukee — CKAN, 16K+ records, addresses confirmed Milwaukee WI
             {
-                'source_key': 'las-vegas-nv-arcgis', 'slug': 'las-vegas',
-                'name': 'Las Vegas', 'state': 'NV', 'platform': 'arcgis',
-                'endpoint': 'https://mapdata.lasvegasnevada.gov/clvgis/rest/services/DevelopmentServices/BuildingPermits/MapServer/0',
+                'source_key': 'milwaukee-ckan', 'slug': 'milwaukee',
+                'name': 'Milwaukee', 'state': 'WI', 'platform': 'ckan',
+                'endpoint': 'https://data.milwaukee.gov/api/3/action/datastore_search',
+                'dataset_id': '828e9630-d7cb-42e4-960e-964eae916397',
+            },
+            # V121: Virginia Beach — ArcGIS FeatureServer, PermitNumber+StreetAddress confirmed
+            {
+                'source_key': 'virginia-beach-arcgis', 'slug': 'virginia-beach',
+                'name': 'Virginia Beach', 'state': 'VA', 'platform': 'arcgis',
+                'endpoint': 'https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0',
                 'dataset_id': '',
             },
+            # V121: Gilbert AZ — ArcGIS MapServer, AddressCity=GILBERT confirmed
+            {
+                'source_key': 'gilbert-arcgis', 'slug': 'gilbert',
+                'name': 'Gilbert', 'state': 'AZ', 'platform': 'arcgis',
+                'endpoint': 'https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3',
+                'dataset_id': '',
+            },
+            # V119: Albuquerque — ArcGIS FeatureServer, verified endpoint
             {
                 'source_key': 'albuquerque-nm-arcgis', 'slug': 'albuquerque',
                 'name': 'Albuquerque', 'state': 'NM', 'platform': 'arcgis',
                 'endpoint': 'https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/FeatureServer/0',
                 'dataset_id': '',
             },
+            # V119: St. Paul — Socrata
             {
                 'source_key': 'saint-paul-mn-socrata', 'slug': 'saint-paul',
                 'name': 'St. Paul', 'state': 'MN', 'platform': 'socrata',
