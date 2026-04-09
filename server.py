@@ -3655,9 +3655,38 @@ def admin_cleanup_contamination():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/onboard-next', methods=['POST'])
+def admin_onboard_next():
+    """V121: Process next N cities by population. Google-test-add."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.json or {}
+    count = min(data.get('count', 1), 10)
+
+    conn = permitdb.get_connection()
+    candidates = conn.execute("""
+        SELECT city_slug, city, state, population FROM prod_cities
+        WHERE population >= 12907
+        AND city_slug NOT IN (SELECT DISTINCT source_city_key FROM permits WHERE collected_at > datetime('now', '-7 days') AND source_city_key IS NOT NULL)
+        AND (health_status IS NULL OR health_status != 'no_source_found')
+        ORDER BY population DESC LIMIT ?
+    """, (count,)).fetchall()
+
+    from onboard import onboard_single_city
+    results = []
+    for row in candidates:
+        result = onboard_single_city(row[0], row[1], row[2], row[3])
+        results.append(result)
+        time.sleep(2)
+
+    successes = sum(1 for r in results if r.get('outcome') == 'success')
+    return jsonify({'processed': len(results), 'successes': successes, 'results': results}), 200
+
+
 @app.route('/api/admin/onboard-city', methods=['POST'])
 def admin_onboard_city():
-    """REARCH: Discover, VALIDATE, backfill, activate. Validation is mandatory.
+    """V121: Google it, test it, add it. Uses onboard.py module.
 
     Body: {"city_slug": "las-vegas"} or {"city_slugs": [...]} or {"top_pending": 20}
     """
@@ -3665,6 +3694,7 @@ def admin_onboard_city():
     if not valid:
         return error
 
+    from onboard import onboard_single_city
     data = request.json or {}
     conn = permitdb.get_connection()
 
@@ -3692,76 +3722,23 @@ def admin_onboard_city():
             (slug,)
         ).fetchone()
         if not city:
-            results.append({'city_slug': slug, 'status': 'not_found'})
+            results.append({'city_slug': slug, 'outcome': 'not_found'})
             continue
         city_name, state, pop, tp = city[0], city[1], city[2], city[3]
 
         if tp and tp > 100:
-            results.append({'city_slug': slug, 'city': city_name, 'status': 'already_has_data', 'permits': tp})
+            results.append({'city_slug': slug, 'city': city_name, 'outcome': 'already_has_data', 'permits': tp})
             continue
 
-        result = {'city_slug': slug, 'city': city_name, 'state': state, 'population': pop}
-
-        # STEP 1: DISCOVER candidates
-        print(f"REARCH: Discovering sources for {city_name}, {state}...", flush=True)
-        source = _try_discover_source(city_name, state, slug)
-        if not source:
-            result['status'] = 'no_source_found'
-            conn.execute("UPDATE prod_cities SET health_status = 'no_source' WHERE city_slug = ?", (slug,))
-            conn.commit()
-            results.append(result)
-            continue
-
-        result['platform'] = source['platform']
-        result['endpoint'] = source['endpoint'][:100]
-
-        # STEP 2: TEST + VALIDATE (pull data AND verify it's from the right city)
-        print(f"REARCH-FIX: Testing {source['platform']} for {slug}...", flush=True)
-        raw_records, permits, err = _test_source(source, city_name, state)
-        if err or not permits:
-            result['status'] = 'test_failed'
-            result['error'] = err or 'zero permits'
-            results.append(result)
-            continue
-
-        # MANDATORY VALIDATION: check RAW records (BEFORE city/state stamping)
-        # This is the critical fix — we must check the original API data, not
-        # our normalized permits which always contain the city name because we put it there
-        city_lower = city_name.lower()
-        state_lower = state.lower()
-        matches = 0
-        sample = raw_records[:min(30, len(raw_records))]
-        for raw in sample:
-            text = ' '.join(str(v) for v in raw.values() if v).lower()
-            if city_lower in text or state_lower in text:
-                matches += 1
-        match_rate = matches / len(sample) if sample else 0
-        print(f"REARCH-FIX: {slug} validation: {matches}/{len(sample)} RAW records mention '{city_name}' or '{state}' ({match_rate:.0%})", flush=True)
-
-        if match_rate < 0.2:
-            result['status'] = 'validation_failed'
-            result['error'] = f'Data validation: only {match_rate:.0%} of records mention {city_name} or {state}'
-            result['permits_fetched'] = len(permits)
-            print(f"REARCH: REJECTED {slug} — match rate {match_rate:.0%} too low", flush=True)
-            results.append(result)
-            continue
-
-        result['permits_fetched'] = len(permits)
-        result['validation'] = f'{match_rate:.0%} match rate'
-
-        # STEP 3: ADD IT (only reaches here if validation passed)
-        print(f"REARCH: Adding {len(permits)} validated permits for {slug}...", flush=True)
-        source_key = f"{slug}-{source['platform']}"
-        inserted = _add_city_permits(conn, source, source_key, permits, slug, city_name, state)
-        result['status'] = 'onboarded'
-        result['permits_inserted'] = inserted
+        # V121: Use the new onboard module
+        result = onboard_single_city(slug, city_name, state, pop)
         results.append(result)
-        print(f"REARCH: {slug} ONBOARDED: {inserted} permits (validated {match_rate:.0%})", flush=True)
+        time.sleep(2)
 
-    onboarded = sum(1 for r in results if r.get('status') == 'onboarded')
+    successes = sum(1 for r in results if r.get('outcome') == 'success')
     total_inserted = sum(r.get('permits_inserted', 0) for r in results)
     return jsonify({
-        'summary': {'onboarded': onboarded, 'total_permits': total_inserted, 'total': len(city_slugs)},
+        'summary': {'successes': successes, 'total_permits': total_inserted, 'total': len(city_slugs)},
         'results': results
     }), 200
 
