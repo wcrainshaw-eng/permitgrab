@@ -3976,6 +3976,42 @@ def admin_v123_onboard():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v125-activate', methods=['POST'])
+def admin_v125_activate():
+    """V125: Reactivate configured cities + skip dead ends."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        results = []
+
+        # Reactivate 15 cities that already have platform+endpoint
+        reactivate = [
+            'virginia-beach', 'oakland', 'wichita', 'anaheim-ca-accela',
+            'stockton', 'riverside', 'newark', 'cincinnati-oh',
+            'durham-nc-arcgis', 'plano-tx', 'anchorage', 'gilbert',
+            'madison-wi', 'fort-wayne-in', 'saint-petersburg',
+        ]
+        for slug in reactivate:
+            r = conn.execute("UPDATE cities SET status='active', updated_at=datetime('now') WHERE city_slug=? AND platform IS NOT NULL", (slug,))
+            results.append({'slug': slug, 'action': 'activate', 'updated': r.rowcount})
+        conn.commit()
+
+        # Skip 5 dead ends
+        skips = ['lexington-fayette-urban-county-ky', 'north-las-vegas-nv', 'oyster-bay-ny', 'st-louis-mo', 'lubbock-tx']
+        for slug in skips:
+            r = conn.execute("UPDATE cities SET status='skip', notes='V125: no public API', updated_at=datetime('now') WHERE city_slug=?", (slug,))
+            results.append({'slug': slug, 'action': 'skip', 'updated': r.rowcount})
+        conn.commit()
+
+        active = conn.execute("SELECT COUNT(*) FROM cities WHERE status='active'").fetchone()[0]
+        return jsonify({'results': results, 'total_active': active}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/v125-skip', methods=['POST'])
 def admin_v125_skip():
     """V125: Mark cities as skip."""
