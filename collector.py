@@ -924,6 +924,31 @@ def fetch_arcgis(config, days_back):
     resp.raise_for_status()
     data = resp.json()
 
+    # V126: If date query fails, retry with alternate date formats
+    if "error" in data and date_field:
+        print(f"    [V126] ArcGIS date query failed with format '{date_format}', trying alternates...", flush=True)
+        alt_formats = []
+        if date_format != "epoch":
+            alt_formats.append(("epoch", f"{date_field} >= {int(since_dt.timestamp() * 1000)}"))
+        if date_format != "date":
+            alt_formats.append(("DATE", f"{date_field} >= DATE '{since_dt.strftime('%Y-%m-%d')}'"))
+        if date_format != "string":
+            alt_formats.append(("string", f"{date_field} >= '{since_dt.strftime('%Y-%m-%d')}'"))
+        alt_formats.append(("timestamp", f"{date_field} >= timestamp '{since_dt.strftime('%Y-%m-%d')} 00:00:00'"))
+
+        for fmt_name, alt_where in alt_formats:
+            try:
+                alt_params = dict(params)
+                alt_params["where"] = alt_where
+                alt_resp = SESSION.get(endpoint, params=alt_params, timeout=API_TIMEOUT_SECONDS)
+                alt_data = alt_resp.json()
+                if "error" not in alt_data:
+                    print(f"    [V126] Date format '{fmt_name}' worked for {endpoint[:60]}", flush=True)
+                    data = alt_data
+                    break
+            except Exception:
+                continue
+
     # V12.4: Detect ArcGIS-level errors (HTTP 200 with error JSON body)
     if "error" in data:
         error_msg = data["error"].get("message", "Unknown ArcGIS error")
@@ -3353,15 +3378,16 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                     except Exception:
                         continue
 
-                # V124: INSERT IMMEDIATELY after each city — don't accumulate
+                # V126: INSERT IMMEDIATELY after each city + loud logging
                 permit_count = len(city_permits)
                 inserted_count = 0
                 if city_permits:
                     try:
                         inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=source_id)
+                        print(f"    [V126-INSERT] {city_name} ({source_id}): {permit_count} normalized, {inserted_count} inserted to DB", flush=True)
                     except Exception as upsert_err:
-                        print(f"    [V124] Upsert error for {city_name}: {upsert_err}", flush=True)
-                all_permits.extend(city_permits)  # keep for stats/compat
+                        print(f"    [V126-INSERT-ERROR] {city_name} ({source_id}): {upsert_err}", flush=True)
+                all_permits.extend(city_permits)
 
                 stats[source_id] = {
                     "raw": len(raw),
@@ -3451,14 +3477,15 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                         except Exception:
                             continue
 
-                    # V124: INSERT IMMEDIATELY
+                        # V126: INSERT IMMEDIATELY + loud logging
                     permit_count = len(city_permits)
                     inserted_count = 0
                     if city_permits:
                         try:
                             inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=city_key)
+                            print(f"    [V126-INSERT] {city_name} ({city_key}): {permit_count} normalized, {inserted_count} inserted", flush=True)
                         except Exception as upsert_err:
-                            print(f"    [V124] Upsert error for {city_name}: {upsert_err}", flush=True)
+                            print(f"    [V126-INSERT-ERROR] {city_name} ({city_key}): {upsert_err}", flush=True)
                     all_permits.extend(city_permits)
 
                     stats[city_key] = {
