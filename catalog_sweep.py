@@ -91,7 +91,7 @@ def _v115_cleanup():
 def sweep_socrata_catalog():
     """Sweep Socrata Discovery API for all building permit datasets."""
     _v115_cleanup()  # Purge junk from previous runs
-    _log("[SWEEP] Starting Socrata catalog sweep...")
+    _log("[SWEEP] V116b: Starting Socrata catalog sweep (7 search terms)...")
     conn = permitdb.get_connection()
 
     # Ensure sweep_sources table exists
@@ -312,8 +312,8 @@ def _process_multi_city_dataset(conn, domain, dataset_id, name, city_column):
 # ================================================================
 
 def sweep_arcgis_hub():
-    """V116: Sweep ArcGIS Hub — fixed pagination (meta.next, not links.next)."""
-    _log("[ARCGIS] Starting ArcGIS Hub sweep...")
+    """V116b: Sweep ArcGIS Hub — fixed pagination (meta.next, not links.next)."""
+    _log("[ARCGIS] V116b: Starting ArcGIS Hub sweep (meta.next pagination)...")
     conn = permitdb.get_connection()
 
     # Cache top cities for matching (in memory for speed)
