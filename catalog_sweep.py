@@ -29,9 +29,9 @@ def sweep_socrata_catalog():
     _log("[SWEEP] Starting Socrata catalog sweep...")
     conn = permitdb.get_connection()
 
-    # Ensure discovered_sources table exists
+    # Ensure sweep_sources table exists
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS discovered_sources (
+        CREATE TABLE IF NOT EXISTS sweep_sources (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             city_slug TEXT NOT NULL,
             source_type TEXT NOT NULL,
@@ -80,30 +80,34 @@ def sweep_socrata_catalog():
     # Process each dataset
     matched = 0
     for ds in all_datasets:
-        resource = ds.get('resource', {})
-        metadata = ds.get('metadata', {})
-        domain = metadata.get('domain', '')
-        dataset_id = resource.get('id', '')
-        name = resource.get('name', '')
-        columns = [c.lower() for c in resource.get('columns_name', [])]
+        try:
+            resource = ds.get('resource', {})
+            metadata = ds.get('metadata', {})
+            domain = metadata.get('domain', '')
+            dataset_id = resource.get('id', '')
+            name = resource.get('name', '')
+            columns = [c.lower() for c in resource.get('columns_name', [])]
 
-        if not dataset_id:
+            if not dataset_id:
+                continue
+
+            # City columns for multi-city datasets
+            city_columns = [c for c in columns if any(
+                kw in c for kw in ['city', 'municipality', 'town', 'jurisdiction', 'community']
+            )]
+
+            # Try to match domain to a specific city
+            city_match = _match_domain_to_city(domain, conn)
+
+            if city_match:
+                _process_single_city_dataset(conn, city_match, domain, dataset_id, name, columns)
+                matched += 1
+            elif city_columns:
+                _process_multi_city_dataset(conn, domain, dataset_id, name, city_columns[0])
+                matched += 1
+        except Exception as e:
+            _log(f"[SWEEP] Error processing dataset {dataset_id}: {e}")
             continue
-
-        # City columns for multi-city datasets
-        city_columns = [c for c in columns if any(
-            kw in c for kw in ['city', 'municipality', 'town', 'jurisdiction', 'community']
-        )]
-
-        # Try to match domain to a specific city
-        city_match = _match_domain_to_city(domain, conn)
-
-        if city_match:
-            _process_single_city_dataset(conn, city_match, domain, dataset_id, name, columns)
-            matched += 1
-        elif city_columns:
-            _process_multi_city_dataset(conn, domain, dataset_id, name, city_columns[0])
-            matched += 1
 
     _log(f"[SWEEP] Socrata: processed {matched} relevant datasets")
     return matched
@@ -137,7 +141,7 @@ def _process_single_city_dataset(conn, city_match, domain, dataset_id, name, col
 
     # Skip if already discovered
     existing = conn.execute(
-        "SELECT 1 FROM discovered_sources WHERE city_slug = ? AND dataset_id = ?",
+        "SELECT 1 FROM sweep_sources WHERE city_slug = ? AND dataset_id = ?",
         (slug, dataset_id)
     ).fetchone()
     if existing:
@@ -157,7 +161,7 @@ def _process_single_city_dataset(conn, city_match, domain, dataset_id, name, col
         if resp.status_code == 200 and len(resp.json()) > 0:
             _log(f"[SWEEP] CONFIRMED: {city_match['city_name']} — {name} on {domain}")
             conn.execute("""
-                INSERT OR IGNORE INTO discovered_sources
+                INSERT OR IGNORE INTO sweep_sources
                 (city_slug, source_type, source_url, platform, dataset_id, domain, name,
                  status, discovered_at)
                 VALUES (?, 'socrata', ?, 'socrata', ?, ?, ?, 'confirmed', datetime('now'))
@@ -195,7 +199,7 @@ def _process_multi_city_dataset(conn, domain, dataset_id, name, city_column):
             if row and (not row[3] or row[3] == 0):
                 slug = row[0]
                 conn.execute("""
-                    INSERT OR IGNORE INTO discovered_sources
+                    INSERT OR IGNORE INTO sweep_sources
                     (city_slug, source_type, source_url, platform, dataset_id, domain, name,
                      city_column, city_value, status, discovered_at)
                     VALUES (?, 'socrata_state', ?, 'socrata', ?, ?, ?, ?, ?, 'pending_test', datetime('now'))
@@ -222,7 +226,7 @@ def sweep_arcgis_hub():
 
     # Ensure table exists
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS discovered_sources (
+        CREATE TABLE IF NOT EXISTS sweep_sources (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             city_slug TEXT NOT NULL, source_type TEXT NOT NULL, source_url TEXT NOT NULL,
             platform TEXT NOT NULL, dataset_id TEXT DEFAULT '', domain TEXT DEFAULT '',
@@ -287,7 +291,7 @@ def sweep_arcgis_hub():
             if city_lower in text:
                 # Check not already discovered
                 existing = conn.execute(
-                    "SELECT 1 FROM discovered_sources WHERE city_slug = ? AND source_url = ?",
+                    "SELECT 1 FROM sweep_sources WHERE city_slug = ? AND source_url = ?",
                     (slug, svc_url)
                 ).fetchone()
                 if not existing:
@@ -297,7 +301,7 @@ def sweep_arcgis_hub():
                     if has_data and (not has_data[0] or has_data[0] == 0):
                         _log(f"[SWEEP] ArcGIS match: {slug} — {name}")
                         conn.execute("""
-                            INSERT OR IGNORE INTO discovered_sources
+                            INSERT OR IGNORE INTO sweep_sources
                             (city_slug, source_type, source_url, platform, name,
                              status, discovered_at)
                             VALUES (?, 'arcgis', ?, 'arcgis', ?, 'pending_test', datetime('now'))
@@ -314,14 +318,14 @@ def sweep_arcgis_hub():
 # TEST + ACTIVATE DISCOVERED SOURCES
 # ================================================================
 
-def test_discovered_sources(limit=100):
+def test_sweep_sources(limit=100):
     """Test pending discovered sources and do 6-month pull for confirmed ones."""
     conn = permitdb.get_connection()
 
     pending = conn.execute("""
         SELECT id, city_slug, source_type, source_url, platform,
                dataset_id, domain, city_column, city_value, name
-        FROM discovered_sources
+        FROM sweep_sources
         WHERE status = 'pending_test'
         LIMIT ?
     """, (limit,)).fetchall()
@@ -345,7 +349,7 @@ def test_discovered_sources(limit=100):
 
             status = 'confirmed' if count > 0 else 'no_data'
             conn.execute("""
-                UPDATE discovered_sources SET status = ?, permits_found = ?, tested_at = datetime('now')
+                UPDATE sweep_sources SET status = ?, permits_found = ?, tested_at = datetime('now')
                 WHERE id = ?
             """, (status, count, src_id))
             conn.commit()
@@ -356,7 +360,7 @@ def test_discovered_sources(limit=100):
 
         except Exception as e:
             _log(f"[TEST] Error testing {slug}: {e}")
-            conn.execute("UPDATE discovered_sources SET status = 'error', tested_at = datetime('now') WHERE id = ?", (src_id,))
+            conn.execute("UPDATE sweep_sources SET status = 'error', tested_at = datetime('now') WHERE id = ?", (src_id,))
             conn.commit()
 
         time.sleep(0.5)

@@ -2998,10 +2998,10 @@ def admin_sweep_catalogs():
 
     def run():
         try:
-            from catalog_sweep import sweep_socrata_catalog, sweep_arcgis_hub, test_discovered_sources
+            from catalog_sweep import sweep_socrata_catalog, sweep_arcgis_hub, test_sweep_sources
             sweep_socrata_catalog()
             sweep_arcgis_hub()
-            test_discovered_sources(limit=200)
+            test_sweep_sources(limit=200)
         except Exception as e:
             print(f"[SWEEP] Error: {e}", flush=True)
             import traceback
@@ -3022,11 +3022,11 @@ def admin_sweep_status():
         conn = permitdb.get_connection()
         stats = conn.execute("""
             SELECT status, COUNT(*) as cnt, SUM(permits_found) as permits
-            FROM discovered_sources GROUP BY status ORDER BY cnt DESC
+            FROM sweep_sources GROUP BY status ORDER BY cnt DESC
         """).fetchall()
         recent = conn.execute("""
             SELECT city_slug, platform, name, permits_found, status, discovered_at
-            FROM discovered_sources WHERE status = 'confirmed'
+            FROM sweep_sources WHERE status = 'confirmed'
             ORDER BY discovered_at DESC LIMIT 30
         """).fetchall()
         return jsonify({
