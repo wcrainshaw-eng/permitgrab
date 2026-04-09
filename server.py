@@ -2398,14 +2398,26 @@ def _try_discover_source(city_name, state, slug):
                 name = resource.get('name', '').lower()
                 dataset_id = resource.get('id', '')
                 if ('permit' in name or 'building' in name) and '.gov' in domain and dataset_id:
+                    # REARCH-FIX: Domain must match the target city or state
+                    domain_lower = domain.lower()
+                    city_clean = city_name.lower().replace(' ', '').replace('.', '').replace("'", "")
+                    state_lower = state.lower()
+                    domain_ok = (city_clean in domain_lower or
+                                 f".{state_lower}." in domain_lower or
+                                 domain_lower.endswith(f".{state_lower}.gov"))
+                    if not domain_ok:
+                        print(f"REARCH-FIX: SKIP {domain} — doesn't match {city_name}, {state}", flush=True)
+                        continue
+
                     endpoint = f"https://{domain}/resource/{dataset_id}.json"
                     test = req.get(f"{endpoint}?$limit=3", timeout=10)
                     if test.ok and len(test.json()) > 0:
                         columns = resource.get('columns_field_name', [])
                         date_field = next((c for c in columns if any(d in c.lower() for d in ['issued', 'date', 'applied'])), '')
-                        print(f"V120: Discovered Socrata for {slug}: {domain}/{dataset_id}", flush=True)
+                        print(f"REARCH-FIX: Discovered Socrata for {slug}: {domain}/{dataset_id}", flush=True)
                         return {'source_key': f"{slug}-socrata", 'platform': 'socrata',
-                                'endpoint': endpoint, 'dataset_id': dataset_id, 'date_field': date_field}
+                                'endpoint': endpoint, 'dataset_id': dataset_id, 'date_field': date_field,
+                                'domain': domain}
     except Exception:
         pass
 
@@ -3531,6 +3543,118 @@ def admin_refresh_tracking():
     return jsonify({'status': 'started', 'message': 'Tracking refresh running in background'}), 200
 
 
+@app.route('/api/admin/debug-onboard', methods=['POST'])
+def admin_debug_onboard():
+    """REARCH-FIX: Debug discovery+validation for a single city WITHOUT inserting."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        import requests as req
+        data = request.json or {}
+        slug = data.get('city_slug', '')
+        conn = permitdb.get_connection()
+        city = conn.execute("SELECT city, state FROM prod_cities WHERE city_slug = ?", (slug,)).fetchone()
+        if not city:
+            return jsonify({'error': f'City {slug} not found'}), 404
+
+        city_name, state = city[0], city[1]
+        result = {'city': city_name, 'state': state, 'city_slug': slug, 'candidates': []}
+
+        # Run discovery
+        r = req.get("https://api.us.socrata.com/api/catalog/v1",
+                     params={'q': f'{city_name} building permits', 'limit': 10, 'only': 'datasets'},
+                     timeout=15)
+        if r.ok:
+            for ds in r.json().get('results', []):
+                resource = ds.get('resource', {})
+                domain = ds.get('metadata', {}).get('domain', '')
+                name = resource.get('name', '')
+                dataset_id = resource.get('id', '')
+
+                city_clean = city_name.lower().replace(' ', '').replace('.', '').replace("'", "")
+                domain_lower = domain.lower()
+                domain_match = (city_clean in domain_lower or
+                                f".{state.lower()}." in domain_lower or
+                                domain_lower.endswith(f".{state.lower()}.gov"))
+
+                candidate = {
+                    'domain': domain, 'dataset_id': dataset_id, 'name': name,
+                    'domain_check': domain_match,
+                    'domain_details': f"city='{city_clean}' in domain='{domain_lower}': {city_clean in domain_lower}; state='{state.lower()}' in domain: {f'.{state.lower()}.' in domain_lower}"
+                }
+
+                # If domain passes, pull sample and validate
+                if domain_match and dataset_id:
+                    try:
+                        endpoint = f"https://{domain}/resource/{dataset_id}.json"
+                        sample_r = req.get(f"{endpoint}?$limit=5", timeout=10)
+                        if sample_r.ok:
+                            raw = sample_r.json()
+                            candidate['sample_count'] = len(raw)
+                            if raw:
+                                candidate['sample_record_keys'] = list(raw[0].keys())[:15]
+                                # Validate: check RAW records for city/state
+                                matches = 0
+                                for rec in raw[:5]:
+                                    text = ' '.join(str(v) for v in rec.values() if v).lower()
+                                    if city_name.lower() in text or state.lower() in text:
+                                        matches += 1
+                                candidate['data_check'] = matches > 0
+                                candidate['data_details'] = f"{matches}/{len(raw[:5])} raw records mention '{city_name}' or '{state}'"
+                    except Exception as e:
+                        candidate['data_check'] = False
+                        candidate['data_details'] = f"Error: {e}"
+
+                result['candidates'].append(candidate)
+
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/cleanup-contamination', methods=['POST'])
+def admin_cleanup_contamination():
+    """REARCH-FIX: Remove permits from wrong-city onboard runs and reset cities."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        bad_slugs = ['las-vegas', 'saint-paul', 'san-jose', 'oklahoma-city', 'district-of-columbia-dc']
+        total_deleted = 0
+
+        for slug in bad_slugs:
+            # Delete permits inserted by onboard (after April 9)
+            d = conn.execute("""
+                DELETE FROM permits WHERE source_city_key = ?
+                AND collected_at > '2026-04-09 00:00'
+            """, (slug,)).rowcount
+            total_deleted += d
+
+        # Reset prod_cities
+        conn.execute("""
+            UPDATE prod_cities SET status = 'pending', source_type = NULL, source_id = NULL,
+            total_permits = 0, last_successful_collection = NULL, health_status = 'unknown'
+            WHERE city_slug IN ('las-vegas', 'saint-paul', 'san-jose', 'oklahoma-city', 'district-of-columbia-dc')
+        """)
+
+        # Delete bad city_sources
+        conn.execute("""
+            DELETE FROM city_sources WHERE source_key IN (
+                'las-vegas-socrata', 'saint-paul-socrata', 'san-jose-socrata',
+                'oklahoma-city-socrata', 'district-of-columbia-dc-socrata',
+                'las-vegas-arcgis', 'saint-paul-arcgis', 'san-jose-arcgis',
+                'oklahoma-city-arcgis', 'district-of-columbia-dc-arcgis'
+            )
+        """)
+        conn.commit()
+        print(f"REARCH-FIX: Cleanup: {total_deleted} contaminated permits deleted, 5 cities reset", flush=True)
+        return jsonify({'status': 'complete', 'permits_deleted': total_deleted, 'cities_reset': bad_slugs}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/onboard-city', methods=['POST'])
 def admin_onboard_city():
     """REARCH: Discover, VALIDATE, backfill, activate. Validation is mandatory.
@@ -3592,23 +3716,27 @@ def admin_onboard_city():
         result['endpoint'] = source['endpoint'][:100]
 
         # STEP 2: TEST + VALIDATE (pull data AND verify it's from the right city)
-        print(f"REARCH: Testing {source['platform']} for {slug}...", flush=True)
-        permits, err = _test_source(source, city_name, state)
+        print(f"REARCH-FIX: Testing {source['platform']} for {slug}...", flush=True)
+        raw_records, permits, err = _test_source(source, city_name, state)
         if err or not permits:
             result['status'] = 'test_failed'
             result['error'] = err or 'zero permits'
             results.append(result)
             continue
 
-        # MANDATORY VALIDATION: check that records actually mention this city
+        # MANDATORY VALIDATION: check RAW records (BEFORE city/state stamping)
+        # This is the critical fix — we must check the original API data, not
+        # our normalized permits which always contain the city name because we put it there
         city_lower = city_name.lower()
+        state_lower = state.lower()
         matches = 0
-        sample = permits[:min(30, len(permits))]
-        for p in sample:
-            text = ' '.join(str(v) for v in p.values() if v).lower()
-            if city_lower in text or state.lower() in text:
+        sample = raw_records[:min(30, len(raw_records))]
+        for raw in sample:
+            text = ' '.join(str(v) for v in raw.values() if v).lower()
+            if city_lower in text or state_lower in text:
                 matches += 1
         match_rate = matches / len(sample) if sample else 0
+        print(f"REARCH-FIX: {slug} validation: {matches}/{len(sample)} RAW records mention '{city_name}' or '{state}' ({match_rate:.0%})", flush=True)
 
         if match_rate < 0.2:
             result['status'] = 'validation_failed'
@@ -3639,7 +3767,8 @@ def admin_onboard_city():
 
 
 def _test_source(source, city_name, state):
-    """V120: Pull permits from a discovered source. Returns (permits_list, error)."""
+    """REARCH-FIX: Pull data and return BOTH raw records and normalized permits.
+    Returns (raw_records, permits_list, error). Raw records are for validation."""
     import requests as req
     from datetime import datetime as dt, timedelta
 
@@ -3654,11 +3783,11 @@ def _test_source(source, city_name, state):
                 params['$where'] = f"{date_field} >= '{since}'"
             r = req.get(endpoint, params=params, timeout=30)
             if not r.ok:
-                return [], f"HTTP {r.status_code}"
+                return [], [], f"HTTP {r.status_code}"
             raw = r.json()
             permits = [_normalize_permit(row, city_name, state) for row in raw]
             permits = [p for p in permits if p]
-            return permits, None
+            return raw, permits, None
 
         elif platform == 'arcgis':
             endpoint = source['endpoint']
@@ -3667,18 +3796,19 @@ def _test_source(source, city_name, state):
                       'f': 'json', 'orderByFields': 'OBJECTID DESC'}
             r = req.get(query_url, params=params, timeout=30)
             if not r.ok:
-                return [], f"HTTP {r.status_code}"
+                return [], [], f"HTTP {r.status_code}"
             data = r.json()
             if data.get('error'):
-                return [], f"ArcGIS error: {data['error'].get('message', '')}"
+                return [], [], f"ArcGIS error: {data['error'].get('message', '')}"
             features = data.get('features', [])
-            permits = [_normalize_permit(f.get('attributes', {}), city_name, state) for f in features]
+            raw = [f.get('attributes', {}) for f in features]
+            permits = [_normalize_permit(attrs, city_name, state) for attrs in raw]
             permits = [p for p in permits if p]
-            return permits, None
+            return raw, permits, None
 
-        return [], f"Unknown platform: {platform}"
+        return [], [], f"Unknown platform: {platform}"
     except Exception as e:
-        return [], str(e)[:200]
+        return [], [], str(e)[:200]
 
 
 def _normalize_permit(raw, city_name, state):
