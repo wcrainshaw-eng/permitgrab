@@ -3553,46 +3553,70 @@ def admin_v122_fix_config():
 
 @app.route('/api/admin/v122-fix-fresh', methods=['POST'])
 def admin_v122_fix_fresh():
-    """V122: Compute permits_7d and permits_total for all cities. SYNCHRONOUS."""
+    """V122: Compute permits_7d/total using GROUP BY (lightweight). SYNCHRONOUS."""
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
         conn = permitdb.get_connection()
 
-        # Pass 1: Direct match — source_city_key = city_slug
-        conn.execute("""
-            UPDATE cities SET
-                permits_7d = (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug AND collected_at > datetime('now', '-7 days')),
-                permits_total = (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug),
-                status = CASE WHEN (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug AND collected_at > datetime('now', '-7 days')) > 0 THEN 'active' ELSE status END
-            WHERE city_slug IN (SELECT DISTINCT source_city_key FROM permits WHERE source_city_key IS NOT NULL)
-        """)
+        # Create index for speed (one-time, idempotent)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_permits_source_collected ON permits(source_city_key, collected_at)")
+        conn.commit()
 
-        # Pass 2: Match via prod_cities.source_id (for underscore/hyphen mismatches)
-        conn.execute("""
-            UPDATE cities SET
-                permits_7d = (SELECT COUNT(*) FROM permits p JOIN prod_cities pc ON p.source_city_key = pc.source_id WHERE pc.city_slug = cities.city_slug AND p.collected_at > datetime('now', '-7 days')),
-                permits_total = (SELECT COUNT(*) FROM permits p JOIN prod_cities pc ON p.source_city_key = pc.source_id WHERE pc.city_slug = cities.city_slug),
-                status = 'active'
-            WHERE permits_7d = 0
-            AND city_slug IN (SELECT pc2.city_slug FROM prod_cities pc2 WHERE pc2.source_id IN (SELECT DISTINCT source_city_key FROM permits WHERE source_city_key IS NOT NULL))
-        """)
+        # GROUP BY for 7d counts (one fast query)
+        fresh_rows = conn.execute("""
+            SELECT source_city_key, COUNT(*) as cnt FROM permits
+            WHERE collected_at > datetime('now', '-7 days') AND source_city_key IS NOT NULL
+            GROUP BY source_city_key
+        """).fetchall()
+        fresh_map = {r[0]: r[1] for r in fresh_rows}
 
-        # Pass 3: Match via city name + state (for bulk-fed cities with no source_city_key match)
-        conn.execute("""
-            UPDATE cities SET
-                permits_7d = (SELECT COUNT(*) FROM permits WHERE LOWER(permits.city) = LOWER(cities.city) AND LOWER(permits.state) = LOWER(cities.state) AND collected_at > datetime('now', '-7 days')),
-                permits_total = (SELECT COUNT(*) FROM permits WHERE LOWER(permits.city) = LOWER(cities.city) AND LOWER(permits.state) = LOWER(cities.state)),
-                status = CASE WHEN (SELECT COUNT(*) FROM permits WHERE LOWER(permits.city) = LOWER(cities.city) AND LOWER(permits.state) = LOWER(cities.state) AND collected_at > datetime('now', '-7 days')) > 0 THEN 'active' ELSE status END
-            WHERE permits_total = 0
-            AND population >= 10000
-        """)
+        # GROUP BY for total counts
+        total_rows = conn.execute("""
+            SELECT source_city_key, COUNT(*) as cnt FROM permits
+            WHERE source_city_key IS NOT NULL GROUP BY source_city_key
+        """).fetchall()
+        total_map = {r[0]: r[1] for r in total_rows}
+
+        # Reset all to 0
+        conn.execute("UPDATE cities SET permits_7d = 0, permits_total = 0")
+
+        # Direct match: source_city_key = city_slug
+        updated = 0
+        for key, cnt in fresh_map.items():
+            r = conn.execute("""
+                UPDATE cities SET permits_7d = ?, permits_total = ?,
+                    status = CASE WHEN platform IS NOT NULL THEN 'active' ELSE status END
+                WHERE city_slug = ?
+            """, (cnt, total_map.get(key, 0), key))
+            updated += r.rowcount
+
+        # Indirect match via prod_cities.source_id
+        remaining_keys = [k for k in fresh_map if k not in {r[0] for r in conn.execute("SELECT city_slug FROM cities WHERE permits_7d > 0").fetchall()}]
+        indirect = 0
+        if remaining_keys:
+            placeholders = ','.join('?' * len(remaining_keys))
+            indirect_rows = conn.execute(f"""
+                SELECT pc.city_slug, pc.source_id FROM prod_cities pc
+                WHERE pc.source_id IN ({placeholders})
+            """, remaining_keys).fetchall()
+            for row in indirect_rows:
+                sid = row[1]
+                slug = row[0]
+                if sid in fresh_map:
+                    conn.execute("""
+                        UPDATE cities SET permits_7d = ?, permits_total = ?,
+                            status = CASE WHEN platform IS NOT NULL THEN 'active' ELSE status END
+                        WHERE city_slug = ? AND permits_7d = 0
+                    """, (fresh_map[sid], total_map.get(sid, 0), slug))
+                    indirect += 1
 
         conn.commit()
-        fresh = conn.execute("SELECT COUNT(*) FROM cities WHERE permits_7d > 0").fetchone()[0]
-        active = conn.execute("SELECT COUNT(*) FROM cities WHERE status = 'active'").fetchone()[0]
-        return jsonify({'fresh_7d': fresh, 'active': active}), 200
+        fresh_total = conn.execute("SELECT COUNT(*) FROM cities WHERE permits_7d > 0").fetchone()[0]
+        active_total = conn.execute("SELECT COUNT(*) FROM cities WHERE status = 'active'").fetchone()[0]
+        return jsonify({'index_created': True, 'direct_updated': updated, 'indirect_updated': indirect,
+                        'fresh_7d': fresh_total, 'active': active_total}), 200
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
