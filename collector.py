@@ -2822,6 +2822,17 @@ def collect_refresh(days_back=7, platform_filter=None, include_scrapers=True):  
             except Exception as e:
                 print(f"  [WARN] Failed to process permit: {e}")
 
+        # DEBUG: Check if Accela cities are in all_permits before upsert
+        _accela_in_batch = {}
+        for _p in new_permits:
+            _src = _p.get('source_city', '?')
+            if _src in ('indianapolis', 'oklahoma_city', 'charlotte', 'oakland'):
+                _accela_in_batch[_src] = _accela_in_batch.get(_src, 0) + 1
+        if _accela_in_batch:
+            print(f"[ACCELA-DEBUG] Accela cities in upsert batch: {_accela_in_batch}", flush=True)
+        else:
+            print(f"[ACCELA-DEBUG] NO Accela target cities in upsert batch of {len(new_permits)} permits", flush=True)
+
         # V12.50: Upsert into SQLite (replaces load→merge→save cycle)
         if new_permits:
             new_count, updated_count = permitdb.upsert_permits(new_permits)

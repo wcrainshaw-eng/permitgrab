@@ -2965,6 +2965,14 @@ def upsert_permits(permits, source_city_key=None):
             key = (canonical.lower(), state.upper())
             p['_prod_city_id'] = _city_to_prod_id.get(key)
 
+    # DEBUG: Count permits per city entering upsert
+    _city_counts = {}
+    for _p in permits:
+        _c = (_p.get('city', '?'), _p.get('state', '?'))
+        _city_counts[_c] = _city_counts.get(_c, 0) + 1
+    _top = sorted(_city_counts.items(), key=lambda x: -x[1])[:10]
+    print(f"[UPSERT-DEBUG] {len(permits)} permits entering upsert. Top cities: {_top}", flush=True)
+
     # V19: Pre-filter to check for existing permits by address+city+state+filing_date
     # This prevents duplicates even when permit_number differs
     conn = get_connection()
@@ -3120,7 +3128,17 @@ def upsert_permits(permits, source_city_key=None):
         ))
 
     conn.commit()
-    print(f"[DB] Upserted permits: {new_count} new, {updated_count} updated")
+    print(f"[DB] Upserted permits: {new_count} new, {updated_count} updated", flush=True)
+
+    # DEBUG: Verify Indianapolis specifically
+    try:
+        indy_count = conn.execute("SELECT COUNT(*) FROM permits WHERE LOWER(city) = 'indianapolis'").fetchone()[0]
+        okc_count = conn.execute("SELECT COUNT(*) FROM permits WHERE LOWER(city) = 'oklahoma city'").fetchone()[0]
+        if indy_count > 0 or okc_count > 0:
+            print(f"[UPSERT-DEBUG] Post-upsert: Indianapolis={indy_count}, OKC={okc_count}", flush=True)
+    except Exception:
+        pass
+
     return new_count, updated_count
 
 
