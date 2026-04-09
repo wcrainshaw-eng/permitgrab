@@ -2422,12 +2422,39 @@ def _try_discover_source(city_name, state, slug):
                 name = attrs.get('name', '').lower()
                 if 'permit' in name and url:
                     test_url = f"{url}/0/query?where=1%3D1&outFields=*&resultRecordCount=3&f=json"
-                    test = req.get(test_url, timeout=15)
-                    if test.ok and test.json().get('features'):
-                        print(f"V120: Discovered ArcGIS for {slug}: {url}", flush=True)
-                        return {'source_key': f"{slug}-arcgis", 'platform': 'arcgis', 'endpoint': url}
+                    try:
+                        test = req.get(test_url, timeout=15)
+                        if test.ok and test.json().get('features'):
+                            print(f"V120: Discovered ArcGIS for {slug}: {url}", flush=True)
+                            return {'source_key': f"{slug}-arcgis", 'platform': 'arcgis', 'endpoint': url}
+                    except Exception:
+                        continue
     except Exception:
         pass
+
+    # --- Common .gov domain patterns ---
+    city_clean = city_name.lower().replace(' ', '').replace('.', '').replace("'", "")
+    for domain in [f"data.{city_clean}.gov", f"data.cityof{city_clean}.org",
+                   f"opendata.{city_clean}.gov", f"data.{city_clean}{state.lower()}.gov"]:
+        try:
+            r = req.get(f"https://{domain}/api/catalog/v1", params={'q': 'permits', 'limit': 5}, timeout=5)
+            if r.ok:
+                for ds in r.json().get('results', []):
+                    resource = ds.get('resource', {})
+                    ds_name = resource.get('name', '').lower()
+                    ds_id = resource.get('id', '')
+                    if ds_id and 'permit' in ds_name:
+                        endpoint = f"https://{domain}/resource/{ds_id}.json"
+                        test = req.get(f"{endpoint}?$limit=3", timeout=8)
+                        if test.ok and len(test.json()) > 0:
+                            columns = resource.get('columns_field_name', [])
+                            date_field = next((c for c in columns if 'date' in c.lower()), '')
+                            print(f"V120: Discovered portal {domain} for {slug}", flush=True)
+                            return {'source_key': f"{slug}-socrata", 'platform': 'socrata',
+                                    'endpoint': endpoint, 'dataset_id': ds_id, 'date_field': date_field,
+                                    'domain': domain}
+        except Exception:
+            continue
 
     return None
 
@@ -3317,68 +3344,249 @@ def admin_fix_v119_cities():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-@app.route('/api/admin/auto-add-batch', methods=['POST'])
-def admin_auto_add_batch():
-    """V120: Auto-discover sources for top pending cities by population."""
+@app.route('/api/admin/onboard-city', methods=['POST'])
+def admin_onboard_city():
+    """V120: Google it, test it, add it. The 6-month pull IS the test.
+
+    Body: {"city_slug": "las-vegas"} or {"city_slugs": [...]} or {"top_pending": 20}
+    """
     valid, error = check_admin_key()
     if not valid:
         return error
 
     data = request.json or {}
-    limit = min(data.get('limit', 10), 50)
+    conn = permitdb.get_connection()
 
-    def run():
+    # Build city list
+    city_slugs = data.get('city_slugs', [])
+    if data.get('city_slug'):
+        city_slugs = [data['city_slug']]
+    if data.get('top_pending'):
+        limit = min(int(data['top_pending']), 50)
+        rows = conn.execute("""
+            SELECT city_slug FROM prod_cities
+            WHERE (status IN ('pending', 'paused') OR (status = 'active' AND total_permits = 0))
+            AND population >= 12907 AND health_status != 'no_source'
+            ORDER BY population DESC LIMIT ?
+        """, (limit,)).fetchall()
+        city_slugs = [r[0] for r in rows]
+
+    if not city_slugs:
+        return jsonify({'error': 'No cities to process'}), 400
+
+    results = []
+    for slug in city_slugs:
+        city = conn.execute(
+            "SELECT city, state, population, total_permits FROM prod_cities WHERE city_slug = ?",
+            (slug,)
+        ).fetchone()
+        if not city:
+            results.append({'city_slug': slug, 'status': 'not_found'})
+            continue
+        city_name, state, pop, tp = city[0], city[1], city[2], city[3]
+
+        if tp and tp > 100:
+            results.append({'city_slug': slug, 'city': city_name, 'status': 'already_has_data', 'permits': tp})
+            continue
+
+        result = {'city_slug': slug, 'city': city_name, 'state': state, 'population': pop}
+
+        # STEP 1: GOOGLE IT
+        print(f"V120: Googling {city_name}, {state}...", flush=True)
+        source = _try_discover_source(city_name, state, slug)
+        if not source:
+            result['status'] = 'no_source_found'
+            conn.execute("UPDATE prod_cities SET health_status = 'no_source' WHERE city_slug = ?", (slug,))
+            conn.commit()
+            results.append(result)
+            continue
+
+        result['platform'] = source['platform']
+        result['endpoint'] = source['endpoint'][:100]
+
+        # STEP 2: TEST IT (pull permits)
+        print(f"V120: Testing {source['platform']} for {slug}...", flush=True)
+        permits, err = _test_source(source, city_name, state)
+        if err or not permits:
+            result['status'] = 'test_failed'
+            result['error'] = err or 'zero permits'
+            result['permits_fetched'] = len(permits) if permits else 0
+            results.append(result)
+            continue
+
+        result['permits_fetched'] = len(permits)
+
+        # STEP 3: ADD IT
+        print(f"V120: Adding {len(permits)} permits for {slug}...", flush=True)
+        source_key = f"{slug}-{source['platform']}"
+        inserted = _add_city_permits(conn, source, source_key, permits, slug, city_name, state)
+        result['status'] = 'onboarded'
+        result['permits_inserted'] = inserted
+        results.append(result)
+        print(f"V120: {slug} ONBOARDED: {inserted} permits", flush=True)
+
+    onboarded = sum(1 for r in results if r.get('status') == 'onboarded')
+    total_inserted = sum(r.get('permits_inserted', 0) for r in results)
+    return jsonify({
+        'summary': {'onboarded': onboarded, 'total_permits': total_inserted, 'total': len(city_slugs)},
+        'results': results
+    }), 200
+
+
+def _test_source(source, city_name, state):
+    """V120: Pull permits from a discovered source. Returns (permits_list, error)."""
+    import requests as req
+    from datetime import datetime as dt, timedelta
+
+    platform = source['platform']
+    try:
+        if platform == 'socrata':
+            endpoint = source['endpoint']
+            date_field = source.get('date_field')
+            params = {'$limit': 5000, '$order': ':id'}
+            if date_field:
+                since = (dt.utcnow() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
+                params['$where'] = f"{date_field} >= '{since}'"
+            r = req.get(endpoint, params=params, timeout=30)
+            if not r.ok:
+                return [], f"HTTP {r.status_code}"
+            raw = r.json()
+            permits = [_normalize_permit(row, city_name, state) for row in raw]
+            permits = [p for p in permits if p]
+            return permits, None
+
+        elif platform == 'arcgis':
+            endpoint = source['endpoint']
+            query_url = f"{endpoint}/query" if '/query' not in endpoint else endpoint
+            params = {'where': '1=1', 'outFields': '*', 'resultRecordCount': 2000,
+                      'f': 'json', 'orderByFields': 'OBJECTID DESC'}
+            r = req.get(query_url, params=params, timeout=30)
+            if not r.ok:
+                return [], f"HTTP {r.status_code}"
+            data = r.json()
+            if data.get('error'):
+                return [], f"ArcGIS error: {data['error'].get('message', '')}"
+            features = data.get('features', [])
+            permits = [_normalize_permit(f.get('attributes', {}), city_name, state) for f in features]
+            permits = [p for p in permits if p]
+            return permits, None
+
+        return [], f"Unknown platform: {platform}"
+    except Exception as e:
+        return [], str(e)[:200]
+
+
+def _normalize_permit(raw, city_name, state):
+    """V120: Flexible field mapping for any permit data source."""
+    from datetime import datetime as dt
+
+    permit = {'city': city_name, 'state': state, 'collected_at': dt.utcnow().isoformat()}
+
+    # Permit number
+    for k in ['permit_number', 'permitnumber', 'FOLDERNUMBER', 'PERMIT_ID', 'APNO',
+              'PermitNumber', 'permit_no', 'PERMIT_NUMBER', 'record_id', 'case_number',
+              'APPLICATION_NUMBER', 'permit_id', 'permitno']:
+        v = raw.get(k) or raw.get(k.lower()) or raw.get(k.upper())
+        if v:
+            permit['permit_number'] = str(v).strip()
+            break
+    if not permit.get('permit_number'):
+        for k, v in raw.items():
+            kl = k.lower()
+            if ('permit' in kl or 'record' in kl) and ('num' in kl or 'no' in kl or 'id' in kl) and v:
+                permit['permit_number'] = str(v).strip()
+                break
+    if not permit.get('permit_number'):
+        return None
+
+    # Description
+    for k in ['description', 'DESCRIPTION', 'WORKDESCRIPTION', 'WorkDescription',
+              'DESC_OF_WORK', 'WORKDESC', 'permit_type', 'FOLDERDESC', 'worktype']:
+        v = raw.get(k) or raw.get(k.lower()) or raw.get(k.upper())
+        if v:
+            permit['description'] = str(v).strip()[:500]
+            break
+
+    # Address
+    for k in ['address', 'ADDRESS', 'FULL_ADDRESS', 'CalculatedAddress', 'ADDR',
+              'site_address', 'staddress', 'street_address', 'location']:
+        v = raw.get(k) or raw.get(k.lower()) or raw.get(k.upper())
+        if v:
+            permit['address'] = str(v).strip()[:300]
+            break
+
+    # Date
+    for k in ['issued_date', 'issueddate', 'ISSUE_DATE', 'DateIssued', 'ISSUE_DT',
+              'ISSUEDATE', 'permit_date', 'date_issued', 'applicationdate', 'permitdate']:
+        v = raw.get(k) or raw.get(k.lower()) or raw.get(k.upper())
+        if v:
+            if isinstance(v, (int, float)) and v > 1e12:
+                permit['filing_date'] = dt.utcfromtimestamp(v / 1000).strftime('%Y-%m-%d')
+            elif isinstance(v, str) and v.strip():
+                permit['filing_date'] = v.strip()[:26]
+            break
+
+    # Contractor
+    for k in ['contractor', 'CONTRACTOR', 'contractor_name', 'contractorname']:
+        v = raw.get(k) or raw.get(k.lower()) or raw.get(k.upper())
+        if v:
+            permit['contractor_name'] = str(v).strip()[:200]
+            break
+
+    # Cost
+    for k in ['estimated_cost', 'PERMITVALUATION', 'Valuation', 'FEES_PAID',
+              'job_value', 'construction_value', 'value', 'VALUATION']:
+        v = raw.get(k) or raw.get(k.lower()) or raw.get(k.upper())
+        if v:
+            try:
+                permit['estimated_cost'] = float(str(v).replace('$', '').replace(',', ''))
+            except (ValueError, TypeError):
+                pass
+            break
+
+    return permit
+
+
+def _add_city_permits(conn, source, source_key, permits, slug, city_name, state):
+    """V120: Insert permits and activate city. Only called after test succeeds."""
+    # Upsert city_sources
+    conn.execute("""
+        INSERT OR REPLACE INTO city_sources
+        (source_key, name, state, platform, endpoint, dataset_id, date_field,
+         mode, status, limit_per_page, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'city', 'active', 2000, datetime('now'), datetime('now'))
+    """, (source_key, city_name, state, source['platform'],
+          source['endpoint'], source.get('dataset_id', ''), source.get('date_field', '')))
+
+    # Insert permits
+    inserted = 0
+    for p in permits:
         try:
-            conn = permitdb.get_connection()
-            pending = conn.execute("""
-                SELECT city_slug, city, state, population FROM prod_cities
-                WHERE status IN ('pending', 'active')
-                AND (source_type IS NULL OR source_type = '')
-                AND (total_permits = 0 OR total_permits IS NULL)
-                AND population >= 25000
-                ORDER BY population DESC LIMIT ?
-            """, (limit,)).fetchall()
+            pn = p.get('permit_number', '')
+            if not pn:
+                continue
+            conn.execute("""
+                INSERT OR IGNORE INTO permits
+                (permit_number, city, state, address, description, filing_date, date,
+                 estimated_cost, contractor_name, source_city_key, collected_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (pn, city_name, state, p.get('address', ''), p.get('description', ''),
+                  p.get('filing_date', ''), p.get('filing_date', ''),
+                  p.get('estimated_cost', 0), p.get('contractor_name', ''), slug))
+            inserted += 1
+        except Exception:
+            continue
+    conn.commit()
 
-            print(f"V120: Auto-add batch starting for {len(pending)} cities", flush=True)
-            configured = 0
-            no_source = 0
-
-            for row in pending:
-                slug, city_name, state, pop = row[0], row[1], row[2], row[3]
-                source = _try_discover_source(city_name, state, slug)
-
-                if source:
-                    # Insert city_sources
-                    conn.execute("""
-                        INSERT OR REPLACE INTO city_sources
-                        (source_key, name, state, platform, endpoint, dataset_id, date_field,
-                         mode, status, limit_per_page, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 'city', 'active', 2000, datetime('now'), datetime('now'))
-                    """, (source['source_key'], city_name, state, source['platform'],
-                          source['endpoint'], source.get('dataset_id', ''), source.get('date_field', '')))
-
-                    conn.execute("""
-                        UPDATE prod_cities SET source_type = ?, source_id = ?,
-                        status = 'active', health_status = 'collecting'
-                        WHERE city_slug = ?
-                    """, (source['platform'], source['source_key'], slug))
-                    conn.commit()
-                    configured += 1
-                    print(f"V120: Configured {slug} ({pop:,}) — {source['platform']}", flush=True)
-                else:
-                    no_source += 1
-
-                time.sleep(1)
-
-            print(f"V120: Batch complete: {configured} configured, {no_source} no source", flush=True)
-        except Exception as e:
-            print(f"V120: Batch error: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
-
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
-    return jsonify({'status': 'started', 'processing': limit}), 200
+    # Activate city
+    conn.execute("""
+        UPDATE prod_cities SET source_type = ?, source_id = ?, status = 'active',
+        health_status = 'collecting', total_permits = total_permits + ?,
+        last_successful_collection = datetime('now')
+        WHERE city_slug = ?
+    """, (source['platform'], source_key, inserted, slug))
+    conn.commit()
+    return inserted
 
 
 @app.route('/api/admin/activate-sweep-sources', methods=['POST'])
