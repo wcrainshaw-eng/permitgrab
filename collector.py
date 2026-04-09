@@ -920,7 +920,12 @@ def fetch_arcgis(config, days_back):
         "f": "json",
     }
 
-    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
+    # V126: Ensure endpoint ends with /query for ArcGIS
+    query_endpoint = endpoint
+    if '/query' not in query_endpoint:
+        query_endpoint = query_endpoint.rstrip('/') + '/query'
+
+    resp = SESSION.get(query_endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
     resp.raise_for_status()
     data = resp.json()
 
@@ -940,7 +945,7 @@ def fetch_arcgis(config, days_back):
             try:
                 alt_params = dict(params)
                 alt_params["where"] = alt_where
-                alt_resp = SESSION.get(endpoint, params=alt_params, timeout=API_TIMEOUT_SECONDS)
+                alt_resp = SESSION.get(query_endpoint, params=alt_params, timeout=API_TIMEOUT_SECONDS)
                 alt_data = alt_resp.json()
                 if "error" not in alt_data:
                     print(f"    [V126] Date format '{fmt_name}' worked for {endpoint[:60]}", flush=True)
