@@ -3673,7 +3673,10 @@ def admin_onboard_next():
         ORDER BY population DESC LIMIT ?
     """, (count,)).fetchall()
 
-    from onboard import onboard_single_city
+    try:
+        from onboard import onboard_single_city
+    except ImportError as e:
+        return jsonify({'error': f'onboard module not available: {e}'}), 500
     results = []
     for row in candidates:
         result = onboard_single_city(row[0], row[1], row[2], row[3])
@@ -3694,7 +3697,10 @@ def admin_onboard_city():
     if not valid:
         return error
 
-    from onboard import onboard_single_city
+    try:
+        from onboard import onboard_single_city
+    except ImportError as e:
+        return jsonify({'error': f'onboard module not available: {e}'}), 500
     data = request.json or {}
     conn = permitdb.get_connection()
 
