@@ -25,6 +25,11 @@ BAD_CITY_COLUMNS = {'contractorcity', 'contractor_city', 'applicantcity', 'appli
                      'contact_city', 'contactcity', 'owner_city', 'ownercity',
                      'mailing_city', 'mailingcity', 'billing_city', 'agent_city', ''}
 
+GOOD_CITY_COLUMNS = {'city', 'municipality', 'town', 'jurisdiction', 'communityname',
+                      'community', 'community_name', 'originalcity', 'original_city',
+                      'city_name', 'cityname', 'municipal', 'muni', 'location_city',
+                      'property_city'}
+
 SKIP_DOMAINS = {'data.calgary.ca', 'data.edmonton.ca', 'data.winnipeg.ca', 'data.surrey.ca',
                 'data.gov.au', 'data.gov.uk', 'austin-metro.demo.socrata.com',
                 'health.data.ny.gov'}
@@ -111,31 +116,43 @@ def sweep_socrata_catalog():
     """)
     conn.commit()
 
-    # Paginate through all Socrata catalog results
-    all_datasets = []
-    offset = 0
-    while True:
-        try:
-            resp = requests.get("https://api.us.socrata.com/api/catalog/v1",
-                                params={'q': 'building permits', 'only': 'datasets',
-                                        'limit': 100, 'offset': offset},
-                                timeout=15)
-            if resp.status_code != 200:
-                break
-            data = resp.json()
-            results = data.get('results', [])
-            total = data.get('resultSetSize', 0)
-            all_datasets.extend(results)
-            _log(f"[SWEEP] Socrata: fetched {len(all_datasets)}/{total} datasets")
-            if len(results) < 100:
-                break
-            offset += 100
-            time.sleep(1)
-        except Exception as e:
-            _log(f"[SWEEP] Socrata catalog error: {e}")
-            break
+    # V116: Multiple search terms to find more datasets
+    SEARCH_TERMS = ['building permits', 'construction permits', 'code enforcement',
+                    'zoning permits', 'demolition permits', 'certificate of occupancy',
+                    'residential permits']
 
-    _log(f"[SWEEP] Socrata: {len(all_datasets)} total datasets found")
+    all_datasets = []
+    seen_ids = set()
+    for search_term in SEARCH_TERMS:
+        offset = 0
+        term_count = 0
+        while True:
+            try:
+                resp = requests.get("https://api.us.socrata.com/api/catalog/v1",
+                                    params={'q': search_term, 'only': 'datasets',
+                                            'limit': 100, 'offset': offset},
+                                    timeout=15)
+                if resp.status_code != 200:
+                    break
+                data = resp.json()
+                results = data.get('results', [])
+                total = data.get('resultSetSize', 0)
+                for r in results:
+                    ds_id = r.get('resource', {}).get('id', '')
+                    if ds_id and ds_id not in seen_ids:
+                        seen_ids.add(ds_id)
+                        all_datasets.append(r)
+                        term_count += 1
+                if len(results) < 100:
+                    break
+                offset += 100
+                time.sleep(0.5)
+            except Exception as e:
+                _log(f"[SWEEP] Socrata error for '{search_term}': {e}")
+                break
+        _log(f"[SWEEP] '{search_term}': {term_count} new datasets (total unique: {len(all_datasets)})")
+
+    _log(f"[SWEEP] Socrata: {len(all_datasets)} unique datasets across {len(SEARCH_TERMS)} search terms")
 
     # Process each dataset
     matched = 0
@@ -166,6 +183,10 @@ def sweep_socrata_catalog():
             )]
             # V115: Filter out bad columns (contractor/applicant/contact addresses)
             city_columns = [c for c in city_columns if c.lower() not in BAD_CITY_COLUMNS]
+            # V116: Prefer known-good columns
+            good = [c for c in city_columns if c.lower() in GOOD_CITY_COLUMNS]
+            if good:
+                city_columns = good
 
             # Try to match domain to a specific city
             city_match = _match_domain_to_city(domain, conn)
@@ -291,94 +312,102 @@ def _process_multi_city_dataset(conn, domain, dataset_id, name, city_column):
 # ================================================================
 
 def sweep_arcgis_hub():
-    """Sweep ArcGIS Hub for building permit Feature Services."""
-    _log("[SWEEP] Starting ArcGIS Hub sweep...")
+    """V116: Sweep ArcGIS Hub — fixed pagination (meta.next, not links.next)."""
+    _log("[ARCGIS] Starting ArcGIS Hub sweep...")
     conn = permitdb.get_connection()
 
-    # Ensure table exists
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sweep_sources (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            city_slug TEXT NOT NULL, source_type TEXT NOT NULL, source_url TEXT NOT NULL,
-            platform TEXT NOT NULL, dataset_id TEXT DEFAULT '', domain TEXT DEFAULT '',
-            name TEXT DEFAULT '', city_column TEXT DEFAULT '', city_value TEXT DEFAULT '',
-            status TEXT DEFAULT 'pending_test', permits_found INTEGER DEFAULT 0,
-            discovered_at TEXT DEFAULT '', tested_at TEXT DEFAULT '',
-            UNIQUE(city_slug, dataset_id)
-        )
-    """)
-    conn.commit()
-
-    # Cache top cities for matching
+    # Cache top cities for matching (in memory for speed)
     cities = conn.execute(
-        "SELECT city_slug, city, state FROM prod_cities WHERE population >= 50000 AND status = 'active' ORDER BY population DESC"
+        "SELECT city_slug, city, state FROM prod_cities WHERE population >= 25000 AND status = 'active' ORDER BY population DESC"
     ).fetchall()
     city_lookup = [(r[0], r[1].lower(), r[2]) for r in cities]
+    _log(f"[ARCGIS] Loaded {len(city_lookup)} cities for matching")
 
-    all_services = []
+    search_url = "https://hub.arcgis.com/api/v3/search"
+    params = {'q': 'building permits', 'filter[type]': 'Feature Service'}
+    # NOTE: page[size] is ignored by API — always returns 20 per page
+
+    total_found = 0
+    total_processed = 0
     page = 1
-    while len(all_services) < 2000:
+    max_pages = 500  # 500 × 20 = 10,000 (covers all 9,592)
+
+    while page <= max_pages:
         try:
-            resp = requests.get("https://hub.arcgis.com/api/v3/search",
-                                params={'q': 'building permits', 'filter[type]': 'Feature Service',
-                                        'page[size]': 100, 'page[number]': page},
-                                timeout=15)
+            resp = requests.get(search_url, params=params, timeout=30)
             if resp.status_code != 200:
+                _log(f"[ARCGIS] Page {page}: HTTP {resp.status_code}, stopping")
                 break
+
             data = resp.json()
             results = data.get('data', [])
             if not results:
                 break
-            all_services.extend(results)
-            _log(f"[SWEEP] ArcGIS: fetched {len(all_services)} services")
-            if len(results) < 100:
+
+            if page == 1:
+                total_count = data.get('meta', {}).get('stats', {}).get('totalCount', 0)
+                _log(f"[ARCGIS] Total available: {total_count}")
+
+            for item in results:
+                try:
+                    attrs = item.get('attributes', {})
+                    name = attrs.get('name', '')
+                    svc_url = attrs.get('url', '')
+                    source_org = attrs.get('source', '')
+
+                    if not svc_url or not _is_building_permit_dataset(name):
+                        continue
+
+                    # Match using source org (most reliable) + name
+                    text = (source_org + ' ' + name).lower()
+                    for slug, city_lower, state in city_lookup:
+                        if city_lower in text and len(city_lower) > 3:
+                            existing = conn.execute(
+                                "SELECT 1 FROM sweep_sources WHERE source_url = ?", (svc_url,)
+                            ).fetchone()
+                            if not existing:
+                                conn.execute("""
+                                    INSERT OR IGNORE INTO sweep_sources
+                                    (city_slug, source_type, source_url, platform, name,
+                                     city_value, status, discovered_at)
+                                    VALUES (?, 'arcgis_hub', ?, 'arcgis', ?, ?, 'pending_test', datetime('now'))
+                                """, (slug, svc_url, name, source_org))
+                                total_found += 1
+                                _log(f"[ARCGIS] Match: {slug} — {name} (org: {source_org})")
+                            break
+                except Exception:
+                    continue
+
+            total_processed += len(results)
+
+            # V116 FIX: next URL is in meta.next, NOT links.next
+            next_url = data.get('meta', {}).get('next')
+            if not next_url:
+                _log(f"[ARCGIS] No next URL on page {page}, done")
                 break
+
+            search_url = next_url
+            params = {}  # Next URL includes all params
+            page += 1
+
+            if page % 25 == 0:
+                conn.commit()
+                _log(f"[ARCGIS] Progress: page {page}, {total_processed} processed, {total_found} matched")
+
+            time.sleep(0.5)
+
+        except requests.exceptions.Timeout:
+            _log(f"[ARCGIS] Timeout page {page}, retrying...")
+            time.sleep(2)
+            continue
+        except Exception as e:
+            _log(f"[ARCGIS] Error page {page}: {e}")
             page += 1
             time.sleep(1)
-        except Exception as e:
-            _log(f"[SWEEP] ArcGIS Hub error: {e}")
-            break
-
-    _log(f"[SWEEP] ArcGIS: {len(all_services)} Feature Services found")
-
-    matched = 0
-    for svc in all_services:
-        attrs = svc.get('attributes', {})
-        name = attrs.get('name', '')
-        owner = attrs.get('owner', '')
-        svc_url = attrs.get('url', '')
-
-        if not svc_url:
-            continue
-        name_lower = name.lower()
-        if not any(kw in name_lower for kw in ['permit', 'building', 'construction']):
-            continue
-        if any(kw in name_lower for kw in ['template', 'test', 'sample', 'demo']):
             continue
 
-        # Match to city
-        text = (svc_url + ' ' + owner + ' ' + name).lower()
-        for slug, city_lower, state in city_lookup:
-            if city_lower in text:
-                # Check not already discovered
-                existing = conn.execute(
-                    "SELECT 1 FROM sweep_sources WHERE city_slug = ? AND source_url = ?",
-                    (slug, svc_url)
-                ).fetchone()
-                if not existing:
-                    has_data = conn.execute(
-                        "SELECT total_permits FROM prod_cities WHERE city_slug = ?", (slug,)
-                    ).fetchone()
-                    if has_data and (not has_data[0] or has_data[0] == 0):
-                        _log(f"[SWEEP] ArcGIS match: {slug} — {name}")
-                        conn.execute("""
-                            INSERT OR IGNORE INTO sweep_sources
-                            (city_slug, source_type, source_url, platform, name,
-                             status, discovered_at)
-                            VALUES (?, 'arcgis', ?, 'arcgis', ?, 'pending_test', datetime('now'))
-                        """, (slug, svc_url, name))
-                        matched += 1
-                break  # Only match first city
+    conn.commit()
+    _log(f"[ARCGIS] Complete: {page} pages, {total_processed} processed, {total_found} matched")
 
     conn.commit()
     _log(f"[SWEEP] ArcGIS: {matched} new city sources discovered")
@@ -596,3 +625,83 @@ def _test_and_pull_arcgis(conn, slug, url):
     except Exception as e:
         _log(f"[PULL] ArcGIS error for {slug}: {e}")
         return 0
+
+
+# ================================================================
+# V116: DATA.GOV CKAN SWEEP
+# ================================================================
+
+def sweep_data_gov():
+    """V116: Sweep data.gov CKAN catalog for building permit datasets."""
+    _log("[DATAGOV] Starting data.gov sweep...")
+    conn = permitdb.get_connection()
+    total_found = 0
+
+    for term in ['building permits', 'construction permits', 'zoning permits']:
+        offset = 0
+        while offset < 1000:
+            try:
+                resp = requests.get("https://catalog.data.gov/api/3/action/package_search",
+                                    params={'q': term, 'rows': 100, 'start': offset},
+                                    timeout=30)
+                if resp.status_code != 200:
+                    break
+                data = resp.json()
+                if not data.get('success'):
+                    break
+                results = data['result']['results']
+                total = data['result']['count']
+                if not results:
+                    break
+                if offset == 0:
+                    _log(f"[DATAGOV] '{term}': {total} total datasets")
+
+                for pkg in results:
+                    try:
+                        title = pkg.get('title', '')
+                        if not _is_building_permit_dataset(title, pkg.get('notes', '')):
+                            continue
+                        for resource in pkg.get('resources', []):
+                            res_url = resource.get('url', '')
+                            if not res_url:
+                                continue
+                            # Socrata datasets
+                            match = re.search(r'([\w.-]+\.(?:gov|org|com)).*?([a-z0-9]{4}-[a-z0-9]{4})', res_url)
+                            if match and _is_valid_domain(match.group(1)):
+                                domain = match.group(1)
+                                dataset_id = match.group(2)
+                                existing = conn.execute("SELECT 1 FROM sweep_sources WHERE dataset_id = ?", (dataset_id,)).fetchone()
+                                if not existing:
+                                    org = pkg.get('organization', {})
+                                    org_name = org.get('title', '') if org else ''
+                                    conn.execute("""
+                                        INSERT OR IGNORE INTO sweep_sources
+                                        (city_slug, source_type, source_url, platform, dataset_id, domain, name,
+                                         status, discovered_at)
+                                        VALUES ('_datagov', 'data_gov', ?, 'socrata', ?, ?, ?, 'pending_test', datetime('now'))
+                                    """, (res_url, dataset_id, domain, title))
+                                    total_found += 1
+                            # ArcGIS endpoints
+                            elif 'FeatureServer' in res_url or 'MapServer' in res_url:
+                                existing = conn.execute("SELECT 1 FROM sweep_sources WHERE source_url = ?", (res_url,)).fetchone()
+                                if not existing:
+                                    conn.execute("""
+                                        INSERT OR IGNORE INTO sweep_sources
+                                        (city_slug, source_type, source_url, platform, name,
+                                         status, discovered_at)
+                                        VALUES ('_datagov', 'data_gov', ?, 'arcgis', ?, 'pending_test', datetime('now'))
+                                    """, (res_url, title))
+                                    total_found += 1
+                    except Exception:
+                        continue
+
+                offset += 100
+                if offset >= total:
+                    break
+                time.sleep(0.5)
+            except Exception as e:
+                _log(f"[DATAGOV] Error for '{term}': {e}")
+                break
+
+    conn.commit()
+    _log(f"[DATAGOV] Complete: {total_found} new sources found")

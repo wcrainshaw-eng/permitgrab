@@ -2998,10 +2998,11 @@ def admin_sweep_catalogs():
 
     def run():
         try:
-            from catalog_sweep import sweep_socrata_catalog, sweep_arcgis_hub, test_sweep_sources
+            from catalog_sweep import sweep_socrata_catalog, sweep_arcgis_hub, sweep_data_gov, test_sweep_sources
             sweep_socrata_catalog()
             sweep_arcgis_hub()
-            test_sweep_sources(limit=200)
+            sweep_data_gov()
+            test_sweep_sources(limit=500)
         except Exception as e:
             print(f"[SWEEP] Error: {e}", flush=True)
             import traceback
