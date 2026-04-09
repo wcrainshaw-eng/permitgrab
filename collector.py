@@ -49,52 +49,46 @@ def is_valid_state(state):
 
 # V15: Helper function to get source config from either CITY_REGISTRY or BULK_SOURCES
 def _get_source_config(source_id):
-    """V15: Look up config by source_id, trying city_source_db first, then direct dict lookup.
-
-    V74: Added fallback for slug/key mismatch - if lookup fails with hyphen format (kansas-city),
-    try underscore format (kansas_city). This fixes prod_cities using slug while CITY_REGISTRY
-    uses underscore keys.
+    """REARCH: Look up config by source_id. city_sources table is PRIMARY.
+    Dict fallbacks kept temporarily but log warnings when used.
     """
-    # Try city_source_db (SQLite) first
+    # PRIMARY: city_sources table (the single source of truth after migration)
     config = get_city_config(source_id)
     if config:
         config['_source_type'] = 'city'
         return config
 
-    # Try bulk source from city_source_db
+    # PRIMARY: bulk sources from city_sources table
     config = get_bulk_source_config(source_id)
     if config:
         config['_source_type'] = 'bulk'
         return config
 
-    # V15: Fallback to direct dict lookup in BULK_SOURCES
-    from city_configs import BULK_SOURCES
-    if source_id in BULK_SOURCES:
-        config = BULK_SOURCES[source_id].copy()
-        config['_source_type'] = 'bulk'
-        return config
-
-    # V61: Fallback to CITY_REGISTRY for cities not yet in city_sources
-    from city_configs import CITY_REGISTRY
-    if source_id in CITY_REGISTRY:
-        config = CITY_REGISTRY[source_id].copy()
-        config['_source_type'] = 'city'
-        config['active'] = True
-        return config
-
-    # V74: Slug/key mismatch fallback - try converting hyphen to underscore
-    # e.g., 'kansas-city' -> 'kansas_city'
+    # Try hyphen↔underscore conversion in city_sources
     underscore_id = source_id.replace('-', '_')
-    if underscore_id != source_id:
-        if underscore_id in CITY_REGISTRY:
-            config = CITY_REGISTRY[underscore_id].copy()
-            config['_source_type'] = 'city'
-            config['active'] = True
-            return config
-        if underscore_id in BULK_SOURCES:
-            config = BULK_SOURCES[underscore_id].copy()
-            config['_source_type'] = 'bulk'
-            return config
+    hyphen_id = source_id.replace('_', '-')
+    for alt_id in [underscore_id, hyphen_id]:
+        if alt_id != source_id:
+            config = get_city_config(alt_id)
+            if config:
+                config['_source_type'] = 'city'
+                return config
+            config = get_bulk_source_config(alt_id)
+            if config:
+                config['_source_type'] = 'bulk'
+                return config
+
+    # FALLBACK: dict lookups (temporary — will be removed after migration verified)
+    from city_configs import BULK_SOURCES, CITY_REGISTRY
+    for lookup, stype in [(BULK_SOURCES, 'bulk'), (CITY_REGISTRY, 'city')]:
+        for key in [source_id, underscore_id, hyphen_id]:
+            if key in lookup:
+                config = lookup[key].copy()
+                config['_source_type'] = stype
+                if stype == 'city':
+                    config['active'] = True
+                print(f"REARCH WARNING: {source_id} found in dict fallback ({stype}), not in city_sources", flush=True)
+                return config
 
     return None
 

@@ -3344,9 +3344,196 @@ def admin_fix_v119_cities():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/config-audit')
+def admin_config_audit():
+    """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from city_configs import CITY_REGISTRY, BULK_SOURCES
+        conn = permitdb.get_connection()
+
+        reg_active = sum(1 for v in CITY_REGISTRY.values() if v.get('active', False))
+        bulk_active = sum(1 for v in BULK_SOURCES.values() if v.get('active', True))
+        cs_city = conn.execute("SELECT count(*) FROM city_sources WHERE mode = 'city' AND status = 'active'").fetchone()[0]
+        cs_bulk = conn.execute("SELECT count(*) FROM city_sources WHERE mode = 'bulk' AND status = 'active'").fetchone()[0]
+
+        # Find CITY_REGISTRY keys not in city_sources
+        cs_keys = {r[0] for r in conn.execute("SELECT source_key FROM city_sources").fetchall()}
+        reg_missing = [k for k in CITY_REGISTRY if CITY_REGISTRY[k].get('active', False) and k not in cs_keys]
+        bulk_missing = [k for k in BULK_SOURCES if BULK_SOURCES[k].get('active', True) and k not in cs_keys]
+
+        return jsonify({
+            'city_registry_active': reg_active,
+            'bulk_sources_active': bulk_active,
+            'city_sources_city': cs_city,
+            'city_sources_bulk': cs_bulk,
+            'registry_not_in_db': len(reg_missing),
+            'bulk_not_in_db': len(bulk_missing),
+            'sample_missing_registry': reg_missing[:20],
+            'sample_missing_bulk': bulk_missing[:10],
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/migrate-registry', methods=['POST'])
+def admin_migrate_registry():
+    """REARCH Phase 1: Migrate all active CITY_REGISTRY entries into city_sources table."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from city_configs import CITY_REGISTRY
+        from city_source_db import upsert_city_source
+        import json as _json
+
+        added = 0
+        skipped = 0
+        for source_key, config in CITY_REGISTRY.items():
+            if not config.get('active', False):
+                skipped += 1
+                continue
+            try:
+                upsert_city_source({
+                    'source_key': source_key,
+                    'name': config.get('name', source_key),
+                    'state': config.get('state', ''),
+                    'platform': config.get('platform', ''),
+                    'mode': 'city',
+                    'endpoint': config.get('endpoint', ''),
+                    'dataset_id': config.get('dataset_id', ''),
+                    'field_map': config.get('field_map', {}),
+                    'date_field': config.get('date_field', ''),
+                    'city_field': config.get('city_field', ''),
+                    'limit_per_page': config.get('limit', 2000),
+                    'status': 'active',
+                })
+                added += 1
+            except Exception as e:
+                skipped += 1
+
+            # Also update prod_cities source_id if missing
+            slug = config.get('slug', source_key.replace('_', '-'))
+            permitdb.get_connection().execute("""
+                UPDATE prod_cities SET source_id = ?, source_type = ?
+                WHERE city_slug = ? AND (source_id IS NULL OR source_id = '')
+            """, (source_key, config.get('platform', ''), slug))
+
+        permitdb.get_connection().commit()
+        print(f"REARCH: Migrated {added} CITY_REGISTRY entries, skipped {skipped}", flush=True)
+        return jsonify({'status': 'complete', 'migrated': added, 'skipped': skipped}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/migrate-bulk', methods=['POST'])
+def admin_migrate_bulk():
+    """REARCH Phase 1: Migrate BULK_SOURCES into city_sources table."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from city_configs import BULK_SOURCES
+        from city_source_db import upsert_city_source
+
+        added = 0
+        for source_key, config in BULK_SOURCES.items():
+            if not config.get('active', True):
+                continue
+            try:
+                upsert_city_source({
+                    'source_key': source_key,
+                    'name': config.get('name', source_key),
+                    'state': config.get('state', ''),
+                    'platform': config.get('platform', ''),
+                    'mode': 'bulk',
+                    'endpoint': config.get('endpoint', ''),
+                    'dataset_id': config.get('dataset_id', ''),
+                    'field_map': config.get('field_map', {}),
+                    'date_field': config.get('date_field', ''),
+                    'city_field': config.get('city_field', ''),
+                    'limit_per_page': config.get('limit', 50000),
+                    'status': 'active',
+                })
+                added += 1
+            except Exception:
+                pass
+        print(f"REARCH: Migrated {added} BULK_SOURCES entries", flush=True)
+        return jsonify({'status': 'complete', 'migrated': added}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/refresh-tracking', methods=['POST'])
+def admin_refresh_tracking():
+    """REARCH Phase 1: Batch refresh tracking for all active cities from permits table."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    def run():
+        try:
+            conn = permitdb.get_connection()
+            print("REARCH: Starting tracking refresh...", flush=True)
+
+            # Temp table with aggregated permit stats per city/state
+            conn.execute("DROP TABLE IF EXISTS _tracking_refresh")
+            conn.execute("""
+                CREATE TEMP TABLE _tracking_refresh AS
+                SELECT lower(city) as city_lower, lower(state) as state_lower,
+                       count(*) as permit_count, max(collected_at) as last_collected
+                FROM permits GROUP BY lower(city), lower(state) HAVING count(*) > 0
+            """)
+
+            # Update prod_cities from temp table
+            updated = conn.execute("""
+                UPDATE prod_cities SET
+                    total_permits = COALESCE((
+                        SELECT tr.permit_count FROM _tracking_refresh tr
+                        WHERE lower(prod_cities.city) = tr.city_lower
+                        AND lower(prod_cities.state) = tr.state_lower
+                    ), total_permits),
+                    last_successful_collection = COALESCE((
+                        SELECT tr.last_collected FROM _tracking_refresh tr
+                        WHERE lower(prod_cities.city) = tr.city_lower
+                        AND lower(prod_cities.state) = tr.state_lower
+                    ), last_successful_collection),
+                    health_status = CASE
+                        WHEN (SELECT tr.last_collected FROM _tracking_refresh tr
+                              WHERE lower(prod_cities.city) = tr.city_lower
+                              AND lower(prod_cities.state) = tr.state_lower) > datetime('now', '-7 days')
+                        THEN 'collecting'
+                        WHEN (SELECT tr.permit_count FROM _tracking_refresh tr
+                              WHERE lower(prod_cities.city) = tr.city_lower
+                              AND lower(prod_cities.state) = tr.state_lower) > 0
+                        THEN 'has_data'
+                        ELSE health_status
+                    END
+                WHERE status = 'active' AND population >= 12907
+            """).rowcount
+
+            conn.execute("DROP TABLE IF EXISTS _tracking_refresh")
+            conn.commit()
+
+            fresh = conn.execute(
+                "SELECT count(*) FROM prod_cities WHERE population >= 12907 AND last_successful_collection > datetime('now', '-7 days')"
+            ).fetchone()[0]
+            print(f"REARCH: Tracking refresh complete: {updated} updated, fresh_7d={fresh}", flush=True)
+        except Exception as e:
+            print(f"REARCH: Tracking refresh error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'message': 'Tracking refresh running in background'}), 200
+
+
 @app.route('/api/admin/onboard-city', methods=['POST'])
 def admin_onboard_city():
-    """V120: Google it, test it, add it. The 6-month pull IS the test.
+    """REARCH: Discover, VALIDATE, backfill, activate. Validation is mandatory.
 
     Body: {"city_slug": "las-vegas"} or {"city_slugs": [...]} or {"top_pending": 20}
     """
@@ -3391,8 +3578,8 @@ def admin_onboard_city():
 
         result = {'city_slug': slug, 'city': city_name, 'state': state, 'population': pop}
 
-        # STEP 1: GOOGLE IT
-        print(f"V120: Googling {city_name}, {state}...", flush=True)
+        # STEP 1: DISCOVER candidates
+        print(f"REARCH: Discovering sources for {city_name}, {state}...", flush=True)
         source = _try_discover_source(city_name, state, slug)
         if not source:
             result['status'] = 'no_source_found'
@@ -3404,26 +3591,44 @@ def admin_onboard_city():
         result['platform'] = source['platform']
         result['endpoint'] = source['endpoint'][:100]
 
-        # STEP 2: TEST IT (pull permits)
-        print(f"V120: Testing {source['platform']} for {slug}...", flush=True)
+        # STEP 2: TEST + VALIDATE (pull data AND verify it's from the right city)
+        print(f"REARCH: Testing {source['platform']} for {slug}...", flush=True)
         permits, err = _test_source(source, city_name, state)
         if err or not permits:
             result['status'] = 'test_failed'
             result['error'] = err or 'zero permits'
-            result['permits_fetched'] = len(permits) if permits else 0
+            results.append(result)
+            continue
+
+        # MANDATORY VALIDATION: check that records actually mention this city
+        city_lower = city_name.lower()
+        matches = 0
+        sample = permits[:min(30, len(permits))]
+        for p in sample:
+            text = ' '.join(str(v) for v in p.values() if v).lower()
+            if city_lower in text or state.lower() in text:
+                matches += 1
+        match_rate = matches / len(sample) if sample else 0
+
+        if match_rate < 0.2:
+            result['status'] = 'validation_failed'
+            result['error'] = f'Data validation: only {match_rate:.0%} of records mention {city_name} or {state}'
+            result['permits_fetched'] = len(permits)
+            print(f"REARCH: REJECTED {slug} — match rate {match_rate:.0%} too low", flush=True)
             results.append(result)
             continue
 
         result['permits_fetched'] = len(permits)
+        result['validation'] = f'{match_rate:.0%} match rate'
 
-        # STEP 3: ADD IT
-        print(f"V120: Adding {len(permits)} permits for {slug}...", flush=True)
+        # STEP 3: ADD IT (only reaches here if validation passed)
+        print(f"REARCH: Adding {len(permits)} validated permits for {slug}...", flush=True)
         source_key = f"{slug}-{source['platform']}"
         inserted = _add_city_permits(conn, source, source_key, permits, slug, city_name, state)
         result['status'] = 'onboarded'
         result['permits_inserted'] = inserted
         results.append(result)
-        print(f"V120: {slug} ONBOARDED: {inserted} permits", flush=True)
+        print(f"REARCH: {slug} ONBOARDED: {inserted} permits (validated {match_rate:.0%})", flush=True)
 
     onboarded = sum(1 for r in results if r.get('status') == 'onboarded')
     total_inserted = sum(r.get('permits_inserted', 0) for r in results)
