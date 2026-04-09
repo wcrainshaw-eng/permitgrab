@@ -814,59 +814,94 @@ def run_search_pipeline(min_population=100000, batch_size=25):
     return results
 
 
-def _search_ddg(query, max_results=10):
-    """V112: Search DuckDuckGo with validation and fallback."""
-    try:
-        from duckduckgo_search import DDGS
-        ddgs = DDGS()
-        results = ddgs.text(query, max_results=max_results)
-        if results:
-            _log(f"[SEARCH] Query: {query[:60]} -> {len(results)} results")
-            return results
-    except Exception as e:
-        _log(f"[SEARCH] DDGS error: {e}")
+# V113: State-level Socrata portals — many cities' data lives here
+STATE_SOCRATA_PORTALS = {
+    'AL': 'data.alabama.gov', 'CA': 'data.ca.gov', 'CO': 'data.colorado.gov',
+    'CT': 'data.ct.gov', 'FL': 'data.florida.gov', 'GA': 'data.georgia.gov',
+    'HI': 'data.hawaii.gov', 'IL': 'data.illinois.gov', 'IN': 'data.in.gov',
+    'IA': 'data.iowa.gov', 'KY': 'data.ky.gov', 'LA': 'data.la.gov',
+    'MD': 'data.maryland.gov', 'MA': 'data.mass.gov', 'MI': 'data.michigan.gov',
+    'MN': 'data.state.mn.us', 'MO': 'data.mo.gov', 'NJ': 'data.nj.gov',
+    'NY': 'data.ny.gov', 'NC': 'data.nc.gov', 'OH': 'data.ohio.gov',
+    'OK': 'data.ok.gov', 'OR': 'data.oregon.gov', 'PA': 'data.pa.gov',
+    'SC': 'data.sc.gov', 'TN': 'data.tn.gov', 'TX': 'data.texas.gov',
+    'VA': 'data.virginia.gov', 'WA': 'data.wa.gov', 'WI': 'data.wi.gov',
+}
 
-    # V112: Fallback — scrape DuckDuckGo HTML directly
+# V113: Connection pooling for speed
+from requests.adapters import HTTPAdapter
+_session = requests.Session()
+_session.mount('https://', HTTPAdapter(pool_connections=10, pool_maxsize=10))
+
+
+def _search_state_portal(state_abbrev, city_name):
+    """V113: Search state Socrata portal for building permit datasets with city data."""
+    portal = STATE_SOCRATA_PORTALS.get(state_abbrev)
+    if not portal:
+        return []
+
+    hits = []
     try:
-        resp = requests.get('https://html.duckduckgo.com/html/',
-                            params={'q': query},
-                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
+        resp = _session.get(f"https://{portal}/api/catalog/v1",
+                            params={'q': 'building permits', 'limit': 10, 'domains': portal},
                             timeout=10)
-        if resp.status_code == 200:
-            urls = re.findall(r'href="(https?://[^"]+)"', resp.text)
-            urls = [u for u in urls if 'duckduckgo.com' not in u][:max_results]
-            if urls:
-                _log(f"[SEARCH] HTML fallback: {len(urls)} URLs for: {query[:50]}")
-                return [{'href': u, 'title': '', 'body': ''} for u in urls]
-    except Exception as e:
-        _log(f"[SEARCH] HTML fallback error: {e}")
+        if resp.status_code != 200:
+            return []
 
-    return []
+        results = resp.json().get('results', [])
+        _log(f"[STATE] {portal}: {len(results)} datasets for 'building permits'")
+
+        for r in results:
+            resource = r.get('resource', {})
+            name = resource.get('name', '')
+            dataset_id = resource.get('id', '')
+            columns = [c.lower() for c in resource.get('columns_name', [])]
+
+            # Must be permit-related
+            text = (name + ' ' + resource.get('description', '')).lower()
+            if not any(kw in text for kw in ['permit', 'building', 'construction']):
+                continue
+
+            # Must have a city/municipality column
+            city_cols = [c for c in columns if any(kw in c for kw in ['city', 'municipality', 'town', 'jurisdiction'])]
+            if not city_cols:
+                continue
+
+            # Verify this dataset has data for our city
+            city_col = city_cols[0]
+            try:
+                vresp = _session.get(f"https://{portal}/resource/{dataset_id}.json",
+                                     params={'$where': f"upper({city_col}) = '{city_name.upper()}'", '$limit': 5},
+                                     timeout=10)
+                if vresp.status_code == 200 and len(vresp.json()) > 0:
+                    _log(f"[STATE] MATCH: {portal}/{dataset_id} has {city_name} data via '{city_col}'")
+                    hits.append({
+                        'url': f"https://{portal}/resource/{dataset_id}.json",
+                        'platform': 'socrata', 'domain': portal,
+                        'dataset_id': dataset_id, 'city_column': city_col,
+                        'source': 'state_portal', 'title': name,
+                    })
+            except Exception:
+                pass
+
+    except Exception as e:
+        _log(f"[STATE] Error searching {portal}: {e}")
+
+    return hits
 
 
 def _search_city_sources(city, state):
-    """V111/V112: Search for data sources using URL patterns + DuckDuckGo."""
+    """V113: URL pattern probing + state portal search. DDG removed (broken from datacenter IPs)."""
     candidates = []
 
-    # Phase 1: Try known URL patterns (reliable, instant)
+    # Phase 1: URL pattern probing (reliable, fast)
     candidates.extend(_try_url_patterns(city, state))
 
-    # Phase 2: DuckDuckGo search (fallback)
-    queries = [
-        f'"{city}" "{state}" building permits open data',
-        f'"{city}" {state} building permits socrata OR arcgis OR accela',
-        f'"{city}" {state} permit data download',
-    ]
-    for q in queries:
-        results = _search_ddg(q, max_results=10)
-        for r in results:
-            url = r.get('href', r.get('link', ''))
-            title = r.get('title', '')
-            parsed = _classify_search_url(url, title, city, state)
-            if parsed:
-                candidates.append(parsed)
-        if results:
-            time.sleep(2)  # V112: Rate limit protection
+    # Phase 2: State portal search (NEW in V113)
+    if not candidates:
+        _log(f"[PIPELINE]   No URL pattern hits, trying state portal for {state}")
+        state_hits = _search_state_portal(state, city)
+        candidates.extend(state_hits)
 
     # Deduplicate
     seen = set()
@@ -895,7 +930,7 @@ def _try_url_patterns(city, state):
     ]
     for domain in socrata_domains:
         try:
-            cat_resp = requests.get(
+            cat_resp = _session.get(
                 f"https://{domain}/api/catalog/v1?q=building+permits&limit=5", timeout=5)
             if cat_resp.status_code == 200 and 'results' in cat_resp.text:
                 _log(f"[PROBE] Socrata portal found: {domain}")
@@ -921,7 +956,7 @@ def _try_url_patterns(city, state):
     ]
     for url in energov_patterns:
         try:
-            resp = requests.head(url, timeout=5, allow_redirects=True)
+            resp = _session.head(url, timeout=3, allow_redirects=True)
             if resp.status_code == 200:
                 candidates.append({'url': url, 'platform': 'energov',
                                    'title': f'{city} EnerGov Portal', 'source': 'url_pattern'})
@@ -933,7 +968,7 @@ def _try_url_patterns(city, state):
     # --- Citizenserve patterns ---
     for url in [f"https://www.citizenserve.com/Portal/PortalController?CommunityId={city_slug}"]:
         try:
-            resp = requests.head(url, timeout=5, allow_redirects=True)
+            resp = _session.head(url, timeout=3, allow_redirects=True)
             if resp.status_code == 200:
                 candidates.append({'url': url, 'platform': 'citizenserve',
                                    'title': f'{city} Citizenserve', 'source': 'url_pattern'})
@@ -946,7 +981,7 @@ def _try_url_patterns(city, state):
     for url in [f"https://{city_slug}.viewpointcloud.com",
                 f"https://cityof{city_slug}.viewpointcloud.com"]:
         try:
-            resp = requests.head(url, timeout=5, allow_redirects=True)
+            resp = _session.head(url, timeout=3, allow_redirects=True)
             if resp.status_code == 200:
                 candidates.append({'url': url, 'platform': 'viewpoint',
                                    'title': f'{city} ViewPoint Cloud', 'source': 'url_pattern'})
@@ -1092,7 +1127,8 @@ def _test_socrata(candidate, slug, city, state, prod_city_id):
         _log(f"[PIPELINE]     No date field detected")
         return False, 0
 
-    city_field = field_map.get('city_field')
+    # V113: Use city_column from state portal discovery if available
+    city_field = candidate.get('city_column') or field_map.get('city_field')
     if domain_type in ('state', 'county', 'unknown') and not city_field:
         _log(f"[PIPELINE]     REJECT: {domain_type} portal, no city field")
         return False, 0

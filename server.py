@@ -2429,17 +2429,18 @@ def _cleanup_v108_pipeline_damage():
         print(f"[V110] Cleanup error (non-fatal): {e}", flush=True)
 
     # V111b: Clear stale pipeline_progress so search pipeline retries all cities
+    # V113: Clear pipeline_progress for fresh run with state portal search
     try:
         conn = permitdb.get_connection()
-        row = conn.execute("SELECT value FROM system_state WHERE key = 'v111b_progress_cleared'").fetchone()
+        row = conn.execute("SELECT value FROM system_state WHERE key = 'v113_progress_cleared'").fetchone()
         if not row:
             conn.execute("DELETE FROM pipeline_progress")
             conn.execute("""
                 INSERT OR REPLACE INTO system_state (key, value, updated_at)
-                VALUES ('v111b_progress_cleared', 'true', datetime('now'))
+                VALUES ('v113_progress_cleared', 'true', datetime('now'))
             """)
             conn.commit()
-            print("[V111b] Cleared stale pipeline_progress for search retry", flush=True)
+            print("[V113] Cleared pipeline_progress for state portal search run", flush=True)
     except Exception as e:
         print(f"[V111b] Progress clear error (non-fatal): {e}", flush=True)
 
@@ -2962,55 +2963,42 @@ def admin_test_search():
     state = data.get('state', 'CA')
 
     results = {'city': city, 'state': state, 'url_pattern_hits': [],
-               'search_candidates': [], 'raw_search_results': [], 'errors': []}
+               'state_portal_hits': [], 'errors': []}
 
     # Phase 1: URL patterns
     try:
         from city_onboarding import _try_url_patterns
         url_hits = _try_url_patterns(city, state)
         results['url_pattern_hits'] = [{'url': h['url'], 'platform': h.get('platform', ''),
-                                         'title': h.get('title', '')} for h in url_hits]
+                                         'title': h.get('title', ''),
+                                         'dataset_id': h.get('dataset_id', '')} for h in url_hits]
     except Exception as e:
         results['errors'].append(f"URL pattern error: {str(e)}")
 
-    # Phase 2: DuckDuckGo search
+    # Phase 2: State portal search (V113 — replaces DDG)
     try:
-        from city_onboarding import _classify_search_url, _search_ddg
-        queries = [f'"{city}" "{state}" building permits open data',
-                   f'"{city}" {state} building permits socrata OR arcgis OR accela',
-                   f'"{city}" {state} permit data download']
-        results['queries_tried'] = queries
-        for q in queries:
-            try:
-                for r in _search_ddg(q, max_results=5):
-                    url = r.get('href', r.get('link', ''))
-                    title = r.get('title', '')
-                    results['raw_search_results'].append({'query': q, 'title': title,
-                                                          'url': url, 'snippet': r.get('body', '')[:100]})
-                    classified = _classify_search_url(url, title, city, state)
-                    if classified:
-                        results['search_candidates'].append({'url': url, 'platform': classified['platform'],
-                                                              'title': title})
-            except Exception as e:
-                results['errors'].append(f"Search error: {str(e)[:100]}")
-    except ImportError:
-        results['errors'].append("duckduckgo-search not installed")
+        from city_onboarding import _search_state_portal
+        state_hits = _search_state_portal(state, city)
+        results['state_portal_hits'] = [{'url': h['url'], 'domain': h.get('domain', ''),
+                                          'dataset_id': h.get('dataset_id', ''),
+                                          'city_column': h.get('city_column', ''),
+                                          'title': h.get('title', '')} for h in state_hits]
     except Exception as e:
-        results['errors'].append(f"DDG error: {str(e)}")
+        results['errors'].append(f"State portal error: {str(e)}")
 
     return jsonify(results), 200
 
 
 @app.route('/api/admin/run-search-pipeline', methods=['POST'])
 def admin_run_search_pipeline():
-    """V111: Run the DuckDuckGo-search-powered city pipeline."""
+    """V113: Run city pipeline — URL probing + state portal search."""
     valid, error = check_admin_key()
     if not valid:
         return error
 
     data = request.json or {}
     min_pop = data.get('min_population', 100000)
-    batch_size = data.get('batch_size', 25)
+    batch_size = data.get('batch_size', 100)
 
     def run():
         try:
