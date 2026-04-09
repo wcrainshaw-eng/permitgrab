@@ -3034,6 +3034,134 @@ def admin_test_sweep_sources():
     return jsonify({'status': 'testing_started', 'message': 'Testing up to 500 pending sources'}), 200
 
 
+@app.route('/api/admin/activate-sweep-sources', methods=['POST'])
+def admin_activate_sweep_sources():
+    """V117: Bridge confirmed sweep_sources into prod_cities for collection."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        confirmed = conn.execute("""
+            SELECT city_slug, source_url, platform, dataset_id, domain, name,
+                   city_column, city_value, permits_found
+            FROM sweep_sources WHERE status = 'confirmed' ORDER BY permits_found DESC
+        """).fetchall()
+
+        activated = 0
+        skipped = 0
+        for src in confirmed:
+            slug, url, platform = src[0], src[1], src[2]
+            dataset_id, domain, name = src[3], src[4], src[5]
+            city_col, city_val = src[6], src[7]
+
+            prod = conn.execute("""
+                SELECT id, health_status, source_type FROM prod_cities WHERE city_slug = ?
+            """, (slug,)).fetchone()
+            if not prod:
+                skipped += 1
+                continue
+
+            health = prod[1]
+            src_type = prod[2]
+            if health not in ('no_endpoint', 'never_worked', 'stale') and src_type is not None:
+                skipped += 1
+                continue
+
+            # Build source_id
+            source_id = dataset_id if dataset_id else f"{slug}_{platform}_sweep"
+
+            # Update prod_cities
+            conn.execute("""
+                UPDATE prod_cities SET source_type = ?, source_id = ?, source_endpoint = ?,
+                health_status = 'collecting', consecutive_failures = 0, last_error = NULL
+                WHERE city_slug = ?
+            """, (platform, source_id, url, slug))
+
+            # Upsert into city_sources so collector finds it
+            endpoint = url
+            if platform == 'socrata' and dataset_id and '/resource/' not in endpoint:
+                endpoint = f"https://{domain}/resource/{dataset_id}.json"
+
+            city_row = conn.execute("SELECT city, state FROM prod_cities WHERE city_slug = ?", (slug,)).fetchone()
+            city_name = city_row[0] if city_row else slug
+            state = city_row[1] if city_row else ''
+
+            conn.execute("""
+                INSERT OR REPLACE INTO city_sources
+                (source_key, name, state, platform, endpoint, dataset_id, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'active')
+            """, (source_id, city_name, state, platform, endpoint, dataset_id or ''))
+
+            activated += 1
+            if activated <= 20:
+                print(f"V117: Activated {slug}: {platform} {dataset_id or url[:60]}", flush=True)
+
+        conn.commit()
+        print(f"V117: Activated {activated} sweep sources, skipped {skipped}", flush=True)
+        return jsonify({'status': 'complete', 'activated': activated, 'skipped': skipped}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/pause-zombies', methods=['POST'])
+def admin_pause_zombies():
+    """V117: Pause active cities with no source and no confirmed sweep source."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        paused = conn.execute("""
+            UPDATE prod_cities SET status = 'paused', pause_reason = 'V117: no source available'
+            WHERE status = 'active' AND source_type IS NULL
+            AND health_status IN ('no_endpoint', 'never_worked')
+            AND city_slug NOT IN (SELECT city_slug FROM sweep_sources WHERE status = 'confirmed')
+        """).rowcount
+        conn.commit()
+        print(f"V117: Paused {paused} zombie cities", flush=True)
+        return jsonify({'status': 'complete', 'paused': paused}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/fix-bulk-tracked', methods=['POST'])
+def admin_fix_bulk_tracked():
+    """V117: Fix cities with permits but NULL source — likely bulk-fed."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        cities = conn.execute("""
+            SELECT city_slug, city, state, total_permits FROM prod_cities
+            WHERE status = 'active' AND source_type IS NULL AND health_status = 'has_data' AND total_permits > 0
+        """).fetchall()
+
+        fixed = 0
+        for c in cities:
+            slug, city_name, state = c[0], c[1], c[2]
+            recent = conn.execute("""
+                SELECT COUNT(*) as cnt, MAX(collected_at) as last_col FROM permits
+                WHERE LOWER(city) = LOWER(?) AND LOWER(state) = LOWER(?)
+                AND collected_at > datetime('now', '-30 days')
+            """, (city_name, state)).fetchone()
+
+            if recent and recent[0] > 0:
+                conn.execute("""
+                    UPDATE prod_cities SET health_status = 'has_data',
+                    last_successful_collection = ?, data_freshness = 'fresh'
+                    WHERE city_slug = ?
+                """, (recent[1], slug))
+                fixed += 1
+
+        conn.commit()
+        print(f"V117: Fixed tracking for {fixed}/{len(cities)} bulk-fed cities", flush=True)
+        return jsonify({'status': 'complete', 'checked': len(cities), 'fixed': fixed}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/sweep-status')
 def admin_sweep_status():
     """V114: Check catalog sweep results."""
