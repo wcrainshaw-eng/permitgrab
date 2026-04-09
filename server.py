@@ -3505,6 +3505,126 @@ def admin_v122_migrate():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/v122-fix-config', methods=['POST'])
+def admin_v122_fix_config():
+    """V122: Copy config from city_sources to cities table. SYNCHRONOUS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+
+        # Pass 1: Direct match — city_sources.source_key = cities.city_slug
+        rows = conn.execute(
+            "SELECT source_key, platform, endpoint, dataset_id, date_field, field_map FROM city_sources WHERE endpoint IS NOT NULL AND endpoint != ''"
+        ).fetchall()
+        count1 = 0
+        for r in rows:
+            res = conn.execute("""
+                UPDATE cities SET platform=?, endpoint=?, dataset_id=?, date_field=?, field_map=?, status='active'
+                WHERE city_slug=? AND (platform IS NULL OR endpoint IS NULL)
+            """, (r[1], r[2], r[3], r[4], r[5], r[0]))
+            count1 += res.rowcount
+
+        # Pass 2: Match via prod_cities.source_id
+        rows2 = conn.execute("""
+            SELECT pc.city_slug, cs.platform, cs.endpoint, cs.dataset_id, cs.date_field, cs.field_map
+            FROM prod_cities pc
+            JOIN city_sources cs ON pc.source_id = cs.source_key
+            WHERE cs.endpoint IS NOT NULL AND cs.endpoint != ''
+            AND pc.city_slug IN (SELECT city_slug FROM cities WHERE platform IS NULL)
+        """).fetchall()
+        count2 = 0
+        for r in rows2:
+            res = conn.execute("""
+                UPDATE cities SET platform=?, endpoint=?, dataset_id=?, date_field=?, field_map=?, status='active'
+                WHERE city_slug=?
+            """, (r[1], r[2], r[3], r[4], r[5], r[0]))
+            count2 += res.rowcount
+
+        conn.commit()
+        with_config = conn.execute("SELECT COUNT(*) FROM cities WHERE platform IS NOT NULL").fetchone()[0]
+        return jsonify({'configs_direct': count1, 'configs_via_source_id': count2,
+                        'total_with_config': with_config}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v122-fix-fresh', methods=['POST'])
+def admin_v122_fix_fresh():
+    """V122: Compute permits_7d and permits_total for all cities. SYNCHRONOUS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+
+        # Pass 1: Direct match — source_city_key = city_slug
+        conn.execute("""
+            UPDATE cities SET
+                permits_7d = (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug AND collected_at > datetime('now', '-7 days')),
+                permits_total = (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug),
+                status = CASE WHEN (SELECT COUNT(*) FROM permits WHERE source_city_key = cities.city_slug AND collected_at > datetime('now', '-7 days')) > 0 THEN 'active' ELSE status END
+            WHERE city_slug IN (SELECT DISTINCT source_city_key FROM permits WHERE source_city_key IS NOT NULL)
+        """)
+
+        # Pass 2: Match via prod_cities.source_id (for underscore/hyphen mismatches)
+        conn.execute("""
+            UPDATE cities SET
+                permits_7d = (SELECT COUNT(*) FROM permits p JOIN prod_cities pc ON p.source_city_key = pc.source_id WHERE pc.city_slug = cities.city_slug AND p.collected_at > datetime('now', '-7 days')),
+                permits_total = (SELECT COUNT(*) FROM permits p JOIN prod_cities pc ON p.source_city_key = pc.source_id WHERE pc.city_slug = cities.city_slug),
+                status = 'active'
+            WHERE permits_7d = 0
+            AND city_slug IN (SELECT pc2.city_slug FROM prod_cities pc2 WHERE pc2.source_id IN (SELECT DISTINCT source_city_key FROM permits WHERE source_city_key IS NOT NULL))
+        """)
+
+        # Pass 3: Match via city name + state (for bulk-fed cities with no source_city_key match)
+        conn.execute("""
+            UPDATE cities SET
+                permits_7d = (SELECT COUNT(*) FROM permits WHERE LOWER(permits.city) = LOWER(cities.city) AND LOWER(permits.state) = LOWER(cities.state) AND collected_at > datetime('now', '-7 days')),
+                permits_total = (SELECT COUNT(*) FROM permits WHERE LOWER(permits.city) = LOWER(cities.city) AND LOWER(permits.state) = LOWER(cities.state)),
+                status = CASE WHEN (SELECT COUNT(*) FROM permits WHERE LOWER(permits.city) = LOWER(cities.city) AND LOWER(permits.state) = LOWER(cities.state) AND collected_at > datetime('now', '-7 days')) > 0 THEN 'active' ELSE status END
+            WHERE permits_total = 0
+            AND population >= 10000
+        """)
+
+        conn.commit()
+        fresh = conn.execute("SELECT COUNT(*) FROM cities WHERE permits_7d > 0").fetchone()[0]
+        active = conn.execute("SELECT COUNT(*) FROM cities WHERE status = 'active'").fetchone()[0]
+        return jsonify({'fresh_7d': fresh, 'active': active}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v122-fix-endpoints', methods=['POST'])
+def admin_v122_fix_endpoints():
+    """V122: Set verified endpoints for 5 cities. SYNCHRONOUS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        updates = [
+            ("las-vegas", "socrata", "https://opendata.lasvegasnevada.gov/resource/wpyf-qpia.json", "wpyf-qpia"),
+            ("albuquerque", "arcgis", "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0", None),
+            ("milwaukee", "ckan", "https://data.milwaukee.gov/api/3/action/datastore_search", "828e9630-d7cb-42e4-960e-964eae916397"),
+            ("virginia-beach", "arcgis", "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0", None),
+            ("gilbert", "arcgis", "https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3", None),
+        ]
+        count = 0
+        for slug, plat, ep, ds in updates:
+            r = conn.execute("UPDATE cities SET platform=?, endpoint=?, dataset_id=?, status='active', updated_at=datetime('now') WHERE city_slug=?",
+                             (plat, ep, ds, slug))
+            count += r.rowcount
+        conn.commit()
+        return jsonify({'endpoints_set': count}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
