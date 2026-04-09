@@ -2989,6 +2989,55 @@ def admin_test_search():
     return jsonify(results), 200
 
 
+@app.route('/api/admin/sweep-catalogs', methods=['POST'])
+def admin_sweep_catalogs():
+    """V114: Sweep Socrata + ArcGIS catalogs for building permit datasets."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    def run():
+        try:
+            from catalog_sweep import sweep_socrata_catalog, sweep_arcgis_hub, test_discovered_sources
+            sweep_socrata_catalog()
+            sweep_arcgis_hub()
+            test_discovered_sources(limit=200)
+        except Exception as e:
+            print(f"[SWEEP] Error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'message': 'Sweeping Socrata + ArcGIS catalogs'}), 200
+
+
+@app.route('/api/admin/sweep-status')
+def admin_sweep_status():
+    """V114: Check catalog sweep results."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        stats = conn.execute("""
+            SELECT status, COUNT(*) as cnt, SUM(permits_found) as permits
+            FROM discovered_sources GROUP BY status ORDER BY cnt DESC
+        """).fetchall()
+        recent = conn.execute("""
+            SELECT city_slug, platform, name, permits_found, status, discovered_at
+            FROM discovered_sources WHERE status = 'confirmed'
+            ORDER BY discovered_at DESC LIMIT 30
+        """).fetchall()
+        return jsonify({
+            'stats': [{'status': r[0], 'count': r[1], 'permits': r[2]} for r in stats],
+            'confirmed': [{'slug': r[0], 'platform': r[1], 'name': r[2],
+                           'permits': r[3], 'discovered': r[5]} for r in recent]
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/run-search-pipeline', methods=['POST'])
 def admin_run_search_pipeline():
     """V113: Run city pipeline — URL probing + state portal search."""
