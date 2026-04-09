@@ -2975,13 +2975,14 @@ def admin_test_search():
 
     # Phase 2: DuckDuckGo search
     try:
-        from duckduckgo_search import DDGS
-        from city_onboarding import _classify_search_url
-        ddgs = DDGS()
-        for q in [f'"{city}" "{state}" building permits open data',
-                  f'"{city}" {state} building permits socrata OR arcgis']:
+        from city_onboarding import _classify_search_url, _search_ddg
+        queries = [f'"{city}" "{state}" building permits open data',
+                   f'"{city}" {state} building permits socrata OR arcgis OR accela',
+                   f'"{city}" {state} permit data download']
+        results['queries_tried'] = queries
+        for q in queries:
             try:
-                for r in ddgs.text(q, max_results=5):
+                for r in _search_ddg(q, max_results=5):
                     url = r.get('href', r.get('link', ''))
                     title = r.get('title', '')
                     results['raw_search_results'].append({'query': q, 'title': title,

@@ -777,12 +777,23 @@ def run_search_pipeline(min_population=100000, batch_size=25):
                                 'permits': count, 'source': candidate.get('url', '')[:100]})
                 found = True
                 break
+            elif success and count == 0:
+                # V112: Discovery-only platform found (EnerGov, Citizenserve, etc.)
+                results.append({'city': city, 'state': state, 'status': 'FOUND_PORTAL',
+                                'platform': candidate.get('platform', ''),
+                                'source': candidate.get('url', '')[:100]})
+                found = True
+                break
 
         if not found:
             _save_pipeline_progress(slug, 'no_source',
                                     error=f'tested {len(candidates)} candidates, none worked')
             results.append({'city': city, 'state': state, 'status': 'NO_SOURCE',
                             'candidates_tried': len(candidates)})
+
+        # V112: Summary log per city
+        status = results[-1].get('status', '?')
+        _log(f"[PIPELINE] === {city}, {state} === Candidates: {len(candidates)}, Result: {status}")
 
         time.sleep(1)
 
@@ -803,35 +814,59 @@ def run_search_pipeline(min_population=100000, batch_size=25):
     return results
 
 
-def _search_city_sources(city, state):
-    """V111: Search for data sources using URL patterns + DuckDuckGo."""
-    candidates = []
-
-    # Phase 1: Try known URL patterns (free, instant)
-    candidates.extend(_try_url_patterns(city, state))
-
-    # Phase 2: DuckDuckGo search
+def _search_ddg(query, max_results=10):
+    """V112: Search DuckDuckGo with validation and fallback."""
     try:
         from duckduckgo_search import DDGS
         ddgs = DDGS()
-        queries = [
-            f'"{city}" "{state}" building permits open data',
-            f'"{city}" {state} building permits socrata OR arcgis',
-        ]
-        for q in queries:
-            try:
-                results = ddgs.text(q, max_results=10)
-                for r in results:
-                    url = r.get('href', r.get('link', ''))
-                    title = r.get('title', '')
-                    parsed = _classify_search_url(url, title, city, state)
-                    if parsed:
-                        candidates.append(parsed)
-                time.sleep(1)
-            except Exception as e:
-                _log(f"[PIPELINE]   Search error: {e}")
-    except ImportError:
-        print("[PIPELINE]   duckduckgo-search not installed, skipping web search")
+        results = ddgs.text(query, max_results=max_results)
+        if results:
+            _log(f"[SEARCH] Query: {query[:60]} -> {len(results)} results")
+            return results
+    except Exception as e:
+        _log(f"[SEARCH] DDGS error: {e}")
+
+    # V112: Fallback — scrape DuckDuckGo HTML directly
+    try:
+        resp = requests.get('https://html.duckduckgo.com/html/',
+                            params={'q': query},
+                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
+                            timeout=10)
+        if resp.status_code == 200:
+            urls = re.findall(r'href="(https?://[^"]+)"', resp.text)
+            urls = [u for u in urls if 'duckduckgo.com' not in u][:max_results]
+            if urls:
+                _log(f"[SEARCH] HTML fallback: {len(urls)} URLs for: {query[:50]}")
+                return [{'href': u, 'title': '', 'body': ''} for u in urls]
+    except Exception as e:
+        _log(f"[SEARCH] HTML fallback error: {e}")
+
+    return []
+
+
+def _search_city_sources(city, state):
+    """V111/V112: Search for data sources using URL patterns + DuckDuckGo."""
+    candidates = []
+
+    # Phase 1: Try known URL patterns (reliable, instant)
+    candidates.extend(_try_url_patterns(city, state))
+
+    # Phase 2: DuckDuckGo search (fallback)
+    queries = [
+        f'"{city}" "{state}" building permits open data',
+        f'"{city}" {state} building permits socrata OR arcgis OR accela',
+        f'"{city}" {state} permit data download',
+    ]
+    for q in queries:
+        results = _search_ddg(q, max_results=10)
+        for r in results:
+            url = r.get('href', r.get('link', ''))
+            title = r.get('title', '')
+            parsed = _classify_search_url(url, title, city, state)
+            if parsed:
+                candidates.append(parsed)
+        if results:
+            time.sleep(2)  # V112: Rate limit protection
 
     # Deduplicate
     seen = set()
@@ -847,35 +882,76 @@ def _search_city_sources(city, state):
 
 
 def _try_url_patterns(city, state):
-    """V111: Probe known open data portal URL patterns."""
+    """V112: Probe known open data portal URL patterns — expanded with EnerGov, Citizenserve, ViewPoint."""
     candidates = []
     city_slug = city.lower().replace(' ', '').replace('.', '').replace("'", "")
+    state_lower = state.lower()
 
-    # Socrata portal patterns
-    for domain in [f"data.{city_slug}.gov", f"data.cityof{city_slug}.org",
-                   f"opendata.{city_slug}.gov", f"data.{city_slug}{state.lower()}.gov"]:
+    # --- Socrata portal patterns ---
+    socrata_domains = [
+        f"data.{city_slug}.gov", f"data.cityof{city_slug}.org",
+        f"opendata.{city_slug}.gov", f"data.{city_slug}{state_lower}.gov",
+        f"data.cityof{city_slug}.gov", f"data.{city_slug}.us",
+    ]
+    for domain in socrata_domains:
         try:
-            resp = requests.head(f"https://{domain}", timeout=5, allow_redirects=True)
+            cat_resp = requests.get(
+                f"https://{domain}/api/catalog/v1?q=building+permits&limit=5", timeout=5)
+            if cat_resp.status_code == 200 and 'results' in cat_resp.text:
+                _log(f"[PROBE] Socrata portal found: {domain}")
+                for ds in cat_resp.json().get('results', []):
+                    resource = ds.get('resource', {})
+                    ds_id = resource.get('id')
+                    ds_name = resource.get('name', '')
+                    if ds_id and any(kw in ds_name.lower() for kw in ['permit', 'building', 'construction']):
+                        candidates.append({
+                            'url': f"https://{domain}/resource/{ds_id}.json",
+                            'platform': 'socrata', 'domain': domain,
+                            'dataset_id': ds_id, 'title': ds_name, 'source': 'url_pattern'
+                        })
+        except Exception:
+            pass
+
+    # --- EnerGov / Tyler Technologies patterns ---
+    energov_patterns = [
+        f"https://css.cityof{city_slug}.com/energov_prod/selfservice",
+        f"https://css.{city_slug}.gov/energov_prod/selfservice",
+        f"https://energov.cityof{city_slug}.com/energov_prod/selfservice",
+        f"https://energov.{city_slug}.gov/energov_prod/selfservice",
+    ]
+    for url in energov_patterns:
+        try:
+            resp = requests.head(url, timeout=5, allow_redirects=True)
             if resp.status_code == 200:
-                _log(f"[PIPELINE]   URL pattern hit: {domain}")
-                # Search this portal for permit datasets
-                try:
-                    cat_resp = requests.get(
-                        f"https://{domain}/api/catalog/v1?q=building+permits&limit=5", timeout=8)
-                    if cat_resp.status_code == 200:
-                        for ds in cat_resp.json().get('results', []):
-                            resource = ds.get('resource', {})
-                            ds_id = resource.get('id')
-                            ds_name = resource.get('name', '')
-                            if ds_id and any(kw in ds_name.lower() for kw in ['permit', 'building', 'construction']):
-                                candidates.append({
-                                    'url': f"https://{domain}/resource/{ds_id}.json",
-                                    'platform': 'socrata', 'domain': domain,
-                                    'dataset_id': ds_id, 'title': ds_name,
-                                    'source': 'url_pattern'
-                                })
-                except Exception:
-                    pass
+                candidates.append({'url': url, 'platform': 'energov',
+                                   'title': f'{city} EnerGov Portal', 'source': 'url_pattern'})
+                _log(f"[PROBE] EnerGov found: {url}")
+                break
+        except Exception:
+            pass
+
+    # --- Citizenserve patterns ---
+    for url in [f"https://www.citizenserve.com/Portal/PortalController?CommunityId={city_slug}"]:
+        try:
+            resp = requests.head(url, timeout=5, allow_redirects=True)
+            if resp.status_code == 200:
+                candidates.append({'url': url, 'platform': 'citizenserve',
+                                   'title': f'{city} Citizenserve', 'source': 'url_pattern'})
+                _log(f"[PROBE] Citizenserve found: {url}")
+                break
+        except Exception:
+            pass
+
+    # --- ViewPoint Cloud patterns ---
+    for url in [f"https://{city_slug}.viewpointcloud.com",
+                f"https://cityof{city_slug}.viewpointcloud.com"]:
+        try:
+            resp = requests.head(url, timeout=5, allow_redirects=True)
+            if resp.status_code == 200:
+                candidates.append({'url': url, 'platform': 'viewpoint',
+                                   'title': f'{city} ViewPoint Cloud', 'source': 'url_pattern'})
+                _log(f"[PROBE] ViewPoint found: {url}")
+                break
         except Exception:
             pass
 
@@ -883,14 +959,20 @@ def _try_url_patterns(city, state):
 
 
 def _classify_search_url(url, title, city, state):
-    """V111: Classify a search result URL by platform."""
+    """V112: Classify a search result URL by platform. Expanded platform support."""
     url_lower = url.lower()
-    city_first_word = city.lower().split()[0]
+    city_lower = city.lower()
 
-    # Must be somewhat relevant
-    text = (url_lower + ' ' + title.lower())
-    if city_first_word not in text:
-        return None
+    # V112: Relaxed city check — skip for known platform domains
+    known_platforms = ['socrata.com', 'arcgis.com', 'accela.com', 'energov',
+                       'citizenserve.com', 'viewpointcloud.com', 'tylerhost.net',
+                       'opendatasoft.com', 'iworq.net', 'opengov.com']
+    is_known_platform = any(p in url_lower for p in known_platforms)
+
+    if not is_known_platform:
+        text = (url_lower + ' ' + title.lower())
+        if city_lower.split()[0] not in text:
+            return None
 
     # Socrata dataset link
     socrata_match = re.search(r'([\w.-]+\.(?:gov|org|com))/(?:resource|d)/([\w]{4}-[\w]{4})', url_lower)
@@ -923,6 +1005,20 @@ def _classify_search_url(url, title, city, state):
         if city_slug in url_lower.replace('.', '').replace('-', ''):
             return {'url': url, 'platform': 'portal', 'title': title, 'source': 'search'}
 
+    # V112: EnerGov / Tyler Technologies
+    if 'energov' in url_lower or ('css.' in url_lower and 'selfservice' in url_lower):
+        return {'url': url, 'platform': 'energov', 'title': title, 'source': 'search'}
+    if 'tylerhost.net' in url_lower:
+        return {'url': url, 'platform': 'tyler', 'title': title, 'source': 'search'}
+
+    # V112: Citizenserve
+    if 'citizenserve.com' in url_lower:
+        return {'url': url, 'platform': 'citizenserve', 'title': title, 'source': 'search'}
+
+    # V112: ViewPoint Cloud
+    if 'viewpointcloud.com' in url_lower:
+        return {'url': url, 'platform': 'viewpoint', 'title': title, 'source': 'search'}
+
     # V111b: Generic open data with permit keywords in title
     permit_keywords = ['permit', 'building', 'construction']
     if any(kw in title.lower() for kw in permit_keywords):
@@ -937,6 +1033,27 @@ def _test_candidate(candidate, slug, city, state, prod_city_id):
     platform = candidate.get('platform', '')
     _log(f"[PIPELINE]   Testing {platform}: {candidate.get('title', candidate['url'][:60])}")
 
+    # V112: Discovery-only platforms — record but can't auto-pull
+    DISCOVERY_ONLY = ['energov', 'citizenserve', 'viewpoint', 'tyler', 'city_portal']
+    if platform in DISCOVERY_ONLY:
+        _log(f"[PIPELINE]   FOUND {platform} portal: {candidate['url']}")
+        try:
+            conn = permitdb.get_connection()
+            conn.execute("""
+                INSERT OR REPLACE INTO pipeline_progress
+                (city_slug, status, source_found, error_message, processed_at)
+                VALUES (?, 'found_portal', ?, ?, datetime('now'))
+            """, (slug, candidate['url'][:200],
+                  f"Platform: {platform} — no API scraper yet"))
+            conn.execute("""
+                UPDATE prod_cities SET source_type = ?, pipeline_checked_at = datetime('now')
+                WHERE city_slug = ?
+            """, (platform, slug))
+            conn.commit()
+        except Exception:
+            pass
+        return True, 0  # Found something, stop searching (but 0 permits)
+
     try:
         if platform == 'socrata' and candidate.get('dataset_id'):
             return _test_socrata(candidate, slug, city, state, prod_city_id)
@@ -946,7 +1063,6 @@ def _test_candidate(candidate, slug, city, state, prod_city_id):
                 _mark_city_done(slug, result)
                 return True, result['permits_inserted']
         elif platform == 'portal':
-            # V111b: Explore a portal — search its catalog for permit datasets
             return _explore_portal(candidate, slug, city, state, prod_city_id)
         return False, 0
     except Exception as e:
