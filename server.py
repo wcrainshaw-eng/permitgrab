@@ -3666,6 +3666,42 @@ def admin_v122_deactivate_stale():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v122-add-batch1', methods=['POST'])
+def admin_v122_add_batch1():
+    """V122: Configure San Jose CKAN + reactivate 3 Accela cities."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        results = []
+
+        # San Jose CA — CKAN
+        r = conn.execute("""
+            UPDATE cities SET platform='ckan',
+                endpoint='https://data.sanjoseca.gov/api/3/action/datastore_search',
+                dataset_id='761b7ae8-3be1-4ad6-923d-c7af6404a904',
+                date_field='ISSUEDATE', status='active', updated_at=datetime('now')
+            WHERE city_slug='san-jose'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'san-jose', 'action': 'ckan_config', 'updated': r.rowcount})
+
+        # Reactivate 3 Accela cities
+        for slug in ['el-paso-tx', 'baltimore-md-accela', 'mesa-az-accela']:
+            r = conn.execute("""
+                UPDATE cities SET status='active', updated_at=datetime('now')
+                WHERE city_slug=? AND platform='accela'
+            """, (slug,))
+            conn.commit()
+            results.append({'city_slug': slug, 'action': 'reactivate_accela', 'updated': r.rowcount})
+
+        return jsonify({'batch1_results': results}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
