@@ -3012,6 +3012,27 @@ def admin_sweep_catalogs():
     return jsonify({'status': 'started', 'message': 'Sweeping Socrata + ArcGIS catalogs'}), 200
 
 
+@app.route('/api/admin/test-sweep-sources', methods=['POST'])
+def admin_test_sweep_sources():
+    """V115: Test pending sweep_sources without re-running the catalog sweep."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    def run():
+        try:
+            from catalog_sweep import test_sweep_sources
+            test_sweep_sources(limit=500)
+        except Exception as e:
+            print(f"[TEST] Error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return jsonify({'status': 'testing_started', 'message': 'Testing up to 500 pending sources'}), 200
+
+
 @app.route('/api/admin/sweep-status')
 def admin_sweep_status():
     """V114: Check catalog sweep results."""

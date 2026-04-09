@@ -20,12 +20,72 @@ def _log(msg):
     print(msg, flush=True)
 
 
+# V115: Quality filters
+BAD_CITY_COLUMNS = {'contractorcity', 'contractor_city', 'applicantcity', 'applicant_city',
+                     'contact_city', 'contactcity', 'owner_city', 'ownercity',
+                     'mailing_city', 'mailingcity', 'billing_city', 'agent_city', ''}
+
+SKIP_DOMAINS = {'data.calgary.ca', 'data.edmonton.ca', 'data.winnipeg.ca', 'data.surrey.ca',
+                'data.gov.au', 'data.gov.uk', 'austin-metro.demo.socrata.com',
+                'health.data.ny.gov'}
+
+EXCLUDE_KEYWORDS = ['elevator permit', 'child care', 'food permit', 'health permit',
+                    'liquor permit', 'taxi permit', 'film permit', 'parking permit',
+                    'street permit', 'right-of-way', 'sidewalk cafe', 'special event',
+                    'vendor permit', 'cannabis', 'marijuana', 'liquor', 'tobacco',
+                    'key economic', 'economic indicator']
+
+
+def _is_valid_domain(domain):
+    """V115: Skip non-US and demo domains."""
+    d = domain.lower()
+    if d in SKIP_DOMAINS:
+        return False
+    if d.endswith('.ca') and not d.endswith('.ca.gov'):
+        return False
+    return True
+
+
+def _is_building_permit_dataset(name, description=''):
+    """V115: Check if dataset is about building/construction permits."""
+    text = (name + ' ' + description).lower()
+    if any(kw in text for kw in EXCLUDE_KEYWORDS):
+        return False
+    return 'permit' in text or 'construction' in text or 'building' in text
+
+
+def _v115_cleanup():
+    """V115: One-time purge of junk sweep data."""
+    conn = permitdb.get_connection()
+    if conn.execute("SELECT 1 FROM system_state WHERE key='v115_cleanup_done'").fetchone():
+        return
+    _log("[V115] Starting data cleanup...")
+
+    # Delete bad city column entries
+    placeholders = ','.join(['?' for _ in BAD_CITY_COLUMNS])
+    d1 = conn.execute(f"DELETE FROM sweep_sources WHERE city_column IN ({placeholders})",
+                       list(BAD_CITY_COLUMNS)).rowcount
+
+    # Delete non-US domains
+    d2 = 0
+    for domain in SKIP_DOMAINS:
+        d2 += conn.execute("DELETE FROM sweep_sources WHERE domain = ?", (domain,)).rowcount
+
+    # Delete junk permits (SOC- prefix from sweep, matching bad dataset IDs)
+    d3 = conn.execute("DELETE FROM permits WHERE permit_number LIKE 'SOC-%' AND source_city_key IN (SELECT city_slug FROM sweep_sources WHERE status = 'error' OR city_column IN ('contractorcity','applicant_city','contact_city'))").rowcount
+
+    conn.execute("INSERT OR REPLACE INTO system_state (key, value) VALUES ('v115_cleanup_done', '1')")
+    conn.commit()
+    _log(f"[V115] Cleanup: {d1} bad column entries, {d2} bad domain entries, {d3} junk permits deleted")
+
+
 # ================================================================
 # SOCRATA CATALOG SWEEP
 # ================================================================
 
 def sweep_socrata_catalog():
     """Sweep Socrata Discovery API for all building permit datasets."""
+    _v115_cleanup()  # Purge junk from previous runs
     _log("[SWEEP] Starting Socrata catalog sweep...")
     conn = permitdb.get_connection()
 
@@ -91,10 +151,21 @@ def sweep_socrata_catalog():
             if not dataset_id:
                 continue
 
+            # V115: Skip non-US/demo domains
+            if not _is_valid_domain(domain):
+                continue
+
+            # V115: Skip non-building-permit datasets
+            description = resource.get('description', '')
+            if not _is_building_permit_dataset(name, description):
+                continue
+
             # City columns for multi-city datasets
             city_columns = [c for c in columns if any(
                 kw in c for kw in ['city', 'municipality', 'town', 'jurisdiction', 'community']
             )]
+            # V115: Filter out bad columns (contractor/applicant/contact addresses)
+            city_columns = [c for c in city_columns if c.lower() not in BAD_CITY_COLUMNS]
 
             # Try to match domain to a specific city
             city_match = _match_domain_to_city(domain, conn)
@@ -318,8 +389,9 @@ def sweep_arcgis_hub():
 # TEST + ACTIVATE DISCOVERED SOURCES
 # ================================================================
 
-def test_sweep_sources(limit=100):
-    """Test pending discovered sources and do 6-month pull for confirmed ones."""
+def test_sweep_sources(limit=500):
+    """Test pending sweep sources and pull permits from confirmed ones."""
+    _v115_cleanup()  # Purge junk first
     conn = permitdb.get_connection()
 
     pending = conn.execute("""
@@ -364,6 +436,9 @@ def test_sweep_sources(limit=100):
             conn.commit()
 
         time.sleep(0.5)
+        tested_count = pending.index(row) + 1 if row in pending else 0
+        if tested_count % 10 == 0:
+            _log(f"[TEST] Progress: {tested_count}/{len(pending)} tested, {confirmed} confirmed")
 
     _log(f"[TEST] Complete: {confirmed}/{len(pending)} sources confirmed with data")
     return confirmed
