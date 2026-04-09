@@ -3230,13 +3230,21 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 city_permits_dict, source_stats = collect_bulk_source(source_key, config, days_back=days_back)
                 total_permits = source_stats.get('total_normalized', 0)
 
+                # V124: Insert bulk permits IMMEDIATELY per source
+                bulk_inserted = 0
                 for slug, permits in city_permits_dict.items():
+                    if permits:
+                        try:
+                            ins, _ = permitdb.upsert_permits(permits, source_city_key=slug)
+                            bulk_inserted += ins
+                        except Exception:
+                            pass
                     all_permits.extend(permits)
                     cities_from_bulk.add(slug)
 
                 bulk_stats[source_key] = source_stats
                 bulk_sources_collected.add(source_key)
-                print(f"    ✓ {config.get('name', source_key)}: {total_permits} permits")
+                print(f"    ✓ {config.get('name', source_key)}: {total_permits} found, {bulk_inserted} inserted", flush=True)
 
                 duration_ms = int((time.time() - start_time) * 1000)
                 _log_v15_collection(
@@ -3345,18 +3353,26 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                     except Exception:
                         continue
 
-                all_permits.extend(city_permits)
+                # V124: INSERT IMMEDIATELY after each city — don't accumulate
                 permit_count = len(city_permits)
+                inserted_count = 0
+                if city_permits:
+                    try:
+                        inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=source_id)
+                    except Exception as upsert_err:
+                        print(f"    [V124] Upsert error for {city_name}: {upsert_err}", flush=True)
+                all_permits.extend(city_permits)  # keep for stats/compat
 
                 stats[source_id] = {
                     "raw": len(raw),
                     "normalized": permit_count,
+                    "inserted": inserted_count,
                     "city_name": city_name,
                     "status": fetch_status,
                 }
 
                 if fetch_status == "success":
-                    print(f"    ✓ {city_name}: {permit_count} permits")
+                    print(f"    ✓ {city_name}: {permit_count} found, {inserted_count} inserted", flush=True)
                     if permit_count > 0:
                         try:
                             record_collection(source_id, permit_count)
@@ -3435,18 +3451,26 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                         except Exception:
                             continue
 
-                    all_permits.extend(city_permits)
+                    # V124: INSERT IMMEDIATELY
                     permit_count = len(city_permits)
+                    inserted_count = 0
+                    if city_permits:
+                        try:
+                            inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=city_key)
+                        except Exception as upsert_err:
+                            print(f"    [V124] Upsert error for {city_name}: {upsert_err}", flush=True)
+                    all_permits.extend(city_permits)
 
                     stats[city_key] = {
                         "raw": len(raw),
                         "normalized": permit_count,
+                        "inserted": inserted_count,
                         "city_name": city_name,
                         "status": fetch_status,
                     }
 
                     if fetch_status == "success":
-                        print(f"    \u2713 {city_name}: {permit_count} permits")
+                        print(f"    \u2713 {city_name}: {permit_count} found, {inserted_count} inserted", flush=True)
                         if permit_count > 0:
                             try:
                                 record_collection(city_key, permit_count)
