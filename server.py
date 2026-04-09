@@ -3976,6 +3976,25 @@ def admin_v123_onboard():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v125-skip', methods=['POST'])
+def admin_v125_skip():
+    """V125: Mark cities as skip."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        slugs = request.json.get('slugs', [])
+        results = []
+        for slug in slugs:
+            r = conn.execute("UPDATE cities SET status='skip', updated_at=datetime('now') WHERE city_slug=?", (slug,))
+            results.append({'slug': slug, 'updated': r.rowcount})
+        conn.commit()
+        return jsonify({'skipped': results}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
