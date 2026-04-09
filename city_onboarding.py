@@ -574,7 +574,10 @@ def _parse_date(raw):
         return None
     for fmt in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
                 '%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y',
-                '%Y-%m-%d %H:%M:%S', '%m-%d-%Y']:
+                '%Y-%m-%d %H:%M:%S', '%m-%d-%Y',
+                '%d-%b-%y', '%d-%b-%Y',  # V119: DD-MON-YY (Las Vegas: "06-OCT-04")
+                '%m/%d/%Y %I:%M:%S %p',  # V119: San Jose CKAN: "4/10/2018 12:00:00 AM"
+                ]:
         try:
             return datetime.strptime(str(raw)[:26], fmt).strftime('%Y-%m-%d')
         except (ValueError, TypeError):

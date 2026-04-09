@@ -1696,7 +1696,7 @@ CITY_REGISTRY = {
         "lat": 36.172,
         "lon": -115.14,
         "platform": "arcgis",
-        "endpoint": "https://services1.arcgis.com/0MSEUqKaxRlEPj5g/arcgis/rest/services/Building_Permits/FeatureServer/0/query",
+        "endpoint": "https://mapdata.lasvegasnevada.gov/clvgis/rest/services/DevelopmentServices/BuildingPermits/MapServer/0/query",
         "dataset_id": "Building_Permits_LV",
         "description": "Building Permits",
         "field_map": {
@@ -1709,7 +1709,7 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "date",
         "limit": 2000,
-        "active": False,  # V102: Deactivated â endpoint serves Baltimore data, not Las Vegas. ArcGIS org 0MSEUqKaxRlEPj5g is Baltimore City.
+        "active": True,  # V119: Reactivated with correct Las Vegas MapServer endpoint
         "notes": "V102: Deactivated. Endpoint confirmed to serve Baltimore City permits, not Las Vegas. Need correct Las Vegas ArcGIS service URL.",
     },
 
@@ -1822,7 +1822,7 @@ CITY_REGISTRY = {
         "date_field": "DateIssued",
         "date_format": "epoch",
         "limit": 2000,
-        "active": False,  # V103: Deactivated — stale since April 2024, never_worked in prod, 0 permits collected
+        "active": True,  # V119: Reactivated — endpoint verified with real permit data (PermitNumber, DateIssued, etc.)
         "notes": "V103: Deactivated. ArcGIS endpoint stale since 2024 despite V72 reactivation. 0 permits ever collected.",
     },
 

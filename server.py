@@ -3133,6 +3133,103 @@ def admin_create_permits_index():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/add-major-cities', methods=['POST'])
+def admin_add_major_cities():
+    """V119: Add 5 verified major city sources — San Jose, DC, Las Vegas, Albuquerque, St. Paul."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+
+        # Define the 5 cities with verified endpoints
+        cities = [
+            {
+                'source_key': 'san-jose-ca-ckan', 'slug': 'san-jose',
+                'name': 'San Jose', 'state': 'CA', 'platform': 'ckan',
+                'endpoint': 'https://data.sanjoseca.gov/api/3/action/datastore_search',
+                'dataset_id': '761b7ae8-3be1-4ad6-923d-c7af6404a904',
+            },
+            {
+                'source_key': 'dc-arcgis', 'slug': 'washington',
+                'name': 'Washington', 'state': 'DC', 'platform': 'arcgis',
+                'endpoint': 'https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/DCRA/FeatureServer/4',
+                'dataset_id': '',
+            },
+            {
+                'source_key': 'las-vegas-nv-arcgis', 'slug': 'las-vegas',
+                'name': 'Las Vegas', 'state': 'NV', 'platform': 'arcgis',
+                'endpoint': 'https://mapdata.lasvegasnevada.gov/clvgis/rest/services/DevelopmentServices/BuildingPermits/MapServer/0',
+                'dataset_id': '',
+            },
+            {
+                'source_key': 'albuquerque-nm-arcgis', 'slug': 'albuquerque',
+                'name': 'Albuquerque', 'state': 'NM', 'platform': 'arcgis',
+                'endpoint': 'https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/FeatureServer/0',
+                'dataset_id': '',
+            },
+            {
+                'source_key': 'saint-paul-mn-socrata', 'slug': 'saint-paul',
+                'name': 'St. Paul', 'state': 'MN', 'platform': 'socrata',
+                'endpoint': 'https://information.stpaul.gov/resource/j8ip-eytd.json',
+                'dataset_id': 'j8ip-eytd',
+            },
+        ]
+
+        added = 0
+        for c in cities:
+            try:
+                # Upsert city_sources
+                conn.execute("""
+                    INSERT OR REPLACE INTO city_sources
+                    (source_key, name, state, platform, endpoint, dataset_id, status)
+                    VALUES (?, ?, ?, ?, ?, ?, 'active')
+                """, (c['source_key'], c['name'], c['state'], c['platform'],
+                      c['endpoint'], c['dataset_id']))
+
+                # Find and update prod_cities — try slug first, then city name + state
+                updated = conn.execute("""
+                    UPDATE prod_cities SET source_type = ?, source_id = ?,
+                    source_endpoint = ?, status = 'active', health_status = 'collecting',
+                    consecutive_failures = 0
+                    WHERE city_slug = ? OR (LOWER(city) = LOWER(?) AND state = ?)
+                """, (c['platform'], c['source_key'], c['endpoint'],
+                      c['slug'], c['name'], c['state'])).rowcount
+
+                if updated:
+                    added += 1
+                    print(f"V119: Added {c['name']}, {c['state']} ({c['platform']})", flush=True)
+                else:
+                    print(f"V119: No prod_cities match for {c['slug']}", flush=True)
+            except Exception as e:
+                print(f"V119: Error adding {c['slug']}: {e}", flush=True)
+
+        conn.commit()
+        return jsonify({'status': 'complete', 'added': added, 'total': len(cities)}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/test-city-collection', methods=['POST'])
+def admin_test_city_collection():
+    """V119: Test collection for a single city."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        data = request.json or {}
+        city_slug = data.get('city_slug')
+        days_back = data.get('days_back', 180)
+        if not city_slug:
+            return jsonify({'error': 'city_slug required'}), 400
+
+        from collector import collect_single_city
+        result = collect_single_city(city_slug, days_back=days_back)
+        return jsonify({'city_slug': city_slug, 'result': result}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/activate-sweep-sources', methods=['POST'])
 def admin_activate_sweep_sources():
     """V117: Bridge confirmed sweep_sources into prod_cities for collection."""
