@@ -2383,6 +2383,55 @@ _startup_done = False
 _collectors_manually_started = False
 
 @app.before_request
+def _try_discover_source(city_name, state, slug):
+    """V120: Try to auto-discover a working permit data source for a city."""
+    import requests as req
+
+    # --- Socrata Discovery API ---
+    try:
+        r = req.get("https://api.us.socrata.com/api/catalog/v1",
+                     params={'q': f'{city_name} building permits', 'limit': 10, 'only': 'datasets'},
+                     timeout=15)
+        if r.ok:
+            for ds in r.json().get('results', []):
+                resource = ds.get('resource', {})
+                domain = ds.get('metadata', {}).get('domain', '')
+                name = resource.get('name', '').lower()
+                dataset_id = resource.get('id', '')
+                if ('permit' in name or 'building' in name) and '.gov' in domain and dataset_id:
+                    endpoint = f"https://{domain}/resource/{dataset_id}.json"
+                    test = req.get(f"{endpoint}?$limit=3", timeout=10)
+                    if test.ok and len(test.json()) > 0:
+                        columns = resource.get('columns_field_name', [])
+                        date_field = next((c for c in columns if any(d in c.lower() for d in ['issued', 'date', 'applied'])), '')
+                        print(f"V120: Discovered Socrata for {slug}: {domain}/{dataset_id}", flush=True)
+                        return {'source_key': f"{slug}-socrata", 'platform': 'socrata',
+                                'endpoint': endpoint, 'dataset_id': dataset_id, 'date_field': date_field}
+    except Exception:
+        pass
+
+    # --- ArcGIS Hub ---
+    try:
+        r = req.get("https://hub.arcgis.com/api/v3/search",
+                     params={'q': f'{city_name} {state} building permits', 'filter[type]': 'Feature Service'},
+                     timeout=15)
+        if r.ok:
+            for item in r.json().get('data', [])[:5]:
+                attrs = item.get('attributes', {})
+                url = attrs.get('url', '')
+                name = attrs.get('name', '').lower()
+                if 'permit' in name and url:
+                    test_url = f"{url}/0/query?where=1%3D1&outFields=*&resultRecordCount=3&f=json"
+                    test = req.get(test_url, timeout=15)
+                    if test.ok and test.json().get('features'):
+                        print(f"V120: Discovered ArcGIS for {slug}: {url}", flush=True)
+                        return {'source_key': f"{slug}-arcgis", 'platform': 'arcgis', 'endpoint': url}
+    except Exception:
+        pass
+
+    return None
+
+
 def _cleanup_v108_pipeline_damage():
     """V110: One-time cleanup — uses system_state flag to run only ONCE."""
     try:
@@ -3228,6 +3277,108 @@ def admin_test_city_collection():
         return jsonify({'city_slug': city_slug, 'result': result}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/fix-v119-cities', methods=['POST'])
+def admin_fix_v119_cities():
+    """V120: Fix the 4 broken V119 cities + San Jose permit names."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        fixes = []
+
+        # Fix San Jose: update permit city names from "san_jose" to "San Jose"
+        fixed_sj = conn.execute(
+            "UPDATE permits SET city = 'San Jose' WHERE city = 'san_jose' AND state = 'CA'"
+        ).rowcount
+        if fixed_sj:
+            conn.execute("""
+                UPDATE prod_cities SET
+                    total_permits = (SELECT count(*) FROM permits WHERE lower(city) = 'san jose' AND lower(state) = 'ca'),
+                    last_successful_collection = (SELECT max(collected_at) FROM permits WHERE lower(city) = 'san jose' AND lower(state) = 'ca'),
+                    health_status = 'collecting', data_freshness = 'fresh'
+                WHERE city_slug = 'san-jose'
+            """)
+            fixes.append(f"San Jose: fixed {fixed_sj} permits city name")
+
+        # Fix St. Paul: set date_field in city_sources
+        conn.execute("""
+            UPDATE city_sources SET date_field = 'issueddate'
+            WHERE source_key = 'saint-paul-mn-socrata' AND (date_field IS NULL OR date_field = '')
+        """)
+        fixes.append("St. Paul: set date_field=issueddate")
+
+        conn.commit()
+        print(f"V120: Fixed V119 cities: {fixes}", flush=True)
+        return jsonify({'status': 'complete', 'fixes': fixes}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/auto-add-batch', methods=['POST'])
+def admin_auto_add_batch():
+    """V120: Auto-discover sources for top pending cities by population."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    data = request.json or {}
+    limit = min(data.get('limit', 10), 50)
+
+    def run():
+        try:
+            conn = permitdb.get_connection()
+            pending = conn.execute("""
+                SELECT city_slug, city, state, population FROM prod_cities
+                WHERE status IN ('pending', 'active')
+                AND (source_type IS NULL OR source_type = '')
+                AND (total_permits = 0 OR total_permits IS NULL)
+                AND population >= 25000
+                ORDER BY population DESC LIMIT ?
+            """, (limit,)).fetchall()
+
+            print(f"V120: Auto-add batch starting for {len(pending)} cities", flush=True)
+            configured = 0
+            no_source = 0
+
+            for row in pending:
+                slug, city_name, state, pop = row[0], row[1], row[2], row[3]
+                source = _try_discover_source(city_name, state, slug)
+
+                if source:
+                    # Insert city_sources
+                    conn.execute("""
+                        INSERT OR REPLACE INTO city_sources
+                        (source_key, name, state, platform, endpoint, dataset_id, date_field,
+                         mode, status, limit_per_page, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'city', 'active', 2000, datetime('now'), datetime('now'))
+                    """, (source['source_key'], city_name, state, source['platform'],
+                          source['endpoint'], source.get('dataset_id', ''), source.get('date_field', '')))
+
+                    conn.execute("""
+                        UPDATE prod_cities SET source_type = ?, source_id = ?,
+                        status = 'active', health_status = 'collecting'
+                        WHERE city_slug = ?
+                    """, (source['platform'], source['source_key'], slug))
+                    conn.commit()
+                    configured += 1
+                    print(f"V120: Configured {slug} ({pop:,}) — {source['platform']}", flush=True)
+                else:
+                    no_source += 1
+
+                time.sleep(1)
+
+            print(f"V120: Batch complete: {configured} configured, {no_source} no source", flush=True)
+        except Exception as e:
+            print(f"V120: Batch error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'processing': limit}), 200
 
 
 @app.route('/api/admin/activate-sweep-sources', methods=['POST'])
