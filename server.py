@@ -3702,6 +3702,58 @@ def admin_v122_add_batch1():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v122-add-batch2', methods=['POST'])
+def admin_v122_add_batch2():
+    """V122: St. Paul ArcGIS, DC merge, Irving ArcGIS, Boise ArcGIS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        results = []
+
+        # St. Paul MN — ArcGIS FeatureServer, 317K records
+        r = conn.execute("""
+            UPDATE cities SET platform='arcgis',
+                endpoint='https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0',
+                date_field='ISSUEDATE', status='active', updated_at=datetime('now')
+            WHERE city_slug='saint-paul'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'saint-paul', 'action': 'arcgis_config', 'updated': r.rowcount})
+
+        # DC duplicate merge
+        conn.execute("UPDATE cities SET population=702250, updated_at=datetime('now') WHERE city_slug='washington-dc'")
+        r = conn.execute("UPDATE cities SET status='skip', updated_at=datetime('now') WHERE city_slug='district-of-columbia-dc'")
+        conn.commit()
+        results.append({'city_slug': 'district-of-columbia-dc', 'action': 'skip_duplicate', 'updated': r.rowcount})
+
+        # Irving TX — ArcGIS FeatureServer, 15K residential permits
+        r = conn.execute("""
+            UPDATE cities SET platform='arcgis',
+                endpoint='https://services3.arcgis.com/OfsJXUlu8pSkbl7B/arcgis/rest/services/Residential_Permits_Issued_Feb_15_2022_Present/FeatureServer/0',
+                date_field='Issued_Date', status='active', updated_at=datetime('now')
+            WHERE city_slug='irving'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'irving', 'action': 'arcgis_config', 'updated': r.rowcount})
+
+        # Boise ID — ArcGIS FeatureServer, 10K records (DateOnly = YYYY-MM-DD strings)
+        r = conn.execute("""
+            UPDATE cities SET platform='arcgis',
+                endpoint='https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/Housing_OpenData/FeatureServer/0',
+                date_field='IssuedDate', status='active', updated_at=datetime('now')
+            WHERE city_slug='boise'
+        """)
+        conn.commit()
+        results.append({'city_slug': 'boise', 'action': 'arcgis_config', 'updated': r.rowcount})
+
+        return jsonify({'batch2_results': results}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/config-audit')
 def admin_config_audit():
     """REARCH: Audit config sources — shows gap between dicts and city_sources table."""
