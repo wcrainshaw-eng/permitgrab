@@ -5335,20 +5335,19 @@ def admin_test_and_backfill():
 
         test_config['limit'] = 10  # Small sample for freshness check
         try:
-            # Test with 30-day window — if there's no data in the last 30 days,
-            # the source is stale and not worth activating for leads
+            # V128: Test with 90-day window (was 30 — too strict for monthly-updating portals)
             if platform == 'socrata':
-                test_raw = fetch_socrata(test_config, 30)
+                test_raw = fetch_socrata(test_config, 90)
             elif platform == 'arcgis':
-                test_raw = fetch_arcgis(test_config, 30)
+                test_raw = fetch_arcgis(test_config, 90)
             elif platform == 'ckan':
-                test_raw = fetch_ckan(test_config, 30)
+                test_raw = fetch_ckan(test_config, 90)
             elif platform == 'carto':
-                test_raw = fetch_carto(test_config, 30)
+                test_raw = fetch_carto(test_config, 90)
             elif platform == 'accela':
                 if not _accela_available:
                     return jsonify({'error': 'Accela scraper not available (Playwright not installed)'}), 400
-                test_raw = fetch_accela(test_config, 30)
+                test_raw = fetch_accela(test_config, 90)
             else:
                 return jsonify({'error': f'Unsupported platform: {platform}'}), 400
         except Exception as e:
@@ -5364,7 +5363,7 @@ def admin_test_and_backfill():
                 'status': 'FAILED',
                 'step': 'test',
                 'error': 'No permits in last 30 days',
-                'message': f'{city_key} has no data in the last 30 days. Stale source — do NOT activate.'
+                'message': f'{city_key} has no data in the last 90 days. Stale source — do NOT activate.'
             }), 400
 
         # Step 2: BACKFILL — fetch full historical data
