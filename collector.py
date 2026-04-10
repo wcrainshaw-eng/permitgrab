@@ -1637,8 +1637,7 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
                     parsed_date = f"{y:04d}-{m:02d}-{d:02d}"
             except (ValueError, IndexError):
                 pass
-        if not parsed_date:
-            parsed_date = str(date_str)[:10]
+        # V126: Leave unparseable dates as empty (quarantine)
 
     # Build description
     desc = get_field("description") or get_field("work_type") or get_field("permit_type")
@@ -1673,9 +1672,9 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
         "trade_category": trade,
         "address": sanitize_string(address),
         "zip": sanitize_string(get_field("zip")),
-        "filing_date": parsed_date,
-        "date": parsed_date,  # V15: populate both date columns
-        "issued_date": parsed_date,  # V15: populate all date columns
+        "filing_date": parsed_date or None,  # V126: NULL if no date (quarantine)
+        "date": parsed_date or None,
+        "issued_date": parsed_date or None,
         "status": sanitize_string(get_field("status")),
         "estimated_cost": cost,
         "value_tier": value_tier,
@@ -1839,23 +1838,23 @@ def normalize_permit(raw_record, city_key):
 
     address = " ".join(address_parts) if address_parts else (parsed_addr or get_field("address"))
 
-    # Fallback: try common address field names not in field_map
+    # V126: Expanded address fallback — search ALL raw fields for address-like keys
     if not address:
-        for fallback_key in ["location", "project_address", "site_address",
-                             "property_address", "address_full", "location_1",
-                             "mapped_location"]:
-            raw_val = raw_record.get(fallback_key, "")
-            val = parse_address_value(raw_val)
-            if not val:
-                val = str(raw_val).strip()
-            if val and val.lower() not in ["none", "n/a", ""]:
-                # V18: Sanity check - skip if value looks like a description (>100 chars or contains work keywords)
-                if len(val) < 100 and not any(kw in val.lower() for kw in ["construction", "alteration", "renovation", "permit", "install"]):
-                    address = val
-                    break
+        addr_keywords = ['address', 'addr', 'location', 'site', 'street', 'property']
+        for raw_key, raw_val in raw_record.items():
+            if not raw_val or not isinstance(raw_val, (str, dict)):
+                continue
+            key_lower = raw_key.lower()
+            if any(kw in key_lower for kw in addr_keywords):
+                val = parse_address_value(raw_val) if isinstance(raw_val, dict) else str(raw_val).strip()
+                if val and val.lower() not in ["none", "n/a", ""] and len(val) < 200:
+                    if not any(kw in val.lower() for kw in ["construction", "alteration", "renovation", "permit", "install"]):
+                        address = val
+                        break
 
-    if not address:
-        address = "Address not provided"
+    # V126: REQUIRED — drop record if no address found
+    if not address or address == "Address not provided":
+        return None
 
     # Parse cost
     cost_str = get_field("estimated_cost")
@@ -1898,8 +1897,8 @@ def normalize_permit(raw_record, city_key):
                     parsed_date = f"{y:04d}-{m:02d}-{d:02d}"
             except (ValueError, IndexError):
                 pass
-        if not parsed_date:
-            parsed_date = str(date_str)[:10]
+        # V126: Leave unparseable dates as empty (quarantine approach)
+        # Next collection identifies new records by their absence in prior run
 
     # Build description from available fields
     desc = get_field("description") or get_field("work_type") or get_field("permit_type")
@@ -1917,13 +1916,22 @@ def normalize_permit(raw_record, city_key):
     contact = get_field("contact_name") or owner
     phone = get_field("owner_phone") or get_field("contact_phone")
 
-    # Handle missing permit numbers with synthetic IDs
-    import hashlib
+    # V126: permit_number is REQUIRED — also search all raw fields
     permit_num = get_field("permit_number")
     if not permit_num:
-        # Generate a synthetic permit number from city + date + hash
-        raw_str = f"{city_key}_{address}_{parsed_date}"
-        permit_num = f"PG-{city_key[:3].upper()}-{hashlib.md5(raw_str.encode()).hexdigest()[:8]}"
+        # Search all raw fields for permit-like keys
+        for raw_key, raw_val in raw_record.items():
+            if not raw_val:
+                continue
+            key_lower = raw_key.lower()
+            if any(kw in key_lower for kw in ['permit_n', 'permitn', 'permit_id', 'permit_no',
+                                                'record_n', 'record_id', 'case_n', 'application_n',
+                                                'apno', 'foldernumber']):
+                permit_num = str(raw_val).strip()
+                if permit_num:
+                    break
+    if not permit_num:
+        return None  # V126: REQUIRED — drop records without permit number
 
     return {
         "id": f"{city_key}_{permit_num}",
@@ -1935,9 +1943,9 @@ def normalize_permit(raw_record, city_key):
         "trade_category": trade,
         "address": sanitize_string(address),
         "zip": sanitize_string(get_field("zip")),
-        "filing_date": parsed_date,
-        "date": parsed_date,  # V15: populate both date columns
-        "issued_date": parsed_date,  # V15: populate all date columns
+        "filing_date": parsed_date or None,  # V126: NULL if no date (quarantine)
+        "date": parsed_date or None,
+        "issued_date": parsed_date or None,
         "status": sanitize_string(get_field("status")),
         "estimated_cost": cost,
         "value_tier": value_tier,
