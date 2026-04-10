@@ -2236,6 +2236,31 @@ async def close_browser():
 
 
 # ============================================================================
+# V133: SILVERLIGHT MASK DISMISS HELPER
+# ============================================================================
+
+async def dismiss_loading_mask(page):
+    """V133: Dismiss Accela Silverlight loading mask that blocks clicks.
+    Must be called before every click action on an Accela page."""
+    try:
+        await page.evaluate('''() => {
+            // Remove the global loading mask
+            const mask = document.getElementById('divGlobalLoadingMask');
+            if (mask) { mask.style.display = 'none'; mask.remove(); }
+            // Remove all Silverlight mask iframes
+            document.querySelectorAll('iframe.mask_iframe').forEach(f => f.remove());
+            // Remove any overlay divs with loading in their ID
+            document.querySelectorAll('[id*="LoadingMask"]').forEach(el => el.remove());
+            document.querySelectorAll('[id*="loadingMask"]').forEach(el => el.remove());
+            document.querySelectorAll('[id*="loading_mask"]').forEach(el => el.remove());
+            // Also handle the ACA processing panel
+            document.querySelectorAll('.ACA_Loading, .ACA_SmLoading').forEach(el => { el.style.display = 'none'; });
+        }''')
+    except Exception:
+        pass
+
+
+# ============================================================================
 # CORE SCRAPER
 # ============================================================================
 
@@ -2284,6 +2309,7 @@ async def scrape_accela_permits(city_key, days_back=1):
         print(f"    [Accela] Navigating to {agency} search page...")
         await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(2000)  # Let ASP.NET finish rendering
+        await dismiss_loading_mask(page)  # V133: Remove Silverlight mask after page load
 
         # ---- STEP 1: Set date range ----
         end_date = datetime.now()
@@ -2304,6 +2330,7 @@ async def scrape_accela_permits(city_key, days_back=1):
         for sel in start_date_selectors:
             start_input = await page.query_selector(sel)
             if start_input:
+                await dismiss_loading_mask(page)  # V133
                 await start_input.click(click_count=3)  # Select all
                 await start_input.fill(start_str)
                 break
@@ -2317,6 +2344,7 @@ async def scrape_accela_permits(city_key, days_back=1):
         for sel in end_date_selectors:
             end_input = await page.query_selector(sel)
             if end_input:
+                await dismiss_loading_mask(page)  # V133
                 await end_input.click(click_count=3)
                 await end_input.fill(end_str)
                 break
@@ -2326,6 +2354,7 @@ async def scrape_accela_permits(city_key, days_back=1):
         accept_btn = await page.query_selector('a:has-text("I Agree"), a:has-text("Accept"), button:has-text("Accept"), a:has-text("Continue")')
         if accept_btn:
             print(f"    [Accela] Accepting terms/disclaimer...")
+            await dismiss_loading_mask(page)  # V133
             await accept_btn.click()
             await page.wait_for_timeout(2000)
 
@@ -2369,6 +2398,7 @@ async def scrape_accela_permits(city_key, days_back=1):
                 # Scroll into view and wait
                 await btn.scroll_into_view_if_needed()
                 await page.wait_for_timeout(500)
+                await dismiss_loading_mask(page)  # V133: Remove mask before click
                 try:
                     await btn.click(timeout=10000)
                     search_btn = btn
@@ -2468,6 +2498,7 @@ async def _try_csv_export(page, agency_code):
             return []
 
         # Set up download listener BEFORE clicking
+        await dismiss_loading_mask(page)  # V133
         async with page.expect_download(timeout=30000) as download_info:
             await export_btn.click()
 
@@ -2590,6 +2621,7 @@ async def _parse_results_table(page, agency_code):
             break  # No more pages
 
         # Click next page
+        await dismiss_loading_mask(page)  # V133
         await next_btn.click()
         await page.wait_for_load_state("networkidle", timeout=30000)
         await page.wait_for_timeout(2000)
