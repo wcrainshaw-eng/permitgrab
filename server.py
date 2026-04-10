@@ -5485,7 +5485,9 @@ def admin_test_and_backfill():
             }), 400
 
         # Step 4: INSERT into DB
-        inserted = permitdb.upsert_permits(normalized, source_city_key=city_key)
+        # Use hyphen-format slug as source_city_key to match score query expectations
+        slug = config.get('slug', city_key.replace('_', '-'))
+        inserted = permitdb.upsert_permits(normalized, source_city_key=slug)
 
         # Step 5: ACTIVATE — update city_sources and prod_cities
         conn = permitdb.get_connection()
