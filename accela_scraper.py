@@ -2719,6 +2719,20 @@ def fetch_accela(config, days_back):
         if source_key and source_key in ACCELA_CONFIGS:
             city_key = source_key
 
+    # V130: Try source_key without state suffix (e.g., "atlanta_ga" → "atlanta")
+    if not city_key:
+        source_key = config.get("source_key", "")
+        if source_key and '_' in source_key:
+            base_key = '_'.join(source_key.split('_')[:-1])
+            if base_key in ACCELA_CONFIGS:
+                city_key = base_key
+
+    # V130: Try city name lowercase with underscores
+    if not city_key:
+        name = config.get("name", "").lower().replace(" ", "_").replace("-", "_")
+        if name in ACCELA_CONFIGS:
+            city_key = name
+
     if not city_key:
         # V46: Raise instead of silent return so collector logs as error
         raise ValueError(f"Cannot determine Accela city_key from config: {config.get('name', 'unknown')} (source_key: {config.get('source_key', 'none')})")
