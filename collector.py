@@ -845,11 +845,13 @@ def atomic_write_json(filepath, data, indent=2):
 # ============================================================================
 
 def fetch_socrata(config, days_back):
-    """Fetch permits from a Socrata SODA API."""
+    """Fetch permits from a Socrata SODA API. V131: Paginates until exhausted."""
     endpoint = config["endpoint"]
     # V60: Removed V55 /query auto-append — was incorrectly appending /query to Socrata .json URLs causing 404s
     date_field = config["date_field"]
-    limit = config.get("limit", 2000)
+    page_size = config.get("limit", 2000)
+    MAX_PAGES = 10  # V131: Safety limit — max 10 pages (20,000 records)
+    MAX_RECORDS = 50000  # V131: Hard cap
 
     # Calculate date filter
     since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
@@ -868,15 +870,24 @@ def fetch_socrata(config, days_back):
     if extra_filter:
         where_clause += f" AND ({extra_filter})"
 
-    params = {
-        "$limit": limit,
-        "$order": f"{date_field} DESC",
-        "$where": where_clause,
-    }
-
-    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
-    resp.raise_for_status()
-    return resp.json()
+    # V131: Paginate through all results
+    all_records = []
+    offset = 0
+    for page_num in range(MAX_PAGES):
+        params = {
+            "$limit": page_size,
+            "$offset": offset,
+            "$order": f"{date_field} DESC",
+            "$where": where_clause,
+        }
+        resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        page = resp.json()
+        all_records.extend(page)
+        if len(page) < page_size or len(all_records) >= MAX_RECORDS:
+            break  # Last page or safety limit
+        offset += page_size
+    return all_records
 
 
 def fetch_arcgis(config, days_back):
@@ -912,24 +923,32 @@ def fetch_arcgis(config, days_back):
         filter_value = city_filter["value"]
         where_clause += f" AND upper({filter_field}) = upper('{filter_value}')"
 
-    params = {
-        "where": where_clause,
-        "outFields": "*",
-        "resultRecordCount": limit,
-        "orderByFields": f"{date_field} DESC",
-        "f": "json",
-    }
+    page_size = limit
+    MAX_PAGES = 10  # V131: Safety limit
+    MAX_RECORDS = 50000  # V131: Hard cap
 
     # V126: Ensure endpoint ends with /query for ArcGIS
     query_endpoint = endpoint
     if '/query' not in query_endpoint:
         query_endpoint = query_endpoint.rstrip('/') + '/query'
 
-    resp = SESSION.get(query_endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
-    resp.raise_for_status()
-    data = resp.json()
+    # V131: Helper to fetch one page with date format auto-retry (V126)
+    def _fetch_arcgis_page(wc, offs):
+        params = {
+            "where": wc,
+            "outFields": "*",
+            "resultRecordCount": page_size,
+            "resultOffset": offs,
+            "orderByFields": f"{date_field} DESC",
+            "f": "json",
+        }
+        r = SESSION.get(query_endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
+        r.raise_for_status()
+        return r.json()
 
-    # V126: If date query fails, retry with alternate date formats
+    # First page — with date format auto-retry (V126)
+    data = _fetch_arcgis_page(where_clause, 0)
+
     if "error" in data and date_field:
         print(f"    [V126] ArcGIS date query failed with format '{date_format}', trying alternates...", flush=True)
         alt_formats = []
@@ -943,13 +962,11 @@ def fetch_arcgis(config, days_back):
 
         for fmt_name, alt_where in alt_formats:
             try:
-                alt_params = dict(params)
-                alt_params["where"] = alt_where
-                alt_resp = SESSION.get(query_endpoint, params=alt_params, timeout=API_TIMEOUT_SECONDS)
-                alt_data = alt_resp.json()
+                alt_data = _fetch_arcgis_page(alt_where, 0)
                 if "error" not in alt_data:
                     print(f"    [V126] Date format '{fmt_name}' worked for {endpoint[:60]}", flush=True)
                     data = alt_data
+                    where_clause = alt_where  # Use working format for pagination
                     break
             except Exception:
                 continue
@@ -959,6 +976,28 @@ def fetch_arcgis(config, days_back):
         error_msg = data["error"].get("message", "Unknown ArcGIS error")
         error_code = data["error"].get("code", "unknown")
         raise Exception(f"ArcGIS error {error_code}: {error_msg}")
+
+    # V131: Paginate through all results
+    all_features = data.get("features", [])
+    exceeded = data.get("exceededTransferLimit", False)
+    for page_num in range(1, MAX_PAGES):
+        if len(all_features) >= MAX_RECORDS:
+            break
+        page_has_full = len(data.get("features", [])) >= page_size
+        if not page_has_full and not exceeded:
+            break
+        offset = page_num * page_size
+        try:
+            data = _fetch_arcgis_page(where_clause, offset)
+            if "error" in data or "features" not in data:
+                break
+            all_features.extend(data["features"])
+            exceeded = data.get("exceededTransferLimit", False)
+        except Exception:
+            break  # Network error on pagination — keep what we have
+
+    # Build final data dict for downstream processing
+    data = {"features": all_features}
 
     if "features" in data:
         results = [f["attributes"] for f in data["features"]]
@@ -996,49 +1035,69 @@ def fetch_arcgis(config, days_back):
 
 
 def fetch_ckan(config, days_back):
-    """Fetch permits from a CKAN datastore API."""
+    """Fetch permits from a CKAN datastore API. V131: Paginates until exhausted."""
     endpoint = config["endpoint"]
     dataset_id = config["dataset_id"]
-    limit = config.get("limit", 2000)
+    page_size = config.get("limit", 2000)
     date_field = config.get("date_field", "")
+    MAX_PAGES = 10  # V131: Safety limit
+    MAX_RECORDS = 50000  # V131: Hard cap
 
     # Calculate date filter
     since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
-    params = {
-        "resource_id": dataset_id,
-        "limit": limit,
-    }
+    # V131: Paginate through all results
+    all_records = []
+    offset = 0
+    for page_num in range(MAX_PAGES):
+        params = {
+            "resource_id": dataset_id,
+            "limit": page_size,
+            "offset": offset,
+        }
+        # CKAN doesn't have great date filtering, so we fetch and filter in Python
+        if date_field:
+            params["sort"] = f"{date_field} desc"
 
-    # CKAN doesn't have great date filtering, so we fetch and filter in Python
-    if date_field:
-        params["sort"] = f"{date_field} desc"
+        resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        data = resp.json()
 
-    resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
-    resp.raise_for_status()
-    data = resp.json()
+        if data.get("success") and "result" in data and "records" in data["result"]:
+            records = data["result"]["records"]
+        else:
+            break
 
-    if data.get("success") and "result" in data and "records" in data["result"]:
-        records = data["result"]["records"]
         # Filter by date in Python
         if date_field:
             filtered = []
+            stale_count = 0
             for r in records:
                 date_val = r.get(date_field, "")
                 if date_val and str(date_val)[:10] >= since_date:
                     filtered.append(r)
+                elif date_val:
+                    stale_count += 1
             records = filtered
+            # V131: If sorting by date desc and most records are stale, stop paginating
+            if stale_count > len(records) and page_num > 0:
+                all_records.extend(records)
+                break
 
-        # V12.7: Add city filter (Python-side filtering)
-        city_filter = config.get("city_filter")
-        if city_filter and records:
-            filter_field = city_filter["field"]
-            filter_value = city_filter["value"].upper()
-            records = [r for r in records
+        all_records.extend(records)
+        if len(data["result"]["records"]) < page_size or len(all_records) >= MAX_RECORDS:
+            break
+        offset += page_size
+
+    # V12.7: Add city filter (Python-side filtering)
+    city_filter = config.get("city_filter")
+    if city_filter and all_records:
+        filter_field = city_filter["field"]
+        filter_value = city_filter["value"].upper()
+        all_records = [r for r in all_records
                        if str(r.get(filter_field, "")).upper() == filter_value]
 
-        return records
-    return []
+    return all_records
 
 
 def fetch_carto(config, days_back):
