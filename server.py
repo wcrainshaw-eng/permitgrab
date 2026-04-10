@@ -3820,6 +3820,15 @@ def admin_v129_fix_slugs():
             ).rowcount
             if updated2 > 0:
                 slug_fixes += updated2
+            # V129c: Fix variant keys like "buffalo-ny-bulk", "norfolk-va-new", "tacoma-wa-accela"
+            # Any permits whose source_city_key starts with the expected slug + "-" suffix
+            pattern = expected_slug + '-%'
+            updated3 = conn.execute(
+                "UPDATE permits SET source_city_key = ? WHERE source_city_key LIKE ? AND source_city_key != ?",
+                (expected_slug, pattern, expected_slug)
+            ).rowcount
+            if updated3 > 0:
+                slug_fixes += updated3
         conn.commit()
 
         # Re-check score
