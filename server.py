@@ -3754,6 +3754,76 @@ def admin_v122_add_batch2():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v128-configure-accela', methods=['POST'])
+def admin_v128_configure_accela():
+    """V128: Configure major Accela cities in city_sources + prod_cities."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from city_source_db import upsert_city_source
+        conn = permitdb.get_connection()
+        results = []
+
+        accela_cities = [
+            ('san_diego', 'San Diego', 'CA', 'SANDIEGO', 'Building'),
+            ('dallas_tx', 'Dallas', 'TX', 'DALLASTX', 'Building'),
+            ('indianapolis', 'Indianapolis', 'IN', 'INDY', 'Permits'),
+            ('oklahoma_city', 'Oklahoma City', 'OK', None, 'Permits'),  # uses access.okc.gov
+            ('el_paso_tx', 'El Paso', 'TX', 'ELPASO', 'Building'),
+            ('detroit', 'Detroit', 'MI', 'DETROIT', 'Building'),
+            ('colorado_springs', 'Colorado Springs', 'CO', 'COSPRINGS', 'Building'),
+            ('fresno', 'Fresno', 'CA', 'FRESNO', 'Building'),
+            ('mesa_az', 'Mesa', 'AZ', 'MESA', 'Building'),
+            ('san_antonio_tx', 'San Antonio', 'TX', 'COSATX', 'Building'),
+            ('austin_tx', 'Austin', 'TX', 'AUSTINTX', 'Building'),
+            ('sacramento_ca', 'Sacramento', 'CA', 'SACRAMENTO', 'Building'),
+            ('stockton', 'Stockton', 'CA', 'STOCKTON', 'Building'),
+            ('riverside', 'Riverside', 'CA', 'RIVERSIDE', 'Building'),
+            ('anaheim', 'Anaheim', 'CA', 'ANAHEIM', 'Building'),
+            ('madison_wi', 'Madison', 'WI', 'MADISON', 'Building'),
+            ('birmingham_al', 'Birmingham', 'AL', 'BIRMINGHAM', 'Building'),
+            ('tacoma_wa', 'Tacoma', 'WA', 'TACOMA', 'Building'),
+            ('santa_rosa_ca', 'Santa Rosa', 'CA', 'SANTAROSA', 'Building'),
+        ]
+
+        for source_key, name, state, agency, module in accela_cities:
+            if agency:
+                endpoint = f"https://aca-prod.accela.com/{agency}/Cap/CapHome.aspx?module={module}&TabName={module}"
+            else:
+                # OKC uses a different domain
+                endpoint = "https://access.okc.gov/aca/Cap/CapHome.aspx?module=Permits&TabName=HOME"
+
+            try:
+                upsert_city_source({
+                    'source_key': source_key,
+                    'name': name,
+                    'state': state,
+                    'platform': 'accela',
+                    'endpoint': endpoint,
+                    'mode': 'city',
+                    'status': 'active',
+                })
+
+                # Also update prod_cities
+                slug = source_key.replace('_', '-')
+                conn.execute("""
+                    UPDATE prod_cities SET source_type='accela', source_id=?, status='active'
+                    WHERE city_slug=? OR city_slug=?
+                """, (source_key, slug, source_key))
+
+                results.append({'city': name, 'source_key': source_key, 'status': 'configured'})
+            except Exception as e:
+                results.append({'city': name, 'source_key': source_key, 'error': str(e)[:80]})
+
+        conn.commit()
+        return jsonify({'configured': len([r for r in results if r.get('status') == 'configured']),
+                        'results': results}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/v122-batch2-fix', methods=['POST'])
 def admin_v122_batch2_fix():
     """V122: Fix slugs, test endpoints live, debug St. Paul. SYNCHRONOUS."""
