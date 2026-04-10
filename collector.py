@@ -1621,8 +1621,9 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
                 pass
         if not parsed_date:
             # V50: Added St. Louis format "February, 02 2026 00:00:00"
-            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d",
-                        "%m/%d/%Y", "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
+            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                        "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%Y %H:%M:%S %p",
+                        "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
                 try:
                     parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
                     break
@@ -1881,8 +1882,9 @@ def normalize_permit(raw_record, city_key):
                 pass
         if not parsed_date:
             # V50: Added St. Louis format "February, 02 2026 00:00:00"
-            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d",
-                        "%m/%d/%Y", "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
+            for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                        "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%Y %H:%M:%S %p",
+                        "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
                 try:
                     parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
                     break
