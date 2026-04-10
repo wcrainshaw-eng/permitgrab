@@ -3794,6 +3794,34 @@ def admin_v129_fix_slugs():
 
         conn.commit()
 
+        # V129b: Also fix permits whose source_city_key doesn't match REPLACE(source_key, '_', '-')
+        # e.g., permits with "boston" should become "boston-ma" to match source_key "boston_ma"
+        slug_fixes = 0
+        all_sources = conn.execute("""
+            SELECT source_key FROM city_sources WHERE status = 'active' AND source_key LIKE '%\\_%' ESCAPE '\\'
+        """).fetchall()
+        for src in all_sources:
+            sk = src[0]
+            expected_slug = sk.replace('_', '-')
+            # Find permits that have a slug that's a prefix of expected_slug but missing state
+            # e.g., source_key "boston_ma" → expected "boston-ma", but permits have "boston"
+            base = expected_slug.rsplit('-', 1)[0] if '-' in expected_slug else expected_slug
+            if base != expected_slug:
+                updated = conn.execute(
+                    "UPDATE permits SET source_city_key = ? WHERE source_city_key = ?",
+                    (expected_slug, base)
+                ).rowcount
+                if updated > 0:
+                    slug_fixes += updated
+            # Also fix underscore format
+            updated2 = conn.execute(
+                "UPDATE permits SET source_city_key = ? WHERE source_city_key = ?",
+                (expected_slug, sk)
+            ).rowcount
+            if updated2 > 0:
+                slug_fixes += updated2
+        conn.commit()
+
         # Re-check score
         score = conn.execute("""
             SELECT COUNT(*) as score FROM city_sources cs
@@ -3806,7 +3834,7 @@ def admin_v129_fix_slugs():
             )
         """).fetchone()[0]
 
-        return jsonify({'fixed': fixed, 'total_checked': len(rows), 'new_score': score}), 200
+        return jsonify({'fixed': fixed, 'slug_fixes': slug_fixes, 'total_checked': len(rows), 'new_score': score}), 200
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -5485,9 +5513,9 @@ def admin_test_and_backfill():
             }), 400
 
         # Step 4: INSERT into DB
-        # Use hyphen-format slug as source_city_key to match score query expectations
-        slug = config.get('slug', city_key.replace('_', '-'))
-        inserted = permitdb.upsert_permits(normalized, source_city_key=slug)
+        # Always use hyphen-format of city_key as source_city_key — matches score query: REPLACE(source_key, '_', '-')
+        source_slug = city_key.replace('_', '-')
+        inserted = permitdb.upsert_permits(normalized, source_city_key=source_slug)
 
         # Step 5: ACTIVATE — update city_sources and prod_cities
         conn = permitdb.get_connection()
