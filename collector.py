@@ -1861,17 +1861,47 @@ def sanitize_string(value):
 
 def normalize_permit(raw_record, city_key):
     """Normalize a raw permit record into our standard schema."""
+    # V137: Debug log raw keys (first call only)
+    if raw_record and isinstance(raw_record, dict) and not hasattr(normalize_permit, '_logged'):
+        normalize_permit._logged = True
+        keys_preview = list(raw_record.keys())[:8]
+        print(f"V137 RAW KEYS ({len(raw_record)} fields): {keys_preview}", flush=True)
     config = get_city_config(city_key)
     if not config:
         return None
 
-    fmap = config["field_map"]
+    fmap = config.get("field_map", {}) or {}
 
     def get_field(field_name):
         raw_key = fmap.get(field_name, "")
         if not raw_key:
             return ""
-        return str(raw_record.get(raw_key, "")).strip()
+        # V136: Try exact match first, then case-insensitive
+        val = raw_record.get(raw_key)
+        if val is None:
+            for k, v in raw_record.items():
+                if k.lower() == raw_key.lower():
+                    val = v
+                    break
+        return str(val).strip() if val is not None else ""
+
+    # V136: Accela fallback — if field_map produces nothing, try common Accela keys
+    def accela_fallback(field_name):
+        accela_keys = {
+            'permit_number': ['Record Number', 'record_number', 'Record ID', 'Permit Number', 'permit_number', 'RECORD_NUMBER', 'recordNumber', 'Record #'],
+            'address': ['Address', 'address', 'Full Address', 'full_address', 'Street Address', 'Site Address', 'ADDRESS', 'Location', 'location'],
+            'date': ['Date', 'date', 'Filed Date', 'Open Date', 'Created Date', 'DATE', 'Record Date', 'Opened', 'Submitted Date'],
+            'issued_date': ['Date', 'date', 'Filed Date', 'Opened', 'Submitted Date', 'Issue Date'],
+            'filing_date': ['Date', 'date', 'Filed Date', 'Opened', 'Submitted Date'],
+            'description': ['Description', 'description', 'Work Description', 'DESCRIPTION', 'Project Name'],
+            'permit_type': ['Record Type', 'record_type', 'Type', 'Permit Type', 'permit_type', 'RECORD_TYPE'],
+            'status': ['Status', 'status', 'Record Status', 'STATUS'],
+        }
+        for raw_key in accela_keys.get(field_name, []):
+            val = raw_record.get(raw_key)
+            if val and str(val).strip():
+                return str(val).strip()
+        return ""
 
     # Build address — V12.55c: handle Socrata location objects
     # V18: Handle cities like Chicago with separate street_number, street_direction, street_name
@@ -1912,9 +1942,13 @@ def normalize_permit(raw_record, city_key):
                         address = val
                         break
 
-    # V126: REQUIRED — drop record if no address found
+    # V136: Accela fallback for address
     if not address or address == "Address not provided":
-        return None
+        address = accela_fallback('address')
+
+    # V137: Relaxed — keep record even without address (Accela records still useful)
+    if not address or address == "Address not provided":
+        address = "Address not available"
 
     # Parse cost
     cost_str = get_field("estimated_cost")
@@ -1930,6 +1964,9 @@ def normalize_permit(raw_record, city_key):
 
     # Parse date — V15: Try filing_date, then date, then issued_date field_map keys
     date_str = get_field("filing_date") or get_field("date") or get_field("issued_date")
+    # V137: Accela fallback for date
+    if not date_str:
+        date_str = accela_fallback('date') or ""
     parsed_date = ""
     if date_str:
         # Check if it's an epoch timestamp (milliseconds)
@@ -1963,6 +2000,9 @@ def normalize_permit(raw_record, city_key):
 
     # Build description from available fields
     desc = get_field("description") or get_field("work_type") or get_field("permit_type")
+    # V137: Accela fallback for description
+    if not desc:
+        desc = accela_fallback('description') or ""
 
     # Classify trade
     trade = classify_trade(desc + " " + get_field("work_type") + " " + get_field("permit_type"))
@@ -1991,6 +2031,9 @@ def normalize_permit(raw_record, city_key):
                 permit_num = str(raw_val).strip()
                 if permit_num:
                     break
+    # V137: Accela fallback for permit_number
+    if not permit_num:
+        permit_num = accela_fallback('permit_number')
     if not permit_num:
         return None  # V126: REQUIRED — drop records without permit number
 
