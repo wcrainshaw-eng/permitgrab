@@ -3761,7 +3761,6 @@ def admin_v128_configure_accela():
     if not valid:
         return error
     try:
-        from city_source_db import upsert_city_source
         conn = permitdb.get_connection()
         results = []
 
@@ -3795,17 +3794,12 @@ def admin_v128_configure_accela():
                 endpoint = "https://access.okc.gov/aca/Cap/CapHome.aspx?module=Permits&TabName=HOME"
 
             try:
-                upsert_city_source({
-                    'source_key': source_key,
-                    'name': name,
-                    'state': state,
-                    'platform': 'accela',
-                    'endpoint': endpoint,
-                    'mode': 'city',
-                    'status': 'active',
-                })
+                conn.execute("""
+                    INSERT OR REPLACE INTO city_sources
+                    (source_key, name, state, platform, endpoint, mode, status, updated_at)
+                    VALUES (?, ?, ?, 'accela', ?, 'city', 'active', datetime('now'))
+                """, (source_key, name, state, endpoint))
 
-                # Also update prod_cities
                 slug = source_key.replace('_', '-')
                 conn.execute("""
                     UPDATE prod_cities SET source_type='accela', source_id=?, status='active'
