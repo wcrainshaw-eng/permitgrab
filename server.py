@@ -3754,6 +3754,64 @@ def admin_v122_add_batch2():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v129-fix-slugs', methods=['POST'])
+def admin_v129_fix_slugs():
+    """V129: Fix source_keys missing state suffix — breaks score joins."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+
+        # Find source_keys without underscore (no state suffix)
+        rows = conn.execute("""
+            SELECT source_key, state FROM city_sources
+            WHERE source_key NOT LIKE '%\\_%' ESCAPE '\\'
+            AND status = 'active' AND state IS NOT NULL AND state != ''
+        """).fetchall()
+
+        fixed = 0
+        for r in rows:
+            old_key = r[0]
+            state = r[1].lower()
+            new_key = f"{old_key}_{state}"
+
+            # Check if new_key already exists
+            exists = conn.execute("SELECT 1 FROM city_sources WHERE source_key = ?", (new_key,)).fetchone()
+            if exists:
+                continue
+
+            # Update city_sources
+            conn.execute("UPDATE city_sources SET source_key = ? WHERE source_key = ?", (new_key, old_key))
+
+            # Update prod_cities source_id to match
+            conn.execute("UPDATE prod_cities SET source_id = ? WHERE source_id = ?", (new_key, old_key))
+
+            # Update permits source_city_key to match
+            conn.execute("UPDATE permits SET source_city_key = ? WHERE source_city_key = ?", (new_key, old_key))
+
+            fixed += 1
+
+        conn.commit()
+
+        # Re-check score
+        score = conn.execute("""
+            SELECT COUNT(*) as score FROM city_sources cs
+            WHERE cs.status = 'active'
+            AND EXISTS (
+                SELECT 1 FROM permits p
+                WHERE (p.source_city_key = cs.source_key
+                    OR p.source_city_key = REPLACE(cs.source_key, '_', '-'))
+                AND p.date > date('now', '-90 days')
+            )
+        """).fetchone()[0]
+
+        return jsonify({'fixed': fixed, 'total_checked': len(rows), 'new_score': score}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/v128-configure-accela', methods=['POST'])
 def admin_v128_configure_accela():
     """V128: Configure major Accela cities in city_sources + prod_cities."""
