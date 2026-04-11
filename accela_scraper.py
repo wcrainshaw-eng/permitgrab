@@ -2455,7 +2455,8 @@ async def scrape_accela_permits(city_key, days_back=1):
             raise Exception(f"Could not find/click Search button on {agency} portal. Debug screenshot saved.")
 
         # Wait for results to load (ASP.NET postback)
-        await page.wait_for_load_state("networkidle", timeout=30000)
+        # V141: Increased timeout from 30s to 60s for slow portals (Atlanta, etc.)
+        await page.wait_for_load_state("networkidle", timeout=60000)
         await page.wait_for_timeout(3000)
 
         # ---- STEP 3: Check for results ----
@@ -2623,7 +2624,7 @@ async def _parse_results_table(page, agency_code):
         # Click next page
         await dismiss_loading_mask(page)  # V133
         await next_btn.click()
-        await page.wait_for_load_state("networkidle", timeout=30000)
+        await page.wait_for_load_state("networkidle", timeout=60000)  # V141
         await page.wait_for_timeout(2000)
 
     return all_permits
