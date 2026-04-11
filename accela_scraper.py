@@ -2745,6 +2745,14 @@ def fetch_accela(config, days_back):
     """
     city_key = config.get("_accela_city_key", "")
 
+    # V145: Use dataset_id directly as city_key (set by sources table backfill)
+    if not city_key:
+        city_key = config.get("dataset_id", "")
+        if city_key and city_key in ACCELA_CONFIGS:
+            pass  # Found it
+        else:
+            city_key = ""  # Not a valid ACCELA_CONFIGS key
+
     # Also accept agency_code and reverse-lookup city_key
     if not city_key:
         agency = config.get("agency_code", "")

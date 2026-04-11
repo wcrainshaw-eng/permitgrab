@@ -2765,8 +2765,19 @@ def _deferred_startup():
     except Exception:
         pass  # /var/data may not exist locally
 
-    # V145: Collectors require manual start via POST /api/admin/start-collectors
-    print(f"[{datetime.now()}] V145: POST /api/admin/start-collectors to start daemon")
+    # V145: Auto-start daemon with 45s delay — defensive, catches all errors
+    import threading as _th
+    def _v145_delayed_daemon():
+        import time as _t
+        _t.sleep(45)
+        try:
+            print(f"[{datetime.now()}] V145: Auto-starting collectors...", flush=True)
+            start_collectors()
+            print(f"[{datetime.now()}] V145: Collectors auto-started OK", flush=True)
+        except Exception as _e:
+            print(f"[{datetime.now()}] V145: Auto-start failed (non-fatal): {_e}", flush=True)
+    _th.Thread(target=_v145_delayed_daemon, daemon=True, name='v145_autostart').start()
+    print(f"[{datetime.now()}] V145: Daemon auto-start scheduled (45s delay)")
 
     # V106: Phase B — Heavy maintenance in background thread
     # Server is ready to serve requests while this runs
@@ -4020,6 +4031,43 @@ def admin_v145_health():
             'platforms': [dict(p) for p in platforms],
             'stale': [dict(s) for s in stale][:20],
         })
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v145-fix-accela-keys', methods=['POST'])
+def admin_v145_fix_accela_keys():
+    """V145: Populate dataset_id for Accela sources from ACCELA_CONFIGS."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from accela_scraper import ACCELA_CONFIGS
+        conn = permitdb.get_connection()
+        # Get all Accela sources
+        accela_sources = conn.execute("SELECT source_key, name, state FROM sources WHERE platform='accela'").fetchall()
+        fixed = 0
+        for row in accela_sources:
+            sk = row[0]  # e.g. 'atlanta-ga' or 'atlanta'
+            name = (row[1] or '').lower().replace(' ', '_').replace('-', '_')
+            # Try matching: source_key (hyphen→underscore), name, stripped suffix
+            candidates = [
+                sk.replace('-', '_'),  # atlanta-ga → atlanta_ga
+                name,  # atlanta
+                '_'.join(sk.replace('-', '_').split('_')[:-1]),  # atlanta_ga → atlanta
+            ]
+            matched_key = None
+            for c in candidates:
+                if c and c in ACCELA_CONFIGS:
+                    matched_key = c
+                    break
+            if matched_key:
+                conn.execute("UPDATE sources SET dataset_id=? WHERE source_key=?", (matched_key, sk))
+                fixed += 1
+        conn.commit()
+        conn.close()
+        return jsonify({'fixed': fixed, 'total_accela': len(accela_sources)}), 200
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
