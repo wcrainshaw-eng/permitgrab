@@ -2578,9 +2578,20 @@ def _migrate_create_sources_table():
     try:
         conn.execute("ALTER TABLE sources ADD COLUMN data_type TEXT NOT NULL DEFAULT 'permits'")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sources_data_type ON sources(data_type)")
-        print(f"[{datetime.now()}] V145: Added data_type column to sources")
     except Exception:
-        pass  # Column already exists
+        pass
+
+    # Add verification columns
+    for col_sql in [
+        "ALTER TABLE sources ADD COLUMN verified_at TEXT",
+        "ALTER TABLE sources ADD COLUMN last_verified_at TEXT",
+        "ALTER TABLE sources ADD COLUMN verification_status TEXT DEFAULT 'pending'",
+        "ALTER TABLE sources ADD COLUMN days_consecutive INTEGER DEFAULT 0",
+    ]:
+        try:
+            conn.execute(col_sql)
+        except Exception:
+            pass
 
     # Violations table (V82b ready)
     conn.executescript('''
@@ -4084,6 +4095,89 @@ def admin_v145_fix_accela_keys():
         return jsonify({'fixed': fixed, 'total_accela': len(accela_sources), 'dupes_deleted': dupes_deleted}), 200
     except Exception as e:
         import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v145-cleanup', methods=['POST'])
+def admin_v145_cleanup():
+    """V145: Clean garbage dates, city names, and duplicates."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        results = {}
+
+        # Delete future-dated permits
+        r = conn.execute("DELETE FROM permits WHERE date > date('now')").rowcount
+        results['future_dates_deleted'] = r
+
+        # Delete ancient permits (before 2020)
+        r = conn.execute("DELETE FROM permits WHERE date < '2020-01-01' AND date IS NOT NULL AND date != ''").rowcount
+        results['ancient_dates_deleted'] = r
+
+        # Delete garbage city names
+        garbage_cities = [
+            'Industrial Permit Database', 'Assessor', 'DSC', 'New Jersey',
+            'Metro West', 'Millenia', 'Park Central', 'Rio Grande Park',
+            'Address not available', 'None', 'N/A', 'Unknown', 'TEST',
+        ]
+        placeholders = ','.join(['?' for _ in garbage_cities])
+        r = conn.execute(f"DELETE FROM permits WHERE city IN ({placeholders})", garbage_cities).rowcount
+        results['garbage_cities_deleted'] = r
+
+        # Delete old scraper_runs (keep 30 days)
+        r = conn.execute("DELETE FROM scraper_runs WHERE run_started_at < datetime('now', '-30 days')").rowcount
+        results['old_scraper_runs_deleted'] = r
+
+        conn.commit()
+
+        # Get freshness verification query
+        verified = conn.execute("""
+            SELECT city, state, COUNT(*) as total,
+                   MAX(date) as newest,
+                   COUNT(DISTINCT date) as days_with_data
+            FROM permits
+            WHERE date >= date('now', '-7 days') AND date <= date('now')
+            GROUP BY city, state
+            HAVING days_with_data >= 3 AND newest >= date('now', '-3 days')
+            ORDER BY total DESC
+        """).fetchall()
+        results['verified_cities'] = len(verified)
+        results['verified_list'] = [{'city': r[0], 'state': r[1], 'permits': r[2], 'newest': r[3], 'days': r[4]} for r in verified[:50]]
+
+        conn.close()
+        return jsonify(results), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v145-verified', methods=['GET', 'POST'])
+def admin_v145_verified():
+    """V145: Get the verified cities list — ONLY cities with consistent fresh data."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        verified = conn.execute("""
+            SELECT city, state, COUNT(*) as total_permits,
+                   MAX(date) as newest_date,
+                   COUNT(DISTINCT date) as days_with_data,
+                   MIN(date) as oldest_in_window
+            FROM permits
+            WHERE date >= date('now', '-7 days') AND date <= date('now')
+              AND city IS NOT NULL AND city != ''
+              AND LENGTH(city) > 2
+            GROUP BY city, state
+            HAVING days_with_data >= 2 AND newest_date >= date('now', '-3 days')
+            ORDER BY total_permits DESC
+        """).fetchall()
+        conn.close()
+        cities = [{'city': r[0], 'state': r[1], 'permits_7d': r[2], 'newest': r[3], 'days_active': r[4]} for r in verified]
+        return jsonify({'verified_count': len(cities), 'cities': cities}), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
