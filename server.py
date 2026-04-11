@@ -2533,6 +2533,130 @@ def _cleanup_v108_pipeline_damage():
 
 
 @app.before_request
+def _migrate_create_sources_table():
+    """V145: Create the single source of truth table."""
+    conn = permitdb.get_connection()
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS sources (
+            source_key TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            scope_type TEXT NOT NULL DEFAULT 'city',
+            state TEXT,
+            population INTEGER DEFAULT 0,
+            platform TEXT NOT NULL,
+            endpoint TEXT NOT NULL DEFAULT '',
+            dataset_id TEXT,
+            field_map TEXT DEFAULT '{}',
+            date_field TEXT DEFAULT 'date',
+            city_field TEXT,
+            limit_per_page INTEGER,
+            status TEXT DEFAULT 'pending',
+            pause_reason TEXT,
+            last_attempt_at TEXT,
+            last_attempt_status TEXT,
+            last_attempt_error TEXT,
+            last_attempt_duration_ms INTEGER,
+            last_success_at TEXT,
+            consecutive_failures INTEGER DEFAULT 0,
+            last_permits_found INTEGER DEFAULT 0,
+            last_permits_inserted INTEGER DEFAULT 0,
+            total_permits INTEGER DEFAULT 0,
+            newest_permit_date TEXT,
+            covers_cities TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            notes TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);
+        CREATE INDEX IF NOT EXISTS idx_sources_platform ON sources(platform);
+        CREATE INDEX IF NOT EXISTS idx_sources_last_attempt_status ON sources(last_attempt_status);
+    ''')
+    conn.close()
+    print(f"[{datetime.now()}] V145: sources table created/verified")
+
+
+def _backfill_sources_table():
+    """V145: Populate sources from prod_cities + permits (one-time)."""
+    conn = permitdb.get_connection()
+    count = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+    if count > 100:
+        print(f"[{datetime.now()}] V145: sources already has {count} rows, skipping backfill")
+        conn.close()
+        return
+
+    # Get all active sources from prod_cities
+    rows = conn.execute("""
+        SELECT city_slug, city, state, source_id, source_type, status
+        FROM prod_cities
+        WHERE source_type IS NOT NULL AND source_id IS NOT NULL AND status = 'active'
+    """).fetchall()
+
+    inserted = 0
+    for row in rows:
+        source_key = row[0]  # city_slug (hyphen format)
+        city = row[1] or source_key
+        state = row[2] or ''
+        platform = row[4] or 'unknown'
+        pc_status = row[5] or 'active'
+
+        # Get permit stats for this source
+        stats = conn.execute("""
+            SELECT COUNT(*) as cnt, MAX(date) as newest, MAX(collected_at) as last_coll
+            FROM permits WHERE source_city_key = ?
+        """, (source_key,)).fetchone()
+
+        # Try to get config from city_sources
+        cs_key = source_key.replace('-', '_')
+        cs = conn.execute("SELECT endpoint, field_map, date_field FROM city_sources WHERE source_key = ?", (cs_key,)).fetchone()
+        if not cs:
+            cs = conn.execute("SELECT endpoint, field_map, date_field FROM city_sources WHERE source_key = ?", (source_key,)).fetchone()
+
+        endpoint = cs[0] if cs else ''
+        field_map = cs[1] if cs else '{}'
+        date_field = cs[2] if cs else 'date'
+
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO sources
+                (source_key, name, state, platform, endpoint, field_map, date_field,
+                 status, total_permits, newest_permit_date, last_success_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (source_key, city, state, platform, endpoint or '', field_map or '{}',
+                  date_field or 'date', 'active' if pc_status == 'active' else 'paused',
+                  stats[0] if stats else 0, stats[1] if stats else None, stats[2] if stats else None))
+            inserted += 1
+        except Exception:
+            pass
+
+    # Also backfill orphan permit keys not in prod_cities
+    orphans = conn.execute("""
+        SELECT DISTINCT source_city_key FROM permits
+        WHERE source_city_key IS NOT NULL
+        AND source_city_key NOT IN (SELECT source_key FROM sources)
+    """).fetchall()
+
+    for row in orphans:
+        key = row[0]
+        stats = conn.execute("""
+            SELECT COUNT(*) as cnt, MAX(date) as newest
+            FROM permits WHERE source_city_key = ?
+        """, (key,)).fetchone()
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO sources
+                (source_key, name, state, platform, endpoint, status, total_permits, newest_permit_date, notes)
+                VALUES (?, ?, '', 'unknown', '', 'active', ?, ?, 'backfilled from permits')
+            """, (key, key, stats[0] if stats else 0, stats[1] if stats else None))
+        except Exception:
+            pass
+
+    conn.commit()
+    final = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+    active = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active'").fetchone()[0]
+    conn.close()
+    print(f"[{datetime.now()}] V145: Backfill complete — {final} total, {active} active sources")
+
+
 def _deferred_startup():
     """V69: Mark startup done but DO NOT start any background threads.
     V93: Email scheduler is now auto-started (doesn't need Postgres)."""
@@ -2540,16 +2664,44 @@ def _deferred_startup():
     if _startup_done:
         return
     _startup_done = True
-    # V144: Auto-start collectors on every boot — no more manual POST required
-    print(f"[{datetime.now()}] V144: Server starting — SQLite only, auto-starting collectors")
+    print(f"[{datetime.now()}] V145: Server starting — SQLite only")
 
-    # V144: REMOVED sync_city_registry_to_prod_cities() — it wiped city_sources in V143.
-    # prod_cities (2,395 active) is the source of truth, not CITY_REGISTRY dict.
+    # V145: Create sources table (single source of truth)
+    try:
+        _migrate_create_sources_table()
+    except Exception as e:
+        print(f"[{datetime.now()}] V145: Sources migration error (non-fatal): {e}")
 
-    # V144: Collectors require manual start via POST /api/admin/start-collectors
-    # Auto-start was attempted but crashes the gunicorn worker during boot.
-    # TODO: Fix start_collectors() to be boot-safe before enabling auto-start.
-    print(f"[{datetime.now()}] V144: POST /api/admin/start-collectors to start daemon")
+    # V145: Backfill sources from prod_cities + permits (one-time)
+    try:
+        _backfill_sources_table()
+    except Exception as e:
+        print(f"[{datetime.now()}] V145: Sources backfill error (non-fatal): {e}")
+
+    # V145: Cleanup old scraper_runs and log disk usage
+    try:
+        conn = permitdb.get_connection()
+        deleted = conn.execute("DELETE FROM scraper_runs WHERE run_started_at < datetime('now', '-30 days')").rowcount
+        conn.commit()
+        conn.close()
+        if deleted > 0:
+            print(f"[{datetime.now()}] V145: Cleaned {deleted} old scraper_runs")
+    except Exception as e:
+        print(f"[{datetime.now()}] V145: Cleanup error (non-fatal): {e}")
+
+    # V145: Log disk usage
+    try:
+        import shutil
+        usage = shutil.disk_usage('/var/data')
+        pct = usage.used / usage.total * 100
+        print(f"[{datetime.now()}] V145: Disk {pct:.1f}% ({usage.used // 1024 // 1024}MB / {usage.total // 1024 // 1024}MB)")
+        if pct > 85:
+            print(f"[{datetime.now()}] V145: WARNING — disk usage above 85%!")
+    except Exception:
+        pass  # /var/data may not exist locally
+
+    # V145: Collectors require manual start via POST /api/admin/start-collectors
+    print(f"[{datetime.now()}] V145: POST /api/admin/start-collectors to start daemon")
 
     # V106: Phase B — Heavy maintenance in background thread
     # Server is ready to serve requests while this runs
@@ -8325,6 +8477,13 @@ def is_data_loading():
 
 
 def sync_city_registry_to_prod_cities():
+    """V97: DISABLED in V145 — this function wiped city_sources in V143.
+    prod_cities (2,395 active) is the source of truth. Do not sync from CITY_REGISTRY.
+    """
+    print("[V145] sync_city_registry_to_prod_cities DISABLED — prevented data wipe")
+    return
+
+    # ORIGINAL CODE BELOW (dead code, kept for reference):
     """V97: Complete sync — CITY_REGISTRY + BULK_SOURCES → prod_cities + city_sources.
 
     V97 FIXES (replaces broken V95/V96 logic):
