@@ -2540,19 +2540,23 @@ def _deferred_startup():
     if _startup_done:
         return
     _startup_done = True
-    # V70: NO background threads. NO Postgres pool. SQLite only. Just serve requests.
-    print(f"[{datetime.now()}] V70: Server starting — Postgres DISABLED, SQLite only")
-    print(f"[{datetime.now()}] V70: POST /api/admin/enable-postgres to enable Postgres pool")
-    print(f"[{datetime.now()}] V70: POST /api/admin/start-collectors to start background threads")
+    # V144: Auto-start collectors on every boot — no more manual POST required
+    print(f"[{datetime.now()}] V144: Server starting — SQLite only, auto-starting collectors")
 
-    # V106: Phase A — Fast startup (blocks until done, keeps it quick)
-    # Only sync config — no heavy DB operations
-    try:
-        print(f"[{datetime.now()}] V98b: Auto-syncing CITY_REGISTRY → prod_cities...")
-        sync_city_registry_to_prod_cities()
-        print(f"[{datetime.now()}] V98b: Registry sync complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V98b: Registry sync error (non-fatal): {e}")
+    # V144: REMOVED sync_city_registry_to_prod_cities() — it wiped city_sources in V143.
+    # prod_cities (2,395 active) is the source of truth, not CITY_REGISTRY dict.
+
+    # V144: Auto-start collector daemon after a short delay
+    import threading
+    def _auto_start_collectors():
+        import time
+        time.sleep(10)  # Let server finish booting first
+        try:
+            start_collectors()
+            print(f"[{datetime.now()}] V144: Collectors auto-started on boot")
+        except Exception as e:
+            print(f"[{datetime.now()}] V144: Collector auto-start failed (non-fatal): {e}")
+    threading.Thread(target=_auto_start_collectors, daemon=True, name='v144_autostart').start()
 
     # V106: Phase B — Heavy maintenance in background thread
     # Server is ready to serve requests while this runs
