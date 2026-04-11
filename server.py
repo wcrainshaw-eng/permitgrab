@@ -2546,19 +2546,10 @@ def _deferred_startup():
     # V144: REMOVED sync_city_registry_to_prod_cities() — it wiped city_sources in V143.
     # prod_cities (2,395 active) is the source of truth, not CITY_REGISTRY dict.
 
-    # V144: Auto-start collector daemon after a 30s delay (longer to let gunicorn fully boot)
-    import threading
-    def _auto_start_collectors():
-        import time
-        time.sleep(30)  # Wait for gunicorn workers to stabilize
-        try:
-            print(f"[{datetime.now()}] V144: Auto-starting collectors...")
-            start_collectors()
-            print(f"[{datetime.now()}] V144: Collectors auto-started on boot")
-        except Exception as e:
-            print(f"[{datetime.now()}] V144: Collector auto-start failed (non-fatal): {e}")
-    threading.Thread(target=_auto_start_collectors, daemon=True, name='v144_autostart').start()
-    print(f"[{datetime.now()}] V144: Auto-start thread scheduled (30s delay)")
+    # V144: Collectors require manual start via POST /api/admin/start-collectors
+    # Auto-start was attempted but crashes the gunicorn worker during boot.
+    # TODO: Fix start_collectors() to be boot-safe before enabling auto-start.
+    print(f"[{datetime.now()}] V144: POST /api/admin/start-collectors to start daemon")
 
     # V106: Phase B — Heavy maintenance in background thread
     # Server is ready to serve requests while this runs
