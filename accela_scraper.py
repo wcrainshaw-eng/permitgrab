@@ -2467,7 +2467,9 @@ async def scrape_accela_permits(city_key, days_back=1):
 
         # ---- STEP 4: HTML table parsing first (V142: reversed order — CSV crashed server) ----
         print(f"    [Accela] Parsing HTML table...")
-        permits = await _parse_results_table(page, agency)
+        # V145: Use 50 pages for backfill (days_back > 30), 10 for daily daemon
+        page_limit = 50 if days_back > 30 else 10
+        permits = await _parse_results_table(page, agency, max_pages=page_limit)
         if permits:
             print(f"    [Accela] Got {len(permits)} permits via HTML parsing from {agency}")
             return permits
@@ -2606,13 +2608,13 @@ def _csv_row_to_permit(row):
 # HTML TABLE PARSER (fallback — paginates through results)
 # ============================================================================
 
-async def _parse_results_table(page, agency_code):
+async def _parse_results_table(page, agency_code, max_pages=10):
     """
     Parse the HTML results table and paginate through all pages.
     Returns list of permit dicts.
+    max_pages: 10 for daemon (memory-safe), 50 for test-and-backfill (full pull).
     """
     all_permits = []
-    max_pages = 10  # V142: Reduced from 50 to prevent OOM crashes on Render
 
     for page_num in range(1, max_pages + 1):
         # Parse current page
