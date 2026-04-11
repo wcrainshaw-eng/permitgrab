@@ -2534,8 +2534,10 @@ def _cleanup_v108_pipeline_damage():
 
 @app.before_request
 def _migrate_create_sources_table():
-    """V145: Create the single source of truth table."""
+    """V145: Create sources + violations + enrichment tables."""
     conn = permitdb.get_connection()
+
+    # Sources table (already exists from earlier V145 — just ensure indexes)
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS sources (
             source_key TEXT PRIMARY KEY,
@@ -2571,90 +2573,153 @@ def _migrate_create_sources_table():
         CREATE INDEX IF NOT EXISTS idx_sources_platform ON sources(platform);
         CREATE INDEX IF NOT EXISTS idx_sources_last_attempt_status ON sources(last_attempt_status);
     ''')
+
+    # Add data_type column if it doesn't exist
+    try:
+        conn.execute("ALTER TABLE sources ADD COLUMN data_type TEXT NOT NULL DEFAULT 'permits'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sources_data_type ON sources(data_type)")
+        print(f"[{datetime.now()}] V145: Added data_type column to sources")
+    except Exception:
+        pass  # Column already exists
+
+    # Violations table (V82b ready)
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS violations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_key TEXT NOT NULL,
+            city TEXT,
+            state TEXT,
+            address TEXT,
+            violation_date TEXT,
+            violation_type TEXT,
+            category TEXT,
+            status TEXT,
+            description TEXT,
+            respondent_name TEXT,
+            source_url TEXT,
+            raw_data TEXT,
+            collected_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(source_key, source_url, violation_date, address)
+        );
+        CREATE INDEX IF NOT EXISTS idx_violations_source_date ON violations(source_key, violation_date);
+        CREATE INDEX IF NOT EXISTS idx_violations_city_date ON violations(city, violation_date);
+        CREATE INDEX IF NOT EXISTS idx_violations_collected ON violations(collected_at);
+    ''')
+
+    # Contractor enrichment tables (V82c ready)
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS contractor_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contractor_name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            city TEXT,
+            state TEXT,
+            phone TEXT,
+            email TEXT,
+            website TEXT,
+            license_number TEXT,
+            license_state TEXT,
+            source TEXT,
+            confidence REAL,
+            last_verified_at TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_contractor_normalized ON contractor_contacts(normalized_name, state);
+
+        CREATE TABLE IF NOT EXISTS enrichment_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contractor_name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            city TEXT,
+            state TEXT,
+            layer_tried TEXT,
+            result TEXT,
+            attempted_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_enrichment_name ON enrichment_log(normalized_name, state, layer_tried);
+    ''')
+
     conn.close()
-    print(f"[{datetime.now()}] V145: sources table created/verified")
+    print(f"[{datetime.now()}] V145: All tables created/verified (sources, violations, contractor_contacts, enrichment_log)")
 
 
 def _backfill_sources_table():
-    """V145: Populate sources from prod_cities + permits (one-time)."""
+    """V145: Populate sources ONLY from proven data (successful scraper_runs + permits)."""
     conn = permitdb.get_connection()
     count = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
-    if count > 100:
+    if count > 50:
         print(f"[{datetime.now()}] V145: sources already has {count} rows, skipping backfill")
         conn.close()
         return
 
-    # Get all active sources from prod_cities
-    rows = conn.execute("""
-        SELECT city_slug, city, state, source_id, source_type, status
-        FROM prod_cities
-        WHERE source_type IS NOT NULL AND source_id IS NOT NULL AND status = 'active'
-    """).fetchall()
+    # STEP 1: Get prod_cities with successful scraper_runs in last 90 days
+    try:
+        proven = conn.execute("""
+            SELECT DISTINCT p.city_slug, p.city, p.state, p.source_id, p.source_type, p.population
+            FROM prod_cities p
+            INNER JOIN scraper_runs sr ON sr.source_name = p.source_id
+            WHERE p.source_id IS NOT NULL AND p.source_id != ''
+              AND p.source_type IS NOT NULL
+              AND sr.status = 'success'
+              AND sr.run_started_at > datetime('now', '-90 days')
+        """).fetchall()
+    except Exception:
+        proven = []
+    print(f"[{datetime.now()}] V145: Found {len(proven)} proven sources from scraper_runs")
 
     inserted = 0
-    for row in rows:
+    for row in proven:
         source_key = row[0]  # city_slug (hyphen format)
-        city = row[1] or source_key
-        state = row[2] or ''
-        platform = row[4] or 'unknown'
-        pc_status = row[5] or 'active'
-
-        # Get permit stats for this source
-        stats = conn.execute("""
-            SELECT COUNT(*) as cnt, MAX(date) as newest, MAX(collected_at) as last_coll
-            FROM permits WHERE source_city_key = ?
-        """, (source_key,)).fetchone()
-
-        # Try to get config from city_sources
-        cs_key = source_key.replace('-', '_')
-        cs = conn.execute("SELECT endpoint, field_map, date_field FROM city_sources WHERE source_key = ?", (cs_key,)).fetchone()
-        if not cs:
-            cs = conn.execute("SELECT endpoint, field_map, date_field FROM city_sources WHERE source_key = ?", (source_key,)).fetchone()
-
-        endpoint = cs[0] if cs else ''
-        field_map = cs[1] if cs else '{}'
-        date_field = cs[2] if cs else 'date'
-
+        # Get permit stats
+        stats = conn.execute("SELECT COUNT(*) as cnt, MAX(date) as newest FROM permits WHERE source_city_key=?", (source_key,)).fetchone()
+        # Try config lookup
+        cs = None
+        for k in [source_key.replace('-', '_'), source_key]:
+            cs = conn.execute("SELECT endpoint, field_map, date_field, platform FROM city_sources WHERE source_key=?", (k,)).fetchone()
+            if cs: break
         try:
             conn.execute("""
                 INSERT OR IGNORE INTO sources
-                (source_key, name, state, platform, endpoint, field_map, date_field,
-                 status, total_permits, newest_permit_date, last_success_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (source_key, city, state, platform, endpoint or '', field_map or '{}',
-                  date_field or 'date', 'active' if pc_status == 'active' else 'paused',
-                  stats[0] if stats else 0, stats[1] if stats else None, stats[2] if stats else None))
+                (source_key, name, state, population, platform, endpoint, field_map, date_field,
+                 data_type, status, total_permits, newest_permit_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'permits', 'active', ?, ?)
+            """, (source_key, row[1] or source_key, row[2] or '', row[5] or 0,
+                  (cs[3] if cs else row[4]) or 'unknown', cs[0] if cs else '', cs[1] if cs else '{}', cs[2] if cs else 'date',
+                  stats[0] if stats else 0, stats[1] if stats else None))
             inserted += 1
         except Exception:
             pass
 
-    # Also backfill orphan permit keys not in prod_cities
-    orphans = conn.execute("""
-        SELECT DISTINCT source_city_key FROM permits
-        WHERE source_city_key IS NOT NULL
-        AND source_city_key NOT IN (SELECT source_key FROM sources)
-    """).fetchall()
+    # STEP 2: Orphan permit sources with recent data but no prod_cities
+    try:
+        orphans = conn.execute("""
+            SELECT DISTINCT source_city_key, COUNT(*) as cnt, MAX(date) as newest
+            FROM permits
+            WHERE source_city_key NOT IN (SELECT source_key FROM sources)
+              AND date > date('now', '-90 days')
+            GROUP BY source_city_key HAVING cnt > 10
+        """).fetchall()
+    except Exception:
+        orphans = []
 
     for row in orphans:
-        key = row[0]
-        stats = conn.execute("""
-            SELECT COUNT(*) as cnt, MAX(date) as newest
-            FROM permits WHERE source_city_key = ?
-        """, (key,)).fetchone()
         try:
             conn.execute("""
                 INSERT OR IGNORE INTO sources
-                (source_key, name, state, platform, endpoint, status, total_permits, newest_permit_date, notes)
-                VALUES (?, ?, '', 'unknown', '', 'active', ?, ?, 'backfilled from permits')
-            """, (key, key, stats[0] if stats else 0, stats[1] if stats else None))
+                (source_key, name, state, platform, endpoint, data_type, status,
+                 total_permits, newest_permit_date, notes)
+                VALUES (?, ?, '', 'unknown', '', 'permits', 'unverified', ?, ?, 'backfilled from permits')
+            """, (row[0], row[0], row[1], row[2]))
         except Exception:
             pass
 
     conn.commit()
-    final = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+    total = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
     active = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active'").fetchone()[0]
+    unverified = conn.execute("SELECT COUNT(*) FROM sources WHERE status='unverified'").fetchone()[0]
     conn.close()
-    print(f"[{datetime.now()}] V145: Backfill complete — {final} total, {active} active sources")
+    print(f"[{datetime.now()}] V145: Backfill — {total} total, {active} active, {unverified} unverified")
 
 
 def _deferred_startup():
@@ -3898,6 +3963,31 @@ def admin_v122_add_batch2():
         results.append({'city_slug': 'boise', 'action': 'arcgis_config', 'updated': r.rowcount})
 
         return jsonify({'batch2_results': results}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/v145-backfill-sources', methods=['POST'])
+def admin_v145_backfill():
+    """V145: Manually trigger sources table backfill."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        _migrate_create_sources_table()
+        # Force backfill even if count > 50
+        conn = permitdb.get_connection()
+        conn.execute("DELETE FROM sources")  # Clear and rebuild
+        conn.commit()
+        conn.close()
+        _backfill_sources_table()
+        conn = permitdb.get_connection()
+        total = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+        active = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active'").fetchone()[0]
+        unverified = conn.execute("SELECT COUNT(*) FROM sources WHERE status='unverified'").fetchone()[0]
+        conn.close()
+        return jsonify({'total': total, 'active': active, 'unverified': unverified}), 200
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
