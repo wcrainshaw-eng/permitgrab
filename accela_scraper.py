@@ -2465,17 +2465,24 @@ async def scrape_accela_permits(city_key, days_back=1):
             print(f"    [Accela] No results for {agency} in date range")
             return []
 
-        # ---- STEP 4: Try CSV Export first (preferred — gets all results) ----
-        permits = await _try_csv_export(page, agency)
+        # ---- STEP 4: HTML table parsing first (V142: reversed order — CSV crashed server) ----
+        print(f"    [Accela] Parsing HTML table...")
+        permits = await _parse_results_table(page, agency)
         if permits:
-            print(f"    [Accela] Got {len(permits)} permits via CSV export from {agency}")
+            print(f"    [Accela] Got {len(permits)} permits via HTML parsing from {agency}")
             return permits
 
-        # ---- STEP 5: Fall back to HTML table parsing with pagination ----
-        print(f"    [Accela] CSV export unavailable, parsing HTML table...")
-        permits = await _parse_results_table(page, agency)
-        print(f"    [Accela] Got {len(permits)} permits via HTML parsing from {agency}")
-        return permits
+        # ---- STEP 5: If HTML got nothing, try CSV export as fallback ----
+        print(f"    [Accela] HTML empty, trying CSV export...")
+        try:
+            csv_permits = await _try_csv_export(page, agency)
+            if csv_permits:
+                print(f"    [Accela] Got {len(csv_permits)} permits via CSV export from {agency}")
+                return csv_permits
+        except Exception as csv_err:
+            print(f"    [Accela] CSV export failed for {agency}: {str(csv_err)[:100]}")
+
+        return permits  # Return HTML results (even if empty)
 
     except Exception as e:
         print(f"    [Accela] ERROR scraping {agency}: {str(e)[:200]}")
