@@ -2612,7 +2612,7 @@ async def _parse_results_table(page, agency_code):
     Returns list of permit dicts.
     """
     all_permits = []
-    max_pages = 50  # Safety limit
+    max_pages = 10  # V142: Reduced from 50 to prevent OOM crashes on Render
 
     for page_num in range(1, max_pages + 1):
         # Parse current page
