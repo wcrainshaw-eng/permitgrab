@@ -476,6 +476,48 @@ def activate_bulk_covered_cities():
         return 0
 
 
+# V145: Update sources table after every collection attempt
+def _record_source_result(source_key, status, permits_found=0, permits_inserted=0,
+                          error=None, duration_ms=None):
+    """V145: Dual-write collection results to the sources table."""
+    try:
+        conn = permitdb.get_connection()
+        now = datetime.now().isoformat()
+
+        if status in ('success', 'no_new'):
+            conn.execute("""
+                UPDATE sources SET
+                    last_attempt_at=?, last_attempt_status=?,
+                    last_attempt_error=NULL, last_attempt_duration_ms=?,
+                    last_success_at=?, consecutive_failures=0,
+                    last_permits_found=?, last_permits_inserted=?,
+                    total_permits=total_permits+?, updated_at=?
+                WHERE source_key=?
+            """, (now, status, duration_ms, now, permits_found or 0,
+                  permits_inserted or 0, permits_inserted or 0, now, source_key))
+        else:
+            conn.execute("""
+                UPDATE sources SET
+                    last_attempt_at=?, last_attempt_status='failed',
+                    last_attempt_error=?, last_attempt_duration_ms=?,
+                    consecutive_failures=consecutive_failures+1, updated_at=?
+                WHERE source_key=?
+            """, (now, str(error)[:500] if error else None, duration_ms, now, source_key))
+
+        if permits_inserted and permits_inserted > 0:
+            newest = conn.execute(
+                "SELECT MAX(date) FROM permits WHERE source_city_key=?",
+                (source_key,)
+            ).fetchone()
+            if newest and newest[0]:
+                conn.execute("UPDATE sources SET newest_permit_date=? WHERE source_key=?",
+                            (newest[0], source_key))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"  [V145] _record_source_result error: {str(e)[:80]}")
+
+
 # V15: Helper function for logging collection runs to scraper_runs table
 def _log_v15_collection(city_key, city_name, state, permits_found, permits_inserted,
                         status, error_message=None, duration_ms=None):
@@ -650,6 +692,20 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
                     city_slug,
                     error=error_message or status
                 )
+
+        # V145: Dual-write to sources table
+        try:
+            _record_source_result(
+                source_key=city_slug,
+                status=status,
+                permits_found=permits_found,
+                permits_inserted=permits_inserted,
+                error=error_message,
+                duration_ms=duration_ms
+            )
+        except Exception as src_err:
+            print(f"  [V145] sources update error: {str(src_err)[:50]}")
+
     except Exception as e:
         # Don't let V15 logging errors break collection
         print(f"  [V15] Logging error: {str(e)[:50]}")

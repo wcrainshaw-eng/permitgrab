@@ -3968,6 +3968,63 @@ def admin_v122_add_batch2():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v145-health', methods=['GET', 'POST'])
+def admin_v145_health():
+    """V145: Single-glance health dashboard from sources table."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        total = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active'").fetchone()[0]
+        permit_src = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active' AND data_type='permits'").fetchone()[0]
+        violation_src = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active' AND data_type='violations'").fetchone()[0]
+        healthy = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active' AND last_success_at > datetime('now', '-48 hours')").fetchone()[0]
+        failing = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active' AND consecutive_failures >= 3").fetchone()[0]
+        never = conn.execute("SELECT COUNT(*) FROM sources WHERE status='active' AND last_attempt_at IS NULL").fetchone()[0]
+        fresh_7d = conn.execute("SELECT COUNT(DISTINCT source_city_key) FROM permits WHERE date > date('now', '-7 days')").fetchone()[0]
+        score_90d = conn.execute("SELECT COUNT(DISTINCT source_city_key) FROM permits WHERE date > date('now', '-90 days')").fetchone()[0]
+        total_permits = conn.execute("SELECT COUNT(*) FROM permits").fetchone()[0]
+        total_violations = 0
+        try:
+            total_violations = conn.execute("SELECT COUNT(*) FROM violations").fetchone()[0]
+        except Exception:
+            pass
+        platforms = conn.execute("""
+            SELECT platform, COUNT(*) as cnt,
+                   SUM(CASE WHEN last_success_at > datetime('now','-48 hours') THEN 1 ELSE 0 END) as ok,
+                   SUM(CASE WHEN consecutive_failures >= 3 THEN 1 ELSE 0 END) as bad
+            FROM sources WHERE status='active' GROUP BY platform ORDER BY cnt DESC
+        """).fetchall()
+        stale = conn.execute("""
+            SELECT source_key, name, platform, consecutive_failures, last_attempt_error,
+                   ROUND(julianday('now') - julianday(COALESCE(last_success_at, created_at)), 1) as days_stale
+            FROM sources WHERE status='active'
+              AND (last_success_at IS NULL OR last_success_at < datetime('now', '-3 days'))
+            ORDER BY consecutive_failures DESC LIMIT 20
+        """).fetchall()
+        try:
+            import shutil
+            usage = shutil.disk_usage('/var/data')
+            disk = {'used_mb': usage.used // 1048576, 'total_mb': usage.total // 1048576, 'pct': round(usage.used / usage.total * 100, 1)}
+        except Exception:
+            disk = {'used_mb': 0, 'total_mb': 0, 'pct': 0}
+        conn.close()
+        return jsonify({
+            'timestamp': datetime.now().isoformat(),
+            'score_90d': score_90d,
+            'sources': {'total_active': total, 'permit_sources': permit_src, 'violation_sources': violation_src,
+                        'healthy_48h': healthy, 'failing_3plus': failing, 'never_collected': never},
+            'data': {'fresh_7d_cities': fresh_7d, 'total_permits': total_permits, 'total_violations': total_violations},
+            'disk': disk,
+            'platforms': [dict(p) for p in platforms],
+            'stale': [dict(s) for s in stale][:20],
+        })
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/v145-backfill-sources', methods=['POST'])
 def admin_v145_backfill():
     """V145: Manually trigger sources table backfill."""
