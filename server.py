@@ -4038,25 +4038,21 @@ def admin_v145_health():
 
 @app.route('/api/admin/v145-fix-accela-keys', methods=['POST'])
 def admin_v145_fix_accela_keys():
-    """V145: Populate dataset_id for Accela sources from ACCELA_CONFIGS."""
+    """V145: Populate dataset_id for Accela sources + cleanup duplicates."""
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
         from accela_scraper import ACCELA_CONFIGS
         conn = permitdb.get_connection()
-        # Get all Accela sources
+
+        # Fix Accela dataset_ids
         accela_sources = conn.execute("SELECT source_key, name, state FROM sources WHERE platform='accela'").fetchall()
         fixed = 0
         for row in accela_sources:
-            sk = row[0]  # e.g. 'atlanta-ga' or 'atlanta'
+            sk = row[0]
             name = (row[1] or '').lower().replace(' ', '_').replace('-', '_')
-            # Try matching: source_key (hyphen→underscore), name, stripped suffix
-            candidates = [
-                sk.replace('-', '_'),  # atlanta-ga → atlanta_ga
-                name,  # atlanta
-                '_'.join(sk.replace('-', '_').split('_')[:-1]),  # atlanta_ga → atlanta
-            ]
+            candidates = [sk.replace('-', '_'), name, '_'.join(sk.replace('-', '_').split('_')[:-1])]
             matched_key = None
             for c in candidates:
                 if c and c in ACCELA_CONFIGS:
@@ -4065,9 +4061,27 @@ def admin_v145_fix_accela_keys():
             if matched_key:
                 conn.execute("UPDATE sources SET dataset_id=? WHERE source_key=?", (matched_key, sk))
                 fixed += 1
+
+        # Cleanup: delete 'unverified'/'unknown' duplicates where an 'active' row exists for same city
+        # e.g. delete 'atlanta-ga' (unknown) when 'atlanta' (accela, active) exists
+        dupes_deleted = 0
+        dupes = conn.execute("""
+            SELECT s1.source_key FROM sources s1
+            WHERE s1.status = 'unverified' AND s1.platform = 'unknown'
+            AND EXISTS (
+                SELECT 1 FROM sources s2
+                WHERE s2.status = 'active' AND s2.platform != 'unknown'
+                AND LOWER(s2.name) = LOWER(s1.name)
+                AND s2.source_key != s1.source_key
+            )
+        """).fetchall()
+        for d in dupes:
+            conn.execute("DELETE FROM sources WHERE source_key=?", (d[0],))
+            dupes_deleted += 1
+
         conn.commit()
         conn.close()
-        return jsonify({'fixed': fixed, 'total_accela': len(accela_sources)}), 200
+        return jsonify({'fixed': fixed, 'total_accela': len(accela_sources), 'dupes_deleted': dupes_deleted}), 200
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500

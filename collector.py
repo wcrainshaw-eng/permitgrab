@@ -1814,7 +1814,38 @@ def fetch_permits(city_key, days_back=30):
         print(f"  [SKIP] {city_key} - disabled after {MAX_FAILURES_BEFORE_SKIP} failures")
         return [], "skip_failed"
 
-    config = get_city_config(city_key)
+    # V145: Check sources table FIRST (single source of truth)
+    config = None
+    try:
+        conn_src = permitdb.get_connection()
+        # Try exact key, then hyphen-format, then underscore-format
+        for try_key in [city_key, city_key.replace('_', '-'), city_key.replace('-', '_')]:
+            src_row = conn_src.execute(
+                "SELECT source_key, name, state, platform, endpoint, dataset_id, field_map, date_field "
+                "FROM sources WHERE source_key = ? AND status = 'active'", (try_key,)
+            ).fetchone()
+            if src_row:
+                import json as _json
+                config = {
+                    'source_key': src_row[0],
+                    'name': src_row[1] or city_key,
+                    'state': src_row[2] or '',
+                    'platform': src_row[3],
+                    'endpoint': src_row[4] or '',
+                    'dataset_id': src_row[5] or '',
+                    'field_map': _json.loads(src_row[6]) if src_row[6] and src_row[6] != '{}' else {},
+                    'date_field': src_row[7] or 'date',
+                    'active': True,
+                }
+                print(f"  [V145] {city_key}: Using sources table config (platform={config['platform']})")
+                break
+        conn_src.close()
+    except Exception as e:
+        print(f"  [V145] Sources lookup error: {str(e)[:50]}")
+
+    # Fallback: city_sources table
+    if not config:
+        config = get_city_config(city_key)
     if not config:
         # V61: Fallback to CITY_REGISTRY for cities not yet in city_sources
         from city_configs import CITY_REGISTRY
