@@ -5922,6 +5922,23 @@ def admin_test_and_backfill():
 
         conn.commit()
 
+        # V145: Update sources table metadata after successful test-and-backfill
+        try:
+            source_slug = city_key.replace('_', '-')
+            # Try multiple key formats
+            for sk in [source_slug, city_key, source_slug.split('-')[0]]:
+                permitdb.get_connection().execute("""
+                    UPDATE sources SET
+                        total_permits = ?, newest_permit_date = (SELECT MAX(date) FROM permits WHERE source_city_key = ?),
+                        last_attempt_at = datetime('now'), last_attempt_status = 'success',
+                        last_success_at = datetime('now'), last_permits_found = ?, last_permits_inserted = ?,
+                        consecutive_failures = 0, updated_at = datetime('now')
+                    WHERE source_key = ?
+                """, (len(normalized), source_slug, len(raw), inserted[0] if isinstance(inserted, (list, tuple)) else inserted, sk))
+            permitdb.get_connection().commit()
+        except Exception as src_e:
+            print(f"[V145] sources update in test-and-backfill: {str(src_e)[:50]}")
+
         return jsonify({
             'status': 'SUCCESS',
             'city_key': city_key,
