@@ -4128,6 +4128,18 @@ def admin_v145_cleanup():
         r = conn.execute(f"DELETE FROM permits WHERE city IN ({placeholders})", garbage_cities).rowcount
         results['garbage_cities_deleted'] = r
 
+        # V146: Fix known wrong state codes in prod_cities
+        state_fixes = [
+            ("UPDATE prod_cities SET state='AZ' WHERE UPPER(city)='PHOENIX' AND state='IL' AND population > 1000000", 'phoenix_il_to_az'),
+        ]
+        for fix_sql, fix_name in state_fixes:
+            try:
+                r = conn.execute(fix_sql).rowcount
+                if r > 0:
+                    results[f'fix_{fix_name}'] = r
+            except Exception:
+                pass
+
         # Delete old scraper_runs (keep 30 days)
         r = conn.execute("DELETE FROM scraper_runs WHERE run_started_at < datetime('now', '-30 days')").rowcount
         results['old_scraper_runs_deleted'] = r
