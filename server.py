@@ -4163,19 +4163,23 @@ def admin_v145_verified():
         return error
     try:
         conn = permitdb.get_connection()
-        # V146: Get fresh permit cities, then look up correct state from prod_cities
+        # V146: Get fresh permit cities, look up correct state from highest-population prod_cities match
         verified = conn.execute("""
             SELECT p.city,
-                   COALESCE(pc.state, p.state) as state,
+                   COALESCE(
+                     (SELECT pc2.state FROM prod_cities pc2
+                      WHERE LOWER(pc2.city) = LOWER(p.city)
+                      ORDER BY pc2.population DESC LIMIT 1),
+                     p.state
+                   ) as state,
                    COUNT(*) as total_permits,
                    MAX(p.date) as newest_date,
                    COUNT(DISTINCT p.date) as days_with_data
             FROM permits p
-            LEFT JOIN prod_cities pc ON LOWER(pc.city) = LOWER(p.city) AND pc.status = 'active'
             WHERE p.date >= date('now', '-7 days') AND p.date <= date('now')
               AND p.city IS NOT NULL AND p.city != ''
               AND LENGTH(p.city) > 2
-            GROUP BY p.city, COALESCE(pc.state, p.state)
+            GROUP BY p.city
             HAVING days_with_data >= 2 AND newest_date >= date('now', '-3 days')
             ORDER BY total_permits DESC
         """).fetchall()
