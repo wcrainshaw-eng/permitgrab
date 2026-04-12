@@ -2671,7 +2671,33 @@ def _migrate_create_sources_table():
         );
     ''')
 
+    # V149: Unique index for city_research upsert
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_cr_city_state ON city_research(city, state)")
+    except Exception:
+        pass
+
+    conn.close()
     print(f"[{datetime.now()}] V148: All tables created/verified")
+
+
+def _bulk_load_city_research():
+    """V149: One-time bulk load of US cities into city_research from us_cities."""
+    conn = permitdb.get_connection()
+    count = conn.execute("SELECT COUNT(*) FROM city_research").fetchone()[0]
+    if count >= 400:
+        print(f"[{datetime.now()}] V149: city_research already has {count} rows, skipping bulk load")
+        conn.close()
+        return
+    r = conn.execute("""
+        INSERT OR IGNORE INTO city_research (city, state, population)
+        SELECT city_name, state, population FROM us_cities
+        WHERE population >= 50000 ORDER BY population DESC
+    """).rowcount
+    conn.commit()
+    total = conn.execute("SELECT COUNT(*) FROM city_research").fetchone()[0]
+    conn.close()
+    print(f"[{datetime.now()}] V149: Bulk loaded {r} cities into city_research (total: {total})")
 
 
 def _backfill_sources_table():
@@ -2772,6 +2798,12 @@ def _deferred_startup():
         _backfill_sources_table()
     except Exception as e:
         print(f"[{datetime.now()}] V145: Sources backfill error (non-fatal): {e}")
+
+    # V149: Bulk load cities into city_research pipeline
+    try:
+        _bulk_load_city_research()
+    except Exception as e:
+        print(f"[{datetime.now()}] V149: City research bulk load error (non-fatal): {e}")
 
     # V145: Cleanup old scraper_runs and log disk usage
     try:
