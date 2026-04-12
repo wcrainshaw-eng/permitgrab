@@ -1755,6 +1755,16 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
                 pass
         # V126: Leave unparseable dates as empty (quarantine)
 
+    # V145: Reject future dates and implausible dates
+    if parsed_date:
+        try:
+            from datetime import datetime as _dt, timedelta as _td
+            pd = _dt.strptime(parsed_date, "%Y-%m-%d")
+            if pd > _dt.now() + _td(days=7) or pd < _dt(2020, 1, 1):
+                parsed_date = ""
+        except Exception:
+            pass
+
     # Build description
     desc = get_field("description") or get_field("work_type") or get_field("permit_type")
 
@@ -2084,6 +2094,18 @@ def normalize_permit(raw_record, city_key):
                 pass
         # V126: Leave unparseable dates as empty (quarantine approach)
         # Next collection identifies new records by their absence in prior run
+
+    # V145: Reject future dates and implausible dates (bad parsing)
+    if parsed_date:
+        try:
+            from datetime import datetime as _dt, timedelta as _td
+            pd = _dt.strptime(parsed_date, "%Y-%m-%d")
+            if pd > _dt.now() + _td(days=7):  # More than 7 days in future = bad parse
+                parsed_date = ""
+            elif pd < _dt(2020, 1, 1):  # Before 2020 = likely garbage
+                parsed_date = ""
+        except Exception:
+            pass
 
     # Build description from available fields
     desc = get_field("description") or get_field("work_type") or get_field("permit_type")

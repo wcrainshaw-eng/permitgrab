@@ -4181,6 +4181,62 @@ def admin_v145_verified():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/v145-verify-sources', methods=['POST'])
+def admin_v145_verify_sources():
+    """V145: Run verification check — update verification_status for all active sources."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+
+        # Get all active sources
+        sources = conn.execute("SELECT source_key, name FROM sources WHERE status='active'").fetchall()
+
+        verified = 0
+        stale = 0
+        pending = 0
+
+        for src in sources:
+            sk = src[0]
+            # Check permit freshness for this source
+            stats = conn.execute("""
+                SELECT COUNT(*) as total_7d,
+                       COUNT(DISTINCT date) as days_active,
+                       MAX(date) as newest
+                FROM permits
+                WHERE source_city_key = ? AND date >= date('now', '-7 days') AND date <= date('now')
+            """, (sk,)).fetchone()
+
+            total_7d = stats[0] or 0
+            days_active = stats[1] or 0
+            newest = stats[2]
+
+            if days_active >= 2 and newest and newest >= (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d'):
+                conn.execute("""
+                    UPDATE sources SET verification_status='verified',
+                    last_verified_at=datetime('now'),
+                    days_consecutive=?, updated_at=datetime('now')
+                    WHERE source_key=?
+                """, (days_active, sk))
+                if not conn.execute("SELECT verified_at FROM sources WHERE source_key=? AND verified_at IS NOT NULL", (sk,)).fetchone():
+                    conn.execute("UPDATE sources SET verified_at=datetime('now') WHERE source_key=?", (sk,))
+                verified += 1
+            elif total_7d > 0:
+                conn.execute("UPDATE sources SET verification_status='pending', days_consecutive=?, updated_at=datetime('now') WHERE source_key=?", (days_active, sk))
+                pending += 1
+            else:
+                conn.execute("UPDATE sources SET verification_status='stale', days_consecutive=0, updated_at=datetime('now') WHERE source_key=?", (sk,))
+                stale += 1
+
+        conn.commit()
+        conn.close()
+        return jsonify({'verified': verified, 'pending': pending, 'stale': stale, 'total': len(sources)}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/v145-backfill-sources', methods=['POST'])
 def admin_v145_backfill():
     """V145: Manually trigger sources table backfill."""
