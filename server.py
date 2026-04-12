@@ -2776,19 +2776,20 @@ def _deferred_startup():
     except Exception:
         pass  # /var/data may not exist locally
 
-    # V145: Auto-start daemon with 45s delay — defensive, catches all errors
+    # V146: Safe auto-start daemon — runs start_collectors in background thread
+    # so it doesn't block gunicorn worker (start_collectors sleeps 120s+)
     import threading as _th
-    def _v145_delayed_daemon():
+    def _v146_safe_autostart():
         import time as _t
-        _t.sleep(45)
+        _t.sleep(10)  # Short delay for gunicorn to stabilize
         try:
-            print(f"[{datetime.now()}] V145: Auto-starting collectors...", flush=True)
-            start_collectors()
-            print(f"[{datetime.now()}] V145: Collectors auto-started OK", flush=True)
+            print(f"[{datetime.now()}] V146: Auto-starting collectors (background)...", flush=True)
+            start_collectors()  # This takes 120s+ but runs in THIS thread, not blocking gunicorn
+            print(f"[{datetime.now()}] V146: Collectors auto-started OK", flush=True)
         except Exception as _e:
-            print(f"[{datetime.now()}] V145: Auto-start failed (non-fatal): {_e}", flush=True)
-    _th.Thread(target=_v145_delayed_daemon, daemon=True, name='v145_autostart').start()
-    print(f"[{datetime.now()}] V145: Daemon auto-start scheduled (45s delay)")
+            print(f"[{datetime.now()}] V146: Auto-start failed: {_e}", flush=True)
+    _th.Thread(target=_v146_safe_autostart, daemon=True, name='v146_autostart').start()
+    print(f"[{datetime.now()}] V146: Daemon auto-start scheduled (background thread)")
 
     # V106: Phase B — Heavy maintenance in background thread
     # Server is ready to serve requests while this runs
@@ -10227,6 +10228,37 @@ def alerts_redirect():
 
 
 @app.route('/health')
+@app.route('/api/admin/health')
+def admin_daemon_health():
+    """V146: Daemon health check — no auth required (for Render health checks)."""
+    try:
+        conn = permitdb.get_connection()
+        # Last collection
+        last_coll = conn.execute("SELECT MAX(run_started_at) FROM scraper_runs").fetchone()
+        last_coll_at = last_coll[0] if last_coll else None
+        # Collections last 24h
+        colls_24h = conn.execute("SELECT COUNT(*) FROM scraper_runs WHERE run_started_at > datetime('now', '-24 hours')").fetchone()[0]
+        errors_24h = conn.execute("SELECT COUNT(*) FROM scraper_runs WHERE run_started_at > datetime('now', '-24 hours') AND status = 'error'").fetchone()[0]
+        # Fresh cities
+        fresh = conn.execute("SELECT COUNT(DISTINCT city) FROM permits WHERE date >= date('now', '-7 days') AND date <= date('now')").fetchone()[0]
+        conn.close()
+
+        daemon_running = _collector_started
+        is_healthy = daemon_running and colls_24h > 0
+
+        status_code = 200 if is_healthy else 503
+        return jsonify({
+            'status': 'healthy' if is_healthy else 'unhealthy',
+            'daemon_running': daemon_running,
+            'last_collection_at': last_coll_at,
+            'collections_last_24h': colls_24h,
+            'errors_last_24h': errors_24h,
+            'fresh_city_count': fresh,
+        }), status_code
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)[:100]}), 503
+
+
 @app.route('/api/health')
 def health_check():
     """
