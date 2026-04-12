@@ -2652,7 +2652,27 @@ def _migrate_create_sources_table():
     ''')
 
     conn.close()
-    print(f"[{datetime.now()}] V145: All tables created/verified (sources, violations, contractor_contacts, enrichment_log)")
+    # V148: City research pipeline table
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS city_research (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            population INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'untested',
+            portal_url TEXT,
+            dataset_id TEXT,
+            platform TEXT,
+            date_field TEXT,
+            address_field TEXT,
+            notes TEXT,
+            tested_at TEXT,
+            onboarded_at TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+    ''')
+
+    print(f"[{datetime.now()}] V148: All tables created/verified")
 
 
 def _backfill_sources_table():
@@ -4109,6 +4129,40 @@ def admin_v145_cleanup():
         conn = permitdb.get_connection()
         results = {}
 
+        # V147: Seed missing legitimate city/county/township names into us_cities
+        missing_cities = [
+            ('La County', 'CA', 0), ('Saint Petersburg', 'FL', 0), ('Saint Louis', 'MO', 0),
+            ('Prince Georges County', 'MD', 0), ('Ellicott City', 'MD', 0),
+            ('Freehold Twp', 'NJ', 0), ('Toms River', 'NJ', 0), ('Parsippany-Troy Hills', 'NJ', 0),
+            ('Brick', 'NJ', 0), ('Washington Twp', 'NJ', 0), ('Franklin Twp Somerset', 'NJ', 0),
+            ('Ocean Twp', 'NJ', 0), ('Neptune Twp', 'NJ', 0), ('Denville', 'NJ', 0),
+            ('Hazlet', 'NJ', 0), ('Holmdel', 'NJ', 0), ('Branchburg', 'NJ', 0),
+            ('Berkeley Twp', 'NJ', 0), ('Colts Neck', 'NJ', 0), ('Wall Twp', 'NJ', 0),
+            ('Point Pleasant Boro', 'NJ', 0), ('Chatham Boro', 'NJ', 0),
+            ('Freehold Boro', 'NJ', 0), ('Barnegat', 'NJ', 0), ('Upper Freehold', 'NJ', 0),
+            ('Raritan Twp', 'NJ', 0), ('Middletown Twp', 'NJ', 0),
+            ('Shelby County', 'TN', 0), ('Pima County', 'AZ', 0), ('Marin County', 'CA', 0),
+            ('Wake County', 'NC', 0), ('Fairfax County', 'VA', 0), ('Adams County', 'CO', 0),
+            ('Weld County', 'CO', 0), ('Montgomery County', 'MD', 0), ('Delaware County', 'PA', 0),
+            ('Leon County', 'FL', 0), ('Mecklenburg County', 'NC', 0), ('Maricopa County', 'AZ', 0),
+            ('Pasco County', 'FL', 0), ('DeKalb County', 'GA', 0), ('San Bernardino County', 'CA', 0),
+            ('Santa Clara County', 'CA', 0), ('Collin County', 'TX', 0), ('Cook County', 'IL', 0),
+            ('Pierce County', 'WA', 0), ('Hillsborough County', 'FL', 0),
+            ('Martin County', 'FL', 0), ('Volusia County', 'FL', 0),
+            ('Howard County', 'MD', 0), ('San Mateo County', 'CA', 0),
+            ('Spring', 'TX', 0), ('Manteca', 'CA', 0), ('Sparks', 'NV', 0),
+        ]
+        seeded = 0
+        for city_name, state, pop in missing_cities:
+            try:
+                conn.execute("INSERT OR IGNORE INTO us_cities (city_name, state, population) VALUES (?, ?, ?)",
+                            (city_name, state, pop))
+                seeded += 1
+            except Exception:
+                pass
+        conn.commit()
+        results['cities_seeded'] = seeded
+
         # Delete future-dated permits
         r = conn.execute("DELETE FROM permits WHERE date > date('now')").rowcount
         results['future_dates_deleted'] = r
@@ -4165,6 +4219,83 @@ def admin_v145_cleanup():
         return jsonify(results), 200
     except Exception as e:
         import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/city-research', methods=['GET'])
+def admin_city_research_get():
+    """V148: List city research entries."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        status_filter = request.args.get('status')
+        limit = int(request.args.get('limit', 50))
+        if status_filter:
+            rows = conn.execute("SELECT * FROM city_research WHERE status=? ORDER BY population DESC LIMIT ?", (status_filter, limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM city_research ORDER BY population DESC LIMIT ?", (limit,)).fetchall()
+        conn.close()
+        return jsonify({'count': len(rows), 'rows': [dict(r) for r in rows]}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/city-research', methods=['POST'])
+def admin_city_research_post():
+    """V148: Upsert a city research entry."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        data = request.get_json() or {}
+        city = data.get('city')
+        state = data.get('state')
+        if not city or not state:
+            return jsonify({'error': 'city and state are required'}), 400
+        conn = permitdb.get_connection()
+        existing = conn.execute("SELECT id FROM city_research WHERE city=? AND state=?", (city, state)).fetchone()
+        if existing:
+            sets = []
+            vals = []
+            for col in ['population','status','portal_url','dataset_id','platform','date_field','address_field','notes','tested_at','onboarded_at']:
+                if col in data:
+                    sets.append(f"{col}=?")
+                    vals.append(data[col])
+            if sets:
+                vals.extend([city, state])
+                conn.execute(f"UPDATE city_research SET {','.join(sets)} WHERE city=? AND state=?", vals)
+        else:
+            conn.execute("""INSERT INTO city_research (city, state, population, status, portal_url, dataset_id, platform, date_field, address_field, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (city, state, data.get('population',0), data.get('status','untested'), data.get('portal_url'),
+                 data.get('dataset_id'), data.get('platform'), data.get('date_field'), data.get('address_field'), data.get('notes')))
+        conn.commit()
+        row = conn.execute("SELECT * FROM city_research WHERE city=? AND state=?", (city, state)).fetchone()
+        conn.close()
+        return jsonify(dict(row)), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/city-research', methods=['DELETE'])
+def admin_city_research_delete():
+    """V148: Delete a city research entry."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        city = request.args.get('city')
+        state = request.args.get('state')
+        if not city or not state:
+            return jsonify({'error': 'city and state query params required'}), 400
+        conn = permitdb.get_connection()
+        r = conn.execute("DELETE FROM city_research WHERE city=? AND state=?", (city, state)).rowcount
+        conn.commit()
+        conn.close()
+        return jsonify({'deleted': r}), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
