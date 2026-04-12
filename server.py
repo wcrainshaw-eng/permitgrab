@@ -4121,6 +4121,8 @@ def admin_v145_cleanup():
             'Industrial Permit Database', 'Assessor', 'DSC', 'New Jersey',
             'Metro West', 'Millenia', 'Park Central', 'Rio Grande Park',
             'Address not available', 'None', 'N/A', 'Unknown', 'TEST',
+            '33Rd St. Industrial', 'Colonialtown North', 'Lake Como',
+            'Lake Whippoorwill', 'Audubon Park', 'Haralson Estates',
         ]
         placeholders = ','.join(['?' for _ in garbage_cities])
         r = conn.execute(f"DELETE FROM permits WHERE city IN ({placeholders})", garbage_cities).rowcount
@@ -4161,16 +4163,19 @@ def admin_v145_verified():
         return error
     try:
         conn = permitdb.get_connection()
+        # V146: Get fresh permit cities, then look up correct state from prod_cities
         verified = conn.execute("""
-            SELECT city, state, COUNT(*) as total_permits,
-                   MAX(date) as newest_date,
-                   COUNT(DISTINCT date) as days_with_data,
-                   MIN(date) as oldest_in_window
-            FROM permits
-            WHERE date >= date('now', '-7 days') AND date <= date('now')
-              AND city IS NOT NULL AND city != ''
-              AND LENGTH(city) > 2
-            GROUP BY city, state
+            SELECT p.city,
+                   COALESCE(pc.state, p.state) as state,
+                   COUNT(*) as total_permits,
+                   MAX(p.date) as newest_date,
+                   COUNT(DISTINCT p.date) as days_with_data
+            FROM permits p
+            LEFT JOIN prod_cities pc ON LOWER(pc.city) = LOWER(p.city) AND pc.status = 'active'
+            WHERE p.date >= date('now', '-7 days') AND p.date <= date('now')
+              AND p.city IS NOT NULL AND p.city != ''
+              AND LENGTH(p.city) > 2
+            GROUP BY p.city, COALESCE(pc.state, p.state)
             HAVING days_with_data >= 2 AND newest_date >= date('now', '-3 days')
             ORDER BY total_permits DESC
         """).fetchall()
