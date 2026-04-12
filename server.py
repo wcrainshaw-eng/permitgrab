@@ -2651,7 +2651,6 @@ def _migrate_create_sources_table():
         CREATE INDEX IF NOT EXISTS idx_enrichment_name ON enrichment_log(normalized_name, state, layer_tried);
     ''')
 
-    conn.close()
     # V148: City research pipeline table
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS city_research (
