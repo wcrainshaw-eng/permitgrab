@@ -83,8 +83,10 @@ def _parse_results_table(soup):
             text = link.get_text(strip=True) if link else cell.get_text(strip=True)
             if text:
                 values[col_name] = text
-        # Skip empty/header-only rows
-        if values.get('Record Number') or values.get('Address'):
+        # Skip empty/header-only rows — check for any permit number or address
+        has_permit = values.get('Record Number') or values.get('Permit Number') or values.get('Record #')
+        has_address = values.get('Address')
+        if has_permit or has_address:
             records.append(values)
 
     # Extract total count from "Showing X-Y of Z" text
@@ -224,15 +226,23 @@ def fetch_accela_portal(agency_code, days_back=30, module="Building",
     # Step 5: Normalize to standard permit format
     permits = []
     for rec in all_records:
+        # Handle column name variants across agencies
+        pn = rec.get('Record Number') or rec.get('Permit Number') or rec.get('Record #') or ''
+        dt = rec.get('Date') or rec.get('Received Date') or rec.get('Filed Date') or rec.get('Opened Date') or ''
+        pt = rec.get('Record Type') or rec.get('Permit Type') or rec.get('Type') or ''
+        addr = rec.get('Address') or ''
+        desc = rec.get('Description') or rec.get('Project Name') or ''
+        status = rec.get('Status') or ''
+
         permit = {
-            'permit_number': rec.get('Record Number', ''),
-            'address': rec.get('Address', ''),
-            'permit_type': rec.get('Record Type', ''),
-            'description': rec.get('Description', '') or rec.get('Project Name', ''),
-            'status': rec.get('Status', ''),
-            'filing_date': _parse_aca_date(rec.get('Date', '')),
-            'date': _parse_aca_date(rec.get('Date', '')),
-            'issued_date': _parse_aca_date(rec.get('Date', '')),
+            'permit_number': pn,
+            'address': addr,
+            'permit_type': pt,
+            'description': desc,
+            'status': status,
+            'filing_date': _parse_aca_date(dt),
+            'date': _parse_aca_date(dt),
+            'issued_date': _parse_aca_date(dt),
             'expiration_date': _parse_aca_date(rec.get('Expiration Date', '')),
             'project_name': rec.get('Project Name', ''),
         }
