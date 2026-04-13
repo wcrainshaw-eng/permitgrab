@@ -14069,6 +14069,7 @@ STATE_CONFIG = {
     'kentucky': {'name': 'Kentucky', 'abbrev': 'KY'},
     'oklahoma': {'name': 'Oklahoma', 'abbrev': 'OK'},
     'mississippi': {'name': 'Mississippi', 'abbrev': 'MS'},
+    'district-of-columbia': {'name': 'District of Columbia', 'abbrev': 'DC'},
 }
 
 
