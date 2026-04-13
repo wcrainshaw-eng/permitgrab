@@ -968,9 +968,13 @@ def fetch_arcgis(config, days_back):
         where_clause = f"{date_field} >= '{since_date}'"
     elif date_format == "string_mdy":
         # V154: For M/D/YYYY string date fields (e.g., Worcester), use LIKE to filter by year
-        # and do fine-grained filtering client-side
-        year = since_dt.year
-        where_clause = f"{date_field} LIKE '%/{year}'"
+        # and do fine-grained filtering client-side. Cover both since_year and current_year.
+        since_year = since_dt.year
+        current_year = datetime.now().year
+        if since_year == current_year:
+            where_clause = f"{date_field} LIKE '%/{current_year}'"
+        else:
+            where_clause = f"({date_field} LIKE '%/{since_year}' OR {date_field} LIKE '%/{current_year}')"
     elif date_format == "none":
         where_clause = "1=1"
     else:
@@ -1388,8 +1392,14 @@ def fetch_arcgis_bulk(config, days_back=90):
         where_clause = f"{date_field} >= '{since_date}'" if date_field else "1=1"
     elif date_format == "string_mdy":
         # V154: M/D/YYYY string dates — LIKE filter by year, client-side fine filtering
-        year = since_dt.year
-        where_clause = f"{date_field} LIKE '%/{year}'" if date_field else "1=1"
+        since_year = since_dt.year
+        current_year = datetime.now().year
+        if not date_field:
+            where_clause = "1=1"
+        elif since_year == current_year:
+            where_clause = f"{date_field} LIKE '%/{current_year}'"
+        else:
+            where_clause = f"({date_field} LIKE '%/{since_year}' OR {date_field} LIKE '%/{current_year}')"
     elif date_format == "none" or not date_field:
         where_clause = "1=1"
     else:
