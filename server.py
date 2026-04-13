@@ -14593,6 +14593,15 @@ def state_city_landing(state_slug, city_slug):
     state_abbrev = STATE_CONFIG[state_slug]['abbrev']
     state_name = STATE_CONFIG[state_slug]['name']
 
+    # V156: Slug aliases for cities where URL slug differs from DB slug
+    _SLUG_ALIASES = {
+        'new-york': 'new-york-city',
+        'chicago': 'chicago-il',
+        'washington': 'washington-dc',
+        'washington-dc': 'washington-dc',
+    }
+    city_slug = _SLUG_ALIASES.get(city_slug, city_slug)
+
     # Look up city in prod_cities first (authoritative source)
     conn = permitdb.get_connection()
     city_row = conn.execute("""
