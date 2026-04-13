@@ -6656,6 +6656,22 @@ def admin_cleanup_data():
         return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/collect-violations', methods=['POST'])
+def admin_collect_violations():
+    """V156: Trigger violation collection from all configured Socrata sources."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from violation_collector import collect_all_violations
+        data = request.get_json() or {}
+        days_back = data.get('days_back', 180)
+        stats = collect_all_violations(days_back=days_back)
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': f'Violation collection failed: {str(e)}'}), 500
+
+
 @app.route('/api/admin/query', methods=['POST'])
 def admin_query():
     """V34: Run a read-only SQL query for diagnostics.
@@ -15532,7 +15548,7 @@ def scheduled_collection():
         # Violation collection (daily)
         try:
             from violation_collector import collect_all_violations
-            collect_all_violations(days_back=90)
+            collect_all_violations(days_back=180)
             print(f"[{datetime.now()}] Violation collection complete.")
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")
@@ -15805,7 +15821,7 @@ def run_initial_collection():
         # Violation collection
         try:
             from violation_collector import collect_all_violations
-            collect_all_violations(days_back=90)
+            collect_all_violations(days_back=180)
         except Exception as e:
             print(f"[{datetime.now()}] Initial violation collection error: {e}")
 

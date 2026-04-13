@@ -793,6 +793,28 @@ def _init_postgres_schema(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_city_validations_phase ON city_validations(phase)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_city_validations_status ON city_validations(phase_status)")
 
+    # V156: Violations table for code enforcement data
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS violations (
+            id SERIAL PRIMARY KEY,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            violation_id TEXT,
+            address TEXT,
+            violation_date TEXT,
+            violation_type TEXT,
+            description TEXT,
+            status TEXT,
+            source_dataset TEXT,
+            source_url TEXT,
+            collected_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(city, state, violation_id)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status)")
+
     print("[DB_ENGINE] PostgreSQL schema initialized")
 
 

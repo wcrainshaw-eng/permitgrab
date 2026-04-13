@@ -850,6 +850,26 @@ def init_db():
             notes TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_discovered_sources_status ON discovered_sources(status);
+
+        -- V156: Violations table for code enforcement data
+        CREATE TABLE IF NOT EXISTS violations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            violation_id TEXT,
+            address TEXT,
+            violation_date TEXT,
+            violation_type TEXT,
+            description TEXT,
+            status TEXT,
+            source_dataset TEXT,
+            source_url TEXT,
+            collected_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(city, state, violation_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
+        CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
+        CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status);
     """)
     conn.commit()
 
