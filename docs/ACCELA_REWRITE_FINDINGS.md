@@ -1,10 +1,13 @@
 # Accela Collector Rewrite — Research Findings (2026-04-13)
 
-## Key Finding: Portal Data Requires JavaScript
+## UPDATE: requests + BeautifulSoup WORKS
 
-The Accela Citizen Access (ACA) portal loads permit data via client-side JavaScript, 
-not in the initial HTML response. A pure `requests + BeautifulSoup` approach **cannot** 
-extract permit data from these portals.
+Initial testing suggested the portal required JavaScript. The actual issue was a
+**CSRF check** — Accela rejects form POSTs without `Referer` and `Origin` headers.
+Adding these headers makes the standard ViewState form submission work perfectly.
+
+The new `accela_portal_collector.py` replaces the Playwright-based scraper with
+~200 lines of requests + BeautifulSoup code. No headless browser needed.
 
 ### Tested Approaches (Dallas/DALLASTX portal):
 

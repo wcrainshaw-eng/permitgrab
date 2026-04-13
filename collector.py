@@ -1923,10 +1923,20 @@ def fetch_permits(city_key, days_back=30):
             elif platform == "carto":
                 raw = fetch_carto(config, days_back)
             elif platform == "accela":
-                if not ACCELA_AVAILABLE:
-                    print(f"  [SKIP] Accela not available (playwright not installed)")
-                    return [], "skip_no_playwright"
-                raw = fetch_accela(config, days_back)
+                # V160: Try lightweight portal collector first, fall back to Playwright
+                try:
+                    from accela_portal_collector import fetch_accela as fetch_accela_portal
+                    raw = fetch_accela_portal(config, days_back)
+                    if raw:
+                        print(f"  [V160] Accela portal collector returned {len(raw)} permits")
+                    else:
+                        raise Exception("Portal collector returned 0 — trying Playwright")
+                except Exception as portal_err:
+                    print(f"  [V160] Portal collector failed ({portal_err}), trying Playwright...")
+                    if not ACCELA_AVAILABLE:
+                        print(f"  [SKIP] Playwright also not available")
+                        return [], "skip_no_playwright"
+                    raw = fetch_accela(config, days_back)
             elif platform == "json":
                 raw = fetch_json(config, days_back)
             else:
