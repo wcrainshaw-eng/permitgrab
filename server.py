@@ -3320,6 +3320,9 @@ def _migrate_create_sources_table():
     conn.close()
     print(f"[{datetime.now()}] V158: All tables created/verified")
 
+    # V158: Ensure deferred startup runs (starts email scheduler, collectors, etc.)
+    _deferred_startup()
+
 
 def _bulk_load_city_research():
     """V149: One-time bulk load of US cities into city_research from us_cities."""
