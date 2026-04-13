@@ -292,9 +292,15 @@ def upsert_violations(violations):
         return 0
     import db as permitdb
 
-    # V156: Ensure violations table exists
+    # V156: Ensure violations table has correct schema (drop old if needed)
     conn = permitdb.get_connection()
     try:
+        # Check if old schema (has source_key instead of violation_id)
+        test = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='violations'").fetchone()
+        if test and 'violation_id' not in str(test[0] if isinstance(test, tuple) else test['sql']):
+            print("[V156] Dropping old violations table (wrong schema)")
+            conn.execute("DROP TABLE IF EXISTS violations")
+            conn.commit()
         conn.execute("""CREATE TABLE IF NOT EXISTS violations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             city TEXT NOT NULL, state TEXT NOT NULL, violation_id TEXT,
@@ -303,9 +309,11 @@ def upsert_violations(violations):
             collected_at TEXT DEFAULT (datetime('now')),
             UNIQUE(city, state, violation_id)
         )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date)")
         conn.commit()
     except Exception as e:
-        print(f"[V156] Table creation note: {e}")
+        print(f"[V156] Table creation error: {e}")
 
     inserted = 0
     errors = 0
