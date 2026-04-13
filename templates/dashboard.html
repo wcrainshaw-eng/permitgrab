@@ -1422,7 +1422,7 @@ footer a:hover { color: white; }
   </div>
   <div class="hero-content">
     <h1>Building Permit Data for <span>Contractors</span></h1>
-    <p>Track building permits across 900+ US cities. Find new construction, renovation, and remodeling permits daily. Be the first contractor to call.</p>
+    <p>Track building permits across {{ city_count | default(260) }}+ US cities. Find new construction, renovation, and remodeling permits daily. Be the first contractor to call.</p>
   </div>
   <div class="stats-bar">
     <div class="stat-item">
@@ -1434,7 +1434,7 @@ footer a:hover { color: white; }
       <div class="stat-label">Cities Covered</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-states">50</div>
+      <div class="stat-value" id="stat-states">{{ state_count | default(38) }}</div>
       <div class="stat-label">States</div>
     </div>
     <div class="stat-item">

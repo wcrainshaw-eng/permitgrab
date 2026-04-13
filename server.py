@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V158',
+                'version': 'V160',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -9573,7 +9573,7 @@ with app.app_context():
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["2000 per day", "200 per hour"],
     storage_uri="memory://",
 )
 
@@ -11153,8 +11153,17 @@ def index():
             default_city = user.city or ''
             default_trade = user.trade or ''
 
-    # V31: City count = only actively pulled cities (not historical bulk data)
+    # V31/V160: City count = only cities with fresh data (last 30 days)
     city_count = get_total_city_count_auto()
+
+    # V160: State count — only states with fresh data
+    try:
+        _sc = permitdb.get_connection()
+        state_count = _sc.execute(
+            "SELECT COUNT(DISTINCT state) as cnt FROM prod_cities WHERE newest_permit_date >= date('now', '-30 days')"
+        ).fetchone()['cnt']
+    except Exception:
+        state_count = 38
 
     # V13: Pass ALL cities for dropdown (sorted by state then city name)
     # This ensures dropdown shows all 555+ cities, not just those in the paginated API response
@@ -11170,7 +11179,8 @@ def index():
 
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
-                          city_count=city_count, all_dropdown_cities=all_dropdown_cities,
+                          city_count=city_count, state_count=state_count,
+                          all_dropdown_cities=all_dropdown_cities,
                           initial_stats=initial_stats)
 
 
@@ -15402,7 +15412,7 @@ def state_city_landing(state_slug, city_slug):
     # Look up city in prod_cities first (authoritative source)
     conn = permitdb.get_connection()
     city_row = conn.execute("""
-        SELECT city, state, city_slug, source_id, source_type, total_permits,
+        SELECT id, city, state, city_slug, source_id, source_type, total_permits,
                newest_permit_date, last_collection, data_freshness, status
         FROM prod_cities
         WHERE city_slug = ? AND state = ?
@@ -15411,7 +15421,7 @@ def state_city_landing(state_slug, city_slug):
     if not city_row:
         # Try without state filter (some cities might not have state stored correctly)
         city_row = conn.execute("""
-            SELECT city, state, city_slug, source_id, source_type, total_permits,
+            SELECT id, city, state, city_slug, source_id, source_type, total_permits,
                    newest_permit_date, last_collection, data_freshness, status
             FROM prod_cities WHERE city_slug = ?
         """, (city_slug,)).fetchone()
@@ -15437,46 +15447,64 @@ def state_city_landing(state_slug, city_slug):
         data_freshness = city_row['data_freshness'] or 'no_data'
         is_active = city_row['status'] == 'active'
 
-    # Get recent permits from permits table
-    filter_name = city_name
-    permits_cursor = conn.execute("""
-        SELECT * FROM permits
-        WHERE city = ? AND state = ?
-        ORDER BY filing_date DESC, estimated_cost DESC
-        LIMIT 50
-    """, (filter_name, city_state))
-    recent_permits = [dict(row) for row in permits_cursor]
-
-    # If no permits with state filter, try without
-    if not recent_permits:
+    # V160: Get recent permits using prod_city_id FK (not city name string match)
+    prod_city_id = city_row['id'] if city_row else None
+    if prod_city_id:
         permits_cursor = conn.execute("""
             SELECT * FROM permits
-            WHERE city = ?
+            WHERE prod_city_id = ?
             ORDER BY filing_date DESC, estimated_cost DESC
             LIMIT 50
-        """, (filter_name,))
+        """, (prod_city_id,))
+        recent_permits = [dict(row) for row in permits_cursor]
+    else:
+        recent_permits = []
+
+    # Fallback: try city name match if FK returned nothing
+    if not recent_permits:
+        filter_name = city_name
+        permits_cursor = conn.execute("""
+            SELECT * FROM permits
+            WHERE city = ? AND state = ?
+            ORDER BY filing_date DESC, estimated_cost DESC
+            LIMIT 50
+        """, (filter_name, city_state))
         recent_permits = [dict(row) for row in permits_cursor]
 
-    # Get permit stats
-    stats_row = conn.execute("""
-        SELECT COUNT(*) as permit_count,
-               MIN(filing_date) as earliest_date,
-               MAX(filing_date) as latest_date
-        FROM permits WHERE city = ?
-    """, (filter_name,)).fetchone()
+    # V160: Get permit stats using prod_city_id
+    if prod_city_id:
+        stats_row = conn.execute("""
+            SELECT COUNT(*) as permit_count,
+                   MIN(filing_date) as earliest_date,
+                   MAX(filing_date) as latest_date
+            FROM permits WHERE prod_city_id = ?
+        """, (prod_city_id,)).fetchone()
+    else:
+        filter_name = city_name
+        stats_row = conn.execute("""
+            SELECT COUNT(*) as permit_count,
+                   MIN(filing_date) as earliest_date,
+                   MAX(filing_date) as latest_date
+            FROM permits WHERE city = ?
+        """, (filter_name,)).fetchone()
 
     permit_count = stats_row['permit_count'] if stats_row else 0
     earliest_date = stats_row['earliest_date'] if stats_row else None
     latest_date = stats_row['latest_date'] if stats_row else None
 
-    # Get permit types breakdown
-    types_cursor = conn.execute("""
-        SELECT COALESCE(permit_type, 'Other') as ptype, COUNT(*) as cnt
-        FROM permits WHERE city = ?
-        GROUP BY permit_type
-        ORDER BY cnt DESC
-        LIMIT 10
-    """, (filter_name,))
+    # V160: Get permit types breakdown using prod_city_id
+    if prod_city_id:
+        types_cursor = conn.execute("""
+            SELECT COALESCE(permit_type, 'Other') as ptype, COUNT(*) as cnt
+            FROM permits WHERE prod_city_id = ?
+            GROUP BY permit_type ORDER BY cnt DESC LIMIT 10
+        """, (prod_city_id,))
+    else:
+        types_cursor = conn.execute("""
+            SELECT COALESCE(permit_type, 'Other') as ptype, COUNT(*) as cnt
+            FROM permits WHERE city = ?
+            GROUP BY permit_type ORDER BY cnt DESC LIMIT 10
+        """, (city_name,))
     permit_types = {row['ptype']: row['cnt'] for row in types_cursor}
 
     # Get nearby cities in same state for internal linking

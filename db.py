@@ -3494,14 +3494,16 @@ def get_prod_cities(status='active', min_permits=1):
     """
     conn = get_connection()
 
-    # V107: Order by population DESC so biggest cities (incl. 0-permit Accela) get processed first
+    # V107/V160: Order by permits_last_30d, filter to fresh cities only
     if status:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
-                   source_type, source_id, consecutive_failures, last_error
+                   source_type, source_id, consecutive_failures, last_error,
+                   permits_last_30d, newest_permit_date
             FROM prod_cities
             WHERE status = ? AND total_permits >= ?
-            ORDER BY population DESC, total_permits DESC
+              AND newest_permit_date >= date('now', '-30 days')
+            ORDER BY permits_last_30d DESC, total_permits DESC
         """, (status, min_permits))
     else:
         cursor = conn.execute("""
@@ -3537,8 +3539,10 @@ def get_prod_city_count():
     """
     try:
         conn = get_connection()
+        # V160: Only count cities with fresh data (permit in last 30 days)
         row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM prod_cities WHERE status = 'active' AND total_permits > 0"
+            "SELECT COUNT(*) as cnt FROM prod_cities "
+            "WHERE newest_permit_date >= date('now', '-30 days')"
         ).fetchone()
         return row['cnt'] if row else 0
     except Exception:
