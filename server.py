@@ -14685,9 +14685,56 @@ def state_city_landing(state_slug, city_slug):
     # Format display name
     display_name = format_city_name(city_name)
 
-    # SEO meta
-    meta_title = f"{display_name}, {state_name} Building Permits | PermitGrab"
-    meta_description = f"Browse recent building permits in {display_name}, {state_name}. Track new construction, renovations, and remodeling permits updated daily. Built for contractors and builders."
+    # V156: SEO-optimized meta for top cities, generic fallback for others
+    _SEO_OVERRIDES = {
+        ('New York City', 'NY'): {
+            'title': 'NYC Building Permits & Contractor Leads — Daily Updates | PermitGrab',
+            'meta': f'Track {permit_count:,}+ NYC building permits updated daily. Find DOB permits, code violations, and contractor leads by address. 14-day free trial.',
+        },
+        ('Los Angeles', 'CA'): {
+            'title': 'Los Angeles Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Search {permit_count:,}+ LA building permits. Find LADBS permits, code enforcement cases, and construction leads daily. 14-day free trial.',
+        },
+        ('Chicago', 'IL'): {
+            'title': 'Chicago Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Track {permit_count:,}+ Chicago building permits and code violations. Find new construction projects and contractor leads updated daily.',
+        },
+        ('Austin', 'TX'): {
+            'title': 'Austin Building Permits & Contractor Leads — Updated Daily | PermitGrab',
+            'meta': f'Search {permit_count:,}+ Austin TX building permits. Track new construction, code enforcement cases, and find contractor leads. Free trial.',
+        },
+        ('San Antonio', 'TX'): {
+            'title': 'San Antonio Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Track {permit_count:,}+ San Antonio building permits updated daily. Find new construction projects and contractor leads by trade.',
+        },
+        ('Mesa', 'AZ'): {
+            'title': 'Mesa AZ Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Search {permit_count:,}+ Mesa building permits. Track new construction projects, code enforcement cases, and find leads daily.',
+        },
+        ('Fort Worth', 'TX'): {
+            'title': 'Fort Worth Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Track {permit_count:,}+ Fort Worth building permits and code violations. Find new construction projects and leads updated daily.',
+        },
+        ('Washington', 'DC'): {
+            'title': 'Washington DC Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Search {permit_count:,}+ DC building permits updated daily. Find construction projects and contractor leads in the DMV area.',
+        },
+        ('Little Rock', 'AR'): {
+            'title': 'Little Rock Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Track {permit_count:,}+ Little Rock building permits. Find new construction projects and code enforcement leads updated daily.',
+        },
+        ('Cape Coral', 'FL'): {
+            'title': 'Cape Coral Building Permits & Contractor Leads | PermitGrab',
+            'meta': f'Search {permit_count:,}+ Cape Coral FL building permits. Track new construction projects and find contractor leads daily.',
+        },
+    }
+    _seo = _SEO_OVERRIDES.get((city_name, city_state))
+    if _seo:
+        meta_title = _seo['title']
+        meta_description = _seo['meta']
+    else:
+        meta_title = f"{display_name}, {state_name} Building Permits | PermitGrab"
+        meta_description = f"Browse recent building permits in {display_name}, {state_name}. Track new construction, renovations, and remodeling permits updated daily. Built for contractors and builders."
 
     # Robots directive
     robots_directive = "index, follow" if permit_count > 0 and is_active else "noindex, follow"
@@ -15229,7 +15276,7 @@ def sitemap_blog():
     for post in BLOG_POSTS:
         urls.append({
             'loc': f"{SITE_URL}/blog/{post['slug']}",
-            'changefreq': 'monthly',
+            'changefreq': 'weekly',
             'priority': '0.6',
             'lastmod': post['date']
         })

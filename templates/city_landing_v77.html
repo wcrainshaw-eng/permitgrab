@@ -79,6 +79,23 @@
 }
 </script>
 
+<!-- V156: WebApplication Schema for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "PermitGrab - {{ city_name }} Building Permits",
+  "url": "{{ canonical_url }}",
+  "description": "{{ meta_description }}",
+  "applicationCategory": "BusinessApplication",
+  "offers": {
+    "@type": "Offer",
+    "price": "149.00",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -592,6 +609,22 @@ body {
 
   <div class="contractor-context">
     <p>New building permits in {{ city_name }}, {{ state_name }} indicate upcoming construction projects. Contractors can identify subcontracting opportunities by monitoring recently issued permits for residential renovations, commercial buildouts, and new construction. Early outreach to permit holders often results in higher close rates before projects go to competitive bid.</p>
+  </div>
+</section>
+
+<!-- V156: SEO CONTENT SECTIONS -->
+<section class="section" style="background: white; max-width: none; padding-left: 32px; padding-right: 32px;">
+  <div style="max-width: 800px; margin: 0 auto; font-size: 15px; line-height: 1.7; color: var(--gray-700);">
+
+    <h2 style="font-size: 22px; color: var(--gray-900); margin-bottom: 16px;">About {{ city_name }} Building Permits</h2>
+    <p>{{ city_name }}, {{ state_name }} processes thousands of building permits covering residential construction, commercial buildouts, renovations, and specialty trade work. PermitGrab tracks {{ permit_count|default(0) }}+ {{ city_name }} building permits with data updated daily from official city sources.</p>
+    <p style="margin-top: 12px;">Every new construction project in {{ city_name }} requires a building permit before work can begin. These public records include the project address, scope of work, estimated cost, and often the general contractor's name — making them valuable leads for subcontractors looking for new projects in {{ city_name }}.</p>
+
+    <h2 style="font-size: 22px; color: var(--gray-900); margin: 28px 0 16px;">How Contractors Use {{ city_name }} Permit Data</h2>
+    <p>HVAC contractors, electricians, plumbers, and roofers in {{ city_name }} use building permit data to find projects before they hit traditional lead services. When a new commercial buildout or residential renovation permit is filed, it signals upcoming work that needs subcontractors.</p>
+    <p style="margin-top: 12px;">Instead of competing for shared leads on HomeAdvisor or Angi, contractors who monitor {{ city_name }} building permits can reach out to general contractors the day a permit is issued — before anyone else calls. This first-mover advantage leads to higher close rates and better project selection.</p>
+    <p style="margin-top: 12px;">PermitGrab sends daily email alerts filtered by trade, so {{ city_name }} electrical contractors only see electrical permits, HVAC contractors only see mechanical permits, and so on.</p>
+
   </div>
 </section>
 
