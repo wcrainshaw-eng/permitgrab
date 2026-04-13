@@ -280,11 +280,23 @@ def fetch_accela(config, days_back=30):
     """
     # Extract agency code from config
     agency_code = None
+    module = "Building"
+    tab_name = "Building"
 
     # Check _accela_city_key first (e.g., "dallastx" -> "DALLASTX")
     accela_key = config.get('_accela_city_key', '')
     if accela_key:
         agency_code = accela_key.upper()
+        # Look up module from ACCELA_CONFIGS in old scraper
+        try:
+            from accela_scraper import ACCELA_CONFIGS
+            old_config = ACCELA_CONFIGS.get(accela_key) or ACCELA_CONFIGS.get(accela_key.lower())
+            if old_config:
+                agency_code = old_config.get('agency_code', agency_code)
+                module = old_config.get('module', module)
+                tab_name = old_config.get('tab_name', module)
+        except ImportError:
+            pass
 
     # Fall back to extracting from endpoint URL
     if not agency_code:
@@ -292,20 +304,15 @@ def fetch_accela(config, days_back=30):
         m = re.search(r'accela\.com/([^/]+)/', endpoint)
         if m:
             agency_code = m.group(1)
+        if 'module=' in endpoint:
+            m2 = re.search(r'module=(\w+)', endpoint)
+            if m2:
+                module = m2.group(1)
+                tab_name = module
 
     if not agency_code:
         print(f"  [ACA] No agency code found in config")
         return []
-
-    # Determine module from config
-    module = "Building"  # Default
-    endpoint = config.get('endpoint', '')
-    if 'module=' in endpoint:
-        m = re.search(r'module=(\w+)', endpoint)
-        if m:
-            module = m.group(1)
-
-    tab_name = module  # Usually the same
 
     return fetch_accela_portal(agency_code, days_back=days_back,
                                module=module, tab_name=tab_name)
