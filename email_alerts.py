@@ -28,7 +28,31 @@ if not SUBSCRIBERS_FILE.exists():
 
 
 def load_subscribers():
-    """Load active subscribers from subscribers.json."""
+    """Load active subscribers. V158: Try DB first, fall back to JSON file."""
+    # V158: Try SQLite subscribers table first
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute(
+            "SELECT email, name, plan, digest_cities, active, last_digest_sent_at "
+            "FROM subscribers WHERE active=1"
+        ).fetchall()
+        if rows:
+            subs = []
+            for r in rows:
+                subs.append({
+                    'email': r['email'] if isinstance(r, dict) else r[0],
+                    'name': r['name'] if isinstance(r, dict) else r[1],
+                    'plan': r['plan'] if isinstance(r, dict) else r[2],
+                    'cities': json.loads((r['digest_cities'] if isinstance(r, dict) else r[3]) or '[]'),
+                    'active': True,
+                    'last_digest_sent_at': r['last_digest_sent_at'] if isinstance(r, dict) else r[5],
+                })
+            print(f"  [V158] Loaded {len(subs)} subscribers from DB")
+            return subs
+    except Exception as e:
+        print(f"  [V158] DB subscriber load failed ({e}), falling back to JSON")
+
+    # Fallback: JSON file
     if not SUBSCRIBERS_FILE.exists():
         print(f"  [WARN] Subscribers file not found: {SUBSCRIBERS_FILE}")
         return []
@@ -52,8 +76,11 @@ class SubscriberProxy:
         self.last_digest_sent_at = data.get("last_digest_sent_at")
         # Convert single city string to JSON array format
         city = data.get("city", "")
-        cities = data.get("cities", [])  # Support future multi-city
-        if cities:
+        cities = data.get("cities", [])  # V158: DB format uses 'cities' directly
+        digest_cities = data.get("digest_cities")  # V158: May already be JSON string
+        if digest_cities and isinstance(digest_cities, str):
+            self.digest_cities = digest_cities
+        elif cities:
             self.digest_cities = json.dumps(cities)
         elif city:
             self.digest_cities = json.dumps([city])

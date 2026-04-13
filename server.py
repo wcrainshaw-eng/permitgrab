@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V70',
+                'version': 'V158',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -3277,8 +3277,48 @@ def _migrate_create_sources_table():
     except Exception:
         pass
 
+    # V158: Digest logging and subscriber tables
+    conn2 = permitdb.get_connection()
+    conn2.executescript('''
+        CREATE TABLE IF NOT EXISTS digest_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sent_at TEXT DEFAULT (datetime('now')),
+            recipient_email TEXT,
+            permits_count INTEGER DEFAULT 0,
+            cities_included TEXT,
+            status TEXT,
+            error_message TEXT
+        );
+        CREATE TABLE IF NOT EXISTS subscribers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT,
+            plan TEXT DEFAULT 'free',
+            digest_cities TEXT DEFAULT '[]',
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            last_digest_sent_at TEXT
+        );
+    ''')
+    conn2.commit()
+
+    # V158: Ensure default subscriber exists in DB
+    try:
+        existing = conn2.execute("SELECT id FROM subscribers WHERE email='wcrainshaw@gmail.com'").fetchone()
+        if not existing:
+            conn2.execute("""
+                INSERT INTO subscribers (email, name, plan, digest_cities, active)
+                VALUES ('wcrainshaw@gmail.com', 'Wes', 'pro',
+                        '["New York City","Austin","Chicago","Los Angeles","San Antonio"]', 1)
+            """)
+            conn2.commit()
+            print(f"[{datetime.now()}] V158: Created default subscriber for wcrainshaw@gmail.com")
+    except Exception as e:
+        print(f"[{datetime.now()}] V158: Subscriber setup note: {e}")
+    conn2.close()
+
     conn.close()
-    print(f"[{datetime.now()}] V148: All tables created/verified")
+    print(f"[{datetime.now()}] V158: All tables created/verified")
 
 
 def _bulk_load_city_research():
@@ -7270,6 +7310,93 @@ def admin_collect_violations():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': f'Violation collection failed: {str(e)}'}), 500
+
+
+@app.route('/api/admin/digest/status', methods=['GET'])
+def admin_digest_status():
+    """V158: Get digest daemon status and recent history."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    # Check if email_scheduler thread is alive
+    daemon_alive = False
+    for t in threading.enumerate():
+        if t.name == 'email_scheduler' and t.is_alive():
+            daemon_alive = True
+            break
+
+    # Get recent digest logs
+    conn = permitdb.get_connection()
+    recent_logs = []
+    try:
+        rows = conn.execute(
+            "SELECT * FROM digest_log ORDER BY sent_at DESC LIMIT 10"
+        ).fetchall()
+        recent_logs = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    # Get subscriber count
+    sub_count = 0
+    try:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM subscribers WHERE active=1").fetchone()
+        sub_count = row['cnt'] if row else 0
+    except Exception:
+        # Fall back to JSON file
+        try:
+            from email_alerts import load_subscribers
+            sub_count = len(load_subscribers())
+        except Exception:
+            pass
+
+    return jsonify({
+        'daemon_alive': daemon_alive,
+        'digest_status': DIGEST_STATUS,
+        'subscriber_count': sub_count,
+        'recent_logs': recent_logs,
+        'smtp_configured': bool(os.environ.get('SMTP_PASS', '')),
+    })
+
+
+@app.route('/api/admin/digest/trigger', methods=['POST'])
+def admin_digest_trigger():
+    """V158: Manually trigger a digest send."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        from email_alerts import send_daily_digest, send_test_digest
+        data = request.get_json() or {}
+
+        # Option 1: Send to specific email
+        test_email = data.get('email')
+        if test_email:
+            result = send_test_digest(test_email, city=data.get('city'))
+            _log_digest(test_email, result, 'manual_trigger')
+            return jsonify({'status': 'sent', 'email': test_email, 'result': str(result)})
+
+        # Option 2: Send full digest to all subscribers
+        sent, failed = send_daily_digest()
+        _log_digest('all_subscribers', f'sent={sent},failed={failed}', 'manual_trigger')
+        return jsonify({'status': 'sent', 'sent': sent, 'failed': failed})
+    except Exception as e:
+        _log_digest('error', str(e), 'manual_trigger_error')
+        return jsonify({'error': f'Digest trigger failed: {str(e)}'}), 500
+
+
+def _log_digest(recipient, result, status):
+    """V158: Log digest send attempt to digest_log table."""
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("""
+            INSERT INTO digest_log (recipient_email, permits_count, status, error_message)
+            VALUES (?, 0, ?, ?)
+        """, (recipient, status, str(result)[:500]))
+        conn.commit()
+    except Exception:
+        pass  # Table may not exist yet
 
 
 @app.route('/api/admin/query', methods=['POST'])
@@ -16401,11 +16528,28 @@ def schedule_email_tasks():
                         DIGEST_STATUS['last_digest_sent'] = sent
                         DIGEST_STATUS['last_digest_failed'] = failed
                         last_digest_date = today_date  # Mark as done for today
+                        # V158: Log success to DB
+                        try:
+                            _conn = permitdb.get_connection()
+                            _conn.execute("INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('digest_last_success', ?, datetime('now'))", (datetime.now().isoformat(),))
+                            _conn.execute("INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('digest_last_sent_count', ?, datetime('now'))", (str(sent),))
+                            _conn.execute("INSERT INTO digest_log (recipient_email, permits_count, status) VALUES ('scheduled', ?, 'sent')", (sent,))
+                            _conn.commit()
+                        except Exception:
+                            pass
                     except Exception as e:
                         print(f"[{datetime.now()}] [ERROR] Daily digest failed: {e}")
                         import traceback
                         traceback.print_exc()
                         DIGEST_STATUS['last_digest_result'] = f'error: {e}'
+                        # V158: Log failure to DB
+                        try:
+                            _conn = permitdb.get_connection()
+                            _conn.execute("INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('digest_last_error', ?, datetime('now'))", (str(e)[:500],))
+                            _conn.execute("INSERT INTO digest_log (recipient_email, status, error_message) VALUES ('scheduled', 'failed', ?)", (str(e)[:500],))
+                            _conn.commit()
+                        except Exception:
+                            pass
 
                 # Trial lifecycle at 8 AM ET
                 if now_et.hour == 8 and now_et.minute < 30:
