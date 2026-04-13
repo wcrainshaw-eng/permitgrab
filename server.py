@@ -2593,28 +2593,26 @@ def _migrate_create_sources_table():
         except Exception:
             pass
 
-    # Violations table (V82b ready)
+    # Violations table (V156: Updated schema with violation_id)
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS violations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source_key TEXT NOT NULL,
-            city TEXT,
-            state TEXT,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            violation_id TEXT,
             address TEXT,
             violation_date TEXT,
             violation_type TEXT,
-            category TEXT,
-            status TEXT,
             description TEXT,
-            respondent_name TEXT,
+            status TEXT,
+            source_dataset TEXT,
             source_url TEXT,
-            raw_data TEXT,
             collected_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(source_key, source_url, violation_date, address)
+            UNIQUE(city, state, violation_id)
         );
-        CREATE INDEX IF NOT EXISTS idx_violations_source_date ON violations(source_key, violation_date);
-        CREATE INDEX IF NOT EXISTS idx_violations_city_date ON violations(city, violation_date);
-        CREATE INDEX IF NOT EXISTS idx_violations_collected ON violations(collected_at);
+        CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
+        CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
+        CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status);
     ''')
 
     # Contractor enrichment tables (V82c ready)
