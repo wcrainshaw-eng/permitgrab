@@ -14272,6 +14272,16 @@ def state_or_city_landing(state_slug):
 
 def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
+    # V157: Slug aliases for cities where URL slug differs from DB slug
+    _INNER_ALIASES = {
+        'new-york': 'new-york-city',
+        'chicago': 'chicago-il',
+        'washington-dc': 'washington-dc',
+        'little-rock': 'little-rock-ar',
+        'mesa': 'mesa-az-accela',
+    }
+    city_slug = _INNER_ALIASES.get(city_slug, city_slug)
+
     # V15: Check prod_cities status for this city
     is_prod_city = False
     prod_city_status = None
