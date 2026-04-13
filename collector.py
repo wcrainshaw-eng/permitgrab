@@ -966,6 +966,11 @@ def fetch_arcgis(config, days_back):
         # use server-side string comparison instead of fetching everything
         since_date = since_dt.strftime("%Y-%m-%d")
         where_clause = f"{date_field} >= '{since_date}'"
+    elif date_format == "string_mdy":
+        # V154: For M/D/YYYY string date fields (e.g., Worcester), use LIKE to filter by year
+        # and do fine-grained filtering client-side
+        year = since_dt.year
+        where_clause = f"{date_field} LIKE '%/{year}'"
     elif date_format == "none":
         where_clause = "1=1"
     else:
@@ -1057,8 +1062,8 @@ def fetch_arcgis(config, days_back):
 
     if "features" in data:
         results = [f["attributes"] for f in data["features"]]
-        # If using "none" date_format, filter in Python
-        if date_format == "none" and date_field and results:
+        # If using "none" or "string_mdy" date_format, filter in Python
+        if date_format in ("none", "string_mdy") and date_field and results:
             since_epoch = int(since_dt.timestamp() * 1000)
             since_iso = since_dt.strftime("%Y-%m-%d")
             filtered = []
@@ -1072,8 +1077,8 @@ def fetch_arcgis(config, days_back):
                 # Handle ISO/string dates (e.g. "2026-01-15" or "2026-01-15T...")
                 elif isinstance(val, str) and len(val) >= 10 and val[:4].isdigit() and val[:10] >= since_iso:
                     filtered.append(r)
-                # Handle US date strings (e.g. "03/22/2026" -> MM/DD/YYYY) - V49
-                elif isinstance(val, str) and len(val) >= 10 and '/' in val:
+                # Handle US date strings (e.g. "03/22/2026" or "3/1/2026" -> M/D/YYYY) - V49, V154
+                elif isinstance(val, str) and len(val) >= 8 and '/' in val:
                     try:
                         parts = val.split('/')
                         if len(parts) == 3:
@@ -1381,6 +1386,10 @@ def fetch_arcgis_bulk(config, days_back=90):
         # V54: String-type date fields (ISO format) — server-side string comparison
         since_date = since_dt.strftime("%Y-%m-%d")
         where_clause = f"{date_field} >= '{since_date}'" if date_field else "1=1"
+    elif date_format == "string_mdy":
+        # V154: M/D/YYYY string dates — LIKE filter by year, client-side fine filtering
+        year = since_dt.year
+        where_clause = f"{date_field} LIKE '%/{year}'" if date_field else "1=1"
     elif date_format == "none" or not date_field:
         where_clause = "1=1"
     else:
@@ -1458,8 +1467,8 @@ def fetch_arcgis_bulk(config, days_back=90):
             traceback.print_exc()
             break
 
-    # Post-fetch: if date_format is "none", filter by date in Python (V48: smart multi-format)
-    if date_format == "none" and date_field and all_records:
+    # Post-fetch: if date_format is "none" or "string_mdy", filter by date in Python (V48, V154)
+    if date_format in ("none", "string_mdy") and date_field and all_records:
         since_epoch = int(since_dt.timestamp() * 1000)
         since_iso = since_dt.strftime("%Y-%m-%d")
         before_count = len(all_records)
@@ -1474,8 +1483,8 @@ def fetch_arcgis_bulk(config, days_back=90):
             # Handle ISO/string dates (e.g. "2026-01-15" or "2026-01-15T...")
             elif isinstance(val, str) and len(val) >= 10 and val[:4].isdigit() and val[:10] >= since_iso:
                 filtered.append(r)
-            # Handle US date strings (e.g. "03/22/2026" -> MM/DD/YYYY)
-            elif isinstance(val, str) and len(val) >= 10 and '/' in val:
+            # Handle US date strings (e.g. "03/22/2026" or "3/1/2026" -> M/D/YYYY) - V154
+            elif isinstance(val, str) and len(val) >= 8 and '/' in val:
                 try:
                     parts = val.split('/')
                     if len(parts) == 3:

@@ -8513,9 +8513,9 @@ CITY_REGISTRY = {
             "filing_date": "Permit_License_Issued_Date",
         },
         "date_field": "Permit_License_Issued_Date",
-        "date_format": "none",
+        "date_format": "string_mdy",
         "active": True,
-        "notes": "V154: ArcGIS FeatureServer, 50K permits, verified fresh Apr 2026. Date fields are strings (M/D/YYYY), date_format=none for client-side filtering.",
+        "notes": "V154: ArcGIS FeatureServer, 50K permits, verified fresh Apr 2026. Date fields are strings (M/D/YYYY), string_mdy for LIKE-based year filtering.",
     },
 
     "springfield_ma": {
