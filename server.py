@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V160',
+                'version': 'V161',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -4763,7 +4763,10 @@ def admin_v145_fix_accela_keys():
     if not valid:
         return error
     try:
-        from accela_scraper import ACCELA_CONFIGS
+        try:
+            from accela_configs import ACCELA_CONFIGS
+        except ImportError:
+            ACCELA_CONFIGS = {}
         conn = permitdb.get_connection()
 
         # Fix Accela dataset_ids
@@ -4895,6 +4898,34 @@ def admin_v145_cleanup():
         # Delete old scraper_runs (keep 30 days)
         r = conn.execute("DELETE FROM scraper_runs WHERE run_started_at < datetime('now', '-30 days')").rowcount
         results['old_scraper_runs_deleted'] = r
+
+        # V161: Recalculate freshness for all cities with permits
+        try:
+            conn.execute("""
+                UPDATE prod_cities SET
+                    newest_permit_date = (
+                        SELECT MAX(COALESCE(filing_date, collected_at))
+                        FROM permits WHERE permits.prod_city_id = prod_cities.id
+                    ),
+                    permits_last_30d = (
+                        SELECT COUNT(*) FROM permits
+                        WHERE permits.prod_city_id = prod_cities.id
+                        AND COALESCE(permits.filing_date, permits.collected_at) >= date('now', '-30 days')
+                    ),
+                    data_freshness = CASE
+                        WHEN (SELECT MAX(COALESCE(filing_date, collected_at)) FROM permits
+                              WHERE permits.prod_city_id = prod_cities.id) >= date('now', '-7 days')
+                        THEN 'fresh'
+                        WHEN (SELECT MAX(COALESCE(filing_date, collected_at)) FROM permits
+                              WHERE permits.prod_city_id = prod_cities.id) >= date('now', '-30 days')
+                        THEN 'stale'
+                        ELSE data_freshness
+                    END
+                WHERE id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
+            """)
+            results['freshness_recalculated'] = True
+        except Exception as e:
+            results['freshness_error'] = str(e)[:100]
 
         conn.commit()
 
@@ -15151,37 +15182,51 @@ def city_landing_inner(city_slug):
             """
         }
 
-    # V12.51: Use SQLite for city permits
+    # V161: Use prod_city_id for permit queries (fixes NYC name mismatch)
     filter_name = config.get('raw_name', config['name'])
     filter_state = config.get('state', '')
     conn = permitdb.get_connection()
 
-    # V32: Add state filter to prevent cross-state data pollution
-    # (e.g., Newark NJ showing Oklahoma permits)
-    if filter_state:
-        state_clause = " AND state = ?"
-        state_params = (filter_name, filter_state)
-    else:
-        state_clause = ""
-        state_params = (filter_name,)
+    # V161: Look up prod_city_id for accurate FK-based queries
+    _prod_city_id = None
+    try:
+        _pc_row = conn.execute("SELECT id FROM prod_cities WHERE city_slug = ?", (city_slug,)).fetchone()
+        if _pc_row:
+            _prod_city_id = _pc_row['id'] if isinstance(_pc_row, dict) else _pc_row[0]
+    except Exception:
+        pass
 
-    # Get stats via SQL aggregation
-    stats_row = conn.execute(f"""
-        SELECT COUNT(*) as permit_count,
-               COALESCE(SUM(estimated_cost), 0) as total_value,
-               COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
-        FROM permits WHERE city = ?{state_clause}
-    """, state_params).fetchone()
+    # V161: Query by prod_city_id if available, fall back to city name
+    if _prod_city_id:
+        stats_row = conn.execute("""
+            SELECT COUNT(*) as permit_count,
+                   COALESCE(SUM(estimated_cost), 0) as total_value,
+                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
+            FROM permits WHERE prod_city_id = ?
+        """, (_prod_city_id,)).fetchone()
+        cursor = conn.execute("""
+            SELECT * FROM permits WHERE prod_city_id = ? ORDER BY estimated_cost DESC LIMIT 100
+        """, (_prod_city_id,))
+    else:
+        if filter_state:
+            state_clause = " AND state = ?"
+            state_params = (filter_name, filter_state)
+        else:
+            state_clause = ""
+            state_params = (filter_name,)
+        stats_row = conn.execute(f"""
+            SELECT COUNT(*) as permit_count,
+                   COALESCE(SUM(estimated_cost), 0) as total_value,
+                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
+            FROM permits WHERE city = ?{state_clause}
+        """, state_params).fetchone()
+        cursor = conn.execute(f"""
+            SELECT * FROM permits WHERE city = ?{state_clause} ORDER BY estimated_cost DESC LIMIT 100
+        """, state_params)
 
     permit_count = stats_row['permit_count']
     total_value = stats_row['total_value']
-    # V12.18: High-value = $100K+ projects (more meaningful to contractors)
     high_value_count = stats_row['high_value_count']
-
-    # Get permits for display (limited set, sorted by value)
-    cursor = conn.execute(f"""
-        SELECT * FROM permits WHERE city = ?{state_clause} ORDER BY estimated_cost DESC LIMIT 100
-    """, state_params)
     city_permits = [dict(row) for row in cursor]
 
     # V15: noindex for non-prod cities or empty cities
@@ -15195,11 +15240,17 @@ def city_landing_inner(city_slug):
         # V12.11: Coming Soon flag for empty cities
         is_coming_soon = permit_count == 0
 
-    # V12.51: Trade breakdown via SQL for full accuracy
-    trade_cursor = conn.execute("""
-        SELECT COALESCE(trade_category, 'Other') as trade, COUNT(*) as cnt
-        FROM permits WHERE city = ? GROUP BY trade_category
-    """, (filter_name,))
+    # V161: Trade breakdown — use prod_city_id if available
+    if _prod_city_id:
+        trade_cursor = conn.execute("""
+            SELECT COALESCE(trade_category, 'Other') as trade, COUNT(*) as cnt
+            FROM permits WHERE prod_city_id = ? GROUP BY trade_category
+        """, (_prod_city_id,))
+    else:
+        trade_cursor = conn.execute("""
+            SELECT COALESCE(trade_category, 'Other') as trade, COUNT(*) as cnt
+            FROM permits WHERE city = ? GROUP BY trade_category
+        """, (filter_name,))
     trade_breakdown = {row['trade'] or 'Other': row['cnt'] for row in trade_cursor}
 
     # Permits already sorted by value from SQL

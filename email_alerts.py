@@ -361,29 +361,60 @@ def get_permits_for_digest(cities, since_date, limit=25):
     if not cities_normalized:
         return []
 
-    # Build city filter
+    # V161: Build city filter — also look up prod_city_ids for FK-based queries
     placeholders = ','.join('?' * len(cities_normalized))
-    query = f"""
-        SELECT * FROM permits
-        WHERE city IN ({placeholders})
-        AND filing_date >= ?
-        ORDER BY filing_date DESC, estimated_cost DESC
-        LIMIT ?
-    """
-    params = cities_normalized + [since_date, limit]
+    prod_city_ids = []
+    try:
+        for cn in cities_normalized:
+            row = conn.execute("SELECT id FROM prod_cities WHERE city = ?", (cn,)).fetchone()
+            if row:
+                prod_city_ids.append(row['id'] if isinstance(row, dict) else row[0])
+    except Exception:
+        pass
+
+    # V161: Use prod_city_id if available (fixes NYC and similar name mismatches)
+    if prod_city_ids:
+        id_placeholders = ','.join('?' * len(prod_city_ids))
+        query = f"""
+            SELECT * FROM permits
+            WHERE prod_city_id IN ({id_placeholders})
+            AND COALESCE(filing_date, date, collected_at) >= ?
+            ORDER BY COALESCE(filing_date, date, collected_at) DESC, estimated_cost DESC
+            LIMIT ?
+        """
+        params = prod_city_ids + [since_date, limit]
+    else:
+        query = f"""
+            SELECT * FROM permits
+            WHERE city IN ({placeholders})
+            AND COALESCE(filing_date, date, collected_at) >= ?
+            ORDER BY COALESCE(filing_date, date, collected_at) DESC, estimated_cost DESC
+            LIMIT ?
+        """
+        params = cities_normalized + [since_date, limit]
 
     cursor = conn.execute(query, params)
     permits = [dict(row) for row in cursor]
 
     # V22: FALLBACK — if no new permits, show most recent regardless of date
     if not permits and cities_normalized:
-        fallback_query = f"""
-            SELECT * FROM permits
-            WHERE city IN ({placeholders})
-            ORDER BY filing_date DESC, estimated_cost DESC
-            LIMIT 5
-        """
-        cursor = conn.execute(fallback_query, cities_normalized)
+        if prod_city_ids:
+            fallback_query = f"""
+                SELECT * FROM permits
+                WHERE prod_city_id IN ({id_placeholders})
+                ORDER BY COALESCE(filing_date, date, collected_at) DESC, estimated_cost DESC
+                LIMIT 5
+            """
+            params_fb = prod_city_ids
+        else:
+            fallback_query = f"""
+                SELECT * FROM permits
+                WHERE city IN ({placeholders})
+                ORDER BY COALESCE(filing_date, date, collected_at) DESC, estimated_cost DESC
+                LIMIT 5
+            """
+            params_fb = cities_normalized
+        cursor = conn.execute(fallback_query, params_fb)
         permits = [dict(row) for row in cursor]
         # Tag these as fallback so the template knows
         for p in permits:

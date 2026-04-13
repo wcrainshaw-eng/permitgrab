@@ -287,15 +287,15 @@ def fetch_accela(config, days_back=30):
     accela_key = config.get('_accela_city_key', '')
     if accela_key:
         agency_code = accela_key.upper()
-        # Look up module from ACCELA_CONFIGS in old scraper
+        # Look up module from ACCELA_CONFIGS if available
         try:
-            from accela_scraper import ACCELA_CONFIGS
+            from accela_configs import ACCELA_CONFIGS
             old_config = ACCELA_CONFIGS.get(accela_key) or ACCELA_CONFIGS.get(accela_key.lower())
             if old_config:
                 agency_code = old_config.get('agency_code', agency_code)
                 module = old_config.get('module', module)
                 tab_name = old_config.get('tab_name', module)
-        except ImportError:
+        except (ImportError, Exception):
             pass
 
     # Fall back to extracting from endpoint URL
