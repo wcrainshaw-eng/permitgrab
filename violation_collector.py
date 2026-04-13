@@ -309,6 +309,10 @@ def upsert_violations(violations):
 
     inserted = 0
     errors = 0
+    print(f"[V156] upsert_violations called with {len(violations)} violations")
+    if violations:
+        v0 = violations[0]
+        print(f"[V156] First violation: city={v0.get('city')}, state={v0.get('state')}, vid={v0.get('violation_id')}, addr={str(v0.get('address',''))[:40]}")
     for v in violations:
         try:
             conn.execute(
@@ -362,11 +366,34 @@ def collect_all_violations(days_back=180):
         count = upsert_violations(city_violations)
         total_inserted += count
 
+        # V156: Diagnostic — if 0 inserted from 1000+ normalized, test with 1 record
+        diag = None
+        if count == 0 and len(city_violations) > 0:
+            test_v = city_violations[0]
+            try:
+                import db as permitdb
+                tc = permitdb.get_connection()
+                tc.execute(
+                    "INSERT OR REPLACE INTO violations "
+                    "(city, state, violation_id, address, violation_date, "
+                    "violation_type, description, status, source_dataset) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (test_v['city'], test_v['state'], test_v['violation_id'],
+                     test_v['address'], test_v['violation_date'],
+                     test_v['violation_type'], test_v.get('description', ''),
+                     test_v['status'], test_v.get('source_dataset', ''))
+                )
+                tc.commit()
+                diag = f"single_insert_ok: vid={test_v['violation_id']}"
+            except Exception as e:
+                diag = f"single_insert_error: {type(e).__name__}: {str(e)[:200]}"
+
         stats[city_key] = {
             "raw": len(raw),
             "normalized": len(city_violations),
             "inserted": count,
             "city_name": VIOLATION_SOURCES[city_key]["name"],
+            **({"diagnostic": diag} if diag else {}),
         }
 
     # Also save to JSON for backwards compat
