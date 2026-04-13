@@ -291,7 +291,22 @@ def upsert_violations(violations):
     if not violations:
         return 0
     import db as permitdb
+
+    # V156: Ensure violations table exists
     conn = permitdb.get_connection()
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS violations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT NOT NULL, state TEXT NOT NULL, violation_id TEXT,
+            address TEXT, violation_date TEXT, violation_type TEXT,
+            description TEXT, status TEXT, source_dataset TEXT, source_url TEXT,
+            collected_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(city, state, violation_id)
+        )""")
+        conn.commit()
+    except Exception as e:
+        print(f"[V156] Table creation note: {e}")
+
     inserted = 0
     for v in violations:
         try:
@@ -310,8 +325,10 @@ def upsert_violations(violations):
                 v['status'], v.get('source_dataset', ''),
             ))
             inserted += 1
-        except Exception:
-            pass
+        except Exception as e:
+            if inserted == 0:
+                print(f"[V156] First violation insert error: {e}")
+                print(f"[V156] Violation data: city={v.get('city')}, vid={v.get('violation_id')}")
     conn.commit()
     return inserted
 
