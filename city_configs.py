@@ -8512,6 +8512,7 @@ CITY_REGISTRY = {
             "status": "Record_Status",
             "contractor": "Contractor_Name",
             "filing_date": "Permit_License_Issued_Date",
+            "_date_format": "string_mdy",
         },
         "date_field": "Permit_License_Issued_Date",
         "date_format": "string_mdy",
