@@ -1719,7 +1719,7 @@ BLOG_POSTS = [
         'meta_description': 'Washington DC building permit costs for 2026. DOB fees, historic district rules, ProjectDox system, and tips for contractors.',
         'date': '2026-04-06',
         'category': 'permit-costs',
-        'city_link': '/permits/washington-dc/washington',
+        'city_link': '/permits/district-of-columbia/washington-dc',
         'city_name': 'Washington DC',
         'excerpt': 'DC calculates permit fees based on signed construction contract cost, with unique rules for historic districts covering much of the city.',
         'content': '''
@@ -1868,7 +1868,7 @@ BLOG_POSTS = [
         'meta_description': 'How DC subcontractors find construction leads. Federal adjacency, embassy projects, institutional sector, high-value renovation market.',
         'date': '2026-04-06',
         'category': 'contractor-leads',
-        'city_link': '/permits/washington-dc/washington',
+        'city_link': '/permits/district-of-columbia/washington-dc',
         'city_name': 'Washington DC',
         'excerpt': 'DC\'s compact 68 square miles offers high-value federal, embassy, and institutional work across every trade.',
         'content': '''
