@@ -4225,6 +4225,7 @@ def admin_v145_cleanup():
             ("DELETE FROM permits WHERE city='Portland' AND date > '2030-01-01'", 'portland_future_dates'),
             ("UPDATE permits SET state='OR' WHERE city='Portland' AND state='WI'", 'portland_wi_to_or'),
             ("UPDATE city_sources SET field_map='{\"permit_number\": \"Record__\", \"address\": \"Address\", \"permit_type\": \"Record_Type\", \"description\": \"Permit_For\", \"status\": \"Record_Status\", \"contractor\": \"Contractor_Name\", \"filing_date\": \"Permit_License_Issued_Date\", \"_date_format\": \"string_mdy\"}' WHERE source_key='worcester'", 'worcester_field_map_fix'),
+            ("DELETE FROM permits WHERE city='Worcester' AND state='MA' AND date < '2026-01-01'", 'worcester_bad_dates_cleanup'),
         ]
         for fix_sql, fix_name in state_fixes:
             try:
