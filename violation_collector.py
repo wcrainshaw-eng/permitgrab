@@ -308,28 +308,31 @@ def upsert_violations(violations):
         print(f"[V156] Table creation note: {e}")
 
     inserted = 0
+    errors = 0
     for v in violations:
         try:
-            conn.execute("""
-                INSERT INTO violations (city, state, violation_id, address, violation_date,
-                    violation_type, description, status, source_dataset)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(city, state, violation_id) DO UPDATE SET
-                    address = excluded.address,
-                    violation_date = excluded.violation_date,
-                    status = excluded.status,
-                    description = excluded.description
-            """, (
-                v['city'], v['state'], v['violation_id'], v['address'],
-                v['violation_date'], v['violation_type'], v.get('description', ''),
-                v['status'], v.get('source_dataset', ''),
-            ))
+            conn.execute(
+                "INSERT OR REPLACE INTO violations "
+                "(city, state, violation_id, address, violation_date, "
+                "violation_type, description, status, source_dataset) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    v['city'], v['state'], v['violation_id'], v['address'],
+                    v['violation_date'], v['violation_type'], v.get('description', ''),
+                    v['status'], v.get('source_dataset', ''),
+                )
+            )
             inserted += 1
         except Exception as e:
-            if inserted == 0:
-                print(f"[V156] First violation insert error: {e}")
-                print(f"[V156] Violation data: city={v.get('city')}, vid={v.get('violation_id')}")
-    conn.commit()
+            errors += 1
+            if errors <= 3:
+                print(f"[V156] Violation insert error #{errors}: {type(e).__name__}: {e}")
+    try:
+        conn.commit()
+    except Exception as e:
+        print(f"[V156] Commit error: {e}")
+    if errors > 0:
+        print(f"[V156] Total insert errors: {errors}/{len(violations)}")
     return inserted
 
 
