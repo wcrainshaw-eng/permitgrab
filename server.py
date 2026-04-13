@@ -4223,6 +4223,7 @@ def admin_v145_cleanup():
             ("UPDATE permits SET state='FL' WHERE city='Miami' AND state='TX'", 'miami_tx_to_fl'),
             ("UPDATE permits SET state='TN' WHERE city='Memphis' AND state='TX'", 'memphis_tx_to_tn'),
             ("DELETE FROM permits WHERE city='Portland' AND date > '2030-01-01'", 'portland_future_dates'),
+            ("UPDATE permits SET state='OR' WHERE city='Portland' AND state='WI'", 'portland_wi_to_or'),
         ]
         for fix_sql, fix_name in state_fixes:
             try:
