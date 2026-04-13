@@ -17,7 +17,7 @@ services:
   - type: web
     name: permitgrab
     runtime: python
-    buildCommand: find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; pip install -r requirements.txt && playwright install chromium --with-deps
+    buildCommand: find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; pip install -r requirements.txt
     # V69: Increased timeout from 300 to 600 to prevent worker kills during pool retries
     startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 600
     healthCheckPath: /api/health

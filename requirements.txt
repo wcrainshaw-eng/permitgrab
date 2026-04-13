@@ -10,6 +10,5 @@ bcrypt==4.1.2
 Flask-SQLAlchemy==3.1.1
 psycopg2-binary==2.9.9
 pytz==2024.1
-playwright==1.49.0
 beautifulsoup4==4.12.3
 # duckduckgo-search removed — causes build failures on Render, search done locally instead

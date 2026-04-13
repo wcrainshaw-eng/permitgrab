@@ -21,15 +21,8 @@ from city_source_db import (
 import db as permitdb  # V12.50: SQLite database layer
 from db import normalize_city_name, normalize_city_slug, is_garbage_city_name  # V18: City name deduplication
 
-# V24: Accela scraper (Playwright-based)
-# V102: Catch all exceptions, not just ImportError — playwright or deps may fail differently
-try:
-    from accela_scraper import fetch_accela
-    ACCELA_AVAILABLE = True
-    print("[V102] Accela scraper loaded successfully — ACCELA_AVAILABLE = True")
-except Exception as e:
-    ACCELA_AVAILABLE = False
-    print(f"[V24] Playwright/accela_scraper not available - Accela cities will be skipped: {e}")
+# Accela: uses accela_portal_collector (requests+BS4, no Playwright needed)
+ACCELA_AVAILABLE = True
 
 # V18: Valid US state/territory codes for validation
 VALID_US_STATES = {
@@ -1923,20 +1916,8 @@ def fetch_permits(city_key, days_back=30):
             elif platform == "carto":
                 raw = fetch_carto(config, days_back)
             elif platform == "accela":
-                # V160: Try lightweight portal collector first, fall back to Playwright
-                try:
-                    from accela_portal_collector import fetch_accela as fetch_accela_portal
-                    raw = fetch_accela_portal(config, days_back)
-                    if raw:
-                        print(f"  [V160] Accela portal collector returned {len(raw)} permits")
-                    else:
-                        raise Exception("Portal collector returned 0 — trying Playwright")
-                except Exception as portal_err:
-                    print(f"  [V160] Portal collector failed ({portal_err}), trying Playwright...")
-                    if not ACCELA_AVAILABLE:
-                        print(f"  [SKIP] Playwright also not available")
-                        return [], "skip_no_playwright"
-                    raw = fetch_accela(config, days_back)
+                from accela_portal_collector import fetch_accela as fetch_accela_portal
+                raw = fetch_accela_portal(config, days_back)
             elif platform == "json":
                 raw = fetch_json(config, days_back)
             else:
