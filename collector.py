@@ -1856,6 +1856,12 @@ def fetch_permits(city_key, days_back=30):
                     'date_field': src_row[7] or 'date',
                     'active': True,
                 }
+                # V154: Merge extra keys from CITY_REGISTRY (e.g., date_format, where_filter)
+                from city_configs import CITY_REGISTRY
+                if city_key in CITY_REGISTRY:
+                    for extra_key in ['date_format', 'where_filter', 'city_filter', 'limit']:
+                        if extra_key in CITY_REGISTRY[city_key] and extra_key not in config:
+                            config[extra_key] = CITY_REGISTRY[city_key][extra_key]
                 print(f"  [V145] {city_key}: Using sources table config (platform={config['platform']})")
                 break
         conn_src.close()
@@ -1865,6 +1871,13 @@ def fetch_permits(city_key, days_back=30):
     # Fallback: city_sources table
     if not config:
         config = get_city_config(city_key)
+        # V154: Merge extra keys from CITY_REGISTRY (e.g., date_format)
+        if config:
+            from city_configs import CITY_REGISTRY
+            if city_key in CITY_REGISTRY:
+                for extra_key in ['date_format', 'where_filter', 'city_filter', 'limit']:
+                    if extra_key in CITY_REGISTRY[city_key] and extra_key not in config:
+                        config[extra_key] = CITY_REGISTRY[city_key][extra_key]
     if not config:
         # V61: Fallback to CITY_REGISTRY for cities not yet in city_sources
         from city_configs import CITY_REGISTRY
