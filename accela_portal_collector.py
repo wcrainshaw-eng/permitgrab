@@ -84,7 +84,7 @@ def _parse_results_table(soup):
             if text:
                 values[col_name] = text
         # Skip empty/header-only rows — check for any permit number or address
-        has_permit = values.get('Record Number') or values.get('Permit Number') or values.get('Record #')
+        has_permit = values.get('Record Number') or values.get('Permit Number') or values.get('Record #') or values.get('Case Number')
         has_address = values.get('Address')
         if has_permit or has_address:
             records.append(values)
@@ -227,9 +227,9 @@ def fetch_accela_portal(agency_code, days_back=30, module="Building",
     permits = []
     for rec in all_records:
         # Handle column name variants across agencies
-        pn = rec.get('Record Number') or rec.get('Permit Number') or rec.get('Record #') or ''
+        pn = rec.get('Record Number') or rec.get('Permit Number') or rec.get('Record #') or rec.get('Case Number') or ''
         dt = rec.get('Date') or rec.get('Received Date') or rec.get('Filed Date') or rec.get('Opened Date') or ''
-        pt = rec.get('Record Type') or rec.get('Permit Type') or rec.get('Type') or ''
+        pt = rec.get('Record Type') or rec.get('Permit Type') or rec.get('Type') or rec.get('Case Type') or ''
         addr = rec.get('Address') or ''
         desc = rec.get('Description') or rec.get('Project Name') or ''
         status = rec.get('Status') or ''
