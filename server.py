@@ -14084,6 +14084,12 @@ STATE_CONFIG = {
     'oklahoma': {'name': 'Oklahoma', 'abbrev': 'OK'},
     'mississippi': {'name': 'Mississippi', 'abbrev': 'MS'},
     'district-of-columbia': {'name': 'District of Columbia', 'abbrev': 'DC'},
+    'arkansas': {'name': 'Arkansas', 'abbrev': 'AR'},
+    'south-dakota': {'name': 'South Dakota', 'abbrev': 'SD'},
+    'west-virginia': {'name': 'West Virginia', 'abbrev': 'WV'},
+    'new-hampshire': {'name': 'New Hampshire', 'abbrev': 'NH'},
+    'wyoming': {'name': 'Wyoming', 'abbrev': 'WY'},
+    'maine': {'name': 'Maine', 'abbrev': 'ME'},
 }
 
 
@@ -14597,6 +14603,8 @@ def state_city_landing(state_slug, city_slug):
         'chicago': 'chicago-il',
         'washington': 'washington-dc',
         'washington-dc': 'washington-dc',
+        'little-rock': 'little-rock-ar',
+        'mesa': 'mesa-az-accela',
     }
     city_slug = _SLUG_ALIASES.get(city_slug, city_slug)
 
