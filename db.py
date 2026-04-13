@@ -2933,12 +2933,19 @@ def upsert_permits(permits, source_city_key=None):
     # as the authoritative source. This fixes issues like Atlanta showing as "TX"
     # or "OK" when ArcGIS sources don't return state data, or when bulk datasets
     # have wrong state mappings. prod_cities is the single source of truth.
+    # V153: Fixed to use highest-population match (was random, caused Baltimore→VT etc.)
     try:
         conn_tmp = get_connection()
         prod_rows = conn_tmp.execute(
-            "SELECT LOWER(city) as city_lower, state FROM prod_cities WHERE state IS NOT NULL AND state != ''"
+            "SELECT LOWER(city) as city_lower, state, population FROM prod_cities "
+            "WHERE state IS NOT NULL AND state != '' ORDER BY population DESC"
         ).fetchall()
-        _city_to_state = {r['city_lower']: r['state'] for r in prod_rows}
+        _city_to_state = {}
+        for r in prod_rows:
+            cl = r['city_lower'] if isinstance(r, dict) else r[0]
+            st = r['state'] if isinstance(r, dict) else r[1]
+            if cl not in _city_to_state:  # First match = highest population
+                _city_to_state[cl] = st
         for p in permits:
             city = (p.get('city') or '').strip().lower()
             if city and city in _city_to_state:
