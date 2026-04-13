@@ -4217,6 +4217,9 @@ def admin_v145_cleanup():
         # V146: Fix known wrong state codes in prod_cities
         state_fixes = [
             ("UPDATE prod_cities SET state='AZ' WHERE UPPER(city)='PHOENIX' AND state='IL' AND population > 1000000", 'phoenix_il_to_az'),
+            ("UPDATE permits SET state='PA' WHERE city='Philadelphia' AND state='TN'", 'philly_tn_to_pa'),
+            ("UPDATE permits SET state='PA' WHERE city='Philadelphia' AND state IS NULL", 'philly_null_to_pa'),
+            ("DELETE FROM permits WHERE city='Portland' AND date > '2030-01-01'", 'portland_future_dates'),
         ]
         for fix_sql, fix_name in state_fixes:
             try:
