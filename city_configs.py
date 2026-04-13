@@ -5082,7 +5082,8 @@ CITY_REGISTRY = {
         },
         "date_field": "applicationdate",
         "limit": 2000,
-        "active": True,
+        "active": False,  # V154: Deactivated — data only goes through 2015, completely stale
+        "notes": "V154: Deactivated. Data ends 2015, endpoint is dead.",
     },
 
     "clarkston": {
