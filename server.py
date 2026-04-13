@@ -3308,13 +3308,27 @@ def _migrate_create_sources_table():
         if not existing:
             conn2.execute("""
                 INSERT INTO subscribers (email, name, plan, digest_cities, active)
-                VALUES ('wcrainshaw@gmail.com', 'Wes', 'pro',
-                        '["New York City","Austin","Chicago","Los Angeles","San Antonio"]', 1)
+                VALUES ('wcrainshaw@gmail.com', 'Wes', 'pro', '["Atlanta"]', 1)
             """)
             conn2.commit()
             print(f"[{datetime.now()}] V158: Created default subscriber for wcrainshaw@gmail.com")
     except Exception as e:
         print(f"[{datetime.now()}] V158: Subscriber setup note: {e}")
+
+    # V159: One-time fix — correct subscriber cities to Atlanta
+    try:
+        migrated = conn2.execute("SELECT value FROM system_state WHERE key='migration_v159_subscriber_fix'").fetchone()
+        if not migrated:
+            conn2.execute("""
+                UPDATE subscribers SET digest_cities = '["Atlanta"]'
+                WHERE email = 'wcrainshaw@gmail.com' AND digest_cities != '["Atlanta"]'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v159_subscriber_fix', '1')")
+            conn2.commit()
+            print(f"[{datetime.now()}] V159: Fixed subscriber cities to Atlanta")
+    except Exception as e:
+        print(f"[{datetime.now()}] V159: Subscriber fix note: {e}")
+
     conn2.close()
 
     conn.close()
@@ -7438,6 +7452,41 @@ def admin_query():
             return jsonify({'rows': result, 'count': len(result)})
         finally:
             conn.close()  # V66: Fix connection leak
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/execute', methods=['POST'])
+def admin_execute():
+    """V159: Run a write SQL statement (INSERT/UPDATE/DELETE).
+    Body: {"sql": "UPDATE ..."}
+    Requires X-Admin-Key. DROP/ALTER/ATTACH still forbidden.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        data = request.get_json() or {}
+        sql = data.get('sql', '').strip()
+        if not sql:
+            return jsonify({'error': 'sql is required'}), 400
+
+        import re
+        sql_upper = sql.upper()
+        forbidden = ['DROP', 'ALTER', 'ATTACH', 'TRUNCATE', 'CREATE']
+        for kw in forbidden:
+            if re.search(rf'\b{kw}\b', sql_upper):
+                return jsonify({'error': f'Forbidden keyword: {kw}'}), 400
+
+        conn = permitdb.get_connection()
+        try:
+            result = conn.execute(sql)
+            conn.commit()
+            rows_affected = result.rowcount
+            print(f"[V159] Admin execute: {sql[:100]}... -> {rows_affected} rows")
+            return jsonify({'success': True, 'rows_affected': rows_affected})
+        finally:
+            conn.close()
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
