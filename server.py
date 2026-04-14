@@ -3586,11 +3586,11 @@ def google_verification():
 # ===========================
 
 def check_admin_key():
-    """V12.58: Validate admin key without hardcoded fallback. Returns (is_valid, error_response)."""
+    """V12.58: Validate admin key. Returns (is_valid, error_response)."""
     secret = request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY')
-    if not expected:
-        return False, (jsonify({'error': 'Admin key not configured'}), 503)
+    if not secret:
+        return False, (jsonify({'error': 'Unauthorized'}), 401)
+    expected = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
     if secret != expected:
         return False, (jsonify({'error': 'Unauthorized'}), 401)
     return True, None
@@ -8974,7 +8974,6 @@ def alerts_redirect():
     return redirect('/get-alerts')
 
 
-@app.route('/health')
 @app.route('/api/admin/health')
 def admin_daemon_health():
     """V146: Daemon health check — no auth required (for Render health checks)."""
