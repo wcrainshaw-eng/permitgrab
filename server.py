@@ -3195,26 +3195,36 @@ def _migrate_create_sources_table():
         except Exception:
             pass
 
-    # Violations table (V156: Updated schema with violation_id)
+    # Violations table (V162: Schema with prod_city_id FK)
+    # Drop old schema if it lacks prod_city_id
+    try:
+        _vs = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='violations'").fetchone()
+        if _vs and 'prod_city_id' not in ((_vs[0] if isinstance(_vs, tuple) else _vs['sql']) or ''):
+            conn.execute("DROP TABLE IF EXISTS violations")
+            conn.commit()
+    except Exception:
+        pass
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS violations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prod_city_id INTEGER NOT NULL,
             city TEXT NOT NULL,
             state TEXT NOT NULL,
-            violation_id TEXT,
-            address TEXT,
+            source_violation_id TEXT UNIQUE,
             violation_date TEXT,
             violation_type TEXT,
-            description TEXT,
+            violation_description TEXT,
             status TEXT,
-            source_dataset TEXT,
-            source_url TEXT,
-            collected_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(city, state, violation_id)
+            address TEXT,
+            zip TEXT,
+            latitude REAL,
+            longitude REAL,
+            raw_data TEXT,
+            collected_at TEXT DEFAULT (datetime('now'))
         );
+        CREATE INDEX IF NOT EXISTS idx_violations_prod_city_id ON violations(prod_city_id);
         CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
         CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
-        CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status);
     ''')
 
     # Contractor enrichment tables (V82c ready)
