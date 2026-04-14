@@ -5396,6 +5396,43 @@ def admin_migrate_violations():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/backfill-trade-tags', methods=['POST'])
+def admin_backfill_trade_tags():
+    """V170 B1: Backfill trade_tag on existing permits. Runs in background thread."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    def _backfill():
+        from collector import classify_trade
+        conn = permitdb.get_connection()
+        total = conn.execute("SELECT COUNT(*) FROM permits WHERE trade_category IS NULL OR trade_category = ''").fetchone()[0]
+        print(f"[BACKFILL] Starting trade_tag backfill: {total} permits to process")
+        offset = 0
+        batch_size = 10000
+        updated = 0
+        while True:
+            rows = conn.execute(
+                "SELECT id, description, permit_type FROM permits "
+                "WHERE (trade_category IS NULL OR trade_category = '') "
+                "ORDER BY id LIMIT ? OFFSET ?", (batch_size, offset)
+            ).fetchall()
+            if not rows:
+                break
+            for r in rows:
+                tag = classify_trade(r['description'] or r['permit_type'], r['permit_type'])
+                conn.execute("UPDATE permits SET trade_category = ? WHERE id = ?", (tag, r['id']))
+                updated += 1
+            conn.commit()
+            offset += batch_size
+            print(f"[BACKFILL] {updated}/{total} ({100*updated//max(total,1)}%)", flush=True)
+        print(f"[BACKFILL] Complete: {updated} permits tagged")
+
+    t = threading.Thread(target=_backfill, daemon=True, name='trade_backfill')
+    t.start()
+    return jsonify({'status': 'started', 'message': 'Trade tag backfill running in background'})
+
+
 @app.route('/api/admin/collect-violations', methods=['POST'])
 def admin_collect_violations():
     """V162: Trigger violation collection from all configured Socrata sources."""
