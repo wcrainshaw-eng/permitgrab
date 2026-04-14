@@ -7412,13 +7412,27 @@ def api_violations(city_slug):
     if not prod_city:
         return jsonify({'error': f'City not found: {city_slug}'}), 404
 
+    city_name = prod_city['city']
+    city_state = prod_city['state']
     pid = prod_city['id']
-    total = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (pid,)).fetchone()['cnt']
-    rows = conn.execute("""
-        SELECT violation_date, violation_type, violation_description, status, address, zip
-        FROM violations WHERE prod_city_id = ?
-        ORDER BY violation_date DESC LIMIT 100
-    """, (pid,)).fetchall()
+
+    # V162: Try prod_city_id first, fall back to city name
+    try:
+        total = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (pid,)).fetchone()['cnt']
+        rows = conn.execute("""
+            SELECT violation_date, violation_type, violation_description, status, address, zip
+            FROM violations WHERE prod_city_id = ?
+            ORDER BY violation_date DESC LIMIT 100
+        """, (pid,)).fetchall()
+    except Exception:
+        # Old schema fallback (no prod_city_id column)
+        total = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE city = ? AND state = ?", (city_name, city_state)).fetchone()['cnt']
+        rows = conn.execute("""
+            SELECT violation_date, violation_type, COALESCE(description, '') as violation_description,
+                   status, address, '' as zip
+            FROM violations WHERE city = ? AND state = ?
+            ORDER BY violation_date DESC LIMIT 100
+        """, (city_name, city_state)).fetchall()
 
     return jsonify({
         'city': prod_city['city'], 'state': prod_city['state'],
@@ -15714,19 +15728,30 @@ def state_city_landing(state_slug, city_slug):
     # V162: Get violation data for cities that have it
     violations_data = []
     violations_count = 0
-    if prod_city_id:
+    try:
+        # Try prod_city_id first (V162 schema), fall back to city name (V156 schema)
         try:
-            v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (prod_city_id,)).fetchone()
-            violations_count = v_count['cnt'] if v_count else 0
-            if violations_count > 0:
-                v_rows = conn.execute("""
-                    SELECT violation_date, violation_type, violation_description, status, address
-                    FROM violations WHERE prod_city_id = ?
-                    ORDER BY violation_date DESC LIMIT 25
-                """, (prod_city_id,)).fetchall()
-                violations_data = [dict(r) for r in v_rows]
+            if prod_city_id:
+                v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (prod_city_id,)).fetchone()
+                violations_count = v_count['cnt'] if v_count else 0
         except Exception:
             pass
+        if violations_count == 0:
+            v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE city = ? AND state = ?", (city_name, city_state)).fetchone()
+            violations_count = v_count['cnt'] if v_count else 0
+        if violations_count > 0:
+            try:
+                v_rows = conn.execute("""
+                    SELECT violation_date, violation_type, COALESCE(violation_description, description, '') as violation_description,
+                           status, address
+                    FROM violations WHERE city = ? AND state = ?
+                    ORDER BY violation_date DESC LIMIT 25
+                """, (city_name, city_state)).fetchall()
+                violations_data = [dict(r) for r in v_rows]
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     return render_template('city_landing_v77.html',
         city_name=display_name,
