@@ -15,7 +15,7 @@ import threading
 import time
 
 # V167: App-level constants
-APP_VERSION = 'V168'
+APP_VERSION = 'V170'
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 START_TIME = time.time()
 import secrets
@@ -5472,6 +5472,51 @@ def api_violations_stats(city_slug):
     })
 
 
+@app.route('/api/permits/<city_slug>/export.csv')
+def export_csv(city_slug):
+    """V170 B3: Export permits for a city as CSV."""
+    import csv, io
+    conn = permitdb.get_connection()
+    prod_city = conn.execute(
+        "SELECT id, city, state FROM prod_cities WHERE city_slug = ?", (city_slug,)
+    ).fetchone()
+    if not prod_city:
+        return jsonify({'error': f'City not found: {city_slug}'}), 404
+
+    pid = prod_city['id']
+    trade_filter = request.args.get('trade', '')
+    tier_filter = request.args.get('tier', '')
+    limit = min(int(request.args.get('limit', 10000)), 10000)
+
+    query = "SELECT * FROM permits WHERE prod_city_id = ?"
+    params = [pid]
+    if trade_filter:
+        query += " AND trade_category = ?"
+        params.append(trade_filter)
+    query += " ORDER BY filing_date DESC LIMIT ?"
+    params.append(limit)
+
+    rows = conn.execute(query, params).fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['date', 'permit_number', 'address', 'type', 'description',
+                     'value', 'trade', 'contractor_name', 'owner_name', 'status'])
+    for r in rows:
+        writer.writerow([
+            r['filing_date'] or r['date'], r['permit_number'], r['address'],
+            r['permit_type'], (r['description'] or '')[:200],
+            r['estimated_cost'], r['trade_category'],
+            r['contractor_name'] or r['contact_name'], r['owner_name'], r['status'],
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{city_slug}-permits.csv"'}
+    )
+
+
 @app.route('/api/admin/digest/status', methods=['GET'])
 def admin_digest_status():
     """V158: Get digest daemon status and recent history."""
@@ -5694,6 +5739,12 @@ def api_diagnostics():
                 'permits_collected': fresh('permits'),
                 'violations_collected': fresh('violations'),
             },
+            'violations_last_collect_at': conn.execute(
+                "SELECT MAX(collected_at) FROM violations"
+            ).fetchone()[0] if count('violations') else None,
+            'permits_last_collect_at': conn.execute(
+                "SELECT MAX(collected_at) FROM permits"
+            ).fetchone()[0] if count('permits') else None,
             'last_scraper_run': last_scraper,
             'env': {
                 'render_service': os.environ.get('RENDER_SERVICE_ID'),
