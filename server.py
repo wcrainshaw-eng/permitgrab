@@ -5433,6 +5433,55 @@ def admin_backfill_trade_tags():
     return jsonify({'status': 'started', 'message': 'Trade tag backfill running in background'})
 
 
+@app.route('/api/admin/backfill-normalized-addresses', methods=['POST'])
+def admin_backfill_addresses():
+    """V170 B5: Backfill normalized_address on permits + violations."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    def _backfill():
+        from address_utils import normalize_address
+        conn = permitdb.get_connection()
+        # Add columns if missing
+        for table in ('permits', 'violations'):
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN normalized_address TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_norm_addr ON {table}(normalized_address, city, state)")
+            except Exception:
+                pass
+        conn.commit()
+
+        for table, addr_col in [('permits', 'address'), ('violations', 'address')]:
+            total = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE normalized_address IS NULL AND {addr_col} IS NOT NULL").fetchone()[0]
+            print(f"[BACKFILL] {table}: {total} rows to normalize", flush=True)
+            offset = 0
+            updated = 0
+            while True:
+                rows = conn.execute(
+                    f"SELECT id, {addr_col} FROM {table} WHERE normalized_address IS NULL AND {addr_col} IS NOT NULL ORDER BY id LIMIT 10000 OFFSET ?",
+                    (offset,)
+                ).fetchall()
+                if not rows:
+                    break
+                for r in rows:
+                    norm = normalize_address(r[addr_col] if isinstance(r, dict) else r[1])
+                    rid = r['id'] if isinstance(r, dict) else r[0]
+                    conn.execute(f"UPDATE {table} SET normalized_address = ? WHERE id = ?", (norm, rid))
+                    updated += 1
+                conn.commit()
+                offset += 10000
+                print(f"[BACKFILL] {table}: {updated}/{total} ({100*updated//max(total,1)}%)", flush=True)
+            print(f"[BACKFILL] {table}: complete ({updated} normalized)", flush=True)
+
+    t = threading.Thread(target=_backfill, daemon=True, name='addr_backfill')
+    t.start()
+    return jsonify({'status': 'started', 'message': 'Address normalization backfill running in background'})
+
+
 @app.route('/api/admin/collect-violations', methods=['POST'])
 def admin_collect_violations():
     """V162: Trigger violation collection from all configured Socrata sources."""
