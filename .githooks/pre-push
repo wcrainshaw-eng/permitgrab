@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "Running smoke tests before push..."
+make smoke || { echo "Smoke tests failed. Push blocked."; exit 1; }
+echo "Smoke tests green. Pushing."
