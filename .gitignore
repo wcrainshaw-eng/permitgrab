@@ -23,3 +23,12 @@ node_modules/
 RENDER_ENV_VARS.txt
 city_configs.py.backup.*
 permits.db
+
+# V163: Exclude data files
+*.db
+*.xlsx
+*.db-shm
+*.db-wal
+data/*.json
+!render.yaml
+!package.json
