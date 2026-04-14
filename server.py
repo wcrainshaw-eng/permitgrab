@@ -3326,10 +3326,28 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V159: Subscriber fix note: {e}")
 
+    # V170 A1: Mark NO_SOURCE top-100 cities (one-time migration)
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v170_a1'").fetchone()
+        if not m:
+            conn2.execute("""
+                UPDATE prod_cities SET status='paused',
+                    last_error='V170 A1: No viable public building permit API'
+                WHERE source_type IS NULL AND status='active'
+                AND city IN ('Jacksonville','Fresno','Long Beach','Tulsa',
+                    'Corpus Christi','Laredo','Lubbock','Glendale',
+                    'Garland','Irving','North Las Vegas')
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v170_a1', '1')")
+            conn2.commit()
+            print(f"[{datetime.now()}] V170 A1: Marked NO_SOURCE cities as paused")
+    except Exception as e:
+        print(f"[{datetime.now()}] V170 A1 migration note: {e}")
+
     conn2.close()
 
     conn.close()
-    print(f"[{datetime.now()}] V158: All tables created/verified")
+    print(f"[{datetime.now()}] V170: All tables created/verified")
 
     # V158: Ensure deferred startup runs (starts email scheduler, collectors, etc.)
     _deferred_startup()
