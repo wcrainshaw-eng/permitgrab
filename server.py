@@ -12216,30 +12216,8 @@ def api_violations():
     })
 
 
-@app.route('/api/violations/<path:address>')
-def api_violations_by_address(address):
-    """
-    GET /api/violations/<address>
-    Returns violations at a specific address.
-    """
-    violations = load_violations()
-    normalized_addr = normalize_address_for_lookup(address)
-
-    if not normalized_addr:
-        return jsonify({'violations': [], 'count': 0})
-
-    # Find violations at this address
-    matching = []
-    for v in violations:
-        v_addr = normalize_address_for_lookup(v.get('address', ''))
-        if normalized_addr == v_addr or normalized_addr in v_addr or v_addr in normalized_addr:
-            matching.append(v)
-
-    return jsonify({
-        'violations': matching,
-        'count': len(matching),
-        'has_active_violations': any(v.get('status', '').lower() in ('open', 'active', 'pending') for v in matching),
-    })
+## Old /api/violations/<path:address> route removed in V162
+## Replaced by /api/violations/<city_slug> (database-backed)
 
 
 # ===========================
