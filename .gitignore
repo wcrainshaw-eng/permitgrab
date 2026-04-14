@@ -32,3 +32,9 @@ permits.db
 data/*.json
 !render.yaml
 !package.json
+
+# V167: Test artifacts
+.pytest_cache/
+.coverage
+test.db
+*.log
