@@ -7361,6 +7361,24 @@ def admin_cleanup_data():
         return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/migrate-violations', methods=['POST'])
+def admin_migrate_violations():
+    """V162: Drop and recreate violations table with new schema."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        conn.execute("DROP TABLE IF EXISTS violations")
+        conn.commit()
+        from violation_collector import _ensure_table
+        _ensure_table()
+        schema = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='violations'").fetchone()
+        return jsonify({'success': True, 'schema': schema[0] if schema else 'not found'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/collect-violations', methods=['POST'])
 def admin_collect_violations():
     """V162: Trigger violation collection from all configured Socrata sources."""
