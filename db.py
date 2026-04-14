@@ -3494,7 +3494,7 @@ def get_prod_cities(status='active', min_permits=1):
     """
     conn = get_connection()
 
-    # V107/V160: Order by permits_last_30d, filter to fresh cities only
+    # V162: Only configured cities with fresh data (source_type IS NOT NULL)
     if status:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
@@ -3503,6 +3503,7 @@ def get_prod_cities(status='active', min_permits=1):
             FROM prod_cities
             WHERE status = ? AND total_permits >= ?
               AND newest_permit_date >= date('now', '-30 days')
+              AND source_type IS NOT NULL
             ORDER BY permits_last_30d DESC, total_permits DESC
         """, (status, min_permits))
     else:
@@ -3539,10 +3540,11 @@ def get_prod_city_count():
     """
     try:
         conn = get_connection()
-        # V160: Only count cities with fresh data (permit in last 30 days)
+        # V162: Only count configured cities with fresh data
         row = conn.execute(
             "SELECT COUNT(*) as cnt FROM prod_cities "
-            "WHERE newest_permit_date >= date('now', '-30 days')"
+            "WHERE newest_permit_date >= date('now', '-30 days') "
+            "AND source_type IS NOT NULL AND status = 'active'"
         ).fetchone()
         return row['cnt'] if row else 0
     except Exception:

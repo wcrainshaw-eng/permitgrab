@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V161',
+                'version': 'V162',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -4899,7 +4899,18 @@ def admin_v145_cleanup():
         r = conn.execute("DELETE FROM scraper_runs WHERE run_started_at < datetime('now', '-30 days')").rowcount
         results['old_scraper_runs_deleted'] = r
 
-        # V161: Recalculate freshness for all cities with permits
+        # V162: Reset garbage cities (source_type IS NULL) — never show in listings
+        try:
+            r = conn.execute("""
+                UPDATE prod_cities SET newest_permit_date = NULL, permits_last_30d = 0,
+                    data_freshness = 'no_data'
+                WHERE source_type IS NULL AND (newest_permit_date IS NOT NULL OR permits_last_30d > 0)
+            """).rowcount
+            results['garbage_cities_reset'] = r
+        except Exception:
+            pass
+
+        # V162: Recalculate freshness ONLY for configured cities (source_type IS NOT NULL)
         try:
             conn.execute("""
                 UPDATE prod_cities SET
@@ -4921,7 +4932,8 @@ def admin_v145_cleanup():
                         THEN 'stale'
                         ELSE data_freshness
                     END
-                WHERE id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
+                WHERE source_type IS NOT NULL
+                  AND id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
             """)
             results['freshness_recalculated'] = True
         except Exception as e:
@@ -11186,7 +11198,7 @@ def index():
     try:
         _sc = permitdb.get_connection()
         state_count = _sc.execute(
-            "SELECT COUNT(DISTINCT state) as cnt FROM prod_cities WHERE newest_permit_date >= date('now', '-30 days')"
+            "SELECT COUNT(DISTINCT state) as cnt FROM prod_cities WHERE newest_permit_date >= date('now', '-30 days') AND source_type IS NOT NULL AND status = 'active'"
         ).fetchone()['cnt']
     except Exception:
         state_count = 38
