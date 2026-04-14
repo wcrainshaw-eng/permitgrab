@@ -3477,11 +3477,10 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
     # V16: Optimized collection - bulk sources first (once each), then individual cities
     if use_prod_cities:
-        # V16 PHASE 1: Collect from ALL bulk sources ONCE each
-        # This covers harvested cities (source_id='bulk_harvest') efficiently
-        print("\n  [V64] Phase 1: Bulk source collection (one request per source)")
+        # V165: PHASE 1 DISABLED — state-level bulk collection causes health check timeouts
+        print("\n  [V165] Phase 1: Bulk source collection DISABLED (state-level data blocked gunicorn)")
         bulk_sources_collected = set()
-        active_bulk_sources = get_active_bulk_sources()
+        active_bulk_sources = []  # V165: Empty list = skip all bulk sources
 
         for source_key in active_bulk_sources:
             config = get_bulk_source_config(source_key)

@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V164',
+                'version': 'V165',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
