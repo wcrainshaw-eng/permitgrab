@@ -16,6 +16,7 @@ import time
 
 # V167: App-level constants
 APP_VERSION = 'V168'
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 START_TIME = time.time()
 import secrets
 import uuid
@@ -11612,7 +11613,7 @@ def admin_page():
         total_users=len(all_users),
         pro_users=len(pro_users),
         last_updated=stats.get('collected_at', ''),
-        subscribers=subscribers,
+        subscribers=digest_subscribers,
         total_subscribers=len(digest_subscribers),
         diagnostic=diagnostic,
         success_msg=request.args.get('success', ''),
