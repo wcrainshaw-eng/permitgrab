@@ -7353,18 +7353,82 @@ def admin_cleanup_data():
 
 @app.route('/api/admin/collect-violations', methods=['POST'])
 def admin_collect_violations():
-    """V156: Trigger violation collection from all configured Socrata sources."""
+    """V162: Trigger violation collection from all configured Socrata sources."""
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
-        from violation_collector import collect_all_violations
-        data = request.get_json() or {}
-        days_back = data.get('days_back', 180)
-        stats = collect_all_violations(days_back=days_back)
-        return jsonify(stats)
+        from violation_collector import collect_violations
+        results = collect_violations()
+        # Get totals
+        conn = permitdb.get_connection()
+        totals = conn.execute(
+            "SELECT city, state, COUNT(*) as cnt, MAX(violation_date) as newest "
+            "FROM violations GROUP BY city, state ORDER BY cnt DESC"
+        ).fetchall()
+        return jsonify({
+            'collection_results': results,
+            'totals': [dict(r) for r in totals],
+        })
     except Exception as e:
         return jsonify({'error': f'Violation collection failed: {str(e)}'}), 500
+
+
+@app.route('/api/violations/<city_slug>')
+def api_violations(city_slug):
+    """V162: Get recent violations for a city."""
+    conn = permitdb.get_connection()
+    prod_city = conn.execute(
+        "SELECT id, city, state FROM prod_cities WHERE city_slug = ?", (city_slug,)
+    ).fetchone()
+    if not prod_city:
+        return jsonify({'error': f'City not found: {city_slug}'}), 404
+
+    pid = prod_city['id']
+    total = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (pid,)).fetchone()['cnt']
+    rows = conn.execute("""
+        SELECT violation_date, violation_type, violation_description, status, address, zip
+        FROM violations WHERE prod_city_id = ?
+        ORDER BY violation_date DESC LIMIT 100
+    """, (pid,)).fetchall()
+
+    return jsonify({
+        'city': prod_city['city'], 'state': prod_city['state'],
+        'count': len(rows), 'total': total,
+        'violations': [dict(r) for r in rows],
+    })
+
+
+@app.route('/api/violations/<city_slug>/stats')
+def api_violations_stats(city_slug):
+    """V162: Get violation summary stats for a city."""
+    conn = permitdb.get_connection()
+    prod_city = conn.execute(
+        "SELECT id, city, state FROM prod_cities WHERE city_slug = ?", (city_slug,)
+    ).fetchone()
+    if not prod_city:
+        return jsonify({'error': f'City not found: {city_slug}'}), 404
+
+    pid = prod_city['id']
+    total = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (pid,)).fetchone()['cnt']
+    last30 = conn.execute(
+        "SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ? AND violation_date >= date('now', '-30 days')",
+        (pid,)
+    ).fetchone()['cnt']
+    open_count = conn.execute(
+        "SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ? AND LOWER(status) IN ('open','active','pending')",
+        (pid,)
+    ).fetchone()['cnt']
+    top_types = conn.execute("""
+        SELECT violation_type as type, COUNT(*) as count FROM violations
+        WHERE prod_city_id = ? AND violation_type IS NOT NULL AND violation_type != ''
+        GROUP BY violation_type ORDER BY count DESC LIMIT 10
+    """, (pid,)).fetchall()
+
+    return jsonify({
+        'total_violations': total, 'last_30_days': last30, 'open_count': open_count,
+        'top_types': [dict(r) for r in top_types],
+    })
 
 
 @app.route('/api/admin/digest/status', methods=['GET'])
@@ -15619,6 +15683,23 @@ def state_city_landing(state_slug, city_slug):
     city_link = f"/permits/{state_slug}/{city_slug}"
     city_blog_posts = get_blog_posts_for_city(city_link)
 
+    # V162: Get violation data for cities that have it
+    violations_data = []
+    violations_count = 0
+    if prod_city_id:
+        try:
+            v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (prod_city_id,)).fetchone()
+            violations_count = v_count['cnt'] if v_count else 0
+            if violations_count > 0:
+                v_rows = conn.execute("""
+                    SELECT violation_date, violation_type, violation_description, status, address
+                    FROM violations WHERE prod_city_id = ?
+                    ORDER BY violation_date DESC LIMIT 25
+                """, (prod_city_id,)).fetchall()
+                violations_data = [dict(r) for r in v_rows]
+        except Exception:
+            pass
+
     return render_template('city_landing_v77.html',
         city_name=display_name,
         city_slug=city_slug,
@@ -15642,6 +15723,8 @@ def state_city_landing(state_slug, city_slug):
         canonical_url=canonical_url,
         footer_cities=footer_cities,
         blog_posts=city_blog_posts,
+        violations=violations_data,
+        violations_count=violations_count,
     )
 
 
@@ -16463,10 +16546,10 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Prune error: {e}")
 
-        # Violation collection (daily)
+        # V162: Violation collection (daily)
         try:
-            from violation_collector import collect_all_violations
-            collect_all_violations(days_back=180)
+            from violation_collector import collect_violations
+            collect_violations()
             print(f"[{datetime.now()}] Violation collection complete.")
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")
@@ -16753,10 +16836,10 @@ def run_initial_collection():
         from collector import collect_refresh
         collect_refresh(days_back=180)
 
-        # Violation collection
+        # V162: Violation collection
         try:
-            from violation_collector import collect_all_violations
-            collect_all_violations(days_back=180)
+            from violation_collector import collect_violations
+            collect_violations()
         except Exception as e:
             print(f"[{datetime.now()}] Initial violation collection error: {e}")
 

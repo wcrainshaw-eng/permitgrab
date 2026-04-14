@@ -1,434 +1,339 @@
 """
-PermitGrab - Code Violation Collector
-Pulls code violation data from city open-data Socrata APIs
+V162: Code Violation Collector — Socrata SODA API
+Fetches building/housing code violations from public open data portals.
+Stores in the violations table with prod_city_id FK for fast lookups.
 """
 
-import requests
 import json
-import os
-import re
+import time
+import requests
 from datetime import datetime, timedelta
 
-# Use Render persistent disk if available, otherwise local
-if os.path.isdir('/var/data'):
-    DATA_DIR = '/var/data'
-else:
-    DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-os.makedirs(DATA_DIR, exist_ok=True)
+import db as permitdb
 
-# V156: Code violation data sources (Socrata APIs) — verified 2026-04-12
+SESSION = requests.Session()
+SESSION.headers.update({'Accept': 'application/json'})
+
+# ---------------------------------------------------------------------------
+# Violation source configs — hardcoded per instructions
+# ---------------------------------------------------------------------------
+
 VIOLATION_SOURCES = {
-    "nyc_hpd": {
-        "name": "New York City",
-        "state": "NY",
-        "endpoint": "https://data.cityofnewyork.us/resource/wvxf-dwi5.json",
-        "dataset_id": "wvxf-dwi5",
-        "date_field": "inspectiondate",
-        "field_map": {
-            "address": "streetname",
-            "street_number": "housenumber",
-            "borough": "boro",
-            "violation_type": "violationtype",
-            "description": "novdescription",
-            "status": "currentstatus",
-            "violation_date": "inspectiondate",
-            "violation_id": "violationid",
-        },
-        "notes": "NYC HPD Housing Violations. 10.8M records, updated daily.",
+    'new-york-city': {
+        'prod_city_id': 1,
+        'city': 'New York City',
+        'state': 'NY',
+        'endpoints': [
+            {
+                'name': 'HPD Violations',
+                'domain': 'data.cityofnewyork.us',
+                'resource_id': 'wvxf-dwi5',
+                'date_field': 'inspectiondate',
+                'id_field': 'violationid',
+                'description_field': 'novdescription',
+                'status_field': 'currentstatus',
+                'type_field': 'class',
+                'address_fields': {'number': 'housenumber', 'street': 'streetname'},
+                'zip_field': 'zip',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+            {
+                'name': 'DOB Violations',
+                'domain': 'data.cityofnewyork.us',
+                'resource_id': '3h2n-5cm9',
+                'date_field': 'issue_date',
+                'id_field': 'isn_dob_bis_viol',
+                'description_field': 'violation_type_code',
+                'status_field': 'violation_category',
+                'type_field': 'violation_type',
+                'address_fields': {'number': 'house_number', 'street': 'street'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
     },
-    "nyc_dob": {
-        "name": "New York City",
-        "state": "NY",
-        "endpoint": "https://data.cityofnewyork.us/resource/3h2n-5cm9.json",
-        "dataset_id": "3h2n-5cm9",
-        "date_field": "issue_date",
-        "field_map": {
-            "address": "street",
-            "street_number": "house_number",
-            "violation_type": "violation_type_code",
-            "description": "description",
-            "status": "disposition_date",  # NULL = still open
-            "violation_date": "issue_date",
-            "violation_id": "isn_dob_bis_viol",
-        },
-        "status_logic": "dob",  # special: NULL disposition = open
-        "notes": "NYC DOB Building Violations. 2.47M records.",
+    'los-angeles': {
+        'prod_city_id': 3,
+        'city': 'Los Angeles',
+        'state': 'CA',
+        'endpoints': [
+            {
+                'name': 'Open Cases',
+                'domain': 'data.lacity.org',
+                'resource_id': 'u82d-eh7z',
+                'date_field': 'adddttm',
+                'id_field': 'apno',
+                'description_field': 'aptype',
+                'status_field': 'stat',
+                'type_field': 'aptype',
+                'address_fields': {'number': 'stno', 'street': 'stname', 'prefix': 'predir', 'suffix': 'suffix'},
+                'zip_field': 'zip',
+                'lat_field': None,
+                'lng_field': None,
+            },
+            {
+                'name': 'Closed Cases',
+                'domain': 'data.lacity.org',
+                'resource_id': 'rken-a55j',
+                'date_field': 'adddttm',
+                'id_field': 'apno',
+                'description_field': 'aptype',
+                'status_field': 'stat',
+                'type_field': 'aptype',
+                'address_fields': {'number': 'stno', 'street': 'stname', 'prefix': 'predir', 'suffix': 'suffix'},
+                'zip_field': 'zip',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
     },
-    "la_open": {
-        "name": "Los Angeles",
-        "state": "CA",
-        "endpoint": "https://data.lacity.org/resource/u82d-eh7z.json",
-        "dataset_id": "u82d-eh7z",
-        "date_field": "adddttm",
-        "field_map": {
-            "address": "stname",
-            "street_number": "stno",
-            "street_prefix": "predir",
-            "street_suffix": "suffix",
-            "violation_type": "aptype",
-            "description": "apname",
-            "status": "stat",
-            "violation_date": "adddttm",
-            "violation_id": "apno",
-        },
-        "notes": "LA Code Enforcement — Open Cases. 28K records.",
-    },
-    "la_closed": {
-        "name": "Los Angeles",
-        "state": "CA",
-        "endpoint": "https://data.lacity.org/resource/rken-a55j.json",
-        "dataset_id": "rken-a55j",
-        "date_field": "adddttm",
-        "field_map": {
-            "address": "stname",
-            "street_number": "stno",
-            "street_prefix": "predir",
-            "street_suffix": "suffix",
-            "violation_type": "aptype",
-            "description": "apname",
-            "status": "stat",
-            "violation_date": "adddttm",
-            "violation_id": "apno",
-        },
-        "notes": "LA Code Enforcement — Closed Cases (last 6 months).",
-    },
-    "chicago": {
-        "name": "Chicago",
-        "state": "IL",
-        "endpoint": "https://data.cityofchicago.org/resource/22u3-xenr.json",
-        "dataset_id": "22u3-xenr",
-        "date_field": "violation_date",
-        "field_map": {
-            "address": "violation_location",
-            "violation_type": "violation_code",
-            "description": "violation_description",
-            "status": "violation_status",
-            "violation_date": "violation_date",
-            "violation_id": "id",
-        },
-        "notes": "Chicago Building Violations. 2M records, updated daily.",
-    },
-    "austin": {
-        "name": "Austin",
-        "state": "TX",
-        "endpoint": "https://data.austintexas.gov/resource/6wtj-zbtb.json",
-        "dataset_id": "6wtj-zbtb",
-        "date_field": "opened_date",
-        "field_map": {
-            "address": "address",
-            "violation_type": "case_type",
-            "description": "description",
-            "status": "status",
-            "violation_date": "opened_date",
-            "violation_id": "case_id",
-        },
-        "notes": "Austin Code Enforcement Cases. 82K records, updated daily.",
+    'chicago-il': {
+        'prod_city_id': 2,
+        'city': 'Chicago',
+        'state': 'IL',
+        'endpoints': [
+            {
+                'name': 'Building Violations',
+                'domain': 'data.cityofchicago.org',
+                'resource_id': '22u3-xenr',
+                'date_field': 'violation_date',
+                'id_field': 'id',
+                'description_field': 'violation_description',
+                'status_field': 'violation_status',
+                'type_field': 'violation_code',
+                'address_fields': {'full': 'address'},
+                'zip_field': None,
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
     },
 }
 
 
-def sanitize_string(value):
-    """Remove control characters that break JSON parsing."""
-    if not isinstance(value, str):
-        return value
-    # Remove ASCII control chars (0x00-0x1F) except common whitespace
-    sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', value)
-    # Replace newlines and tabs with spaces for single-line fields
-    sanitized = sanitized.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
-    # Collapse multiple spaces
-    sanitized = re.sub(r'  +', ' ', sanitized)
-    return sanitized.strip()
+# ---------------------------------------------------------------------------
+# Collection logic
+# ---------------------------------------------------------------------------
 
-
-def normalize_address(address):
-    """Normalize an address for consistent indexing and matching."""
-    if not address:
-        return ""
-    addr = address.lower().strip()
-    addr = re.sub(r'\s+', ' ', addr)
-    replacements = [
-        (r'\bstreet\b', 'st'),
-        (r'\bavenue\b', 'ave'),
-        (r'\bboulevard\b', 'blvd'),
-        (r'\bdrive\b', 'dr'),
-        (r'\broad\b', 'rd'),
-        (r'\blane\b', 'ln'),
-        (r'\bcourt\b', 'ct'),
-        (r'\bplace\b', 'pl'),
-        (r'\bapartment\b', 'apt'),
-        (r'\bsuite\b', 'ste'),
-        (r'\bnorth\b', 'n'),
-        (r'\bsouth\b', 's'),
-        (r'\beast\b', 'e'),
-        (r'\bwest\b', 'w'),
-    ]
-    for pattern, replacement in replacements:
-        addr = re.sub(pattern, replacement, addr)
-    addr = re.sub(r'[^\w\s#-]', '', addr)
-    return addr
-
-
-def fetch_violations_socrata(source, days_back=90):
-    """Fetch violations from a Socrata SODA API."""
-    endpoint = source["endpoint"]
-    date_field = source["date_field"]
-
-    # Calculate date filter - last 90 days
-    since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
-
-    params = {
-        "$limit": 50000,
-        "$order": f"{date_field} DESC",
-        "$where": f"{date_field} > '{since_date}'",
-    }
-
-    try:
-        resp = requests.get(endpoint, params=params, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as e:
-        print(f"  [ERROR] HTTP {e.response.status_code} for violations: {e}")
-        return []
-    except requests.exceptions.Timeout:
-        print(f"  [ERROR] Timeout for violations")
-        return []
-    except Exception as e:
-        print(f"  [ERROR] Fetching violations: {e}")
-        return []
-
-
-def normalize_violation(raw_record, city_key):
-    """Normalize a raw violation record into our standard schema."""
-    source = VIOLATION_SOURCES[city_key]
-    fmap = source["field_map"]
-
-    def get_field(field_name):
-        raw_key = fmap.get(field_name, "")
-        if not raw_key:
-            return ""
-        return str(raw_record.get(raw_key, "")).strip()
-
-    # Build address — V156: handle multi-part LA addresses
-    address_parts = []
-    if get_field("street_number"):
-        address_parts.append(get_field("street_number"))
-    if get_field("street_prefix"):
-        address_parts.append(get_field("street_prefix"))
-    if get_field("address"):
-        address_parts.append(get_field("address"))
-    if get_field("street_suffix"):
-        address_parts.append(get_field("street_suffix"))
-    address = ' '.join(address_parts) if address_parts else ""
-
-    # V156: Append borough for NYC
-    if get_field("borough"):
-        address = f"{address}, {get_field('borough')}"
-
-    if not address:
-        address = "Address not provided"
-
-    # Parse date
-    date_str = get_field("violation_date")
-    parsed_date = ""
-    if date_str:
-        for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"]:
-            try:
-                parsed_date = datetime.strptime(date_str[:26], fmt).strftime("%Y-%m-%d")
-                break
-            except ValueError:
-                continue
-        if not parsed_date:
-            parsed_date = date_str[:10]
-
-    # Determine status (open/closed) — V156: DOB special logic
-    if source.get("status_logic") == "dob":
-        # NYC DOB: disposition_date NULL = still open
-        status = "closed" if get_field("status") else "open"
-    else:
-        status_raw = get_field("status").lower()
-        if any(s in status_raw for s in ["open", "active", "pending", "in progress", "o"]):
-            status = "open"
-        elif any(s in status_raw for s in ["closed", "resolved", "complete", "dismissed"]):
-            status = "closed"
-        else:
-            status = status_raw[:50] if status_raw else "unknown"
-
-    # V156: Get description field
-    description = get_field("description") or get_field("violation_type")
-
-    return {
-        "id": f"{city_key}_{get_field('violation_id')}",
-        "city": source["name"],
-        "state": source["state"],
-        "violation_id": get_field("violation_id"),
-        "address": sanitize_string(address),
-        "normalized_address": normalize_address(address),
-        "violation_type": sanitize_string(get_field("violation_type")[:200]),
-        "violation_date": parsed_date,
-        "description": sanitize_string(description[:500]) if description else "",
-        "status": sanitize_string(status),
-        "source_dataset": source.get("dataset_id", ""),
-        "source_city": city_key,
-    }
-
-
-def fetch_violations(city_key, days_back=90):
-    """Fetch recent violations for a city."""
-    source = VIOLATION_SOURCES.get(city_key)
-    if not source:
-        print(f"  [SKIP] Unknown city: {city_key}")
-        return []
-
-    print(f"  Fetching {source['name']} violations (last {days_back} days)...")
-
-    raw = fetch_violations_socrata(source, days_back)
-    print(f"  ✓ Got {len(raw)} raw violations from {source['name']}")
-    return raw
-
-
-def upsert_violations(violations):
-    """V156: Insert violations into the database, skip duplicates."""
-    if not violations:
-        return 0
-    import db as permitdb
-
-    # V156: Ensure violations table has correct schema (drop old if needed)
+def _ensure_table():
+    """Create violations table if it doesn't exist (V162 schema)."""
     conn = permitdb.get_connection()
     try:
-        # Check if old schema (has source_key instead of violation_id)
+        # Check if table has the right schema (prod_city_id column)
         test = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='violations'").fetchone()
-        if test and 'violation_id' not in str(test[0] if isinstance(test, tuple) else test['sql']):
-            print("[V156] Dropping old violations table (wrong schema)")
-            conn.execute("DROP TABLE IF EXISTS violations")
-            conn.commit()
-        conn.execute("""CREATE TABLE IF NOT EXISTS violations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            city TEXT NOT NULL, state TEXT NOT NULL, violation_id TEXT,
-            address TEXT, violation_date TEXT, violation_type TEXT,
-            description TEXT, status TEXT, source_dataset TEXT, source_url TEXT,
-            collected_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(city, state, violation_id)
-        )""")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date)")
+        if test:
+            schema = test[0] if isinstance(test, tuple) else test['sql']
+            if 'prod_city_id' not in schema:
+                print("[V162] Dropping old violations table (missing prod_city_id)")
+                conn.execute("DROP TABLE IF EXISTS violations")
+                conn.commit()
+
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS violations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prod_city_id INTEGER NOT NULL,
+                city TEXT NOT NULL,
+                state TEXT NOT NULL,
+                source_violation_id TEXT UNIQUE,
+                violation_date TEXT,
+                violation_type TEXT,
+                violation_description TEXT,
+                status TEXT,
+                address TEXT,
+                zip TEXT,
+                latitude REAL,
+                longitude REAL,
+                raw_data TEXT,
+                collected_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_violations_prod_city_id ON violations(prod_city_id);
+            CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
+            CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
+        """)
         conn.commit()
     except Exception as e:
-        print(f"[V156] Table creation error: {e}")
+        print(f"[V162] Table creation note: {e}")
 
-    inserted = 0
-    errors = 0
-    print(f"[V156] upsert_violations called with {len(violations)} violations")
-    if violations:
-        v0 = violations[0]
-        print(f"[V156] First violation: city={v0.get('city')}, state={v0.get('state')}, vid={v0.get('violation_id')}, addr={str(v0.get('address',''))[:40]}")
-    for v in violations:
+
+def _build_address(record, addr_config):
+    """Build address string from configured fields."""
+    if 'full' in addr_config:
+        return str(record.get(addr_config['full'], '')).strip()
+    parts = []
+    for key in ('number', 'prefix', 'street', 'suffix'):
+        if key in addr_config:
+            val = record.get(addr_config[key])
+            if val and str(val).strip():
+                parts.append(str(val).strip())
+    return ' '.join(parts)
+
+
+def _parse_date(date_str):
+    """Parse SODA date formats to ISO YYYY-MM-DD."""
+    if not date_str or not isinstance(date_str, str):
+        return None
+    s = date_str.strip()
+    # Skip obviously bad dates
+    if s.startswith('Y') or len(s) < 8:
+        return None
+    for fmt in ('%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
         try:
-            conn.execute(
-                "INSERT OR REPLACE INTO violations "
-                "(city, state, violation_id, address, violation_date, "
-                "violation_type, description, status, source_dataset) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    v['city'], v['state'], v['violation_id'], v['address'],
-                    v['violation_date'], v['violation_type'], v.get('description', ''),
-                    v['status'], v.get('source_dataset', ''),
-                )
-            )
-            inserted += 1
-        except Exception as e:
-            errors += 1
-            if errors <= 3:
-                print(f"[V156] Violation insert error #{errors}: {type(e).__name__}: {e}")
+            dt = datetime.strptime(s[:26], fmt)
+            if dt.year < 2020 or dt > datetime.now() + timedelta(days=7):
+                return None
+            return dt.strftime('%Y-%m-%d')
+        except ValueError:
+            continue
+    return None
+
+
+def normalize_violation(record, city_config, endpoint):
+    """Map source fields to normalized schema."""
+    address = _build_address(record, endpoint['address_fields'])
+    vid = record.get(endpoint['id_field'], '')
+    source_id = f"{endpoint['resource_id']}_{vid}" if vid else None
+
+    return {
+        'prod_city_id': city_config['prod_city_id'],
+        'city': city_config['city'],
+        'state': city_config['state'],
+        'source_violation_id': source_id,
+        'violation_date': _parse_date(record.get(endpoint['date_field'])),
+        'violation_type': str(record.get(endpoint.get('type_field', ''), '') or '')[:200],
+        'violation_description': str(record.get(endpoint.get('description_field', ''), '') or '')[:500],
+        'status': str(record.get(endpoint.get('status_field', ''), '') or '')[:100],
+        'address': address,
+        'zip': str(record.get(endpoint['zip_field'], '') or '') if endpoint.get('zip_field') else '',
+        'latitude': record.get(endpoint['lat_field']) if endpoint.get('lat_field') else None,
+        'longitude': record.get(endpoint['lng_field']) if endpoint.get('lng_field') else None,
+        'raw_data': json.dumps(record, default=str),
+    }
+
+
+def collect_violations_from_endpoint(city_config, endpoint):
+    """Fetch violations from a single SODA endpoint."""
+    base_url = f"https://{endpoint['domain']}/resource/{endpoint['resource_id']}.json"
+    date_field = endpoint['date_field']
+    prod_city_id = city_config['prod_city_id']
+
+    # Get last collected date for incremental collection
+    conn = permitdb.get_connection()
     try:
-        conn.commit()
-    except Exception as e:
-        print(f"[V156] Commit error: {e}")
-    if errors > 0:
-        print(f"[V156] Total insert errors: {errors}/{len(violations)}")
-    return inserted
+        row = conn.execute(
+            "SELECT MAX(violation_date) as last_date FROM violations WHERE prod_city_id = ?",
+            (prod_city_id,)
+        ).fetchone()
+        last_date = (row['last_date'] if isinstance(row, dict) else row[0]) if row else None
+    except Exception:
+        last_date = None
 
+    if not last_date:
+        last_date = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
 
-def collect_all_violations(days_back=180):
-    """V156: Collect violations from all configured cities and store in DB."""
-    stats = {}
+    print(f"  [V162] {city_config['city']} / {endpoint['name']}: fetching since {last_date[:10]}")
 
-    print("=" * 60)
-    print("PermitGrab - Code Violation Collection (V156)")
-    print(f"Pulling violations from {len(VIOLATION_SOURCES)} sources (last {days_back} days)")
-    print("=" * 60)
-
+    offset = 0
+    batch_size = 1000
     total_inserted = 0
-    for city_key in VIOLATION_SOURCES:
-        raw = fetch_violations(city_key, days_back)
-        city_violations = []
+    max_records = 50000
 
-        for record in raw:
+    while total_inserted < max_records:
+        params = {
+            '$limit': batch_size,
+            '$offset': offset,
+            '$order': f"{date_field} DESC",
+            '$where': f"{date_field} > '{last_date}'",
+        }
+
+        try:
+            resp = SESSION.get(base_url, params=params, timeout=30)
+            resp.raise_for_status()
+            records = resp.json()
+        except Exception as e:
+            print(f"  [V162] Error fetching page at offset {offset}: {e}")
+            break
+
+        if not records or not isinstance(records, list):
+            break
+
+        # Normalize and insert batch
+        batch = []
+        for record in records:
             try:
-                normalized = normalize_violation(record, city_key)
-                if normalized["address"] != "Address not provided" and normalized.get("violation_id"):
-                    city_violations.append(normalized)
+                norm = normalize_violation(record, city_config, endpoint)
+                if norm['source_violation_id'] and norm['violation_date']:
+                    batch.append(norm)
             except Exception:
                 continue
 
-        # V156: Write to database
-        count = upsert_violations(city_violations)
-        total_inserted += count
+        if batch:
+            inserted = _insert_batch(batch)
+            total_inserted += inserted
 
-        # V156: Diagnostic — if 0 inserted from 1000+ normalized, test with 1 record
-        diag = None
-        if count == 0 and len(city_violations) > 0:
-            test_v = city_violations[0]
+        if len(records) < batch_size:
+            break  # Last page
+
+        offset += batch_size
+        time.sleep(1)  # Rate limit
+
+        if offset % 5000 == 0:
+            print(f"  [V162]   ... {total_inserted} inserted so far (offset {offset})")
+
+    print(f"  [V162] {city_config['city']} / {endpoint['name']}: {total_inserted} violations inserted")
+    return total_inserted
+
+
+def _insert_batch(violations):
+    """Insert a batch of violations, skip duplicates."""
+    conn = permitdb.get_connection()
+    inserted = 0
+    for v in violations:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO violations
+                (prod_city_id, city, state, source_violation_id, violation_date,
+                 violation_type, violation_description, status, address, zip,
+                 latitude, longitude, raw_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                v['prod_city_id'], v['city'], v['state'], v['source_violation_id'],
+                v['violation_date'], v['violation_type'], v['violation_description'],
+                v['status'], v['address'], v['zip'],
+                v['latitude'], v['longitude'], v['raw_data'],
+            ))
+            inserted += 1
+        except Exception:
+            pass
+    conn.commit()
+    return inserted
+
+
+def collect_violations():
+    """Collect violations for all configured cities."""
+    _ensure_table()
+
+    print(f"\n{'='*60}")
+    print(f"V162: Violation Collection — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*60}")
+
+    results = {}
+    for slug, config in VIOLATION_SOURCES.items():
+        city_total = 0
+        for endpoint in config['endpoints']:
             try:
-                import db as permitdb
-                tc = permitdb.get_connection()
-                tc.execute(
-                    "INSERT OR REPLACE INTO violations "
-                    "(city, state, violation_id, address, violation_date, "
-                    "violation_type, description, status, source_dataset) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (test_v['city'], test_v['state'], test_v['violation_id'],
-                     test_v['address'], test_v['violation_date'],
-                     test_v['violation_type'], test_v.get('description', ''),
-                     test_v['status'], test_v.get('source_dataset', ''))
-                )
-                tc.commit()
-                diag = f"single_insert_ok: vid={test_v['violation_id']}"
+                count = collect_violations_from_endpoint(config, endpoint)
+                city_total += count
             except Exception as e:
-                diag = f"single_insert_error: {type(e).__name__}: {str(e)[:200]}"
+                print(f"  [V162] Error on {config['city']}/{endpoint['name']}: {e}")
+        results[slug] = city_total
 
-        stats[city_key] = {
-            "raw": len(raw),
-            "normalized": len(city_violations),
-            "inserted": count,
-            "city_name": VIOLATION_SOURCES[city_key]["name"],
-            **({"diagnostic": diag} if diag else {}),
-        }
+    print(f"\n{'='*60}")
+    print(f"VIOLATION COLLECTION COMPLETE")
+    for slug, count in results.items():
+        print(f"  {VIOLATION_SOURCES[slug]['city']}: {count:,} new violations")
+    print(f"  Total: {sum(results.values()):,}")
+    print(f"{'='*60}\n")
 
-    # Also save to JSON for backwards compat
-    all_violations = []
-    for city_key in VIOLATION_SOURCES:
-        raw = []  # Already processed above
-    output_file = os.path.join(DATA_DIR, "violation_stats.json")
-    violation_stats = {
-        "collected_at": datetime.now().isoformat(),
-        "days_back": days_back,
-        "total_inserted": total_inserted,
-        "city_stats": stats,
-    }
-    with open(output_file, "w") as f:
-        json.dump(violation_stats, f, indent=2)
-
-    # Print summary
-    print("\n" + "=" * 60)
-    print("VIOLATION COLLECTION COMPLETE")
-    print("=" * 60)
-    print(f"Total violations inserted/updated: {total_inserted}")
-    print(f"\nBy Source:")
-    for key, s in sorted(stats.items(), key=lambda x: -x[1].get("inserted", 0)):
-        print(f"  {s['city_name']} ({key}): {s.get('inserted', 0)} inserted ({s['raw']} raw, {s['normalized']} normalized)")
-
-    return violation_stats
-
-
-if __name__ == "__main__":
-    stats = collect_all_violations(days_back=180)
+    return results
