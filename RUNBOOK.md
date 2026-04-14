@@ -41,6 +41,16 @@
 4. Trigger collection: POST /api/admin/test-city-collection
 5. Verify: /permits/new-city-xy shows data
 
+## Known Limitations
+
+- Collector runs in the same process as the web server. Admin API
+  queries can time out during active collection cycles (~60s gaps).
+  Workaround: run admin SQL during the 5-10 min gaps between cycles,
+  or wait for the cycle to finish (visible in /api/diagnostics
+  permits_last_collect_at). Proper fix is splitting the collector
+  into a Render Background Worker (see V167 Phase 3 spec); deferred
+  until admin ops become a regular pain point.
+
 ## Something broke after a push
 
 1. Check GitHub Actions — was CI green?
