@@ -10,8 +10,13 @@ import json
 import math
 import os
 import sqlite3
+import sys
 import threading
 import time
+
+# V167: App-level constants
+APP_VERSION = 'V167'
+START_TIME = time.time()
 import secrets
 import uuid
 from datetime import datetime, timedelta
@@ -2970,7 +2975,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V166',
+                'version': APP_VERSION,
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -5628,6 +5633,74 @@ def admin_execute():
         return jsonify({'error': str(e)}), 500
 
 
+
+
+@app.route('/healthz')
+def healthz():
+    """V167: Lightweight health check for Render's TCP probe. NO DB queries."""
+    return 'ok', 200
+
+
+@app.route('/api/diagnostics')
+def api_diagnostics():
+    """V167: Full system diagnostics — memory, counts, activity."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        import psutil
+        proc = psutil.Process(os.getpid())
+        conn = permitdb.get_connection()
+
+        def count(table):
+            try:
+                return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            except Exception:
+                return None
+
+        def fresh(table, col='collected_at', hours=1):
+            try:
+                return conn.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE {col} >= datetime('now', '-{hours} hours')"
+                ).fetchone()[0]
+            except Exception:
+                return None
+
+        last_scraper = None
+        try:
+            row = conn.execute(
+                "SELECT run_started_at, status, source_key FROM scraper_runs ORDER BY run_started_at DESC LIMIT 1"
+            ).fetchone()
+            if row:
+                last_scraper = dict(row)
+        except Exception:
+            pass
+
+        return jsonify({
+            'version': APP_VERSION,
+            'uptime_seconds': int(time.time() - START_TIME),
+            'memory_mb': round(proc.memory_info().rss / 1024 / 1024, 1),
+            'cpu_percent': proc.cpu_percent(interval=0.1),
+            'open_files': len(proc.open_files()),
+            'threads': proc.num_threads(),
+            'tables': {
+                'prod_cities': count('prod_cities'),
+                'permits': count('permits'),
+                'violations': count('violations'),
+                'subscribers': count('subscribers'),
+            },
+            'activity_last_hour': {
+                'permits_collected': fresh('permits'),
+                'violations_collected': fresh('violations'),
+            },
+            'last_scraper_run': last_scraper,
+            'env': {
+                'render_service': os.environ.get('RENDER_SERVICE_ID'),
+                'python_version': sys.version.split()[0],
+            },
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/data-freshness', methods=['GET'])

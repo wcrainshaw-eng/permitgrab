@@ -20,7 +20,7 @@ services:
     buildCommand: find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; pip install -r requirements.txt
     # V165: Reduced timeout from 600 to 120. Collector is no longer blocking.
     startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
-    healthCheckPath: /api/health
+    healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
