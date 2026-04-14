@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V163',
+                'version': 'V164',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -3134,9 +3134,15 @@ def _cleanup_v108_pipeline_damage():
         print(f"[V111b] Progress clear error (non-fatal): {e}", flush=True)
 
 
+_schema_initialized = False
+
 @app.before_request
 def _migrate_create_sources_table():
-    """V145: Create sources + violations + enrichment tables."""
+    """V145: Create sources + violations + enrichment tables. V164: Runs ONCE."""
+    global _schema_initialized
+    if _schema_initialized:
+        return
+    _schema_initialized = True
     conn = permitdb.get_connection()
 
     # Sources table (already exists from earlier V145 — just ensure indexes)
@@ -14109,51 +14115,7 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] City health check error: {e}")
 
-        # V17: Auto-discovery pipeline (daily)
-        # 1. Discover new sources (Socrata + ArcGIS)
-        # 2. Auto-test and activate pending cities
-        # 3. Send SEO notification email for new activations
-        if permitdb.should_run_daily('discovery'):
-            print(f"[{datetime.now()}] V17b: Starting accelerated discovery pipeline...")
-
-            total_new_sources = 0
-
-            # V17b: Use accelerated parallel discovery (Socrata + ArcGIS combined)
-            try:
-                from auto_discover import run_accelerated_discovery
-                total_new_sources = run_accelerated_discovery(max_results=300, max_workers=5)
-                print(f"[{datetime.now()}] V17b accelerated discovery: {total_new_sources} new sources")
-            except ImportError:
-                # Fallback to sequential if accelerated not available
-                print(f"[{datetime.now()}] V17b not available, using sequential discovery...")
-                try:
-                    from auto_discover import run_full_discovery, run_arcgis_bulk_discovery
-                    total_new_sources += run_full_discovery(max_results=100)
-                    total_new_sources += run_arcgis_bulk_discovery(max_results=100)
-                except Exception as e:
-                    print(f"[{datetime.now()}] Sequential discovery error: {e}")
-            except Exception as e:
-                print(f"[{datetime.now()}] V17b discovery error: {e}")
-
-            # Auto-test pending cities and activate the good ones
-            try:
-                from collector import activate_pending_cities
-                activated, failed = activate_pending_cities()
-                print(f"[{datetime.now()}] Pending cities: {len(activated)} activated, {len(failed)} failed")
-
-                # Send SEO notification if new cities activated
-                if activated:
-                    try:
-                        from email_alerts import send_new_cities_alert
-                        send_new_cities_alert(activated)
-                        print(f"[{datetime.now()}] SEO notification sent for {len(activated)} cities")
-                    except Exception as e:
-                        print(f"[{datetime.now()}] SEO notification error: {e}")
-            except Exception as e:
-                print(f"[{datetime.now()}] Pending activation error: {e}")
-
-            permitdb.mark_daily_complete('discovery')
-            print(f"[{datetime.now()}] V17 discovery pipeline complete: {total_new_sources} new sources")
+        # V164: Discovery pipeline removed (dead code, auto_discover.py deleted in V163)
 
         print(f"[{datetime.now()}] All collection tasks complete.")
 

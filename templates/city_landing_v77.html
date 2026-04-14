@@ -35,7 +35,7 @@
   "@context": "https://schema.org",
   "@type": "Dataset",
   "name": "{{ city_name }}, {{ state_name }} Building Permits",
-  "description": "Building permit records for {{ city_name }}, {{ state_name }}",
+  "description": "Building permit dataset for {{ city_name }}, {{ state_name }}. Contains {{ permit_count|default(0) }} permits including permit number, address, type, value, contractor, and status. Updated daily via municipal open data APIs. Covers residential and commercial construction permits, renovations, demolitions, and system installations.",
   "url": "{{ canonical_url }}",
   "temporalCoverage": "{% if earliest_date and latest_date %}{{ earliest_date }}/{{ latest_date }}{% else %}2024/2026{% endif %}",
   "spatialCoverage": {
