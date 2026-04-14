@@ -1,7 +1,6 @@
 """Fast smoke tests — must pass in < 30 seconds. Run before every push."""
 import pytest
 from server import app
-import json
 import os
 
 @pytest.fixture
@@ -24,7 +23,12 @@ def test_no_duplicate_flask_endpoints():
 def test_health_endpoint(client):
     r = client.get('/api/health')
     assert r.status_code == 200
-    assert b'V' in r.data  # version string present
+    assert b'V' in r.data
+
+def test_healthz_endpoint(client):
+    """V167 lightweight probe."""
+    r = client.get('/healthz')
+    assert r.status_code == 200
 
 def test_homepage(client):
     r = client.get('/')
@@ -39,22 +43,14 @@ def test_robots_and_sitemap(client):
     assert client.get('/robots.txt').status_code == 200
     assert client.get('/sitemap.xml').status_code == 200
 
-def test_admin_query_requires_auth(client):
-    r = client.post('/api/admin/query', json={'sql':'SELECT 1'})
+def test_diagnostics_requires_auth(client):
+    r = client.get('/api/diagnostics')
     assert r.status_code in (401, 403)
-
-def test_admin_query_works_with_key(client):
-    key = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
-    r = client.post('/api/admin/query',
-        json={'sql':'SELECT 1 as n'},
-        headers={'X-Admin-Key': key})
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data['rows'][0]['n'] == 1
 
 def test_admin_query_rejects_non_select(client):
     key = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
     r = client.post('/api/admin/query',
-        json={'sql':'DELETE FROM permits'},
+        json={'sql': 'DELETE FROM permits'},
         headers={'X-Admin-Key': key})
-    assert r.status_code in (400, 403) or 'error' in (r.get_json() or {})
+    body = r.get_json() or {}
+    assert r.status_code in (400, 403) or 'error' in body

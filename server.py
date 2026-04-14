@@ -15,7 +15,7 @@ import threading
 import time
 
 # V167: App-level constants
-APP_VERSION = 'V167'
+APP_VERSION = 'V168'
 START_TIME = time.time()
 import secrets
 import uuid
@@ -14162,33 +14162,7 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")
 
-        # Signal collection (daily)
-        try:
-            from signal_collector import collect_all_signals
-            collect_all_signals(days_back=90)
-            print(f"[{datetime.now()}] Signal collection complete.")
-        except Exception as e:
-            print(f"[{datetime.now()}] Signal collection error: {e}")
-
-        # Permit history collection (weekly or first run)
-        now = datetime.now()
-        if last_history_run is None or (now - last_history_run).days >= 7:
-            try:
-                collect_permit_history(years_back=1)
-                last_history_run = now
-                print(f"[{datetime.now()}] Permit history collection complete.")
-            except Exception as e:
-                print(f"[{datetime.now()}] Permit history collection error: {e}")
-
-        # City health check (daily)
-        try:
-            from city_health import check_all_cities
-            check_all_cities()
-            print(f"[{datetime.now()}] City health check complete.")
-        except Exception as e:
-            print(f"[{datetime.now()}] City health check error: {e}")
-
-        # V164: Discovery pipeline removed (dead code, auto_discover.py deleted in V163)
+        # V168: Removed dead signal_collector, city_health, discovery calls (files deleted in V163)
 
         print(f"[{datetime.now()}] All collection tasks complete.")
 
@@ -14218,8 +14192,8 @@ def scheduled_collection():
         global _last_collection_run
         _last_collection_run = datetime.now()
 
-        # V12.50: Sleep 6 hours (reduced from 24 — deltas are lightweight)
-        time.sleep(21600)
+        # V168: Sleep 1 hour between collection cycles (was 6 hours)
+        time.sleep(3600)
 
 
 # ===========================

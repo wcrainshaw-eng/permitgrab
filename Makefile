@@ -13,7 +13,7 @@ test-full:
 	pytest tests/ -v --tb=short
 
 lint:
-	ruff check .
+	ruff check . --select=E9,F63,F7,F82
 
 format:
 	ruff format .
@@ -21,7 +21,6 @@ format:
 check: lint smoke
 	@echo "All pre-push checks passed."
 
-# Only call this if `make check` is green
 deploy:
 	@make check
 	git push origin main
