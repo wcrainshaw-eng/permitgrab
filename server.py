@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V162',
+                'version': 'V163',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -3227,39 +3227,14 @@ def _migrate_create_sources_table():
         CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
     ''')
 
-    # Contractor enrichment tables (V82c ready)
-    conn.executescript('''
-        CREATE TABLE IF NOT EXISTS contractor_contacts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            contractor_name TEXT NOT NULL,
-            normalized_name TEXT NOT NULL,
-            city TEXT,
-            state TEXT,
-            phone TEXT,
-            email TEXT,
-            website TEXT,
-            license_number TEXT,
-            license_state TEXT,
-            source TEXT,
-            confidence REAL,
-            last_verified_at TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE INDEX IF NOT EXISTS idx_contractor_normalized ON contractor_contacts(normalized_name, state);
-
-        CREATE TABLE IF NOT EXISTS enrichment_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            contractor_name TEXT NOT NULL,
-            normalized_name TEXT NOT NULL,
-            city TEXT,
-            state TEXT,
-            layer_tried TEXT,
-            result TEXT,
-            attempted_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE INDEX IF NOT EXISTS idx_enrichment_name ON enrichment_log(normalized_name, state, layer_tried);
-    ''')
+    # V163: Drop dead tables
+    for dead_table in ['contractor_contacts', 'enrichment_log', 'bulk_source_coverage',
+                       'city_validations', 'pipeline_runs', 'pipeline_progress']:
+        try:
+            conn.execute(f"DROP TABLE IF EXISTS {dead_table}")
+        except Exception:
+            pass
+    conn.commit()
 
     # V148: City research pipeline table
     conn.executescript('''
