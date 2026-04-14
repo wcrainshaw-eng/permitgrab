@@ -3578,6 +3578,12 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 continue
             individual_cities.append(c)
 
+        # V166: Cap cities per cycle to prevent blocking gunicorn for 30+ minutes
+        MAX_CITIES_PER_CYCLE = 50
+        if len(individual_cities) > MAX_CITIES_PER_CYCLE:
+            print(f"    [V166] Limiting to {MAX_CITIES_PER_CYCLE}/{len(individual_cities)} cities this cycle")
+            individual_cities = individual_cities[:MAX_CITIES_PER_CYCLE]
+
         for city_info in individual_cities:
             source_id = city_info.get('source_id')
             city_name = city_info.get('name')

@@ -3134,7 +3134,8 @@ def upsert_permits(permits, source_city_key=None):
         )
         existing.update(row[0] for row in cursor)
 
-    # Batch insert/update
+    # Batch insert/update — V166: commit every 500 rows to avoid long write locks
+    _batch_counter = 0
     for p in permits:
         pn = p.get('permit_number')
         if not pn:
@@ -3173,6 +3174,11 @@ def upsert_permits(permits, source_city_key=None):
             source_city_key or p.get('source_bulk') or p.get('source_city') or p.get('source_city_key'), now, now,
             p.get('_prod_city_id')
         ))
+
+        # V166: Commit every 500 rows to release write lock periodically
+        _batch_counter += 1
+        if _batch_counter % 500 == 0:
+            conn.commit()
 
     conn.commit()
     print(f"[DB] Upserted permits: {new_count} new, {updated_count} updated", flush=True)
