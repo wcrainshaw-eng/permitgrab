@@ -2970,7 +2970,7 @@ class HealthCheckMiddleware:
             start_response(status, response_headers)
             body = json.dumps({
                 'status': 'ok',
-                'version': 'V165',
+                'version': 'V166',
                 'message': 'Health check bypasses Flask entirely'
             })
             return [body.encode('utf-8')]
@@ -14445,23 +14445,8 @@ def start_collectors():
         import traceback
         traceback.print_exc()
 
-    # V12.55c: One-time fix for Socrata location JSON in address fields
-    try:
-        fix_thread = threading.Thread(target=_fix_socrata_addresses, name='socrata_fix', daemon=True)
-        fix_thread.start()
-        print(f"[{datetime.now()}] V67: Address cleanup thread started, waiting 30s...")
-        time.sleep(30)
-    except Exception as e:
-        print(f"[{datetime.now()}] V12.55c: Address cleanup error: {e}")
-
-    # V12.54: Autonomous city discovery engine
-    try:
-        from autonomy_engine import run_autonomy_engine
-        autonomy_thread = threading.Thread(target=run_autonomy_engine, name='autonomy_engine', daemon=True)
-        autonomy_thread.start()
-        print(f"[{datetime.now()}] V67: Autonomy engine thread started.")
-    except ImportError:
-        print(f"[{datetime.now()}] V12.54: autonomy_engine.py not found, skipping.")
+    # V166: Removed dead _fix_socrata_addresses thread (function deleted in V163)
+    # V166: Removed dead autonomy_engine thread (file deleted in V163)
 
     print(f"[{datetime.now()}] V67: All collector threads started (staggered over ~2 minutes).")
 

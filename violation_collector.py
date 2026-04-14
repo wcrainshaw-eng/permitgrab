@@ -237,7 +237,7 @@ def collect_violations_from_endpoint(city_config, endpoint):
     offset = 0
     batch_size = 1000
     total_inserted = 0
-    max_records = 50000
+    max_records = 5000  # V166: Reduced from 50K to 5K per run to limit memory
 
     while total_inserted < max_records:
         params = {
@@ -251,14 +251,15 @@ def collect_violations_from_endpoint(city_config, endpoint):
             resp = SESSION.get(base_url, params=params, timeout=30)
             resp.raise_for_status()
             records = resp.json()
+            resp.close()  # V166: Explicitly close response to free socket/memory
         except Exception as e:
-            print(f"  [V162] Error fetching page at offset {offset}: {e}")
+            print(f"  [V166] Error fetching page at offset {offset}: {e}")
             break
 
         if not records or not isinstance(records, list):
             break
 
-        # Normalize and insert batch
+        # V166: Stream-process — normalize and insert immediately per page, don't accumulate
         batch = []
         for record in records:
             try:
@@ -271,15 +272,13 @@ def collect_violations_from_endpoint(city_config, endpoint):
         if batch:
             inserted = _insert_batch(batch)
             total_inserted += inserted
+        del batch, records  # V166: Free memory immediately
 
-        if len(records) < batch_size:
-            break  # Last page
+        if total_inserted >= max_records:
+            break
 
         offset += batch_size
-        time.sleep(1)  # Rate limit
-
-        if offset % 5000 == 0:
-            print(f"  [V162]   ... {total_inserted} inserted so far (offset {offset})")
+        time.sleep(1)
 
     print(f"  [V162] {city_config['city']} / {endpoint['name']}: {total_inserted} violations inserted")
     return total_inserted

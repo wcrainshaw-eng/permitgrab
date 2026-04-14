@@ -3229,18 +3229,8 @@ def collect_refresh(days_back=7, platform_filter=None, include_scrapers=True):  
             except Exception as e:
                 print(f"  [WARN] Failed to process permit: {e}")
 
-        # DEBUG: Check if Accela cities are in all_permits before upsert
-        _accela_in_batch = {}
-        for _p in new_permits:
-            _src = _p.get('source_city', '?')
-            if _src in ('indianapolis', 'oklahoma_city', 'charlotte', 'oakland'):
-                _accela_in_batch[_src] = _accela_in_batch.get(_src, 0) + 1
-        if _accela_in_batch:
-            print(f"[ACCELA-DEBUG] Accela cities in upsert batch: {_accela_in_batch}", flush=True)
-        else:
-            print(f"[ACCELA-DEBUG] NO Accela target cities in upsert batch of {len(new_permits)} permits", flush=True)
-
-        # V12.50: Upsert into SQLite (replaces load→merge→save cycle)
+        # V166: new_permits is now empty (permits already upserted inline per-city)
+        # The post-processing below is skipped since permits are already in DB
         if new_permits:
             new_count, updated_count = permitdb.upsert_permits(new_permits)
             print(f"[V12.50] Upserted: {new_count} new, {updated_count} updated")
@@ -3439,7 +3429,8 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
       - platform_filter: Only collect from sources matching this platform
       - include_scrapers: If True, include Accela/Playwright sources (default False)
     """
-    all_permits = []
+    all_permits = []  # V166: Still used as return value but capped to prevent unbounded growth
+    all_permits_count = 0  # V166: Track count without holding all permits in memory
     stats = {}
     bulk_stats = {}
     cities_from_bulk = set()  # Track cities covered by bulk sources
@@ -3512,7 +3503,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                             bulk_inserted += ins
                         except Exception:
                             pass
-                    all_permits.extend(permits)
+                    all_permits_count += len(permits)  # V166: Count only, don't accumulate
                     cities_from_bulk.add(slug)
 
                 bulk_stats[source_key] = source_stats
@@ -3635,7 +3626,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                         print(f"    [V126-INSERT] {city_name} ({source_id}): {permit_count} normalized, {inserted_count} inserted to DB", flush=True)
                     except Exception as upsert_err:
                         print(f"    [V126-INSERT-ERROR] {city_name} ({source_id}): {upsert_err}", flush=True)
-                all_permits.extend(city_permits)
+                all_permits_count += len(city_permits)  # V166: Count only, don't accumulate
 
                 stats[source_id] = {
                     "raw": len(raw),
@@ -3734,7 +3725,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                             print(f"    [V126-INSERT] {city_name} ({city_key}): {permit_count} normalized, {inserted_count} inserted", flush=True)
                         except Exception as upsert_err:
                             print(f"    [V126-INSERT-ERROR] {city_name} ({city_key}): {upsert_err}", flush=True)
-                    all_permits.extend(city_permits)
+                    all_permits_count += len(city_permits)  # V166: Count only, don't accumulate
 
                     stats[city_key] = {
                         "raw": len(raw),
@@ -3788,7 +3779,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
             print(f"  [V59] Phase 3 complete: {len(missed_cities)} cities processed")
 
-        print(f"\n  V15 collection complete: {len(all_permits)} permits from {len(prod_cities_list)} sources")
+        print(f"\n  V15 collection complete: {all_permits_count} permits from {len(prod_cities_list)} sources")
 
         # V100: Post-collection health updates
         try:
@@ -3799,7 +3790,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             print(f"[V100] Post-collection health update error (non-fatal): {e}")
 
         # Return early - don't run legacy collection
-        return all_permits, {**stats, **bulk_stats}
+        return [], {**stats, **bulk_stats}
 
     # LEGACY MODE: Fall back to CITY_REGISTRY + BULK_SOURCES if no prod_cities
     print("[V15] No prod_cities data, using legacy collection mode")
@@ -3823,7 +3814,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
                 # Add all permits from bulk source
                 for city_slug, permits in city_permits.items():
-                    all_permits.extend(permits)
+                    all_permits_count += len(permits)  # V166: Count only, don't accumulate
                     cities_from_bulk.add(city_slug)
 
                 bulk_stats[source_key] = source_stats
@@ -3862,7 +3853,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             time.sleep(5)
 
         print(f"\n  Bulk sources complete: {len(cities_from_bulk)} cities from bulk data")
-        print(f"  Total permits from bulk: {len(all_permits)}")
+        print(f"  Total permits from bulk: {all_permits_count}")
 
     # V12.31: Now process individual city APIs
     active_cities = get_active_cities()
@@ -3937,7 +3928,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 except Exception:
                     continue
 
-            all_permits.extend(city_permits)
+            all_permits_count += len(city_permits)  # V166: Count only, don't accumulate
 
             # V13.2: Get display name (handles both dict and legacy config)
             display_name = config.get("name", city_key) if config else city_key
@@ -4037,7 +4028,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             stats_file = os.path.join(DATA_DIR, "collection_stats.json")
             batch_stats = {
                 "collected_at": datetime.now().isoformat(),
-                "total_permits": len(all_permits),
+                "total_permits": all_permits_count,
                 "cities_processed": i + 1,
                 "in_progress": True,
             }
@@ -4045,7 +4036,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 atomic_write_json(stats_file, batch_stats)
             except Exception as e:
                 print(f"  [WARNING] Failed to update batch stats: {e}")
-            print(f"  [Batch {(i+1)//BATCH_SIZE}: {len(all_permits)} permits after {i+1} cities]")
+            print(f"  [Batch {(i+1)//BATCH_SIZE}: {all_permits_count} permits after {i+1} cities]")
             print(f"  [Pausing {BATCH_PAUSE_SECONDS}s before next batch...]")
             time.sleep(BATCH_PAUSE_SECONDS)
 
@@ -4055,16 +4046,16 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
     print(f"  Sources attempted: {sources_attempted}")
     print(f"  Sources succeeded: {sources_succeeded} ({sources_succeeded*100//max(1,sources_attempted)}%)")
     print(f"  Sources failed:    {sources_failed}")
-    print(f"  Permits collected: {len(all_permits)}")
+    print(f"  Permits collected: {all_permits_count}")
     print("-" * 60)
 
     # V12.22: Deduplicate permits by permit_number
     # County datasets split by city_filter can cause the same permit to appear
     # under multiple cities if the filter doesn't match exactly
-    original_count = len(all_permits)
+    original_count = all_permits_count
     all_permits = deduplicate_permits(all_permits)
-    if original_count != len(all_permits):
-        print(f"  [V12.22] Final count: {len(all_permits)} unique permits (was {original_count})")
+    if original_count != all_permits_count:
+        print(f"  [V12.22] Final count: {all_permits_count} unique permits (was {original_count})")
 
     # Trade category breakdown
     trade_counts = {}
@@ -4079,7 +4070,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
     # V12.50: Caller (collect_refresh/collect_full) handles SQLite writes
     # This function now purely returns collected permits without file I/O
-    print(f"[V12.50] Returning {len(all_permits)} permits for SQLite upsert")
+    print(f"[V12.50] Returning {all_permits_count} permits for SQLite upsert")
 
     # V12.30: Save stats FIRST with explicit error handling
     # This ensures timestamp updates even if hot-reload fails
@@ -4087,7 +4078,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
     collection_stats = {
         "collected_at": datetime.now().isoformat(),
         "days_back": days_back,
-        "total_permits": len(all_permits),
+        "total_permits": all_permits_count,
         "city_stats": stats,
         "bulk_stats": bulk_stats,  # V12.31: Include bulk source stats
         "cities_from_bulk": len(cities_from_bulk),  # V12.31
@@ -4172,7 +4163,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
     print("\n" + "=" * 60)
     print("COLLECTION COMPLETE")
     print("=" * 60)
-    print(f"Total permits collected: {len(all_permits)}")
+    print(f"Total permits collected: {all_permits_count}")
     print(f"\nBy City:")
     for key, s in sorted(stats.items(), key=lambda x: -x[1]["normalized"]):
         print(f"  {s['city_name']}: {s['normalized']} permits ({s['raw']} raw)")
@@ -4186,9 +4177,9 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
     # V12.51: SQLite handles persistence - no hot-reload needed here
     # The caller (collect_refresh/collect_full) handles SQLite upsert
-    print(f"\n[V12.50] Returning {len(all_permits)} permits for SQLite persistence")
+    print(f"\n[V12.50] Returning {all_permits_count} permits for SQLite persistence")
 
-    return all_permits, collection_stats
+    return [], collection_stats
 
 
 # ---------------------------------------------------------------------------
