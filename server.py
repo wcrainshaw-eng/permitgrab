@@ -3344,6 +3344,43 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V170 A1 migration note: {e}")
 
+    # V170 A2: Freshness recalculation for cities with NULL newest_permit_date
+    try:
+        m2 = conn2.execute("SELECT value FROM system_state WHERE key='migration_v170_a2_freshness'").fetchone()
+        if not m2:
+            print(f"[{datetime.now()}] V170 A2: Running freshness recalculation for configured cities...")
+            conn2.execute("""
+                UPDATE prod_cities SET
+                    newest_permit_date = (
+                        SELECT MAX(COALESCE(filing_date, collected_at))
+                        FROM permits WHERE permits.prod_city_id = prod_cities.id
+                    )
+                WHERE newest_permit_date IS NULL
+                  AND source_type IS NOT NULL
+                  AND id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
+            """)
+            conn2.execute("""
+                UPDATE prod_cities SET
+                    data_freshness = CASE
+                        WHEN newest_permit_date >= date('now', '-7 days') THEN 'fresh'
+                        WHEN newest_permit_date >= date('now', '-30 days') THEN 'stale'
+                        ELSE 'no_data'
+                    END
+                WHERE source_type IS NOT NULL AND newest_permit_date IS NOT NULL
+            """)
+            # Mark truly broken endpoints
+            conn2.execute("""
+                UPDATE prod_cities SET status='paused', last_error='V170 A2: Endpoint broken - no data after 30 days'
+                WHERE source_type IS NOT NULL AND status='active'
+                  AND newest_permit_date IS NOT NULL AND newest_permit_date < date('now', '-60 days')
+                  AND population > 200000
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v170_a2_freshness', '1')")
+            conn2.commit()
+            print(f"[{datetime.now()}] V170 A2: Freshness recalculation complete")
+    except Exception as e:
+        print(f"[{datetime.now()}] V170 A2 migration note: {e}")
+
     conn2.close()
 
     conn.close()
