@@ -110,6 +110,28 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    'philadelphia': {
+        'prod_city_id': None,  # Looked up dynamically
+        'city': 'Philadelphia',
+        'state': 'PA',
+        'platform': 'carto',
+        'endpoints': [
+            {
+                'name': 'L&I Violations',
+                'carto_base': 'https://phl.carto.com/api/v2/sql',
+                'carto_table': 'violations',
+                'date_field': 'casecreateddate',
+                'id_field': 'violationnumber',
+                'description_field': 'violationcodetitle',
+                'status_field': 'violationstatus',
+                'type_field': 'casetype',
+                'address_fields': {'full': 'address'},
+                'zip_field': 'zip',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
 }
 
 
@@ -213,10 +235,31 @@ def normalize_violation(record, city_config, endpoint):
 
 
 def collect_violations_from_endpoint(city_config, endpoint):
-    """Fetch violations from a single SODA endpoint."""
-    base_url = f"https://{endpoint['domain']}/resource/{endpoint['resource_id']}.json"
+    """Fetch violations from a SODA or Carto endpoint."""
+    is_carto = 'carto_base' in endpoint
+    if is_carto:
+        base_url = endpoint['carto_base']
+    else:
+        base_url = f"https://{endpoint['domain']}/resource/{endpoint['resource_id']}.json"
     date_field = endpoint['date_field']
     prod_city_id = city_config['prod_city_id']
+
+    # V170: Dynamic prod_city_id lookup for cities with None
+    if prod_city_id is None:
+        try:
+            conn_tmp = permitdb.get_connection()
+            row = conn_tmp.execute(
+                "SELECT id FROM prod_cities WHERE city = ? AND state = ?",
+                (city_config['city'], city_config['state'])
+            ).fetchone()
+            if row:
+                prod_city_id = row['id'] if isinstance(row, dict) else row[0]
+                city_config['prod_city_id'] = prod_city_id
+        except Exception:
+            pass
+    if not prod_city_id:
+        print(f"  [V170] {city_config['city']}: No prod_city_id found, skipping")
+        return 0
 
     # Get last collected date for incremental collection
     conn = permitdb.get_connection()
@@ -240,20 +283,29 @@ def collect_violations_from_endpoint(city_config, endpoint):
     max_records = 5000  # V166: Reduced from 50K to 5K per run to limit memory
 
     while total_inserted < max_records:
-        params = {
-            '$limit': batch_size,
-            '$offset': offset,
-            '$order': f"{date_field} DESC",
-            '$where': f"{date_field} > '{last_date}'",
-        }
+        # V170: Build request based on platform (SODA vs Carto)
+        if is_carto:
+            table = endpoint['carto_table']
+            sql = (f"SELECT * FROM {table} WHERE {date_field} > '{last_date}' "
+                   f"ORDER BY {date_field} DESC LIMIT {batch_size} OFFSET {offset}")
+            params = {'q': sql, 'format': 'json'}
+        else:
+            params = {
+                '$limit': batch_size,
+                '$offset': offset,
+                '$order': f"{date_field} DESC",
+                '$where': f"{date_field} > '{last_date}'",
+            }
 
         try:
             resp = SESSION.get(base_url, params=params, timeout=30)
             resp.raise_for_status()
-            records = resp.json()
-            resp.close()  # V166: Explicitly close response to free socket/memory
+            data = resp.json()
+            # V170: Carto wraps records in 'rows', SODA returns array directly
+            records = data.get('rows', data) if isinstance(data, dict) else data
+            resp.close()
         except Exception as e:
-            print(f"  [V166] Error fetching page at offset {offset}: {e}")
+            print(f"  [V170] Error fetching page at offset {offset}: {e}")
             break
 
         if not records or not isinstance(records, list):
