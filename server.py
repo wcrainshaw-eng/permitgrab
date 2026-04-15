@@ -5436,6 +5436,48 @@ def admin_backfill_trade_tags():
     return jsonify({'status': 'started', 'message': 'Trade tag backfill running in background'})
 
 
+@app.route('/api/admin/recalc-freshness', methods=['POST'])
+def admin_recalc_freshness():
+    """V170 A2 v3: One-shot freshness recalc. NOT at startup — run on demand."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        # Update newest_permit_date from actual permits
+        conn.execute("""
+            UPDATE prod_cities SET newest_permit_date = (
+                SELECT MAX(COALESCE(filing_date, collected_at))
+                FROM permits WHERE permits.prod_city_id = prod_cities.id
+            )
+            WHERE newest_permit_date IS NULL
+              AND source_type IS NOT NULL
+              AND id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
+        """)
+        n_dates = conn.total_changes
+        # Update data_freshness
+        conn.execute("""
+            UPDATE prod_cities SET data_freshness = CASE
+                WHEN newest_permit_date >= date('now', '-7 days') THEN 'fresh'
+                WHEN newest_permit_date >= date('now', '-30 days') THEN 'aging'
+                WHEN newest_permit_date >= date('now', '-90 days') THEN 'stale'
+                ELSE 'no_data'
+            END
+            WHERE source_type IS NOT NULL AND newest_permit_date IS NOT NULL
+        """)
+        conn.commit()
+        # Get result
+        rows = conn.execute(
+            "SELECT data_freshness, COUNT(*) as cnt FROM prod_cities WHERE source_type IS NOT NULL GROUP BY 1 ORDER BY cnt DESC"
+        ).fetchall()
+        return jsonify({
+            'status': 'complete',
+            'distribution': {r['data_freshness']: r['cnt'] for r in rows},
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/admin/backfill-normalized-addresses', methods=['POST'])
 def admin_backfill_addresses():
     """V170 B5: Backfill normalized_address on permits + violations."""

@@ -47,6 +47,17 @@ def test_diagnostics_requires_auth(client):
     r = client.get('/api/diagnostics')
     assert r.status_code in (401, 403)
 
+def test_saved_searches_requires_auth(client):
+    """Anon users get 401 on saved-searches endpoints."""
+    r = client.post('/api/saved-searches', json={'name': 'test'})
+    assert r.status_code in (401, 403)
+
+def test_saved_searches_route_registered():
+    """Confirm the route exists in the URL map."""
+    from server import app
+    paths = {rule.rule for rule in app.url_map.iter_rules()}
+    assert '/api/saved-searches' in paths
+
 def test_admin_query_rejects_non_select(client):
     key = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
     r = client.post('/api/admin/query',
