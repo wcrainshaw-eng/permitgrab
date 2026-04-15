@@ -14039,7 +14039,6 @@ def api_update_account():
 
 
 # V170 B4: Saved Searches API
-@app.route('/account/saved-searches', methods=['GET'])
 @app.route('/api/saved-searches', methods=['GET'])
 def list_saved_searches():
     """List user's saved searches."""
