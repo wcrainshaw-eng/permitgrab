@@ -1855,11 +1855,17 @@ async function loadData() {
     totalValueFromAPI = data.total_value || 0;
     highValueCountFromAPI = data.high_value_count || 0;
 
-    // V8: Display data freshness
+    // V173: Show freshness only if updated within 2 days (hide stale timestamps)
     if (data.last_updated) {
       const freshnessEl = document.getElementById('data-freshness');
       if (freshnessEl) {
-        freshnessEl.textContent = '• Updated ' + formatTimeAgo(data.last_updated);
+        const updDate = new Date(data.last_updated);
+        const hoursSince = (Date.now() - updDate.getTime()) / 3600000;
+        if (hoursSince < 48) {
+          freshnessEl.textContent = '• Updated ' + formatTimeAgo(data.last_updated);
+        } else {
+          freshnessEl.textContent = '• Updated daily';
+        }
       }
     }
   } catch (e) {
