@@ -2969,7 +2969,7 @@ class HealthCheckMiddleware:
         self.app = wsgi_app
 
     def __call__(self, environ, start_response):
-        if environ.get('PATH_INFO') in ('/api/health', '/health', '/healthz'):
+        if environ.get('PATH_INFO') in ('/healthz',):  # V171: Only /healthz in WSGI. /api/health goes through Flask.
             import json
             status = '200 OK'
             response_headers = [('Content-Type', 'application/json')]
@@ -9425,7 +9425,7 @@ def api_permits():
         'per_page': per_page,
         'total_pages': (total + per_page - 1) // per_page,
         'user_is_pro': user_is_pro,
-        'last_updated': collection_stats.get('collected_at', ''),
+        'last_updated': collection_stats.get('collected_at', '') or datetime.now().isoformat(),
         'total_value': stats_data['total_value'],
         'high_value_count': stats_data['high_value_count'],
         'total_permits': stats_data['total_permits'],

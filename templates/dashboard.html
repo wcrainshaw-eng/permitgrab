@@ -1984,16 +1984,17 @@ function updateStats(useFiltered = false) {
   // V9 Fix 11: Show trade categories instead of metro areas to avoid marketing contradiction
   const uniqueTrades = new Set(permits.map(p => p.trade_category)).size;
 
-  document.getElementById('stat-total').textContent = total.toLocaleString();
-  document.getElementById('banner-total').textContent = total.toLocaleString();
+  // V171: Null-check all DOM writes to prevent crash when elements don't exist
+  const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  _set('stat-total', total.toLocaleString());
+  _set('banner-total', total.toLocaleString());
   // V12.20: Format as billions if >= $1B, otherwise millions
-  document.getElementById('stat-value').textContent = totalValue >= 1000000000
+  _set('stat-value', totalValue >= 1000000000
     ? '$' + (totalValue / 1000000000).toFixed(1) + 'B'
-    : '$' + (totalValue / 1000000).toFixed(0) + 'M';
-  document.getElementById('stat-high').textContent = highValue.toLocaleString();
-  // V12.17: Singular/plural grammar
-  document.getElementById('stat-high-label').textContent = highValue === 1 ? 'High-Value Lead' : 'High-Value Leads';
-  document.getElementById('stat-trades').textContent = uniqueTrades.toLocaleString();
+    : '$' + (totalValue / 1000000).toFixed(0) + 'M');
+  _set('stat-high', highValue.toLocaleString());
+  _set('stat-high-label', highValue === 1 ? 'High-Value Lead' : 'High-Value Leads');
+  _set('stat-trades', uniqueTrades.toLocaleString());
 }
 
 // ===========================
@@ -3264,7 +3265,7 @@ async function togglePermitHistory(address, cardId) {
 checkCurrentUser();
 
 // Load violations for sidebar
-loadViolations();
+// V171: loadViolations() disabled — /api/violations route removed in V162, replaced by per-city /api/violations/<slug>
 
 // Load market leaders for sidebar
 loadMarketLeaders();
