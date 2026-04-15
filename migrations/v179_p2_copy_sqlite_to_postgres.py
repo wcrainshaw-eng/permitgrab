@@ -244,15 +244,15 @@ def copy_violations():
     sc = sq.cursor(); pc = pg.cursor()
     sc.execute("""SELECT prod_city_id, city, state, source_violation_id, violation_date,
                   violation_type, violation_description, status, address, zip,
-                  latitude, longitude, raw_data, normalized_address, collected_at
+                  latitude, longitude, raw_data, collected_at
                   FROM violations""")
     n = 0
     for row in sc.fetchall():
         try:
             pc.execute("""INSERT INTO violations (prod_city_id, city, state, source_violation_id,
                 violation_date, violation_type, violation_description, status, address, zip,
-                latitude, longitude, raw_data, normalized_address, collected_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                latitude, longitude, raw_data, collected_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (source_violation_id) DO NOTHING""", row)
             n += 1
         except:
