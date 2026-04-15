@@ -3344,69 +3344,8 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V170 A1 migration note: {e}")
 
-    # V170 A2 v2: Freshness recalculation — Postgres-compatible, no auto-pause
-    try:
-        m2 = conn2.execute("SELECT value FROM system_state WHERE key='migration_v170_a2_freshness_v2'").fetchone()
-        if not m2:
-            print(f"[{datetime.now()}] V170 A2 v2: Running Postgres-compatible freshness recalc...")
-            is_postgres = bool(os.environ.get('DATABASE_URL'))
-
-            if is_postgres:
-                conn2.execute('''
-                    UPDATE prod_cities
-                    SET newest_permit_date = sub.max_date
-                    FROM (
-                        SELECT prod_city_id,
-                               MAX(COALESCE(filing_date, collected_at)) AS max_date
-                        FROM permits
-                        WHERE prod_city_id IS NOT NULL
-                        GROUP BY prod_city_id
-                    ) sub
-                    WHERE prod_cities.id = sub.prod_city_id
-                      AND prod_cities.source_type IS NOT NULL
-                      AND prod_cities.newest_permit_date IS NULL
-                ''')
-                conn2.execute('''
-                    UPDATE prod_cities SET data_freshness = CASE
-                        WHEN newest_permit_date >= CURRENT_DATE - INTERVAL '7 days' THEN 'fresh'
-                        WHEN newest_permit_date >= CURRENT_DATE - INTERVAL '30 days' THEN 'aging'
-                        WHEN newest_permit_date >= CURRENT_DATE - INTERVAL '90 days' THEN 'stale'
-                        ELSE 'no_data'
-                    END
-                    WHERE source_type IS NOT NULL AND newest_permit_date IS NOT NULL
-                ''')
-            else:
-                conn2.execute('''
-                    UPDATE prod_cities SET newest_permit_date = (
-                        SELECT MAX(COALESCE(filing_date, collected_at))
-                        FROM permits WHERE permits.prod_city_id = prod_cities.id
-                    )
-                    WHERE newest_permit_date IS NULL
-                      AND source_type IS NOT NULL
-                      AND id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
-                ''')
-                conn2.execute('''
-                    UPDATE prod_cities SET data_freshness = CASE
-                        WHEN newest_permit_date >= date('now', '-7 days') THEN 'fresh'
-                        WHEN newest_permit_date >= date('now', '-30 days') THEN 'aging'
-                        WHEN newest_permit_date >= date('now', '-90 days') THEN 'stale'
-                        ELSE 'no_data'
-                    END
-                    WHERE source_type IS NOT NULL AND newest_permit_date IS NOT NULL
-                ''')
-
-            # No auto-pause. Humans decide what's dead.
-            conn2.execute(
-                "INSERT INTO system_state (key, value) VALUES ('migration_v170_a2_freshness_v2', '1') ON CONFLICT (key) DO NOTHING"
-                if is_postgres else
-                "INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v170_a2_freshness_v2', '1')"
-            )
-            conn2.commit()
-            print(f"[{datetime.now()}] V170 A2 v2: Freshness recalc complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V170 A2 v2 migration error: {e}")
-        import traceback
-        traceback.print_exc()
+    # V170 A2: Freshness recalc REMOVED from startup — was blocking gunicorn for 10+ min.
+    # Run freshness updates via /api/admin/execute or Render Shell instead.
 
     conn2.close()
 
