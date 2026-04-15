@@ -518,10 +518,14 @@ body {
       {% endif %}
     </div>
 
-    {% if data_freshness == 'fresh' or data_freshness == 'aging' %}
+    {% if newest_permit_date %}
     <div class="freshness-badge">
       <span class="freshness-dot"></span>
-      Updated daily
+      Data as of {{ newest_permit_date[:10] if newest_permit_date else 'unknown' }}
+    </div>
+    {% elif data_freshness == 'no_data' %}
+    <div class="freshness-badge" style="color: #b91c1c;">
+      ⚠ Data not yet available
     </div>
     {% endif %}
   </div>
