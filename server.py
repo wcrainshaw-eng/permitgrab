@@ -7522,6 +7522,34 @@ class User(db.Model):
         return max(0, delta.days)
 
 
+class SavedSearch(db.Model):
+    """V170 B4: User saved search for daily alerts."""
+    __tablename__ = 'saved_searches'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    city_slug = db.Column(db.String(255))
+    trade = db.Column(db.String(100))
+    tier = db.Column(db.String(50))
+    min_value = db.Column(db.Integer)
+    frequency = db.Column(db.String(20), nullable=False, default='daily')
+    last_sent_at = db.Column(db.DateTime)
+    active = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('saved_searches', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'name': self.name, 'city_slug': self.city_slug,
+            'trade': self.trade, 'tier': self.tier, 'min_value': self.min_value,
+            'frequency': self.frequency, 'active': self.active,
+            'last_sent_at': self.last_sent_at.isoformat() if self.last_sent_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 # Create tables on startup
 with app.app_context():
     db.create_all()
@@ -14124,6 +14152,75 @@ def api_update_account():
 
     db.session.commit()
     return jsonify({'success': True, 'user': user.to_dict()})
+
+
+# V170 B4: Saved Searches API
+@app.route('/account/saved-searches', methods=['GET'])
+@app.route('/api/saved-searches', methods=['GET'])
+def list_saved_searches():
+    """List user's saved searches."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Login required'}), 401
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    searches = SavedSearch.query.filter_by(user_id=user.id).order_by(SavedSearch.created_at.desc()).all()
+    return jsonify({'searches': [s.to_dict() for s in searches]})
+
+
+@app.route('/api/saved-searches', methods=['POST'])
+def create_saved_search():
+    """Create a new saved search."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Login required'}), 401
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    data = request.get_json() or {}
+    search = SavedSearch(
+        user_id=user.id,
+        name=data.get('name', 'Untitled Search'),
+        city_slug=data.get('city_slug'),
+        trade=data.get('trade'),
+        tier=data.get('tier'),
+        min_value=data.get('min_value'),
+        frequency=data.get('frequency', 'daily'),
+    )
+    db.session.add(search)
+    db.session.commit()
+    return jsonify({'search': search.to_dict(), 'created': True}), 201
+
+
+@app.route('/api/saved-searches/<int:search_id>', methods=['PATCH'])
+def update_saved_search(search_id):
+    """Update a saved search (active/name)."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Login required'}), 401
+    user = find_user_by_email(session['user_email'])
+    search = SavedSearch.query.filter_by(id=search_id, user_id=user.id).first()
+    if not search:
+        return jsonify({'error': 'Not found'}), 404
+    data = request.get_json() or {}
+    if 'active' in data:
+        search.active = int(data['active'])
+    if 'name' in data:
+        search.name = data['name']
+    db.session.commit()
+    return jsonify({'search': search.to_dict()})
+
+
+@app.route('/api/saved-searches/<int:search_id>', methods=['DELETE'])
+def delete_saved_search(search_id):
+    """Delete a saved search."""
+    if 'user_email' not in session:
+        return jsonify({'error': 'Login required'}), 401
+    user = find_user_by_email(session['user_email'])
+    search = SavedSearch.query.filter_by(id=search_id, user_id=user.id).first()
+    if not search:
+        return jsonify({'error': 'Not found'}), 404
+    db.session.delete(search)
+    db.session.commit()
+    return jsonify({'deleted': True})
 
 
 # V12.26: Competitor Watch API
