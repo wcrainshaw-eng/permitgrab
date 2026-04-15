@@ -529,9 +529,23 @@ body {
 
 <!-- RECENT PERMITS TABLE -->
 <section class="section">
-  <div class="section-header">
-    <h2>Recent Building Permits in {{ city_name }}</h2>
-    <p>Latest permits filed with the {{ city_name }} building department</p>
+  <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+    <div>
+      <h2>Recent Building Permits in {{ city_name }}</h2>
+      <p>Latest permits filed with the {{ city_name }} building department</p>
+    </div>
+    {% if permit_count > 0 %}
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+      <a href="/api/permits/{{ city_slug }}/export.csv" download
+         style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; color: var(--gray-700); text-decoration: none; font-weight: 500;">
+        📥 Download CSV
+      </a>
+      <button onclick="saveCurrentSearch()" id="btn-save-search"
+              style="display: none; padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500;">
+        💾 Save Search
+      </button>
+    </div>
+    {% endif %}
   </div>
 
   {% if recent_permits or permit_count > 0 %}
@@ -741,5 +755,36 @@ body {
 
 {% include 'partials/footer.html' %}
 
+<script>
+// V173: Save Search functionality
+function saveCurrentSearch() {
+  const params = new URLSearchParams(window.location.search);
+  const trade = params.get('trade') || '';
+  const tier = params.get('tier') || '';
+  const name = [trade, tier, '{{ city_name }}'].filter(Boolean).join(' — ') || '{{ city_name }} permits';
+
+  fetch('/api/saved-searches', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name: name,
+      city_slug: '{{ city_slug }}',
+      trade: trade,
+      tier: tier,
+    })
+  }).then(r => {
+    if (r.status === 401) { window.location = '/signup?redirect=' + encodeURIComponent(window.location.pathname + window.location.search); return; }
+    return r.json();
+  }).then(d => {
+    if (d && d.created) { alert('Search saved! You\'ll get daily email alerts.'); }
+  }).catch(e => console.error('Save search error:', e));
+}
+
+// Show save button if any filter is active
+if (window.location.search) {
+  const btn = document.getElementById('btn-save-search');
+  if (btn) btn.style.display = 'inline-flex';
+}
+</script>
 </body>
 </html>
