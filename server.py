@@ -9329,8 +9329,8 @@ def api_permits():
 
     FREEMIUM GATING: Non-Pro users see masked contact info on ALL permits.
     """
-    # Parse filters
-    city = request.args.get('city', '')
+    # Parse filters — V174: accept both 'city' and 'city_slug' param names
+    city = request.args.get('city', '') or request.args.get('city_slug', '')
     trade = request.args.get('trade', '')
     value = request.args.get('value', '')
     status_filter = request.args.get('status', '')
