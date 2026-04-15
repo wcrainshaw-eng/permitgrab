@@ -3529,12 +3529,21 @@ def get_prod_city_count():
     """
     try:
         conn = get_connection()
-        # V162: Only count configured cities with fresh data
-        row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM prod_cities "
-            "WHERE newest_permit_date >= date('now', '-30 days') "
-            "AND source_type IS NOT NULL AND status = 'active'"
-        ).fetchone()
+        # V178: Count cities with fresh data — Postgres-compatible
+        import os
+        if os.environ.get('DATABASE_URL'):
+            row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM prod_cities "
+                "WHERE source_type IS NOT NULL AND status = 'active' "
+                "AND newest_permit_date IS NOT NULL "
+                "AND substring(newest_permit_date, 1, 10)::date >= CURRENT_DATE - INTERVAL '30 days'"
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM prod_cities "
+                "WHERE newest_permit_date >= date('now', '-30 days') "
+                "AND source_type IS NOT NULL AND status = 'active'"
+            ).fetchone()
         return row['cnt'] if row else 0
     except Exception:
         return 0
