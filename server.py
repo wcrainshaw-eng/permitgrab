@@ -2969,7 +2969,7 @@ class HealthCheckMiddleware:
         self.app = wsgi_app
 
     def __call__(self, environ, start_response):
-        if environ.get('PATH_INFO') in ('/api/health', '/health'):
+        if environ.get('PATH_INFO') in ('/api/health', '/health', '/healthz'):
             import json
             status = '200 OK'
             response_headers = [('Content-Type', 'application/json')]
