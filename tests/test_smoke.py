@@ -58,6 +58,17 @@ def test_saved_searches_route_registered():
     paths = {rule.rule for rule in app.url_map.iter_rules()}
     assert '/api/saved-searches' in paths
 
+def test_unsubscribe_route_exists():
+    """V170 C3: Unsubscribe route registered."""
+    from server import app
+    paths = {rule.rule for rule in app.url_map.iter_rules()}
+    assert '/unsubscribe/<int:search_id>' in paths
+
+def test_admin_run_daily_alerts_requires_auth(client):
+    """V170 C3: Daily alerts trigger requires admin key."""
+    r = client.post('/api/admin/run-daily-alerts')
+    assert r.status_code in (401, 403)
+
 def test_admin_query_rejects_non_select(client):
     key = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
     r = client.post('/api/admin/query',

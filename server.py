@@ -5438,41 +5438,60 @@ def admin_backfill_trade_tags():
 
 @app.route('/api/admin/recalc-freshness', methods=['POST'])
 def admin_recalc_freshness():
-    """V170 A2 v3: One-shot freshness recalc. NOT at startup — run on demand."""
+    """V170: One-shot freshness recalc using correct Postgres schema.
+    Join: permits.source_city_key = prod_cities.source_id
+    Dates: TEXT columns, need substring cast for comparison."""
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
-        conn = permitdb.get_connection()
-        # Update newest_permit_date from actual permits
-        conn.execute("""
-            UPDATE prod_cities SET newest_permit_date = (
-                SELECT MAX(COALESCE(filing_date, collected_at))
-                FROM permits WHERE permits.prod_city_id = prod_cities.id
-            )
-            WHERE newest_permit_date IS NULL
-              AND source_type IS NOT NULL
-              AND id IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
+        import psycopg2
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        conn.autocommit = False
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '600000'")
+        # Step 1: backfill NULL newest_permit_date
+        cur.execute("""
+            UPDATE prod_cities
+            SET newest_permit_date = sub.max_date
+            FROM (
+                SELECT source_city_key,
+                       MAX(COALESCE(NULLIF(filing_date, ''), NULLIF(issued_date, ''), NULLIF(date, ''),
+                           to_char(collected_at, 'YYYY-MM-DD'))) AS max_date
+                FROM permits
+                WHERE source_city_key IS NOT NULL
+                GROUP BY source_city_key
+            ) sub
+            WHERE prod_cities.source_id = sub.source_city_key
+              AND prod_cities.source_type IS NOT NULL
+              AND prod_cities.newest_permit_date IS NULL
+              AND sub.max_date IS NOT NULL
+              AND sub.max_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
         """)
-        n_dates = conn.total_changes
-        # Update data_freshness
-        conn.execute("""
+        n_dates = cur.rowcount
+        # Step 2: bucket data_freshness
+        cur.execute("""
             UPDATE prod_cities SET data_freshness = CASE
-                WHEN newest_permit_date >= date('now', '-7 days') THEN 'fresh'
-                WHEN newest_permit_date >= date('now', '-30 days') THEN 'aging'
-                WHEN newest_permit_date >= date('now', '-90 days') THEN 'stale'
+                WHEN substring(newest_permit_date, 1, 10)::date >= CURRENT_DATE - INTERVAL '7 days' THEN 'fresh'
+                WHEN substring(newest_permit_date, 1, 10)::date >= CURRENT_DATE - INTERVAL '30 days' THEN 'aging'
+                WHEN substring(newest_permit_date, 1, 10)::date >= CURRENT_DATE - INTERVAL '90 days' THEN 'stale'
                 ELSE 'no_data'
             END
-            WHERE source_type IS NOT NULL AND newest_permit_date IS NOT NULL
+            WHERE source_type IS NOT NULL
+              AND newest_permit_date IS NOT NULL
+              AND newest_permit_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
         """)
+        n_freshness = cur.rowcount
         conn.commit()
         # Get result
-        rows = conn.execute(
-            "SELECT data_freshness, COUNT(*) as cnt FROM prod_cities WHERE source_type IS NOT NULL GROUP BY 1 ORDER BY cnt DESC"
-        ).fetchall()
+        cur.execute("SELECT data_freshness, COUNT(*) as cnt FROM prod_cities WHERE source_type IS NOT NULL GROUP BY 1 ORDER BY cnt DESC")
+        rows = cur.fetchall()
+        conn.close()
         return jsonify({
             'status': 'complete',
-            'distribution': {r['data_freshness']: r['cnt'] for r in rows},
+            'dates_updated': n_dates,
+            'freshness_updated': n_freshness,
+            'distribution': {r[0]: r[1] for r in rows},
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -14104,6 +14123,105 @@ def delete_saved_search(search_id):
     db.session.delete(search)
     db.session.commit()
     return jsonify({'deleted': True})
+
+
+# V170 C3: Daily alert emails
+def send_daily_alerts():
+    """Send digest emails for active daily saved_searches."""
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if not DATABASE_URL:
+        print("[ALERTS] DATABASE_URL not set, skipping")
+        return
+
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT s.id, s.user_id, s.name, s.city_slug, s.trade, s.tier, s.min_value
+        FROM saved_searches s
+        WHERE s.active = 1
+          AND s.frequency = 'daily'
+          AND (s.last_sent_at IS NULL OR s.last_sent_at::date < CURRENT_DATE)
+    """)
+    searches = cur.fetchall()
+    print(f"[ALERTS] {len(searches)} saved searches due for send")
+
+    from email_alerts import send_email as _send_email
+
+    for sid, uid, name, city_slug, trade, tier, min_value in searches:
+        cur.execute("SELECT email FROM users WHERE id = %s", (uid,))
+        row = cur.fetchone()
+        if not row:
+            continue
+        email = row[0]
+
+        where = ["p.collected_at >= NOW() - INTERVAL '24 hours'"]
+        params = []
+        if city_slug:
+            where.append('pc.city_slug = %s')
+            params.append(city_slug)
+        if trade:
+            where.append('p.trade_category = %s')
+            params.append(trade)
+        if min_value:
+            where.append('p.estimated_cost >= %s')
+            params.append(min_value)
+
+        sql = f"""
+            SELECT p.permit_number, p.address, p.permit_type, p.description,
+                   p.estimated_cost, p.value_tier, p.trade_category,
+                   p.contractor_name, p.contact_phone, p.filing_date
+            FROM permits p
+            JOIN prod_cities pc ON pc.source_id = p.source_city_key
+            WHERE {' AND '.join(where)}
+            ORDER BY p.filing_date DESC NULLS LAST
+            LIMIT 50
+        """
+        cur.execute(sql, params)
+        permits = cur.fetchall()
+
+        if not permits:
+            continue
+
+        try:
+            html = render_template('emails/saved_search_digest.html',
+                search_name=name, permits=permits, city_slug=city_slug,
+                unsubscribe_url=f'https://permitgrab.com/unsubscribe/{sid}'
+            )
+            _send_email(email, f"PermitGrab: {len(permits)} new matches for '{name}'", html)
+            print(f"[ALERTS] Sent search_id={sid} to {email} permits={len(permits)}")
+        except Exception as e:
+            print(f"[ALERTS] Error sending to {email}: {e}")
+            continue
+
+        cur.execute("UPDATE saved_searches SET last_sent_at = NOW() WHERE id = %s", (sid,))
+        conn.commit()
+
+    conn.close()
+
+
+@app.route('/api/admin/run-daily-alerts', methods=['POST'])
+def admin_run_daily_alerts():
+    """V170 C3: Manually trigger daily alert emails."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        send_daily_alerts()
+        return jsonify({'triggered': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/unsubscribe/<int:search_id>')
+def unsubscribe_search(search_id):
+    """V170 C3: Unsubscribe from a saved search alert."""
+    search = SavedSearch.query.get(search_id)
+    if search:
+        search.active = 0
+        db.session.commit()
+    return "Unsubscribed. You won't receive more emails for this saved search.", 200
 
 
 # V12.26: Competitor Watch API
