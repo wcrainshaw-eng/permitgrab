@@ -1113,6 +1113,9 @@ body {
   <div class="hero-cta">
     <a href="/?city={{ city_name }}" class="btn-primary">View {{ city_name }} Permits</a>
     <a href="/pricing" class="btn-secondary">See Pricing</a>
+    {% if permit_count > 0 and not is_coming_soon %}
+    <a href="/api/permits/{{ city_slug }}/export.csv" download style="padding:10px 20px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; color:#374151; text-decoration:none; font-size:14px;">📥 Download CSV</a>
+    {% endif %}
   </div>
 </section>
 
