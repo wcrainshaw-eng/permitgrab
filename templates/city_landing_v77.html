@@ -534,7 +534,7 @@ body {
     <p>Latest permits filed with the {{ city_name }} building department</p>
   </div>
 
-  {% if recent_permits %}
+  {% if recent_permits or permit_count > 0 %}
   <div class="permits-table-container">
     <div class="permits-table-header">
       <h3>Recent Permits</h3>
@@ -572,11 +572,17 @@ body {
     </div>
   </div>
   {% else %}
+  {% if permit_count == 0 %}
   <div class="no-data-message">
     <h3>Permit Data Coming Soon</h3>
     <p>We're working on adding {{ city_name }} permit data to our coverage. Sign up to be notified when it's available.</p>
     <a href="/get-alerts" class="btn">Get Notified</a>
   </div>
+  {% else %}
+  <div class="no-data-message">
+    <p>{{ permit_count|default(0) }} permits on file. Recent permits loading...</p>
+  </div>
+  {% endif %}
   {% endif %}
 </section>
 
