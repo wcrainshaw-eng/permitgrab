@@ -9268,6 +9268,7 @@ def health_check():
     if not _startup_done:
         return jsonify({
             'status': 'starting',
+            'version': APP_VERSION,
             'timestamp': datetime.now().isoformat(),
             'message': 'V67: Background init in progress, service is alive'
         }), 200
@@ -9280,6 +9281,7 @@ def health_check():
         # V67: Return degraded (still 200!) if DB is temporarily unavailable
         return jsonify({
             'status': 'degraded',
+            'version': APP_VERSION,
             'timestamp': datetime.now().isoformat(),
             'message': f'DB temporarily unavailable: {str(e)[:100]}',
             'data_loaded': _initial_data_loaded
@@ -9289,6 +9291,7 @@ def health_check():
         # No data and we're in a loading state - still return 200 but indicate loading
         return jsonify({
             'status': 'loading',
+            'version': APP_VERSION,
             'timestamp': datetime.now().isoformat(),
             'message': 'Data collection in progress',
             'permit_count': 0
@@ -9306,6 +9309,7 @@ def health_check():
 
     return jsonify({
         'status': 'ok',
+        'version': APP_VERSION,
         'timestamp': datetime.now().isoformat(),
         'permit_count': permit_count,
         'data_loaded': _initial_data_loaded,
