@@ -51,6 +51,15 @@
   into a Render Background Worker (see V167 Phase 3 spec); deferred
   until admin ops become a regular pain point.
 
+- **Render auto-deploy gate is NOT enforced.** GitHub Actions CI catches
+  broken code, but Render deploys red commits anyway. Until the dashboard
+  setting is changed (Render Settings → Build & Deploy → Auto-Deploy →
+  "Only on successful check runs"), broken commits can reach production.
+  Mitigation: always `make smoke` locally before push, wait for CI green,
+  verify Render Events shows "Deploy live" with green check. Never trust
+  /api/health alone — the WSGI /healthz middleware returns 200 even when
+  Flask is crashed.
+
 ## Verified Flows
 
 ### Sign up → trial → paid (verified 2026-04-15)
