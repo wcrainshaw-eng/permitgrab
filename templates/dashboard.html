@@ -3057,19 +3057,7 @@ let permitHistoryCache = {};
 let violationsCache = {};
 let allViolations = [];
 
-async function loadViolations() {
-  try {
-    const resp = await fetch('/api/violations');
-    if (resp.ok) {
-      const data = await resp.json();
-      allViolations = data.violations || [];
-      renderViolationsSidebar();
-    }
-  } catch (e) {
-    console.error('Failed to load violations:', e);
-    document.getElementById('violations-list').innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">Unable to load violations</div>';
-  }
-}
+// V173: loadViolations() removed — was calling deleted /api/violations route
 
 function renderViolationsSidebar() {
   const container = document.getElementById('violations-list');
