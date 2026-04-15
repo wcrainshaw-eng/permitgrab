@@ -15,7 +15,7 @@ import threading
 import time
 
 # V167: App-level constants
-APP_VERSION = 'V170'
+APP_VERSION = 'V171'
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 START_TIME = time.time()
 import secrets
@@ -5914,6 +5914,11 @@ def api_diagnostics():
                 "SELECT MAX(collected_at) FROM permits"
             ).fetchone()[0] if count('permits') else None,
             'last_scraper_run': last_scraper,
+            'business': {
+                'total_users': count('users'),
+                'active_saved_searches': fresh('saved_searches', 'created_at', hours=999999) if count('saved_searches') else 0,
+                'alerts_sent_24h': fresh('saved_searches', 'last_sent_at', hours=24) if count('saved_searches') else 0,
+            },
             'env': {
                 'render_service': os.environ.get('RENDER_SERVICE_ID'),
                 'python_version': sys.version.split()[0],
