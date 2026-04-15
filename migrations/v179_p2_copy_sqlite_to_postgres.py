@@ -395,3 +395,4 @@ if __name__ == '__main__':
 
     pg.close()
     sq.close()
+# V179 P2 completed 2026-04-15: 1,145,540 permits, 67,259 violations, 20,440 cities in Postgres
