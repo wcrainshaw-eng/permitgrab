@@ -13225,9 +13225,10 @@ def city_landing_inner(city_slug):
     ]
 
     return render_template(
-        'city_landing.html',
+        'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         city_name=config['name'],
         city_slug=city_slug,
+        state_abbrev=current_state,  # V77 template expects state_abbrev, not city_state
         city_state=current_state,
         meta_title=config['meta_title'],
         meta_description=config['meta_description'],
@@ -13255,6 +13256,18 @@ def city_landing_inner(city_slug):
         top_trades=top_trades,  # V14.0: Trade page links
         data_freshness=city_freshness,  # V18: stale indicator
         newest_permit_date=newest_permit_date,  # V18: for "last updated" display
+        # V175: Additional vars expected by city_landing_v77.html
+        recent_permits=sorted_permits[:50],
+        permit_types=trade_breakdown,
+        blog_posts=related_articles,
+        footer_cities=other_cities[:20],
+        earliest_date=None,
+        latest_date=None,
+        total_permits=permit_count,
+        last_collection=last_collected,
+        is_active=not is_coming_soon,
+        violations=[],
+        violations_count=0,
     )
 
 
