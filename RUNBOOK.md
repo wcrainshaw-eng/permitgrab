@@ -51,6 +51,37 @@
   into a Render Background Worker (see V167 Phase 3 spec); deferred
   until admin ops become a regular pain point.
 
+## Verified Flows
+
+### Sign up → trial → paid (verified 2026-04-15)
+- New user gets 14-day trial (User.trial_started_at set on signup)
+- Day 15: trial expires (User.trial_end_date < now)
+- /upgrade → Stripe Checkout → webhook flips status to 'active'
+- Test card: 4242 4242 4242 4242 in test mode
+- Stripe env vars: STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET
+
+### Daily alert emails (verified 2026-04-15)
+- User creates saved search via /api/saved-searches
+- Worker runs send_daily_alerts() at 7 AM ET (or admin trigger)
+- Matching permits from last 24h rendered to email template
+- Unsubscribe via /unsubscribe/<search_id>
+
+## One-Off Operations
+
+### Recalc data_freshness across all cities
+Run POST /api/admin/recalc-freshness with admin key, or from Render Shell:
+```bash
+python3 -c "
+import os, psycopg2
+conn = psycopg2.connect(os.environ['DATABASE_URL'])
+cur = conn.cursor()
+cur.execute(\"SET statement_timeout = '600000'\")
+cur.execute(\"UPDATE prod_cities SET data_freshness = CASE WHEN substring(newest_permit_date,1,10)::date >= CURRENT_DATE - INTERVAL '7 days' THEN 'fresh' WHEN substring(newest_permit_date,1,10)::date >= CURRENT_DATE - INTERVAL '30 days' THEN 'aging' ELSE 'stale' END WHERE source_type IS NOT NULL AND newest_permit_date IS NOT NULL AND newest_permit_date ~ '^[0-9]{4}'\")
+print(cur.rowcount)
+conn.commit()
+"
+```
+
 ## Something broke after a push
 
 1. Check GitHub Actions — was CI green?
