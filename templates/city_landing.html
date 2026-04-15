@@ -1063,6 +1063,7 @@ body {
 <section class="hero">
   <!-- V13.9: Added space before & for proper rendering/screen readers -->
   <h1>{{ city_name }}, {{ city_state }} Building Permits<br> & <span>Contractor Leads</span></h1>
+  {% if permit_count > 0 and not is_coming_soon %}
   <p>Get real-time access to {{ permit_count }}+ active building permits in {{ city_name }}. Find contact info, project values, and job details before your competition.</p>
 
   <div class="hero-stats">
@@ -1070,6 +1071,14 @@ body {
       <div class="hero-stat-value">{{ permit_count }}+</div>
       <div class="hero-stat-label">Active Permits</div>
     </div>
+  {% else %}
+  <p>{{ city_name }} permit data coming soon. Sign up to be notified when we add coverage.</p>
+  <div class="hero-stats" style="display:none;">
+    <div class="hero-stat">
+      <div class="hero-stat-value">—</div>
+      <div class="hero-stat-label">Active Permits</div>
+    </div>
+  {% endif %}
     {% if total_value > 0 %}
     <div class="hero-stat">
       <div class="hero-stat-value">{% if total_value >= 1000000000 %}${{ "%.1f" | format(total_value / 1000000000) }}B{% elif total_value >= 1000000 %}${{ "%.0f" | format(total_value / 1000000) }}M{% else %}${{ "{:,.0f}".format(total_value) }}{% endif %}</div>
