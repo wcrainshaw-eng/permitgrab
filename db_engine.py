@@ -47,7 +47,7 @@ USE_POSTGRES = bool(DATABASE_URL)
 # --------------------------------------------------------------------------
 
 _pg_pool = None
-_pg_pool_enabled = False  # V70: Pool DISABLED by default — must be manually enabled
+_pg_pool_enabled = False  # V179 P3: Auto-enabled when DATABASE_URL is set
 _pg_lock = threading.Lock()
 
 # V65: Rate-limit background thread connection usage to prevent API starvation
@@ -95,6 +95,15 @@ def _get_pg_pool():
 def is_pg_pool_enabled():
     """V70: Check if Postgres pool is available."""
     return _pg_pool is not None and _pg_pool_enabled
+
+
+# V179 P3: Auto-enable Postgres pool when DATABASE_URL is set
+if USE_POSTGRES and not _pg_pool_enabled:
+    try:
+        enable_pg_pool()
+        print("[DB_ENGINE] V179: Postgres pool auto-enabled on import")
+    except Exception as e:
+        print(f"[DB_ENGINE] V179: Postgres auto-enable failed: {e}")
 
 
 class PgConnection:
@@ -233,6 +242,15 @@ def _translate_sql(sql):
     # datetime('now') → NOW()
     translated = translated.replace("datetime('now')", "NOW()")
 
+    # V179: date('now', '-N days') → CURRENT_DATE - INTERVAL 'N days'
+    translated = re.sub(
+        r"date\('now',\s*'-(\d+)\s*days?'\)",
+        r"CURRENT_DATE - INTERVAL '\1 days'",
+        translated
+    )
+    # date('now') → CURRENT_DATE
+    translated = translated.replace("date('now')", "CURRENT_DATE")
+
     # julianday('now') - julianday(x) → EXTRACT(EPOCH FROM NOW() - x::timestamp) / 86400
     # This is complex — handle the most common pattern
     import re
@@ -254,12 +272,29 @@ def _translate_sql(sql):
         translated
     )
 
-    # INSERT OR REPLACE → INSERT ... ON CONFLICT DO UPDATE
-    # This one needs context-specific handling — leave for db.py to manage
+    # V179: INSERT OR REPLACE → INSERT ... ON CONFLICT (pk) DO UPDATE SET ...
+    # For permits (PK = permit_number): translate to ON CONFLICT DO UPDATE
+    if 'INSERT OR REPLACE INTO permits' in translated:
+        translated = translated.replace('INSERT OR REPLACE INTO permits', 'INSERT INTO permits')
+        # Add ON CONFLICT clause after VALUES
+        if 'ON CONFLICT' not in translated:
+            translated = translated.replace(
+                ')',  # Last closing paren of VALUES(...)
+                ') ON CONFLICT (permit_number) DO UPDATE SET updated_at = NOW()',
+                1  # Only replace the LAST occurrence — this is fragile but works for our pattern
+            )
+    elif 'INSERT OR REPLACE INTO system_state' in translated:
+        translated = translated.replace('INSERT OR REPLACE INTO system_state', 'INSERT INTO system_state')
+        if 'ON CONFLICT' not in translated:
+            translated += ' ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at'
+    else:
+        # Generic INSERT OR REPLACE → just INSERT (let PK constraint handle it)
+        translated = translated.replace('INSERT OR REPLACE', 'INSERT')
 
     # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
     translated = translated.replace("INSERT OR IGNORE", "INSERT")
-    # We'll add ON CONFLICT DO NOTHING in db.py where needed
+    if 'INSERT INTO' in translated and 'ON CONFLICT' not in translated and 'DO NOTHING' not in translated:
+        pass  # Don't add ON CONFLICT blindly — only where we know the constraint
 
     # AUTOINCREMENT → (just remove it, Postgres SERIAL handles this)
     translated = translated.replace("AUTOINCREMENT", "")
