@@ -58,6 +58,12 @@ def test_saved_searches_route_registered():
     paths = {rule.rule for rule in app.url_map.iter_rules()}
     assert '/api/saved-searches' in paths
 
+@pytest.mark.parametrize('slug', ['houston', 'new-york-city', 'chicago-il', 'los-angeles'])
+def test_city_pages_render(client, slug):
+    """V176: City pages must render without 500 errors."""
+    r = client.get(f'/permits/{slug}')
+    assert r.status_code < 500, f'/permits/{slug} returned {r.status_code}'
+
 def test_unsubscribe_route_exists():
     """V170 C3: Unsubscribe route registered."""
     from server import app

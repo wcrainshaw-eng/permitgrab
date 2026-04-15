@@ -3352,8 +3352,8 @@ def _migrate_create_sources_table():
     conn.close()
     print(f"[{datetime.now()}] V170: All tables created/verified")
 
-    # V158: Ensure deferred startup runs (starts email scheduler, collectors, etc.)
-    _deferred_startup()
+    # V176: Run deferred startup in background thread so gunicorn can serve immediately
+    threading.Thread(target=_deferred_startup, daemon=True, name='deferred_startup').start()
 
 
 def _bulk_load_city_research():
