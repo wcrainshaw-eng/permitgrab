@@ -3201,6 +3201,9 @@ def _migrate_create_sources_table():
         "ALTER TABLE sources ADD COLUMN last_verified_at TEXT",
         "ALTER TABLE sources ADD COLUMN verification_status TEXT DEFAULT 'pending'",
         "ALTER TABLE sources ADD COLUMN days_consecutive INTEGER DEFAULT 0",
+        # V182 PR2: emblem flags for cities index + city-page badges
+        "ALTER TABLE prod_cities ADD COLUMN has_enrichment INTEGER DEFAULT 0",
+        "ALTER TABLE prod_cities ADD COLUMN has_violations INTEGER DEFAULT 0",
     ]:
         try:
             conn.execute(col_sql)
@@ -3918,22 +3921,39 @@ def admin_start_collectors():
 
 @app.route('/api/admin/refresh-profiles', methods=['POST'])
 def admin_refresh_profiles():
-    """V182: Rebuild contractor_profiles aggregates.
+    """V182: Rebuild contractor_profiles aggregates + emblem flags.
 
     Query params:
       city: specific prod_cities.city_slug to refresh (optional; default = all active)
 
-    Runs synchronously. Expected <60s for current data; if it grows, move to
-    background thread like admin_start_collectors.
+    Also triggers update_city_emblems() after refresh so has_enrichment
+    flag stays in sync on prod_cities.
     """
     valid, error = check_admin_key()
     if not valid:
         return error
     try:
-        from contractor_profiles import refresh_contractor_profiles
+        from contractor_profiles import refresh_contractor_profiles, update_city_emblems
         city_slug = request.args.get('city')
         result = refresh_contractor_profiles(city_slug=city_slug)
-        return jsonify({'status': 'ok', **result}), 200
+        emblems = update_city_emblems()
+        return jsonify({'status': 'ok', 'emblems': emblems, **result}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/refresh-emblems', methods=['POST'])
+def admin_refresh_emblems():
+    """V182: Recompute has_enrichment/has_violations flags on prod_cities.
+
+    Call after violation collection. Fast (<1s for 2K cities).
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from contractor_profiles import update_city_emblems
+        return jsonify({'status': 'ok', **update_city_emblems()}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -13099,6 +13119,60 @@ def state_or_city_landing(state_slug):
     return city_landing_inner(state_slug)
 
 
+def _get_top_contractors_for_city(city_slug, limit=25):
+    """V182 PR2: Top active contractors for a city's landing page.
+
+    Returns [] if:
+      - city fails city_passes_public_filter (bulk-misattribution guard)
+      - no active contractor_profiles exist for the slug
+
+    License-number-only entries render as "License #<raw>" per Wes's
+    direction (tells the user a licensed contractor pulled the permit
+    even when the company name wasn't captured).
+    """
+    from contractor_profiles import is_license_number, city_passes_public_filter
+    conn = permitdb.get_connection()
+    try:
+        pc_row = conn.execute(
+            "SELECT population, total_permits FROM prod_cities WHERE city_slug = ?",
+            (city_slug,)
+        ).fetchone()
+        if pc_row and not city_passes_public_filter(
+            pc_row['population'] or 0, pc_row['total_permits'] or 0
+        ):
+            return []
+        rows = conn.execute("""
+            SELECT contractor_name_raw, contractor_name_normalized,
+                   total_permits, permits_90d, primary_trade,
+                   avg_project_value, phone, website, enrichment_status,
+                   permit_frequency
+            FROM contractor_profiles
+            WHERE source_city_key = ? AND is_active = 1
+            ORDER BY total_permits DESC, permits_90d DESC
+            LIMIT ?
+        """, (city_slug, limit)).fetchall()
+        out = []
+        for r in rows:
+            norm = r['contractor_name_normalized']
+            raw = r['contractor_name_raw']
+            is_license = is_license_number(norm)
+            out.append({
+                'display_name': f"License #{raw}" if is_license else raw,
+                'is_license_number': is_license,
+                'total_permits': r['total_permits'],
+                'permits_90d': r['permits_90d'],
+                'primary_trade': r['primary_trade'],
+                'avg_project_value': r['avg_project_value'],
+                'phone': r['phone'],
+                'website': r['website'],
+                'enriched': r['enrichment_status'] == 'enriched',
+                'permit_frequency': r['permit_frequency'],
+            })
+        return out
+    finally:
+        conn.close()
+
+
 def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
     # V157: Slug aliases for cities where URL slug differs from DB slug
@@ -13404,6 +13478,10 @@ def city_landing_inner(city_slug):
         {'name': 'General Construction', 'slug': 'general-construction'},
     ]
 
+    # V182 PR2: top contractors for this city (empty if city fails
+    # population sanity filter or has no active profiles)
+    top_contractors = _get_top_contractors_for_city(city_slug, limit=25)
+
     return render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         city_name=config['name'],
@@ -13422,6 +13500,7 @@ def city_landing_inner(city_slug):
         unique_contractors=unique_contractors,
         trade_breakdown=trade_breakdown,
         permits=sorted_permits,
+        top_contractors=top_contractors,  # V182 PR2
         other_cities=other_cities,
         nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
         current_year=datetime.now().year,
@@ -13660,6 +13739,9 @@ def state_city_landing(state_slug, city_slug):
     except Exception:
         pass
 
+    # V182 PR2: top contractors (empty if city fails public filter)
+    top_contractors = _get_top_contractors_for_city(city_slug, limit=25)
+
     return render_template('city_landing_v77.html',
         city_name=display_name,
         city_slug=city_slug,
@@ -13675,6 +13757,7 @@ def state_city_landing(state_slug, city_slug):
         data_freshness=data_freshness,
         is_active=is_active,
         recent_permits=recent_permits,
+        top_contractors=top_contractors,  # V182 PR2
         permit_types=permit_types,
         nearby_cities=nearby_cities,
         meta_title=meta_title,
@@ -13920,9 +14003,22 @@ def cities_browse():
     """V17e: Dedicated browse page for all cities, organized by state.
     Reduces homepage link dilution by moving 300+ city links here.
     Acts as an SEO hub that distributes PageRank to all city pages.
+
+    V182 PR2: filters out bulk-misattribution cities (e.g. Fenner NY with
+    39K permits on 1,900 residents) so they don't appear in public rankings.
     """
-    all_cities = get_cities_with_data()
-    footer_cities = all_cities
+    raw_cities = get_cities_with_data()
+    footer_cities = raw_cities
+
+    # V182 PR2: apply public-ranking filter (population vs permit volume).
+    from contractor_profiles import city_passes_public_filter
+    all_cities = [
+        c for c in raw_cities
+        if city_passes_public_filter(c.get('population', 0), c.get('permit_count', 0))
+    ]
+    filtered_out = len(raw_cities) - len(all_cities)
+    if filtered_out:
+        print(f"[V182 cities] Filtered {filtered_out} bulk-misattribution cities from rankings", flush=True)
 
     # Group cities by state
     states = {}

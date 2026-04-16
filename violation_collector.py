@@ -110,6 +110,31 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    'austin-tx': {
+        'prod_city_id': None,  # Looked up dynamically by (city, state)
+        'city': 'Austin',
+        'state': 'TX',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'domain': 'data.austintexas.gov',
+                'resource_id': '6wtj-zbtb',
+                'date_field': 'opened_date',
+                'id_field': 'case_id',
+                'description_field': 'description',
+                'status_field': 'status',
+                'type_field': 'case_type',
+                'address_fields': {'full': 'address'},
+                'zip_field': 'zip_code',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
+    # V182 PR2: Fort Worth and Mesa skipped after endpoint discovery:
+    #   - data.fortworthtexas.gov redirects to ArcGIS (needs new collector shape)
+    #   - data.mesaaz.gov resources nnr9-eg5e returns empty, amsn-zipb 404s
+    # Document here to prevent re-investigation next iteration.
     'philadelphia': {
         'prod_city_id': None,  # Looked up dynamically
         'city': 'Philadelphia',
@@ -386,5 +411,16 @@ def collect_violations():
         print(f"  {VIOLATION_SOURCES[slug]['city']}: {count:,} new violations")
     print(f"  Total: {sum(results.values()):,}")
     print(f"{'='*60}\n")
+
+    # V182 PR2: refresh emblem flags so cities that just gained violations
+    # get their has_violations flag updated before the UI queries them.
+    try:
+        from contractor_profiles import update_city_emblems
+        stats = update_city_emblems()
+        print(f"[V182] Emblem refresh after violations: "
+              f"{stats['cities_with_violations']} cities with violations, "
+              f"{stats['cities_with_enrichment']} with enrichment")
+    except Exception as e:
+        print(f"[V182] Emblem refresh failed (non-fatal): {e}")
 
     return results
