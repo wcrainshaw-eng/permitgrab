@@ -3240,12 +3240,83 @@ def _migrate_create_sources_table():
     ''')
 
     # V163: Drop dead tables
-    for dead_table in ['contractor_contacts', 'enrichment_log', 'bulk_source_coverage',
+    # V182: Removed 'contractor_contacts' and 'enrichment_log' — now live (contractor intelligence).
+    for dead_table in ['bulk_source_coverage',
                        'city_validations', 'pipeline_runs', 'pipeline_progress']:
         try:
             conn.execute(f"DROP TABLE IF EXISTS {dead_table}")
         except Exception:
             pass
+    conn.commit()
+
+    # V182: Contractor intelligence tables (profiles + enrichment log + contacts cache).
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS contractor_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contractor_name_raw TEXT NOT NULL,
+            contractor_name_normalized TEXT NOT NULL,
+            source_city_key TEXT,
+            city TEXT,
+            state TEXT,
+            total_permits INTEGER DEFAULT 0,
+            permits_90d INTEGER DEFAULT 0,
+            permits_30d INTEGER DEFAULT 0,
+            primary_trade TEXT,
+            trade_breakdown TEXT,
+            avg_project_value REAL,
+            max_project_value REAL,
+            total_project_value REAL,
+            primary_area TEXT,
+            first_permit_date TEXT,
+            last_permit_date TEXT,
+            is_active INTEGER DEFAULT 0,
+            permit_frequency TEXT,
+            phone TEXT,
+            website TEXT,
+            email TEXT,
+            google_place_id TEXT,
+            license_number TEXT,
+            license_status TEXT,
+            enrichment_status TEXT DEFAULT 'pending',
+            enriched_at TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(contractor_name_normalized, source_city_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_cp_normalized ON contractor_profiles(contractor_name_normalized);
+        CREATE INDEX IF NOT EXISTS idx_cp_city_key ON contractor_profiles(source_city_key);
+        CREATE INDEX IF NOT EXISTS idx_cp_active ON contractor_profiles(is_active);
+        CREATE INDEX IF NOT EXISTS idx_cp_trade ON contractor_profiles(primary_trade);
+        CREATE INDEX IF NOT EXISTS idx_cp_enrichment ON contractor_profiles(enrichment_status);
+
+        CREATE TABLE IF NOT EXISTS enrichment_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contractor_profile_id INTEGER,
+            source TEXT NOT NULL,
+            status TEXT NOT NULL,
+            details TEXT,
+            cost REAL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (contractor_profile_id) REFERENCES contractor_profiles(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_el_profile ON enrichment_log(contractor_profile_id);
+        CREATE INDEX IF NOT EXISTS idx_el_source ON enrichment_log(source);
+
+        CREATE TABLE IF NOT EXISTS contractor_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contractor_name_normalized TEXT NOT NULL UNIQUE,
+            display_name TEXT,
+            phone TEXT,
+            email TEXT,
+            website TEXT,
+            address TEXT,
+            source TEXT,
+            confidence TEXT,
+            looked_up_at TEXT DEFAULT (datetime('now')),
+            last_error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_contractor_contacts_name ON contractor_contacts(contractor_name_normalized);
+    ''')
     conn.commit()
 
     # V148: City research pipeline table
@@ -3841,6 +3912,115 @@ def admin_start_collectors():
             'message': 'Background collectors started in separate thread'
         }), 200
 
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/refresh-profiles', methods=['POST'])
+def admin_refresh_profiles():
+    """V182: Rebuild contractor_profiles aggregates.
+
+    Query params:
+      city: specific prod_cities.city_slug to refresh (optional; default = all active)
+
+    Runs synchronously. Expected <60s for current data; if it grows, move to
+    background thread like admin_start_collectors.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from contractor_profiles import refresh_contractor_profiles
+        city_slug = request.args.get('city')
+        result = refresh_contractor_profiles(city_slug=city_slug)
+        return jsonify({'status': 'ok', **result}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/enrich-contractors', methods=['POST'])
+def admin_enrich_contractors():
+    """V182: Enrich contractor_profiles for one city via Google Places.
+
+    Gated on GOOGLE_PLACES_API_KEY env var — returns 'skipped_no_api_key' if
+    unset (no PR-merge-time failure mode). Call per-city with a cost cap.
+
+    Query params:
+      city: required — prod_cities.city_slug
+      max_cost: optional $ cap (default $25)
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    city_slug = request.args.get('city')
+    if not city_slug:
+        return jsonify({'error': 'Missing city parameter'}), 400
+    try:
+        max_cost = float(request.args.get('max_cost', '25'))
+    except ValueError:
+        return jsonify({'error': 'max_cost must be a number'}), 400
+    try:
+        from contractor_profiles import enrich_city_profiles
+        result = enrich_city_profiles(city_slug=city_slug, max_cost=max_cost)
+        return jsonify({'status': 'ok', **result}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/reclassify-general', methods=['POST'])
+def admin_reclassify_general():
+    """V182 T3: Re-run classify_trade on permits currently tagged 'General Construction'.
+
+    Only touches rows where the current trade_category is 'General Construction'.
+    Expands TRADE_CATEGORIES hits (insulation, drywall, tile, etc.) to more
+    specific trades. Batched updates, 1000 permits per transaction.
+
+    Never downgrades already-specific trades; only upgrades General Construction.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from collector import classify_trade
+        conn = permitdb.get_connection()
+        total_scanned = 0
+        total_updated = 0
+        batch_size = 1000
+        updated_by_trade = {}
+
+        while True:
+            rows = conn.execute("""
+                SELECT permit_number, description, work_type, permit_type
+                FROM permits
+                WHERE trade_category = 'General Construction'
+                  AND (description IS NOT NULL AND description != '')
+                LIMIT ?
+                OFFSET ?
+            """, (batch_size, total_scanned)).fetchall()
+            if not rows:
+                break
+            for r in rows:
+                text = ' '.join(filter(None, [r['description'], r['work_type'], r['permit_type']]))
+                new_trade = classify_trade(text)
+                if new_trade and new_trade != 'General Construction':
+                    conn.execute(
+                        "UPDATE permits SET trade_category = ? WHERE permit_number = ?",
+                        (new_trade, r['permit_number']),
+                    )
+                    total_updated += 1
+                    updated_by_trade[new_trade] = updated_by_trade.get(new_trade, 0) + 1
+            conn.commit()
+            total_scanned += len(rows)
+            # If this batch was smaller than batch_size, we're done.
+            if len(rows) < batch_size:
+                break
+        conn.close()
+        return jsonify({
+            'status': 'ok',
+            'scanned': total_scanned,
+            'updated': total_updated,
+            'breakdown': updated_by_trade,
+        }), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

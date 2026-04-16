@@ -15,21 +15,38 @@ import db as permitdb
 
 
 def normalize_contractor_name(name):
-    """Lowercase, drop LLC/Inc/Corp, strip punctuation.
+    """Lowercase, drop LLC/Inc/Corp/etc., strip punctuation.
+
+    V182 fix: suffix stripping is now end-of-string only. The previous
+    behavior did a plain .replace() which matched mid-word — e.g.
+    'acme construction llc' had " co" inside "construction" removed,
+    producing 'acmenstruction' and breaking dedup. Loop-and-chain-strip
+    handles names like "ABC INC. LLC".
 
     >>> normalize_contractor_name('Smith & Sons LLC')
     'smith sons'
     >>> normalize_contractor_name('ABC Corp.')
     'abc'
+    >>> normalize_contractor_name('ACME Construction LLC')
+    'acme'
     """
     if not name:
         return ''
     s = name.lower()
-    for suffix in [' llc', ' inc', ' corp', ' co', ' company',
-                   ' ltd', ' l.l.c.', ' l.l.c', ' incorporated',
-                   ' limited', ' enterprises', ' services',
-                   ' construction', ' contracting']:
-        s = s.replace(suffix, '')
+    suffixes = [' llc', ' inc', ' corp', ' co', ' company',
+                ' ltd', ' l.l.c.', ' l.l.c', ' incorporated',
+                ' limited', ' enterprises', ' services',
+                ' construction', ' contracting']
+    # Strip trailing punctuation/whitespace that would shield a suffix
+    # (e.g. "ABC Corp." must have "." stripped before " corp" matches end).
+    changed = True
+    while changed:
+        changed = False
+        s = s.rstrip(' .,-')
+        for suffix in suffixes:
+            if s.endswith(suffix):
+                s = s[: -len(suffix)]
+                changed = True
     s = re.sub(r'[^\w\s]', '', s)
     return re.sub(r'\s+', ' ', s).strip()
 
