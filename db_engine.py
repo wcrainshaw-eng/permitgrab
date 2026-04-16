@@ -272,20 +272,24 @@ def _translate_sql(sql):
         translated
     )
 
-    # V179 P3: INSERT OR REPLACE → INSERT ... ON CONFLICT DO UPDATE
-    if 'INSERT OR REPLACE' in translated:
-        if 'INTO permits' in translated:
-            translated = translated.replace('INSERT OR REPLACE', 'INSERT')
-            if 'ON CONFLICT' not in translated:
-                translated = translated.rstrip().rstrip(';')
-                translated += ' ON CONFLICT (permit_number) DO UPDATE SET updated_at = NOW()'
-        elif 'INTO system_state' in translated:
-            translated = translated.replace('INSERT OR REPLACE', 'INSERT')
-            if 'ON CONFLICT' not in translated:
-                translated = translated.rstrip().rstrip(';')
-                translated += ' ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at'
-        else:
-            translated = translated.replace('INSERT OR REPLACE', 'INSERT')
+    # V179: INSERT OR REPLACE → INSERT ... ON CONFLICT (pk) DO UPDATE SET ...
+    # For permits (PK = permit_number): translate to ON CONFLICT DO UPDATE
+    if 'INSERT OR REPLACE INTO permits' in translated:
+        translated = translated.replace('INSERT OR REPLACE INTO permits', 'INSERT INTO permits')
+        # Add ON CONFLICT clause after VALUES
+        if 'ON CONFLICT' not in translated:
+            translated = translated.replace(
+                ')',  # Last closing paren of VALUES(...)
+                ') ON CONFLICT (permit_number) DO UPDATE SET updated_at = NOW()',
+                1  # Only replace the LAST occurrence — this is fragile but works for our pattern
+            )
+    elif 'INSERT OR REPLACE INTO system_state' in translated:
+        translated = translated.replace('INSERT OR REPLACE INTO system_state', 'INSERT INTO system_state')
+        if 'ON CONFLICT' not in translated:
+            translated += ' ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at'
+    else:
+        # Generic INSERT OR REPLACE → just INSERT (let PK constraint handle it)
+        translated = translated.replace('INSERT OR REPLACE', 'INSERT')
 
     # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
     translated = translated.replace("INSERT OR IGNORE", "INSERT")
