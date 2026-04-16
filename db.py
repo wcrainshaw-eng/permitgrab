@@ -366,25 +366,71 @@ else:
 _local = threading.local()
 
 
+# V179 P3-B: Flask-SQLAlchemy engine reference (set by server.py after db.init_app)
+_sqla_engine = None
+
+
+class _PgConnectionWrapper:
+    """Wraps a raw psycopg2 connection to provide sqlite3.Row-like dict access."""
+
+    def __init__(self, raw_conn):
+        self._conn = raw_conn
+
+    def execute(self, sql, params=None):
+        import psycopg2.extras
+        # Translate SQLite syntax if db_engine is available
+        if _HAS_ENGINE:
+            from db_engine import _translate_sql
+            sql = _translate_sql(sql)
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(sql, params)
+        return cur
+
+    def executescript(self, sql):
+        """Execute multiple statements (Postgres doesn't have executescript)."""
+        cur = self._conn.cursor()
+        cur.execute(sql)
+        self._conn.commit()
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()  # Returns to SQLAlchemy pool
+
+    @property
+    def total_changes(self):
+        return 0  # Not available in Postgres, callers shouldn't rely on this
+
+def set_sqlalchemy_engine(engine):
+    """Called by server.py to share the Flask-SQLAlchemy engine with permitdb."""
+    global _sqla_engine
+    _sqla_engine = engine
+
 def get_connection():
     """Get a database connection.
 
-    V62: Delegates to db_engine when DATABASE_URL is set (PostgreSQL).
+    V179 P3-B: Uses Flask-SQLAlchemy's pool when available (Postgres).
     Falls back to thread-local SQLite for local dev.
-    V70: Falls back to SQLite if Postgres pool not initialized.
-
-    V12.51: Process-aware — resets connection after Gunicorn fork.
-    V12.60: Validates connection is still open before returning.
     """
-    # V62: Use Postgres pool when available
-    # V70: TRY Postgres, but fall back to SQLite if pool not enabled
+    # V179 P3-B: Use SQLAlchemy engine pool if available (lazy, no import-time init)
+    if _sqla_engine is not None:
+        try:
+            raw = _sqla_engine.raw_connection()
+            return _PgConnectionWrapper(raw)
+        except Exception as e:
+            print(f"[DB] V179: SQLAlchemy pool error, falling back to SQLite: {e}")
+
+    # V62: Use db_engine pool as second option
     if _HAS_ENGINE and USE_POSTGRES:
         try:
             return _engine_get_connection()
         except RuntimeError as e:
-            # V70: Pool not initialized — fall back to SQLite
             if "not initialized" in str(e):
-                pass  # Fall through to SQLite
+                pass
             else:
                 raise
 

@@ -7432,6 +7432,8 @@ else:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # V11 Hotfix: pool_pre_ping verifies connections, pool_recycle prevents stale connections
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 5,
+    'max_overflow': 10,
     'pool_pre_ping': True,
     'pool_recycle': 300,
 }
@@ -7445,6 +7447,9 @@ app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '')   # Facebook/M
 
 db = SQLAlchemy(app)
 
+# V179 P3-B: Share SQLAlchemy engine with permitdb for unified DB access
+if database_url:
+    permitdb.set_sqlalchemy_engine(db.engine)
 
 class User(db.Model):
     """User model for PostgreSQL storage (V7 - replaces JSON file)."""
