@@ -235,8 +235,6 @@ def _translate_sql(sql):
     if not USE_POSTGRES:
         return sql
 
-    import re  # V179: moved import to top of function
-
     # Parameter placeholders: ? → %s
     # (careful not to replace ? inside strings)
     translated = sql.replace('?', '%s')
@@ -255,6 +253,7 @@ def _translate_sql(sql):
 
     # julianday('now') - julianday(x) → EXTRACT(EPOCH FROM NOW() - x::timestamp) / 86400
     # This is complex — handle the most common pattern
+    import re
     translated = re.sub(
         r"julianday\('now'\)\s*-\s*julianday\((\w+(?:\.\w+)?)\)",
         r"EXTRACT(EPOCH FROM NOW() - \1::timestamp) / 86400",
