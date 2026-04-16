@@ -610,7 +610,7 @@ body {
               {% endif %}
             </td>
             <td class="description" title="{{ permit.description or '' }}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}...{% endif %}</td>
-            <td>{{ permit.contractor or permit.applicant_name or '-' }}</td>
+            <td>{{ permit.contractor_name or permit.contact_name or '-' }}</td>
           </tr>
           {% endfor %}
         </tbody>
