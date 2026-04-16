@@ -313,6 +313,65 @@ body {
   font-weight: 600;
 }
 
+/* V182 PR2: Top Contractors section */
+.contractors-section {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 0 32px;
+}
+.contractors-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.contractors-table th {
+  background: var(--gray-50);
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: var(--gray-600);
+  border-bottom: 1px solid var(--gray-200);
+}
+.contractors-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--gray-700);
+}
+.contractors-table tr:last-child td { border-bottom: none; }
+.contractors-table tr:hover { background: var(--gray-50); }
+.contractors-table .contractor-name { font-weight: 600; color: var(--gray-900); }
+.contractors-table .contractor-license {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+.contractor-freq {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  margin-left: 6px;
+}
+.contractor-freq.high   { background: #dcfce7; color: #166534; }
+.contractor-freq.medium { background: #fef3c7; color: #92400e; }
+.contractor-freq.low    { background: var(--gray-100); color: var(--gray-600); }
+.contractor-contact a {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 13px;
+}
+.contractor-contact a:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .contractors-section { padding: 0 16px; }
+  .contractors-table .hide-mobile { display: none; }
+}
+
 /* PERMIT TYPES */
 .types-grid {
   display: grid;
@@ -631,6 +690,58 @@ body {
   {% endif %}
   {% endif %}
 </section>
+
+<!-- V182 PR2: TOP CONTRACTORS -->
+{% if top_contractors %}
+<section class="contractors-section">
+  <div class="section-header">
+    <h2>Top Contractors in {{ city_name }}</h2>
+    <p>Most active contractors by permit volume — last 90 days of activity shown in parentheses.</p>
+  </div>
+  <div class="permits-table-wrap">
+    <table class="contractors-table">
+      <thead>
+        <tr>
+          <th>Contractor</th>
+          <th>Permits (90d)</th>
+          <th class="hide-mobile">Trade</th>
+          <th class="hide-mobile">Avg Value</th>
+          <th>Contact</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in top_contractors %}
+        <tr>
+          <td>
+            {% if c.is_license_number %}
+              <span class="contractor-license">{{ c.display_name }}</span>
+            {% else %}
+              <span class="contractor-name">{{ c.display_name }}</span>
+            {% endif %}
+            {% if c.permit_frequency == 'high' %}<span class="contractor-freq high">Active</span>{% endif %}
+          </td>
+          <td>{{ "{:,}".format(c.total_permits) }}<span style="color: var(--gray-500);"> ({{ c.permits_90d }})</span></td>
+          <td class="hide-mobile">{{ c.primary_trade or '-' }}</td>
+          <td class="hide-mobile">
+            {% if c.avg_project_value and c.avg_project_value > 0 %}
+              ${{ "{:,.0f}".format(c.avg_project_value) }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td class="contractor-contact">
+            {% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% endif %}
+            {% if c.phone and c.website %} · {% endif %}
+            {% if c.website %}<a href="{{ c.website }}" rel="nofollow noopener" target="_blank">Website</a>{% endif %}
+            {% if not c.phone and not c.website %}<span style="color: var(--gray-400);">-</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 
 <!-- PERMIT TYPES BREAKDOWN -->
 {% if permit_types %}

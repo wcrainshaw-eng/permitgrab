@@ -3484,11 +3484,15 @@ def get_prod_cities(status='active', min_permits=1):
     conn = get_connection()
 
     # V162: Only configured cities with fresh data (source_type IS NOT NULL)
+    # V182 PR2: include population + has_enrichment + has_violations so
+    # cities_browse can render emblems and apply the bulk-misattribution filter
+    # without N+1 lookups.
     if status:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
                    source_type, source_id, consecutive_failures, last_error,
-                   permits_last_30d, newest_permit_date
+                   permits_last_30d, newest_permit_date,
+                   population, has_enrichment, has_violations
             FROM prod_cities
             WHERE status = ? AND total_permits >= ?
               AND newest_permit_date >= date('now', '-30 days')
@@ -3498,7 +3502,8 @@ def get_prod_cities(status='active', min_permits=1):
     else:
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
-                   source_type, source_id, consecutive_failures, last_error
+                   source_type, source_id, consecutive_failures, last_error,
+                   population, has_enrichment, has_violations
             FROM prod_cities
             ORDER BY population DESC, total_permits DESC
         """)
@@ -3516,6 +3521,10 @@ def get_prod_cities(status='active', min_permits=1):
             'source_id': row['source_id'],
             'consecutive_failures': row['consecutive_failures'],
             'last_error': row['last_error'],
+            # V182 PR2 emblem + filter fields
+            'population': row['population'] or 0,
+            'has_enrichment': bool(row['has_enrichment']),
+            'has_violations': bool(row['has_violations']),
         })
 
     return cities

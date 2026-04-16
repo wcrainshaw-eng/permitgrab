@@ -238,6 +238,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   font-weight: 500;
 }
 
+/* V182 PR2: city-data-completeness emblems */
+.city-emblems {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+.city-emblem {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  line-height: 1;
+  letter-spacing: 0.3px;
+}
+.city-emblem.enrichment {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.city-emblem.violations {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.city-link-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .cities-hero { padding: 48px 20px 40px; }
@@ -280,6 +309,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <span class="top-city-name">{{ city.name }}</span>
       <span class="top-city-meta">{{ city.state }}</span>
       <span class="top-city-count">{{ "{:,}".format(city.permit_count) }} permits</span>
+      {% if city.has_enrichment or city.has_violations %}
+      <span class="city-emblems">
+        {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles available">Contractors</span>{% endif %}
+        {% if city.has_violations %}<span class="city-emblem violations" title="Code violations available">Violations</span>{% endif %}
+      </span>
+      {% endif %}
     </a>
     {% endfor %}
   </div>
@@ -318,7 +353,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         {% for city in cities %}
         <a href="/permits/{{ city.slug }}" class="city-link" data-city="{{ city.name|lower }}">
           <span>{{ city.name }}</span>
-          <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
+          <span class="city-link-meta">
+            <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
+            {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles">C</span>{% endif %}
+            {% if city.has_violations %}<span class="city-emblem violations" title="Code violations">V</span>{% endif %}
+          </span>
         </a>
         {% endfor %}
       </div>
@@ -335,7 +374,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       {% for city in no_state_cities %}
       <a href="/permits/{{ city.slug }}" class="city-link" data-city="{{ city.name|lower }}">
         <span>{{ city.name }}</span>
-        <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
+        <span class="city-link-meta">
+          <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
+          {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles">C</span>{% endif %}
+          {% if city.has_violations %}<span class="city-emblem violations" title="Code violations">V</span>{% endif %}
+        </span>
       </a>
       {% endfor %}
     </div>

@@ -29,16 +29,65 @@ from contractor_enrichment import normalize_contractor_name
 # Tokens that indicate the contractor_name field actually contains the
 # owner/applicant/placeholder — skip these from profile aggregation.
 # Matched against the lowercase normalized form.
+# V182 PR2: expanded after PR1 deploy surfaced "to be bid" / "not applicable"
+# as top contractors on Phoenix + NYC.
 SKIP_NAMES = {
     'owner', 'home owner', 'homeowner', 'self', 'property owner',
     'tenant', 'applicant', 'na', 'n a', 'none', 'tbd', 'tba',
     'unknown', 'not available', 'see plans', 'various', 'null',
     'no contractor', 'same as owner', 'pending',
+    # V182 PR2 additions
+    'to be bid', 'not applicable', 'to be determined',
+    'various contractors', 'no applicable', 'not assigned',
+    'general contractor', 'contractor', 'no applicant',
+    'not specified', 'not listed', 'default',
 }
 
 
+def is_license_number(normalized: str) -> bool:
+    """Return True if the normalized name is purely digits (with optional
+    hyphens/spaces). These are contractor license numbers, not company
+    names — V182 PR2 renders them as "License #<raw>" in the UI.
+    """
+    if not normalized:
+        return False
+    stripped = normalized.replace('-', '').replace(' ', '')
+    return bool(stripped) and stripped.isdigit()
+
+
+def city_passes_public_filter(population, total_permits) -> bool:
+    """V182 PR2: exclude bulk-misattribution cities from public rankings.
+
+    A city appears in public rankings only when:
+      - population >= 10,000, OR
+      - total_permits <= 5 × population (permit volume is consistent
+        with a small place's own activity, not a bulk-state dump).
+
+    Why: Fenner NY (pop 1,900) shows 39K permits because NY state bulk
+    datasets get misattributed to small centroids. Same for Taliaferro
+    GA, Dickens TX, Lindley NY. Those shouldn't surface in rankings.
+    Missing data falls back to True (benefit of doubt).
+    """
+    try:
+        population = int(population or 0)
+        total_permits = int(total_permits or 0)
+    except (TypeError, ValueError):
+        return True
+    if population >= 10000:
+        return True
+    if population <= 0 or total_permits <= 0:
+        return True
+    return total_permits <= 5 * population
+
+
 def _is_real_contractor(normalized: str) -> bool:
-    """Return False for empty/placeholder/owner-type names."""
+    """Return False for empty/placeholder/owner-type names.
+
+    License-number-only entries (e.g. '623618') are KEPT — the UI
+    renders them as 'License #<raw>' rather than hiding the row,
+    so users know a licensed contractor pulled the permit even if
+    the company name wasn't captured.
+    """
     if not normalized:
         return False
     if normalized in SKIP_NAMES:
@@ -103,6 +152,27 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                 "SELECT id, city, state, city_slug FROM prod_cities "
                 "WHERE status = 'active'"
             ).fetchall()
+
+        # V182 PR2: evict stale profiles for names now in SKIP_NAMES.
+        # This makes re-running after a SKIP_NAMES expansion idempotent —
+        # rows that used to aggregate are removed, not just not re-upserted.
+        placeholders = ','.join('?' * len(SKIP_NAMES))
+        if city_slug:
+            deleted = conn.execute(
+                f"DELETE FROM contractor_profiles "
+                f"WHERE source_city_key = ? "
+                f"AND contractor_name_normalized IN ({placeholders})",
+                (city_slug, *SKIP_NAMES)
+            ).rowcount
+        else:
+            deleted = conn.execute(
+                f"DELETE FROM contractor_profiles "
+                f"WHERE contractor_name_normalized IN ({placeholders})",
+                tuple(SKIP_NAMES)
+            ).rowcount
+        conn.commit()
+        if deleted:
+            print(f"[V182 profiles] Evicted {deleted} stale placeholder profiles", flush=True)
 
         total_upserted = 0
         total_skipped = 0
@@ -306,6 +376,53 @@ def enrich_city_profiles(city_slug: str, max_cost: float = 25.0) -> dict:
             'profiles_seen': len(profiles),
             'cost': round(running_cost, 4),
             'cost_cap': max_cost,
+        }
+    finally:
+        conn.close()
+
+
+def update_city_emblems() -> dict:
+    """V182 PR2: recompute has_enrichment + has_violations flags on prod_cities.
+
+    Called after profile refresh and after violation collection. Cheap
+    (two GROUP BY queries + per-city UPDATE) — runs in well under 1s
+    for 2K cities.
+
+    has_permits is NOT stored — derived at render time from existing
+    total_permits + newest_permit_date.
+    """
+    conn = permitdb.get_connection()
+    try:
+        # Reset flags first so cities that lost their data get downgraded
+        conn.execute("UPDATE prod_cities SET has_enrichment = 0, has_violations = 0")
+        # has_enrichment: any contractor_profiles row with is_active=1
+        conn.execute("""
+            UPDATE prod_cities SET has_enrichment = 1
+            WHERE city_slug IN (
+                SELECT DISTINCT source_city_key FROM contractor_profiles WHERE is_active = 1
+            )
+        """)
+        # has_violations: any row in violations table for this city_slug
+        # violations table uses prod_city_id — join through it.
+        conn.execute("""
+            UPDATE prod_cities SET has_violations = 1
+            WHERE id IN (SELECT DISTINCT prod_city_id FROM violations WHERE prod_city_id IS NOT NULL)
+        """)
+        conn.commit()
+
+        stats = conn.execute("""
+            SELECT
+                SUM(CASE WHEN has_enrichment = 1 THEN 1 ELSE 0 END) AS with_enrichment,
+                SUM(CASE WHEN has_violations = 1 THEN 1 ELSE 0 END) AS with_violations,
+                SUM(CASE WHEN total_permits > 0 THEN 1 ELSE 0 END) AS with_permits,
+                COUNT(*) AS total
+            FROM prod_cities WHERE status = 'active'
+        """).fetchone()
+        return {
+            'cities_with_enrichment': stats['with_enrichment'] or 0,
+            'cities_with_violations': stats['with_violations'] or 0,
+            'cities_with_permits': stats['with_permits'] or 0,
+            'active_cities_total': stats['total'] or 0,
         }
     finally:
         conn.close()
