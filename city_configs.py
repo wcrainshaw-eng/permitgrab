@@ -38618,7 +38618,11 @@ TRADE_CATEGORIES = {
         "transformer", "switchgear", "conduit", "ampere", "amp service", "200 amp",
         "meter base", "electric service", "electric panel", "elec permit", "elec work",
         "service upgrade", "sub-panel", "subpanel", "light fixture", "receptacle",
-        "low voltage", "generator", "temporary power", "temp power"
+        "low voltage", "generator", "temporary power", "temp power",
+        # V182 T3 additions
+        "security system", "access control", "data cable", "fiber optic",
+        "intercom", "nurse call", "ev charging station", "tesla charger",
+        "chargepoint", "surveillance camera",
     ],
     "Plumbing": [
         "plumbing", "plumb", "sewer", "drain", "water heater", "water line",
@@ -38632,7 +38636,10 @@ TRADE_CATEGORIES = {
         "ductwork", "heat pump", "boiler", "ventilation", "mini-split", "minisplit",
         "condensing unit", "mechanical", "ac unit", "thermostat", "air handler",
         "package unit", "split system", "mech permit", "mechanical permit",
-        "exhaust fan", "rooftop unit", "rtu", "vrf", "chiller"
+        "exhaust fan", "rooftop unit", "rtu", "vrf", "chiller",
+        # V182 T3 additions
+        "insulation", "weatherization", "refrigeration", "walk-in cooler",
+        "walk-in freezer", "makeup air", "energy recovery", "erv", "hrv",
     ],
     "Roofing": [
         "roof", "roofing", "re-roof", "reroof", "shingle", "membrane",
@@ -38642,14 +38649,22 @@ TRADE_CATEGORIES = {
     "Solar": [
         "solar", "photovoltaic", "pv system", "pv panel", "solar panel",
         "ev charger", "battery storage", "solar electric", "net metering",
-        "inverter", "solar thermal", "ev charging"
+        "inverter", "solar thermal", "ev charging",
+        # V182 T3 additions
+        "powerwall", "tesla powerwall",
     ],
     "Interior Renovation": [
         "interior renovation", "interior remodel", "kitchen remodel",
         "bathroom remodel", "bath remodel", "tenant improvement", "t.i.",
         "finish out", "gut remodel", "buildout", "interior alteration",
         "remodel", "renovation", "kitchen", "bathroom", "interior build",
-        "tenant build", "office build", "retail build"
+        "tenant build", "office build", "retail build",
+        # V182 T3 additions
+        "drywall", "sheetrock", "painting", "flooring", "tile", "tiling",
+        "carpet", "hardwood", "laminate", "vinyl floor", "cabinet",
+        "countertop", "counter top", "millwork", "trim", "baseboard",
+        "crown molding", "plaster", "restroom renovation",
+        "office renovation", "retail renovation", "commercial renovation",
     ],
     "Windows & Doors": [
         "window", "door", "glazing", "storefront", "curtain wall",
@@ -38665,18 +38680,27 @@ TRADE_CATEGORIES = {
         "structural", "foundation", "footing", "retaining wall", "steel",
         "concrete pour", "framing", "load-bearing", "beam", "column",
         "seismic retrofit", "masonry", "concrete slab", "footer",
-        "pier", "caisson", "basement"
+        "pier", "caisson", "basement",
+        # V182 T3 additions
+        "concrete work", "foundation repair", "underpinning", "shoring",
     ],
     "Landscaping & Exterior": [
         "landscape", "landscaping", "fence", "deck", "patio", "driveway",
         "sidewalk", "grading", "pool", "pergola", "exterior", "carport",
         "garage", "spa", "hot tub", "outdoor kitchen", "porch", "awning",
-        "retaining", "pavers", "concrete flatwork"
+        "retaining", "pavers", "concrete flatwork",
+        # V182 T3 additions
+        "siding", "vinyl siding", "hardie board", "exterior paint", "paving",
+        "asphalt", "concrete driveway", "walkway",
     ],
     "Fire Protection": [
         "fire alarm", "fire sprinkler", "fire protection", "fire suppression",
         "smoke detector", "fire escape", "hood suppression", "ansul",
-        "fire safety", "fire panel", "fa system", "fire alarm system"
+        "fire safety", "fire panel", "fa system", "fire alarm system",
+        # V182 T3 additions
+        "fire door", "fire damper", "fire stop", "firestopping",
+        "hood system", "kitchen hood", "type i hood", "type ii hood",
+        "fire watch",
     ],
     "Signage": [
         "sign", "signage", "monument sign", "pole sign", "wall sign",
@@ -38685,7 +38709,12 @@ TRADE_CATEGORIES = {
     "New Construction": [
         "new construction", "new building", "new commercial", "new residential",
         "new single family", "new multi family", "ground up", "spec home",
-        "custom home", "new house"
+        "custom home", "new house",
+        # V182 T3 additions
+        "adu", "accessory dwelling", "accessory structure", "tiny house",
+        "modular", "prefab", "manufactured home", "mobile home",
+        "duplex", "triplex", "townhouse", "townhome",
+        "apartment building", "mixed use", "mixed-use",
     ],
     "Addition": [
         "addition", "room addition", "home addition", "building addition",
