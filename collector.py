@@ -1800,6 +1800,16 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
     if not is_valid_state(state):
         return None  # Skip permits with invalid state codes
 
+    # V180 P1v2.2r1: Read both field_map slots and write both dict keys.
+    # Fallback: if only one slot defined, use it for both. Bulk normalizer
+    # has no `or owner` fallback (owner_name is a separate concept).
+    contractor = get_field("contractor_name")
+    contact = get_field("contact_name")
+    if not contractor:
+        contractor = contact
+    if not contact:
+        contact = contractor
+
     return {
         "id": f"{city_slug}_{permit_num}",
         "city": virtual_config.get("name", ""),
@@ -1817,7 +1827,8 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
         "estimated_cost": cost,
         "value_tier": value_tier,
         "description": sanitize_string(desc[:500]) if desc else "",
-        "contact_name": sanitize_string(get_field("contractor_name")),
+        "contact_name": sanitize_string(contact),
+        "contractor_name": sanitize_string(contractor),
         "contact_phone": "",
         "borough": "",
         "source_city": city_slug,
@@ -2147,6 +2158,12 @@ def normalize_permit(raw_record, city_key):
     if get_field("owner_last"):
         owner = f"{owner} {get_field('owner_last')}".strip()
     contact = get_field("contact_name") or owner
+    contractor = get_field("contractor_name")
+    # V180 P1v2.2r1: Fallback — if only one slot defined, use it for both keys
+    if not contractor:
+        contractor = contact
+    if not contact:
+        contact = contractor
     phone = get_field("owner_phone") or get_field("contact_phone")
 
     # V126: permit_number is REQUIRED — also search all raw fields
@@ -2187,6 +2204,7 @@ def normalize_permit(raw_record, city_key):
         "value_tier": value_tier,
         "description": sanitize_string(desc[:500]) if desc else "",
         "contact_name": sanitize_string(contact),
+        "contractor_name": sanitize_string(contractor),
         "contact_phone": sanitize_string(phone),
         "borough": sanitize_string(get_field("borough")) if "borough" in fmap else "",
         "source_city": city_key,
