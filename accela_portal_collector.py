@@ -117,7 +117,7 @@ def _get_next_page_target(soup, current_page):
 
 
 def fetch_accela_portal(agency_code, days_back=30, module="Building",
-                        tab_name="Building", max_pages=25):
+                        tab_name="Building", max_pages=25, portal_base_url=None):
     """
     Fetch permits from an Accela Citizen Access portal.
 
@@ -127,13 +127,20 @@ def fetch_accela_portal(agency_code, days_back=30, module="Building",
         module: Accela module name (usually "Building")
         tab_name: Tab name for URL (usually same as module)
         max_pages: Maximum pages to scrape (10 results per page)
+        portal_base_url: V188: Custom base URL for non-aca-prod portals
+            (e.g. "https://vcca.ventura.org" for Ventura County,
+             "https://access.okc.gov/aca" for Oklahoma City).
+            If None, uses standard https://aca-prod.accela.com/{agency_code}.
 
     Returns:
         List of permit dicts with keys: permit_number, address, permit_type,
         description, project_name, status, date, expiration_date
     """
     session = _build_session()
-    base_url = f"https://aca-prod.accela.com/{agency_code}/Cap/CapHome.aspx"
+    if portal_base_url:
+        base_url = f"{portal_base_url.rstrip('/')}/Cap/CapHome.aspx"
+    else:
+        base_url = f"https://aca-prod.accela.com/{agency_code}/Cap/CapHome.aspx"
 
     # Step 1: GET search page
     print(f"  [ACA] {agency_code}: Loading search page...")
@@ -299,23 +306,39 @@ def fetch_accela(config, days_back=30):
             pass
 
     # Fall back to extracting from endpoint URL
+    portal_base_url = None
     if not agency_code:
         endpoint = config.get('endpoint', '')
         m = re.search(r'accela\.com/([^/]+)/', endpoint)
         if m:
             agency_code = m.group(1)
+        # V188: Also extract from non-aca-prod custom portal URLs
+        elif '/Cap/' in endpoint:
+            portal_base_url = endpoint.split('/Cap/')[0]
+            agency_code = portal_base_url.split('/')[-1] or 'CUSTOM'
         if 'module=' in endpoint:
             m2 = re.search(r'module=(\w+)', endpoint)
             if m2:
                 module = m2.group(1)
                 tab_name = module
 
+    # V188: Check ACCELA_CONFIGS for custom base_url
+    if not portal_base_url:
+        try:
+            from accela_configs import ACCELA_CONFIGS
+            ac = ACCELA_CONFIGS.get(accela_key) or ACCELA_CONFIGS.get(accela_key.lower()) if accela_key else None
+            if ac and ac.get('base_url'):
+                portal_base_url = ac['base_url']
+        except (ImportError, Exception):
+            pass
+
     if not agency_code:
         print(f"  [ACA] No agency code found in config")
         return []
 
     return fetch_accela_portal(agency_code, days_back=days_back,
-                               module=module, tab_name=tab_name)
+                               module=module, tab_name=tab_name,
+                               portal_base_url=portal_base_url)
 
 
 if __name__ == "__main__":
