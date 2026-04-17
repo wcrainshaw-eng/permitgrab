@@ -1930,7 +1930,9 @@ def _run_v100_health_columns(conn):
 
 
 def _normalize_city_name(name):
-    """V106: Normalize city name for fuzzy matching."""
+    """V106: Normalize city name for fuzzy matching.
+    V190: Added twp/boro abbreviations for NJ township relinking.
+    """
     import re
     if not name:
         return ''
@@ -1940,7 +1942,8 @@ def _normalize_city_name(name):
     name = re.sub(r'\bft\b', 'fort', name)
     name = re.sub(r'\bmt\b', 'mount', name)
     name = re.sub(r'\bst\b', 'saint', name)
-    name = re.sub(r'\s+(city|town|township|village|borough)$', '', name)
+    # V190: "twp" = township, "boro" = borough — common in NJ bulk data
+    name = re.sub(r'\s+(city|town|township|twp|village|borough|boro)$', '', name)
     return name.strip()
 
 
@@ -2001,9 +2004,10 @@ def relink_orphaned_permits():
         norm = _normalize_city_name(city)
         if norm:
             lookup[(norm, state)] = pc_id
-        # By slug
+        # By slug (both hyphen and underscore variants)
         if slug:
             lookup[('slug:' + slug, state)] = pc_id
+            lookup[('slug:' + slug.replace('-', '_'), state)] = pc_id
 
     # Fetch remaining orphans
     orphans = conn.execute("""
@@ -2022,6 +2026,11 @@ def relink_orphaned_permits():
         pc_id = lookup.get((norm, state))
         if not pc_id and source_key:
             pc_id = lookup.get(('slug:' + source_key, state))
+        # V190: also try slug variant (underscore↔hyphen)
+        if not pc_id and source_key:
+            pc_id = lookup.get(('slug:' + source_key.replace('_', '-'), state))
+        if not pc_id and source_key:
+            pc_id = lookup.get(('slug:' + source_key.replace('-', '_'), state))
         if pc_id:
             batch.append((pc_id, rowid))
         if len(batch) >= 1000:
