@@ -131,8 +131,122 @@ VIOLATION_SOURCES = {
             },
         ],
     },
-    # V182 PR2: Fort Worth and Mesa skipped after endpoint discovery:
-    #   - data.fortworthtexas.gov redirects to ArcGIS (needs new collector shape)
+    # V184: 5 new Socrata SODA violation sources
+    'seattle-wa': {
+        'prod_city_id': None,
+        'city': 'Seattle',
+        'state': 'WA',
+        'endpoints': [
+            {
+                'name': 'Code Complaints and Violations (SDCI)',
+                'domain': 'data.seattle.gov',
+                'resource_id': 'ez4a-iug7',
+                'date_field': 'opendate',
+                'id_field': 'recordnum',
+                'description_field': 'description',
+                'status_field': 'statuscurrent',
+                'type_field': 'recordtypedesc',
+                'address_fields': {'full': 'originaladdress1'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'san-francisco': {
+        'prod_city_id': None,
+        'city': 'San Francisco',
+        'state': 'CA',
+        'endpoints': [
+            {
+                'name': 'Notices of Violation (DBI)',
+                'domain': 'data.sfgov.org',
+                'resource_id': 'nbtm-fbw5',
+                'date_field': 'date_filed',
+                'id_field': 'complaint_number',
+                'description_field': 'code_violation_desc',
+                'status_field': 'status',
+                'type_field': 'code_violation_desc',
+                'address_fields': {'number': 'street_number', 'street': 'street_name', 'suffix': 'street_suffix'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'new-orleans-la': {
+        'prod_city_id': None,
+        'city': 'New Orleans',
+        'state': 'LA',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement All Violations',
+                'domain': 'data.nola.gov',
+                'resource_id': '3ehi-je3s',
+                'date_field': 'violationdate',
+                'id_field': 'violationid',
+                'description_field': 'description',
+                'status_field': None,
+                'type_field': 'codesection',
+                'address_fields': {'full': 'location'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'cincinnati-oh': {
+        'prod_city_id': None,
+        'city': 'Cincinnati',
+        'state': 'OH',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement',
+                'domain': 'data.cincinnati-oh.gov',
+                'resource_id': 'cncm-znd6',
+                'date_field': 'entered_date',
+                'id_field': 'number_key',
+                'description_field': 'comp_type_desc',
+                'status_field': 'data_status_display',
+                'type_field': 'sub_type_desc',
+                'address_fields': {'full': 'full_address'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'buffalo-ny': {
+        'prod_city_id': None,
+        'city': 'Buffalo',
+        'state': 'NY',
+        'endpoints': [
+            {
+                'name': 'Code Violations (DPIS)',
+                'domain': 'data.buffalony.gov',
+                'resource_id': 'ivrf-k9vm',
+                'date_field': 'date',
+                'id_field': 'case_number',
+                'description_field': 'description',
+                'status_field': 'status',
+                'type_field': 'code_section',
+                'address_fields': {'full': 'address'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V182 PR2 + V184: Skipped endpoints after endpoint discovery:
+    #   - Fort Worth: data.fortworthtexas.gov redirects to ArcGIS (needs new collector)
+    #   - Mesa: data.mesaaz.gov nnr9-eg5e returns empty, amsn-zipb 404
+    #   - Memphis: data.memphistn.gov 2a5n-q5ky and h4nu-tbge return empty
+    #   - Little Rock: data.littlerock.gov f28w-j2qp returns empty records
+    #   - Houston: no Socrata violations dataset on data.houstontx.gov
+    #   - Boston: CKAN platform (data.boston.gov), 17K records but different API pattern
+    #   - Greensboro: no datasets found on data.greensboro-nc.gov
+    #   - Phila (hq7x): aggregated monthly counts, not individual violations
+    #   - Phila (jr6a): crime incidents, not building violations
     #   - data.mesaaz.gov resources nnr9-eg5e returns empty, amsn-zipb 404s
     # Document here to prevent re-investigation next iteration.
     'philadelphia': {
