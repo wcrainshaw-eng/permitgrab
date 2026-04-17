@@ -3576,12 +3576,30 @@ def _deferred_startup():
     except Exception:
         pass  # /var/data may not exist locally
 
+    # V183: Refresh contractor profiles + emblems BEFORE spawning background
+    # threads. This is the only reliable write window — _deferred_startup runs
+    # sequentially, and once maintenance/_v146_safe_autostart spawn, the SQLite
+    # write lock is held near-continuously by collection + maintenance threads.
+    try:
+        import time as _t183
+        _t183_start = _t183.time()
+        from contractor_profiles import refresh_contractor_profiles, update_city_emblems
+        prof = refresh_contractor_profiles()
+        emb = update_city_emblems()
+        print(f"[{datetime.now()}] [V183] Startup profile refresh: "
+              f"{prof['profiles_upserted']} profiles, "
+              f"{emb.get('cities_with_enrichment', 0)} enriched / "
+              f"{emb.get('cities_with_violations', 0)} violations, "
+              f"{_t183.time() - _t183_start:.1f}s", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] [V183] Startup refresh error (non-fatal): {e}", flush=True)
+
     # V146: Safe auto-start daemon — runs start_collectors in background thread
     # so it doesn't block gunicorn worker (start_collectors sleeps 120s+)
     import threading as _th
     def _v146_safe_autostart():
         import time as _t
-        _t.sleep(120)  # V183: Widened from 10s to 120s to allow admin endpoints a write window before daemon grabs the SQLite lock
+        _t.sleep(10)  # V183: Reverted to 10s — profile refresh now runs in _deferred_startup before threads spawn
         try:
             print(f"[{datetime.now()}] V146: Auto-starting collectors (background)...", flush=True)
             start_collectors()  # This takes 120s+ but runs in THIS thread, not blocking gunicorn
