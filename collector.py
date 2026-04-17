@@ -1895,11 +1895,18 @@ def fetch_permits(city_key, days_back=30):
                         config[extra_key] = CITY_REGISTRY[city_key][extra_key]
     if not config:
         # V61: Fallback to CITY_REGISTRY for cities not yet in city_sources
+        # V187: Try both hyphen and underscore variants — prod_cities uses hyphens
+        # (e.g. 'kansas-city') but CITY_REGISTRY uses underscores ('kansas_city').
         from city_configs import CITY_REGISTRY
-        if city_key in CITY_REGISTRY:
-            config = CITY_REGISTRY[city_key].copy()
+        reg_key = None
+        for try_key in [city_key, city_key.replace('-', '_'), city_key.replace('_', '-')]:
+            if try_key in CITY_REGISTRY:
+                reg_key = try_key
+                break
+        if reg_key:
+            config = CITY_REGISTRY[reg_key].copy()
             config['active'] = True
-            print(f"  [V61] {city_key}: Using CITY_REGISTRY config (no city_sources row)")
+            print(f"  [V61] {city_key}: Using CITY_REGISTRY config (key={reg_key})")
         else:
             print(f"  [SKIP] Unknown city: {city_key}")
             return [], "skip"
