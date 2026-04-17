@@ -3421,6 +3421,37 @@ def _migrate_create_sources_table():
     # V170 A2: Freshness recalc REMOVED from startup — was blocking gunicorn for 10+ min.
     # Run freshness updates via /api/admin/execute or Render Shell instead.
 
+    # V187: Onboard active CITY_REGISTRY cities missing from prod_cities.
+    # The daemon only collects for cities with a prod_cities row. ~898 active
+    # CITY_REGISTRY entries had no row — the daemon never tried to collect them.
+    # Idempotent: INSERT OR IGNORE on the UNIQUE(city, state) constraint.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v187_onboard'").fetchone()
+        if not m:
+            from city_configs import CITY_REGISTRY
+            existing = set(r[0] for r in conn2.execute("SELECT city_slug FROM prod_cities").fetchall())
+            onboarded = 0
+            for key, cfg in CITY_REGISTRY.items():
+                if not cfg.get('active', False):
+                    continue
+                hyphen_slug = cfg.get('slug', key.replace('_', '-'))
+                if hyphen_slug in existing:
+                    continue
+                city_name = cfg.get('name', key.replace('_', ' ').title())
+                state = cfg.get('state', '')
+                platform = cfg.get('platform', '')
+                conn2.execute("""
+                    INSERT OR IGNORE INTO prod_cities
+                    (city, state, city_slug, source_id, source_type, status, added_by)
+                    VALUES (?, ?, ?, ?, ?, 'active', 'V187')
+                """, (city_name, state, hyphen_slug, key, platform))
+                onboarded += 1
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v187_onboard', ?)", (str(onboarded),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V187: Onboarded {onboarded} CITY_REGISTRY cities into prod_cities")
+    except Exception as e:
+        print(f"[{datetime.now()}] V187: Onboard migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
