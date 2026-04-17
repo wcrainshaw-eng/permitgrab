@@ -3452,6 +3452,24 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V187: Onboard migration error (non-fatal): {e}")
 
+    # V190: Pause cities with no viable collection path (viewpoint/energov
+    # platforms have no HTTP handler; zero-permit cities wasting daemon cycles).
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v190_pause'").fetchone()
+        if not m:
+            paused = conn2.execute("""
+                UPDATE prod_cities SET status = 'paused',
+                    last_error = 'V190: no platform handler (viewpoint/energov)'
+                WHERE source_type IN ('viewpoint', 'energov')
+                  AND status = 'active'
+                  AND id NOT IN (SELECT DISTINCT prod_city_id FROM permits WHERE prod_city_id IS NOT NULL)
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v190_pause', ?)", (str(paused),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V190: Paused {paused} viewpoint/energov cities with no permits")
+    except Exception as e:
+        print(f"[{datetime.now()}] V190: Pause migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
