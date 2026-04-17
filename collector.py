@@ -1858,14 +1858,14 @@ def fetch_permits(city_key, days_back=30):
                 "SELECT source_key, name, state, platform, endpoint, dataset_id, field_map, date_field "
                 "FROM sources WHERE source_key = ? AND status = 'active'", (try_key,)
             ).fetchone()
-            if src_row:
+            if src_row and src_row[4]:  # V186: skip sources rows with empty endpoint — fall through to CITY_REGISTRY
                 import json as _json
                 config = {
                     'source_key': src_row[0],
                     'name': src_row[1] or city_key,
                     'state': src_row[2] or '',
                     'platform': src_row[3],
-                    'endpoint': src_row[4] or '',
+                    'endpoint': src_row[4],
                     'dataset_id': src_row[5] or '',
                     'field_map': _json.loads(src_row[6]) if src_row[6] and src_row[6] != '{}' else {},
                     'date_field': src_row[7] or 'date',
