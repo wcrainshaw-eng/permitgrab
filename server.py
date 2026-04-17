@@ -3581,7 +3581,7 @@ def _deferred_startup():
     import threading as _th
     def _v146_safe_autostart():
         import time as _t
-        _t.sleep(10)  # Short delay for gunicorn to stabilize
+        _t.sleep(120)  # V183: Widened from 10s to 120s to allow admin endpoints a write window before daemon grabs the SQLite lock
         try:
             print(f"[{datetime.now()}] V146: Auto-starting collectors (background)...", flush=True)
             start_collectors()  # This takes 120s+ but runs in THIS thread, not blocking gunicorn
@@ -14769,7 +14769,25 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Prune error: {e}")
 
+        # V183: Refresh contractor profiles from new permit data.
+        # Runs BEFORE violations so that update_city_emblems (called at
+        # end of collect_violations) reflects both new profiles AND
+        # new violations in a single pass.
+        try:
+            import time as _timer
+            _t_prof = _timer.time()
+            from contractor_profiles import refresh_contractor_profiles
+            prof_result = refresh_contractor_profiles()
+            print(f"[{datetime.now()}] [DAEMON] Profile refresh: "
+                  f"{prof_result['profiles_upserted']} profiles across "
+                  f"{prof_result['cities_processed']} cities, "
+                  f"{_timer.time() - _t_prof:.1f}s", flush=True)
+        except Exception as e:
+            print(f"[{datetime.now()}] [DAEMON] Profile refresh error (non-fatal): {e}", flush=True)
+
         # V162: Violation collection (daily)
+        # V182 PR2: collect_violations() calls update_city_emblems() at end,
+        # which sets has_enrichment (from profiles above) + has_violations.
         try:
             from violation_collector import collect_violations
             collect_violations()
