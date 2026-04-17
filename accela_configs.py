@@ -2173,6 +2173,74 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
 
+    # V188: New configs for previously-unconfigured Accela cities
+    # NO_AGENCY cities (discovered in Task 0 research)
+    "santa_barbara": {
+        "agency_code": "SANTABARBARA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "yorba_linda": {
+        "agency_code": "YORBALINDA",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "west_sacramento": {
+        "agency_code": "WESTSAC",
+        "module": "Building",
+        "tab_name": "Building",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    # Custom-URL portals (not on aca-prod.accela.com)
+    "thousand_oaks": {
+        "agency_code": "VENTURA",
+        "module": "Building",
+        "tab_name": "Building",
+        "base_url": "https://vcca.ventura.org",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "camarillo": {
+        "agency_code": "VENTURA",
+        "module": "Building",
+        "tab_name": "Building",
+        "base_url": "https://vcca.ventura.org",
+        "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
+    },
+    "kannapolis": {
+        "agency_code": "CABARRUS",
+        "module": "Permits",
+        "tab_name": "Permits",
+        "base_url": "https://citizenaccess.cabarruscounty.us/CitizenAccess",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    # NO_RESULTS cities — try alternate modules
+    "chula_vista": {
+        "agency_code": "CHULAVISTA",
+        "module": "Permits",  # Was Building, try Permits
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "columbus_ga": {
+        "agency_code": "COLUMBUS",
+        "module": "Permits",  # Was Building, try Permits
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "madison_al": {
+        "agency_code": "MADISON",
+        "module": "Permits",  # Was Building, try Permits
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+    "tigard_or": {
+        "agency_code": "TIGARD",
+        "module": "Permits",  # Was Building, try Permits
+        "tab_name": "Permits",
+        "search_url_path": "Cap/CapHome.aspx?module=Permits&TabName=Permits",
+    },
+
 }
 
 # V161 deploy trigger
