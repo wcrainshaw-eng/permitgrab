@@ -3545,6 +3545,54 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V191c: Migration error (non-fatal): {e}")
 
+    # V193: Fix top-50 city gaps — Boston reactivation + Tulsa config
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v193'").fetchone()
+        if not m:
+            fixes = 0
+            # Boston MA: reactivate (CKAN endpoint has 721K records, was paused)
+            fixes += conn2.execute("""
+                UPDATE prod_cities SET status = 'active',
+                    last_error = NULL, data_freshness = 'fresh'
+                WHERE city_slug = 'boston' AND status != 'active'
+            """).rowcount
+
+            # Tulsa: domain data.tulsaok.gov is dead (DNS failure).
+            # Mark as documented dead end.
+            conn2.execute("""
+                UPDATE prod_cities SET status = 'paused',
+                    last_error = 'V193: data.tulsaok.gov DNS dead — no alternative found'
+                WHERE city_slug = 'tulsa-ok' AND status = 'active'
+            """)
+
+            # Kansas City: endpoint alive (data.kcmo.org/ntw8-aacc) but data
+            # stale since May 2025. Keep active — source may resume.
+            conn2.execute("""
+                UPDATE prod_cities SET data_freshness = 'very_stale',
+                    last_error = 'V193: data current through May 2025 only'
+                WHERE city_slug = 'kansas-city' AND status = 'active'
+            """)
+
+            # Wichita: Accela empty, no alternative API found. Pause.
+            conn2.execute("""
+                UPDATE prod_cities SET status = 'paused',
+                    last_error = 'V193: Accela portal empty, no alternative found'
+                WHERE city_slug = 'wichita' AND status = 'active'
+            """)
+
+            # Bakersfield: Kern County Accela empty, no alternative. Pause.
+            conn2.execute("""
+                UPDATE prod_cities SET status = 'paused',
+                    last_error = 'V193: KERNCO Accela portal empty, no alternative'
+                WHERE city_slug = 'bakersfield' AND status = 'active'
+            """)
+
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v193', ?)", (str(fixes),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V193: Fixed {fixes} top-50 gaps (Boston activated, Tulsa/Wichita/Bakersfield paused)")
+    except Exception as e:
+        print(f"[{datetime.now()}] V193: Migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
