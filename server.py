@@ -3470,6 +3470,49 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V190: Pause migration error (non-fatal): {e}")
 
+    # V191b: Fix top-50 city gaps — one-time data corrections
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v191b'").fetchone()
+        if not m:
+            fixes = 0
+            # 1. Bakersfield: prod_cities says socrata but CITY_REGISTRY says accela (Kern County portal)
+            fixes += conn2.execute("""
+                UPDATE prod_cities SET source_type = 'accela',
+                    source_id = 'bakersfield_ca'
+                WHERE city_slug = 'bakersfield' AND source_type = 'socrata'
+            """).rowcount
+
+            # 2. Boston: unpause (has 8K+ permits from past collections)
+            fixes += conn2.execute("""
+                UPDATE prod_cities SET status = 'active'
+                WHERE city_slug = 'boston' AND status = 'paused'
+            """).rowcount
+
+            # 3. Tulsa: activate (was pending, Socrata endpoint exists)
+            fixes += conn2.execute("""
+                UPDATE prod_cities SET status = 'active'
+                WHERE city_slug IN ('tulsa-ok', 'tulsa') AND status IN ('pending', 'paused')
+            """).rowcount
+
+            # 4. Wichita: unpause (Accela, may work via V188 custom URL support)
+            fixes += conn2.execute("""
+                UPDATE prod_cities SET status = 'active'
+                WHERE city_slug = 'wichita' AND status = 'paused'
+            """).rowcount
+
+            # 5. Albuquerque: mark stale endpoint (not pause — keeps the row findable)
+            conn2.execute("""
+                UPDATE prod_cities SET data_freshness = 'very_stale',
+                    last_error = 'V191b: ArcGIS endpoint stale since April 2024'
+                WHERE city_slug = 'albuquerque' AND status = 'active'
+            """)
+
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v191b', ?)", (str(fixes),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V191b: Fixed {fixes} top-50 city gaps (Bakersfield type, Boston/Tulsa/Wichita activate)")
+    except Exception as e:
+        print(f"[{datetime.now()}] V191b: Migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
