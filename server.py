@@ -3513,6 +3513,38 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V191b: Migration error (non-fatal): {e}")
 
+    # V191c: Slug normalization for Baltimore + Mesa (data exists under
+    # '-accela' suffix slugs, needs to be under canonical slugs).
+    # Also fix San Jose CA/IL attribution.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v191c'").fetchone()
+        if not m:
+            fixes = 0
+            # Baltimore: merge baltimore-md-accela → baltimore (canonical for us_cities lookup)
+            fixes += conn2.execute("""
+                UPDATE permits SET source_city_key = 'baltimore'
+                WHERE source_city_key = 'baltimore-md-accela'
+            """).rowcount
+            # Mesa: merge mesa-az-accela → mesa (keep the Accela prod_cities row active)
+            fixes += conn2.execute("""
+                UPDATE permits SET source_city_key = 'mesa'
+                WHERE source_city_key = 'mesa-az-accela'
+            """).rowcount
+            # Update prod_cities city_slug to match
+            conn2.execute("UPDATE prod_cities SET city_slug = 'baltimore' WHERE city_slug = 'baltimore-md-accela'")
+            conn2.execute("UPDATE prod_cities SET city_slug = 'mesa' WHERE city_slug = 'mesa-az-accela'")
+            # San Jose: fix the IL attribution. prod_cities 'san-jose-il' has
+            # San Jose CA data (5.4K permits). Fix the state.
+            conn2.execute("""
+                UPDATE prod_cities SET state = 'CA', city = 'San Jose'
+                WHERE city_slug = 'san-jose-il' AND state = 'IL'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v191c', ?)", (str(fixes),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V191c: Slug normalization — {fixes} permits remapped (Baltimore+Mesa), San Jose state fixed")
+    except Exception as e:
+        print(f"[{datetime.now()}] V191c: Migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
