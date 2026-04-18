@@ -3504,7 +3504,9 @@ def get_prod_cities(status='active', min_permits=1):
                    population, has_enrichment, has_violations
             FROM prod_cities
             WHERE status = ? AND total_permits >= ?
-              AND newest_permit_date >= date('now', '-30 days')
+              AND (newest_permit_date >= date('now', '-30 days')
+                   OR newest_permit_date IS NULL
+                   OR total_permits = 0)
               AND source_type IS NOT NULL
             ORDER BY permits_last_30d DESC, total_permits DESC
         """, (status, min_permits))
