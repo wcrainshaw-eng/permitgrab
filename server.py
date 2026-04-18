@@ -3653,6 +3653,37 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V194: Slug migration error (non-fatal): {e}")
 
+    # V195c: Sync source_type from CITY_REGISTRY for prod_cities with NULL type.
+    # Many cities have active CITY_REGISTRY entries (with platform + endpoint)
+    # but their prod_cities row has source_type=NULL — so the daemon skips them.
+    # E.g., Lexington KY has ACCELA_CONFIGS + CITY_REGISTRY active entry but
+    # prod_cities.source_type=NULL from the V88 population expansion.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v195c_sync'").fetchone()
+        if not m:
+            from city_configs import CITY_REGISTRY as _CR
+            synced = 0
+            null_rows = conn2.execute("""
+                SELECT id, city_slug FROM prod_cities
+                WHERE source_type IS NULL AND status IN ('active', 'pending')
+            """).fetchall()
+            for row in null_rows:
+                slug = row[1]
+                for v in [slug.replace('-', '_'), slug, slug.rsplit('-', 1)[0].replace('-', '_')]:
+                    cfg = _CR.get(v)
+                    if cfg and cfg.get('active') and cfg.get('platform'):
+                        conn2.execute("""
+                            UPDATE prod_cities SET source_type = ?, source_id = ?, status = 'active'
+                            WHERE id = ?
+                        """, (cfg['platform'], v, row[0]))
+                        synced += 1
+                        break
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v195c_sync', ?)", (str(synced),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V195c: Synced source_type for {synced} prod_cities from CITY_REGISTRY")
+    except Exception as e:
+        print(f"[{datetime.now()}] V195c: Sync error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
