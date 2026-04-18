@@ -3613,6 +3613,46 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V193b: Detroit migration error (non-fatal): {e}")
 
+    # V194: Bulk slug normalization — remap underscore→hyphen and strip
+    # -accela suffixes for ALL permits where a canonical prod_cities slug exists.
+    # This is the same fix as Baltimore/Mesa/Detroit but automated for 400+ slugs.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v194_slugs'").fetchone()
+        if not m:
+            # Build the mapping: for each permit source_city_key, check if
+            # a canonical prod_cities.city_slug exists via normalization
+            import re as _re
+            permit_slugs = conn2.execute("""
+                SELECT source_city_key, COUNT(*) as cnt
+                FROM permits
+                WHERE source_city_key IS NOT NULL
+                GROUP BY source_city_key HAVING cnt >= 10
+            """).fetchall()
+            prod_slugs = set(r[0] for r in conn2.execute("SELECT city_slug FROM prod_cities").fetchall())
+
+            total_remapped = 0
+            for row in permit_slugs:
+                old = row[0]
+                if old in prod_slugs:
+                    continue  # already canonical
+                # Try: strip -accela, then underscore→hyphen
+                canonical = old
+                if canonical.endswith('-accela'):
+                    canonical = canonical[:-7]
+                canonical = canonical.replace('_', '-')
+                if canonical in prod_slugs and canonical != old:
+                    n = conn2.execute(
+                        "UPDATE permits SET source_city_key = ? WHERE source_city_key = ?",
+                        (canonical, old)
+                    ).rowcount
+                    total_remapped += n
+
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v194_slugs', ?)", (str(total_remapped),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V194: Slug normalization — {total_remapped:,} permits remapped across 400+ slugs")
+    except Exception as e:
+        print(f"[{datetime.now()}] V194: Slug migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
