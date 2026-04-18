@@ -3593,6 +3593,26 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V193: Migration error (non-fatal): {e}")
 
+    # V193b: Detroit slug normalization (same pattern as Baltimore/Mesa)
+    # 1,163 permits under 'detroit-mi-accela' need remapping to 'detroit'
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v193b'").fetchone()
+        if not m:
+            det = conn2.execute("""
+                UPDATE permits SET source_city_key = 'detroit'
+                WHERE source_city_key = 'detroit-mi-accela'
+            """).rowcount
+            conn2.execute("""
+                UPDATE prod_cities SET city_slug = 'detroit'
+                WHERE city_slug = 'detroit-mi-accela'
+                AND NOT EXISTS (SELECT 1 FROM prod_cities WHERE city_slug = 'detroit')
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v193b', ?)", (str(det),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V193b: Detroit slug normalization — {det} permits remapped")
+    except Exception as e:
+        print(f"[{datetime.now()}] V193b: Detroit migration error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
