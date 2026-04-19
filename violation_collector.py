@@ -271,6 +271,150 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V197: Expansion — 1 new Socrata + 5 new ArcGIS sources
+    'kansas-city-mo': {
+        'prod_city_id': None,
+        'city': 'Kansas City',
+        'state': 'MO',
+        'endpoints': [
+            {
+                'name': 'Property Violations (NPD)',
+                'domain': 'data.kcmo.org',
+                'resource_id': 'vq3e-m9ge',
+                'date_field': 'date_found',
+                'id_field': 'violationid',
+                'description_field': 'ord_text',
+                'status_field': 'vio_status',
+                'type_field': 'description',
+                'address_fields': {'full': 'full_address'},
+                'zip_field': 'postalcode',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'indianapolis-in': {
+        'prod_city_id': None,
+        'city': 'Indianapolis',
+        'state': 'IN',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Violations',
+                'platform': 'arcgis',
+                'resource_id': 'indy-code-enforcement',
+                'arcgis_url': 'https://gis.indy.gov/server/rest/services/OpenData/OpenData_NonSpatial/MapServer/1',
+                'date_field': 'OPEN_DATE',
+                'id_field': 'CASE_NUMBER',
+                'description_field': 'CASE_TYPE',
+                'status_field': 'CASE_STATUS',
+                'type_field': 'CASE_TYPE',
+                'address_fields': {'full': 'STREET_ADDRESS'},
+                'zip_field': 'ZIP',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'columbus-oh': {
+        'prod_city_id': None,
+        'city': 'Columbus',
+        'state': 'OH',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'platform': 'arcgis',
+                'resource_id': 'columbus-code-enforcement',
+                'arcgis_url': 'https://maps2.columbus.gov/arcgis/rest/services/Schemas/BuildingZoning/MapServer/23',
+                'date_field': 'B1_FILE_DD',
+                'id_field': 'B1_ALT_ID',
+                'description_field': 'B1_PER_CATEGORY',
+                'status_field': 'B1_APPL_STATUS',
+                'type_field': 'B1_PER_SUB_TYPE',
+                'address_fields': {'full': 'SITE_ADDRESS'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    'greensboro-nc': {
+        'prod_city_id': None,
+        'city': 'Greensboro',
+        'state': 'NC',
+        'endpoints': [
+            {
+                'name': 'Code Compliance All Violations',
+                'platform': 'arcgis',
+                'resource_id': 'greensboro-cc-violations',
+                'arcgis_url': 'https://gis.greensboro-nc.gov/arcgis/rest/services/OpenGateCity/OpenData_CC_DS/MapServer/3',
+                'date_field': 'IssuedDate',
+                'id_field': 'ViolationID',
+                'description_field': 'ViolationDescription',
+                'status_field': 'CaseStatus',
+                'type_field': 'CaseType',
+                'address_fields': {'full': 'FullAddress'},
+                'zip_field': None,
+                'lat_field': 'Latitude',
+                'lng_field': 'Longitude',
+            },
+        ],
+    },
+    'nashville-tn': {
+        'prod_city_id': None,
+        'city': 'Nashville',
+        'state': 'TN',
+        'endpoints': [
+            {
+                'name': 'Property Standards Violations',
+                'platform': 'arcgis',
+                'resource_id': 'nashville-property-standards',
+                'arcgis_url': 'https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Property_Standards_Violations_2/FeatureServer/0',
+                'date_field': 'Date_Received',
+                'id_field': 'Request_Nbr',
+                'description_field': 'Reported_Problem',
+                'status_field': 'Status',
+                'type_field': 'Subtype_Description',
+                'address_fields': {'full': 'Property_Address'},
+                'zip_field': 'ZIP',
+                'lat_field': 'Lat',
+                'lng_field': 'Lon',
+            },
+        ],
+    },
+    'fort-worth-tx': {
+        'prod_city_id': None,
+        'city': 'Fort Worth',
+        'state': 'TX',
+        'endpoints': [
+            {
+                'name': 'Code Violations',
+                'platform': 'arcgis',
+                'resource_id': 'fort-worth-code-violations',
+                'arcgis_url': 'https://services5.arcgis.com/3ddLCBXe1bRt7mzj/arcgis/rest/services/CFW_Open_Data_Code_Violations_Table_view/FeatureServer/0',
+                'date_field': 'Case_Created_Date',
+                'id_field': 'Violation_ID',
+                'description_field': 'Complaint_Type_Description',
+                'status_field': 'Case_Current_Status',
+                'type_field': 'Complaint_Type_Description',
+                'address_fields': {'full': 'Violation_Address'},
+                'zip_field': None,
+                'lat_field': 'Latitude',
+                'lng_field': 'Longitude',
+            },
+        ],
+    },
+    # V197 PHASE 1 SKIPS (tested via SSH, documented to prevent re-investigation):
+    #   - Nashville data.nashville.gov/479w-kw2x — 302 to hub.arcgis.com (migrated, new source added above)
+    #   - Baltimore data.baltimorecity.gov/pugq-wdem — 302 to hub.arcgis.com; egisdata housing FS
+    #       only has Vacant Building Notices (2010 data, not violations)
+    #   - Fort Worth data.fortworthtexas.gov/spnu-bq4u — 302 to hub.arcgis.com (migrated, new source added)
+    #   - Dallas www.dallasopendata.com/x9pz-kdq9 — STALE, last update 2018-07 / rowsUpdatedAt=2019
+    #   - SF data.sfgov.org/nyek-jaw8 — 311 service requests, stale (2021), not building violations
+    #   - LA data.lacity.org/2uz8-3tj3 — HTTP 404 dataset.missing
+    #
+    # V197 PHASE 2 SOCRATA MISSES (on-domain catalog search returned 0 violation hits):
+    #   Denver, Portland, Tucson, Mesa, Baton Rouge, Honolulu, Louisville, Raleigh, Virginia Beach.
+    # Kansas City had two hits: nhtf-e75a (Historical, 2009-2011, skipped) and vq3e-m9ge (kept).
 }
 
 
@@ -332,8 +476,19 @@ def _build_address(record, addr_config):
 
 
 def _parse_date(date_str):
-    """Parse SODA date formats to ISO YYYY-MM-DD."""
-    if not date_str or not isinstance(date_str, str):
+    """Parse SODA / Carto / ArcGIS date formats to ISO YYYY-MM-DD."""
+    if date_str is None:
+        return None
+    # V197: ArcGIS returns esriFieldTypeDate as epoch milliseconds (int/float).
+    if isinstance(date_str, (int, float)):
+        try:
+            dt = datetime.fromtimestamp(date_str / 1000.0)
+            if dt.year < 2000 or dt > datetime.now() + timedelta(days=7):
+                return None
+            return dt.strftime('%Y-%m-%d')
+        except (ValueError, OSError, OverflowError):
+            return None
+    if not isinstance(date_str, str):
         return None
     s = date_str.strip()
     # Skip obviously bad dates
@@ -374,10 +529,13 @@ def normalize_violation(record, city_config, endpoint):
 
 
 def collect_violations_from_endpoint(city_config, endpoint):
-    """Fetch violations from a SODA or Carto endpoint."""
+    """Fetch violations from a SODA, Carto, or ArcGIS endpoint."""
     is_carto = 'carto_base' in endpoint
+    is_arcgis = endpoint.get('platform') == 'arcgis'
     if is_carto:
         base_url = endpoint['carto_base']
+    elif is_arcgis:
+        base_url = endpoint['arcgis_url'].rstrip('/') + '/query'
     else:
         base_url = f"https://{endpoint['domain']}/resource/{endpoint['resource_id']}.json"
     date_field = endpoint['date_field']
@@ -421,13 +579,31 @@ def collect_violations_from_endpoint(city_config, endpoint):
     total_inserted = 0
     max_records = 5000  # V166: Reduced from 50K to 5K per run to limit memory
 
+    # V197: ArcGIS uses epoch ms for date comparison
+    last_date_ms = None
+    if is_arcgis:
+        try:
+            last_dt = datetime.strptime(last_date[:10], '%Y-%m-%d')
+            last_date_ms = int(last_dt.timestamp() * 1000)
+        except ValueError:
+            last_date_ms = int((datetime.now() - timedelta(days=180)).timestamp() * 1000)
+
     while total_inserted < max_records:
-        # V170: Build request based on platform (SODA vs Carto)
+        # V170: Build request based on platform (SODA vs Carto vs ArcGIS)
         if is_carto:
             table = endpoint['carto_table']
             sql = (f"SELECT * FROM {table} WHERE {date_field} > '{last_date}' "
                    f"ORDER BY {date_field} DESC LIMIT {batch_size} OFFSET {offset}")
             params = {'q': sql, 'format': 'json'}
+        elif is_arcgis:
+            params = {
+                'where': f"{date_field} > {last_date_ms}",
+                'outFields': '*',
+                'orderByFields': f"{date_field} DESC",
+                'resultOffset': offset,
+                'resultRecordCount': batch_size,
+                'f': 'json',
+            }
         else:
             params = {
                 '$limit': batch_size,
@@ -440,8 +616,19 @@ def collect_violations_from_endpoint(city_config, endpoint):
             resp = SESSION.get(base_url, params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            # V170: Carto wraps records in 'rows', SODA returns array directly
-            records = data.get('rows', data) if isinstance(data, dict) else data
+            # V170: Carto wraps in 'rows', SODA returns array, ArcGIS wraps in 'features'.
+            if is_arcgis:
+                if isinstance(data, dict) and 'error' in data:
+                    err = data['error']
+                    print(f"  [V197] ArcGIS error {err.get('code')}: {err.get('message')}")
+                    resp.close()
+                    break
+                feats = data.get('features', []) if isinstance(data, dict) else []
+                records = [f.get('attributes', {}) for f in feats]
+            elif is_carto:
+                records = data.get('rows', []) if isinstance(data, dict) else []
+            else:
+                records = data
             resp.close()
         except Exception as e:
             print(f"  [V170] Error fetching page at offset {offset}: {e}")
