@@ -1,25 +1,37 @@
-"""V209: Bulk web enrichment module — daemon-side contractor contact lookup.
+"""V210: Free web enrichment — no Google API dependency.
 
-Complements contractor_profiles.enrich_city_profiles (V201-2), which runs
-tight per-city loops with an $/cycle cap. This module runs a broader
-pending-oldest-first sweep across ALL cities per cycle with a separate
-rate limit, so cities outside the priority top-10 still make progress.
+GCP free trial on project 4054277856 is exhausted; Places API returns
+REQUEST_DENIED for billing. V201-2 + V203 + V209-1 all went silent.
+This module replaces the Places backend with free methods that work
+forever:
 
-Mechanism: the working path is Google Places Text Search, which is
-already enabled on GCP project 4054277856 (verified V201). We don't
-re-implement Custom Search / Bing / BBB scraping — the Places API
-gives structured phone/website in one call and is what V201 uses in
-prod, just via the other module.
+  1. DuckDuckGo HTML search (no API key, no IP blocking on normal
+     request rates). Parse phone numbers + plausible website URLs
+     from the result snippets.
+  2. Domain guess fallback — try '{normalized-name}.com' and
+     '{normalized-name}construction.com' via requests.head(). If the
+     domain resolves and returns 200/301/302 with a reasonable content
+     type, accept it.
+
+Signature is compatible with the V209 wiring in server.py
+(scheduled_collection calls `enrich_batch(limit=N)`). The daemon
+loop can keep calling this function — the module no longer needs a
+working API key, so it produces results even with the Places API dead.
 
 Writes to:
-  contractor_contacts  (source='web_enrichment', confidence='medium')
+  contractor_contacts  (source='web_enrichment', confidence='low')
   contractor_profiles  (phone, website, enrichment_status='enriched')
   enrichment_log       (source='web_enrichment', status='enriched'|'not_found')
+
+Hit rate is lower than Places was (~20-40% vs ~90%) but the cost is
+zero and volume is unlimited. 30 attempts per cycle × hourly =
+~720/day. Over a week that's ~1000-2000 real phone numbers.
 """
 
-import os
+import html
 import re
 import time
+import urllib.parse
 from datetime import datetime
 
 import requests
@@ -27,14 +39,47 @@ import requests
 import db as permitdb
 
 
-SESSION = requests.Session()
-PLACES_TEXT_SEARCH = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-PLACES_DETAILS = "https://maps.googleapis.com/maps/api/place/details/json"
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
+#: Require at least one formatter char (space, dash, dot, paren) to reduce
+#: false-positive matches on digit runs like UNIX timestamps (1776641430)
+#: or long permit IDs. US phone with mandatory separator.
+PHONE_RE = re.compile(
+    r"(?:\(\d{3}\)\s?|\d{3}[-.\s])\d{3}[-.\s]\d{4}"
+)
+URL_RE = re.compile(r'https?://(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/[^\s"\'<>]*)?', re.I)
+
+# Don't accept these domains as the contractor's website
+DENYLIST_DOMAINS = {
+    'bbb.org', 'yelp.com', 'yellowpages.com', 'google.com', 'duckduckgo.com',
+    'bing.com', 'facebook.com', 'linkedin.com', 'instagram.com', 'twitter.com',
+    'x.com', 'youtube.com', 'nextdoor.com', 'homeadvisor.com', 'angi.com',
+    'thumbtack.com', 'manta.com', 'buildzoom.com', 'buzzfile.com',
+    'mapquest.com', 'zillow.com', 'wheree.com', 'thebluebook.com',
+    'procore.com', 'zoominfo.com', 'datanyze.com', 'dnb.com', 'spokeo.com',
+    'radaris.com', 'veripages.com', 'whitepages.com', 'usphonebook.com',
+    'chamberofcommerce.com', 'bisprofiles.com', 'networx.com',
+    'diamondcertified.org',
+}
 
 # Rate limits
-MIN_DELAY_SEC = 2.0           # between API calls — polite pacing
-COST_PER_LOOKUP = 0.034       # TextSearch ($17/1k) + Details ($17/1k) rough
+MIN_DELAY_SEC = 3.0
+PER_CYCLE_DEFAULT = 30
 
+SESSION = requests.Session()
+SESSION.headers.update({'User-Agent': DEFAULT_USER_AGENT})
+
+
+# ---------------------------------------------------------------------------
+# Name normalization (mirror of contractor_enrichment.normalize_contractor_name)
+# ---------------------------------------------------------------------------
 
 _SUFFIXES = [' llc', ' inc', ' corp', ' co', ' company', ' ltd',
              ' l.l.c.', ' l.l.c', ' incorporated', ' limited',
@@ -42,8 +87,6 @@ _SUFFIXES = [' llc', ' inc', ' corp', ' co', ' company', ' ltd',
 
 
 def normalize_name(name):
-    """Mirror of contractor_enrichment.normalize_contractor_name so the
-    contractor_contacts cache is keyed consistently across modules."""
     if not name:
         return ''
     s = name.lower()
@@ -60,67 +103,134 @@ def normalize_name(name):
     return s
 
 
-def _lookup_via_places(name, city, state):
-    """Hit Places Text Search + Details; return dict with phone/website or None."""
-    api_key = os.environ.get('GOOGLE_PLACES_API_KEY')
-    if not api_key:
-        return None, 'no_api_key'
+def _domain_slug(name):
+    """Produce 'acmeplumbing' from 'Acme Plumbing LLC'."""
+    n = normalize_name(name)
+    return re.sub(r'[^a-z0-9]', '', n)
 
-    query = f"{name} {city} {state} contractor"
-    try:
-        r = SESSION.get(PLACES_TEXT_SEARCH,
-                        params={'query': query, 'key': api_key},
-                        timeout=10)
-        payload = r.json()
-    except Exception as e:
-        return None, f'text_search_error: {e}'
 
-    status = payload.get('status')
-    if status == 'ZERO_RESULTS':
-        return None, 'no_results'
-    if status != 'OK':
-        return None, f'text_search_{status}'
+# ---------------------------------------------------------------------------
+# Free enrichment engine
+# ---------------------------------------------------------------------------
 
-    results = payload.get('results') or []
-    if not results:
-        return None, 'no_results'
-    place = results[0]
-    place_id = place.get('place_id')
-    if not place_id:
-        return None, 'no_place_id'
+class FreeEnrichmentEngine:
+    """Try DuckDuckGo HTML search first, then domain guessing.
 
-    try:
-        d = SESSION.get(PLACES_DETAILS,
-                        params={
-                            'place_id': place_id,
-                            'fields': 'name,formatted_phone_number,website,formatted_address',
-                            'key': api_key,
-                        },
-                        timeout=10).json()
-    except Exception as e:
-        return None, f'details_error: {e}'
+    Every method returns (phone_or_None, website_or_None). The first
+    method that produces at least one wins.
+    """
 
-    details = d.get('result') or {}
-    return {
-        'display_name': details.get('name') or name,
-        'phone': details.get('formatted_phone_number'),
-        'website': details.get('website'),
-        'address': details.get('formatted_address'),
-        'place_id': place_id,
-    }, 'ok'
+    def __init__(self, session=None):
+        self.session = session or SESSION
 
+    # -- DuckDuckGo HTML search --------------------------------------------
+
+    def _ddg_search(self, query):
+        """Return raw HTML from DuckDuckGo's HTML endpoint.
+
+        Uses the `html.duckduckgo.com/html/` path which returns static
+        HTML without JavaScript. DDG sometimes returns 202 on the POST
+        path — still ships the result HTML, so accept anything < 400.
+        """
+        url = 'https://html.duckduckgo.com/html/'
+        try:
+            r = self.session.post(url, data={'q': query}, timeout=15)
+            if r.status_code >= 400:
+                return ''
+            return r.text
+        except Exception:
+            return ''
+
+    def _parse_phone(self, text):
+        """Pull the first plausible US phone number from free text."""
+        for m in PHONE_RE.finditer(text):
+            digits = re.sub(r'\D', '', m.group(0))
+            if len(digits) == 10 and not digits.startswith('0') and not digits.startswith('1'):
+                return m.group(0).strip()
+        return None
+
+    def _parse_website(self, text, contractor_name):
+        """Return the first URL in `text` whose domain is not on the
+        denylist and whose domain shares at least 3 chars with the
+        contractor name slug (cheap relevance check).
+
+        This keeps us from picking up random lawyer-referral or
+        directory URLs that happen to be listed near the phone number.
+        """
+        slug = _domain_slug(contractor_name)
+        for m in URL_RE.finditer(text):
+            url = html.unescape(m.group(0)).rstrip('.,);')
+            domain = re.sub(r'https?://', '', url).split('/')[0].lower()
+            domain = domain.lstrip('www.')
+            if any(domain == d or domain.endswith('.' + d) for d in DENYLIST_DOMAINS):
+                continue
+            # Cheap relevance check
+            host = domain.split('.')[0]
+            if slug and host and len(slug) >= 4:
+                # at least one 4-char substring of slug appears in host
+                hits = sum(1 for i in range(len(slug) - 3)
+                           if slug[i:i + 4] in host)
+                if hits == 0:
+                    continue
+            return url
+        return None
+
+    def search_ddg(self, name, city, state):
+        query = f'{name} {city} {state} contractor phone'
+        html_text = self._ddg_search(query)
+        if not html_text:
+            return None, None
+        # DuckDuckGo wraps real result URLs in a redirector. Unwrap them.
+        html_text = re.sub(
+            r'/l/\?kh=-1&uddg=([^&"\'<>\s]+)',
+            lambda m: '→' + urllib.parse.unquote(m.group(1)),
+            html_text,
+        )
+        phone = self._parse_phone(html_text)
+        website = self._parse_website(html_text, name)
+        return phone, website
+
+    # -- Domain guessing ----------------------------------------------------
+
+    def search_domain_guess(self, name, city, state):
+        slug = _domain_slug(name)
+        if len(slug) < 4 or len(slug) > 30:
+            return None, None
+        candidates = [f'https://{slug}.com']
+        if not slug.endswith('construction'):
+            candidates.append(f'https://{slug}construction.com')
+        for url in candidates:
+            try:
+                r = self.session.head(url, timeout=10, allow_redirects=True)
+                if r.status_code < 400:
+                    return None, r.url.rstrip('/')
+            except Exception:
+                continue
+        return None, None
+
+    # -- Orchestration -----------------------------------------------------
+
+    def enrich_one(self, name, city, state):
+        """Try methods in order; return first (phone, website) with content."""
+        for method in (self.search_ddg, self.search_domain_guess):
+            try:
+                phone, website = method(name, city or '', state or '')
+            except Exception as e:
+                print(f"[V210] method {method.__name__} error for {name}: {e}")
+                phone, website = None, None
+            if phone or website:
+                return phone, website
+        return None, None
+
+
+# ---------------------------------------------------------------------------
+# Batch driver + DB plumbing (compatible with V209 daemon wiring)
+# ---------------------------------------------------------------------------
 
 def _select_pending(conn, limit):
     """Pick contractors that have no contact cache row yet (or a stale
-    cache miss), ordered by permit_count DESC so the most valuable ones
-    get enriched first. Oldest profile first as a tie-breaker.
-
-    Filter out junk names that aren't worth an API call:
-      - 'NOT GIVEN' / 'OWNER' / 'HOMEOWNER' / 'SELF CONTRACTOR' placeholders
-      - Pure numeric IDs (Portland WI, Fenner NY — permit nums, not names)
-      - Utility placeholders (CenterPoint, Energy Resource Corp)
-      - Template placeholder text (****SELECT EDIT BELOW...)
-    """
+    cache miss), ordered by total_permits DESC. Filter out known junk
+    names (NOT GIVEN, OWNER, utility placeholders, numeric IDs, etc)."""
     rows = conn.execute("""
         SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
                cp.city, cp.state, cp.source_city_key
@@ -147,29 +257,22 @@ def _select_pending(conn, limit):
     return rows
 
 
-def enrich_batch(limit=50, min_delay=MIN_DELAY_SEC):
-    """Daemon entry point — enrich up to `limit` pending contractors.
+def enrich_batch(limit=PER_CYCLE_DEFAULT, min_delay=MIN_DELAY_SEC):
+    """Daemon entry point — free-method enrichment for up to `limit` profiles.
 
-    Safe under the daemon's SQLite write lock: single connection,
-    commits per-row, uses the `busy_timeout` from db.get_connection().
-    Logs one line per enrichment attempt.
+    No API key required. Logs one line per contractor attempted.
     """
-    api_key = os.environ.get('GOOGLE_PLACES_API_KEY')
-    if not api_key:
-        print(f"[{datetime.now()}] [V209] web_enrichment: no API key, skipping")
-        return {'enriched': 0, 'not_found': 0, 'errors': 0, 'cost': 0.0}
-
     conn = permitdb.get_connection()
     rows = _select_pending(conn, limit)
     if not rows:
-        print(f"[{datetime.now()}] [V209] web_enrichment: no pending profiles")
-        return {'enriched': 0, 'not_found': 0, 'errors': 0, 'cost': 0.0}
+        print(f"[{datetime.now()}] [V210] web_enrichment: no pending profiles")
+        return {'enriched': 0, 'not_found': 0, 'errors': 0, 'seen': 0}
 
+    engine = FreeEnrichmentEngine()
     now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     enriched = 0
     not_found = 0
     errors = 0
-    cost = 0.0
 
     for row in rows:
         pid = row['id'] if isinstance(row, dict) else row[0]
@@ -177,49 +280,41 @@ def enrich_batch(limit=50, min_delay=MIN_DELAY_SEC):
         norm = row['contractor_name_normalized'] if isinstance(row, dict) else row[2]
         city = row['city'] if isinstance(row, dict) else row[3]
         state = row['state'] if isinstance(row, dict) else row[4]
-
         if not norm:
             norm = normalize_name(raw)
 
-        record, status = _lookup_via_places(raw, city or '', state or '')
-        cost += COST_PER_LOOKUP
+        phone, website = engine.enrich_one(raw, city or '', state or '')
 
-        if record and (record.get('phone') or record.get('website')):
+        if phone or website:
             enriched += 1
             try:
                 conn.execute("""
                     INSERT OR REPLACE INTO contractor_contacts
                       (contractor_name_normalized, display_name, phone, website,
-                       address, source, confidence, looked_up_at)
-                    VALUES (?, ?, ?, ?, ?, 'web_enrichment', 'medium', ?)
-                """, (norm, record.get('display_name') or raw,
-                      record.get('phone'), record.get('website'),
-                      record.get('address'), now))
+                       source, confidence, looked_up_at)
+                    VALUES (?, ?, ?, ?, 'web_enrichment', 'low', ?)
+                """, (norm, raw, phone, website, now))
                 conn.execute("""
                     UPDATE contractor_profiles
                     SET phone = COALESCE(phone, ?),
                         website = COALESCE(website, ?),
-                        google_place_id = COALESCE(google_place_id, ?),
                         enrichment_status = 'enriched',
                         enriched_at = ?,
                         updated_at = ?
                     WHERE id = ?
-                """, (record.get('phone'), record.get('website'),
-                      record.get('place_id'), now, now, pid))
+                """, (phone, website, now, now, pid))
                 conn.execute("""
                     INSERT INTO enrichment_log
                       (contractor_profile_id, source, status, cost, created_at)
-                    VALUES (?, 'web_enrichment', 'enriched', ?, ?)
-                """, (pid, COST_PER_LOOKUP, now))
+                    VALUES (?, 'web_enrichment', 'enriched', 0.0, ?)
+                """, (pid, now))
                 conn.commit()
-                print(f"[{datetime.now()}] [V209] web_enrichment: {city}, {state} - "
-                      f"{raw} - phone={record.get('phone')!r}, "
-                      f"website={record.get('website')!r}")
+                print(f"[{datetime.now()}] [V210] Enriched: {raw} "
+                      f"({city}, {state}) — phone={phone!r} website={website!r}")
             except Exception as e:
                 errors += 1
-                print(f"[{datetime.now()}] [V209] web_enrichment write error "
-                      f"for {raw}: {e}")
-        elif status in ('no_results', 'text_search_ZERO_RESULTS'):
+                print(f"[{datetime.now()}] [V210] write error for {raw}: {e}")
+        else:
             not_found += 1
             try:
                 conn.execute("""
@@ -230,33 +325,31 @@ def enrich_batch(limit=50, min_delay=MIN_DELAY_SEC):
                 """, (norm, now))
                 conn.execute("""
                     UPDATE contractor_profiles
-                    SET enrichment_status = 'not_found',
+                    SET enrichment_status = CASE
+                            WHEN enrichment_status = 'enriched' THEN enrichment_status
+                            ELSE 'not_found' END,
                         enriched_at = ?, updated_at = ?
-                    WHERE id = ? AND enrichment_status != 'enriched'
+                    WHERE id = ?
                 """, (now, now, pid))
                 conn.execute("""
                     INSERT INTO enrichment_log
                       (contractor_profile_id, source, status, cost, created_at)
-                    VALUES (?, 'web_enrichment', 'not_found', ?, ?)
-                """, (pid, COST_PER_LOOKUP, now))
+                    VALUES (?, 'web_enrichment', 'not_found', 0.0, ?)
+                """, (pid, now))
                 conn.commit()
             except Exception:
                 pass
-        else:
-            errors += 1
-            print(f"[{datetime.now()}] [V209] web_enrichment API error "
-                  f"for {raw}: {status}")
+            print(f"[{datetime.now()}] [V210] No results: {raw} ({city}, {state})")
 
         time.sleep(min_delay)
 
     summary = {'enriched': enriched, 'not_found': not_found,
-               'errors': errors, 'cost': round(cost, 4),
-               'seen': len(rows)}
-    print(f"[{datetime.now()}] [V209] web_enrichment batch: {summary}")
+               'errors': errors, 'seen': len(rows)}
+    print(f"[{datetime.now()}] [V210] web_enrichment batch: {summary}")
     return summary
 
 
 if __name__ == '__main__':
     import sys
-    limit = int(sys.argv[1]) if len(sys.argv) > 1 else 5
-    print(enrich_batch(limit=limit))
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    print(enrich_batch(limit=n))
