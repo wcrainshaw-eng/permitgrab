@@ -13776,6 +13776,7 @@ def city_landing_inner(city_slug):
         nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
         current_year=datetime.now().year,
         current_date=datetime.now().strftime('%Y-%m-%d'),
+        current_week_start=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),  # V209-3: for NEW badge
         last_collected=last_collected,  # V17c: Freshness badge
         related_articles=related_articles,  # V17d: Cross-linked blog articles
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
@@ -14039,6 +14040,7 @@ def state_city_landing(state_slug, city_slug):
         blog_posts=city_blog_posts,
         violations=violations_data,
         violations_count=violations_count,
+        current_week_start=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),  # V209-3: NEW badge
     )
 
 
