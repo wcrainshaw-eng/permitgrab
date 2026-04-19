@@ -483,6 +483,18 @@ VIOLATION_SOURCES = {
     #       (only Vacant Building Notices and filtered subsets in dmxPermitsCodeEnforcement)
     #   - San Antonio TX: opendata-cosagis DCAT has 0 violation/enforcement datasets
     #   - Atlanta GA: dpcd-coaplangis DCAT has 0 violation/enforcement datasets
+    # V202 TOP-10 ROUND (probed for market-readiness, none usable):
+    #   - Houston TX: data.houstontx.gov CKAN dataset
+    #       'city-of-houston-building-code-enforcement-violations-don' has only
+    #       XLSX resources (5 files), last modified 2023-06-09 — stale + format
+    #       violation_collector does not support. (re-confirmed from V198 skip.)
+    #   - Phoenix AZ: phoenix-az.maps.arcgis.com org search returns no code
+    #       enforcement FeatureServers under city owner; phoenixopendata.com CKAN
+    #       has no code/violation/enforcement packages. Phoenix NSD publishes
+    #       only dashboards, no underlying REST layer.
+    #   - Dallas TX: dallasgis.maps.arcgis.com has only 2020 monthly snapshots
+    #       ('Code Enforcement Cases <Month> 2020'), last modified 2021-04.
+    #       No current/rolling dataset.
     # V200 PHASE 3 SKIPS (probed via DCAT/SSH, documented):
     #   - Pittsburgh PA: WPRDC CKAN has fresh daily-updated violations (CSV/GeoJSON,
     #       resource 70c06278-...), but violation_collector.py has no CKAN backend —

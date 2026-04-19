@@ -9784,7 +9784,13 @@ def api_permits():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
 
-    # V32: Resolve city slug to name and state for cross-state filtering
+    # V32: Resolve city slug to name and state for cross-state filtering.
+    # V202-4: Fallback to prod_cities.city_slug → (city, state) when the
+    # CITY_REGISTRY slug lookup misses — top-10 pages (new-york-city,
+    # chicago-il, houston-tx, phoenix-az) were rendering 0 results because
+    # CITY_REGISTRY stores the shorter 'new-york' slug while the frontend
+    # URL uses the longer 'new-york-city' slug that prod_cities also uses.
+    # Falling back to prod_cities closes that gap without risky renames.
     city_name = None
     city_state = None
     if city:
@@ -9793,7 +9799,28 @@ def api_permits():
             city_name = city_config.get('name', city)
             city_state = city_config.get('state', '')
         else:
-            city_name = city  # Use as-is if not a valid slug
+            try:
+                conn_tmp = permitdb.get_connection()
+                row = conn_tmp.execute(
+                    "SELECT city, state FROM prod_cities WHERE city_slug = ? LIMIT 1",
+                    (city,)
+                ).fetchone()
+                if row:
+                    city_name = row['city'] if isinstance(row, dict) else row[0]
+                    city_state = row['state'] if isinstance(row, dict) else row[1]
+                    # V202-4: prod_cities display-name can diverge from the
+                    # city value actually stored on permits rows (e.g. NYC
+                    # stores 'New York' in permits.city even though the card
+                    # says 'New York City'). Remap here for the query only;
+                    # the display name is set separately by the template.
+                    CITY_ALIAS = {
+                        ('New York City', 'NY'): 'New York',
+                    }
+                    city_name = CITY_ALIAS.get((city_name, city_state), city_name)
+                else:
+                    city_name = city  # Use as-is if not a valid slug
+            except Exception:
+                city_name = city
 
     # Resolve trade slug to name if needed
     trade_name = None
