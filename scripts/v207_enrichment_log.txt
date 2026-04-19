@@ -1,0 +1,30 @@
+V207 Web Search Enrichment Log
+==============================
+
+Ran per-contractor WebSearch queries, extracted phone + website from SERP
+snippets (Yelp/BBB/company sites), batch-inserted via SSH into
+contractor_contacts + contractor_profiles + enrichment_log. All entries
+use source='web_search', confidence='high'.
+
+City coverage (cumulative, V206 + V207):
+
+ 1. san-antonio-tx        5  (V206: Will Fix It, 3D Landscaping, Lennar SA, Greenhaven — 4 @ V206)
+ 2. miami-dade-county    11  (V206: 9  +  V207: Paul Bange Roofing, A&O Plumbing — 2)
+ 3. chicago-il            2  (V206: Taylor Excavating, Nouveau Illinois)
+ 4. new-orleans-blds      3  (V206: Keefe John Ditta, Jeffrey David Cantin  +  V207: Landis Construction)
+ 5. columbus              5  (ECO PLUMBERS, Columbus/Worthington Air, Atlas Butler, Five Star, Rosati Windows)
+ 6. minneapolis           5  (Warners Stellian, Standard Heating, Bonfe Plumbing, Urban Pine, Dean's Pro Plumbing)
+ 7. henderson             5  (Hirschi Masonry, Greystone Nevada, D.R. Horton, Century Communities, Masters of Barricades)
+ 8. orlando-fl            4  (I&E Construction, Pulte Homes, Skymark Roofing, Frank Gay Services)
+ 9. sacramento-ca         2  (Bell Brothers, Bonney Plumbing) + (Lennar Homes of California)
+10. buffalo-ny            4  (T-Mark Plumbing, Affordable Electric/Radiant, Zenner & Ritter, Michael Dollendorf/Roy's Plumbing)
+11. bellevue              1  (Gene Johnson Plumbing)
+
+Cumulative totals so far: 11 cities, 47 contractor rows enriched
+(V206 shipped: 17 contractors across 4 cities)
+(V207 adds:    30 contractors across 7 more cities)
+
+Searches where name was too generic or a person's name without a
+business hit were skipped (examples: Susan Harrington Chicago, MVM
+Construction Miami, Shinard Banks Cleveland, Jeremiah Johnson Chicago).
+Each of those took <60s of SERP review before moving on.
