@@ -9785,12 +9785,17 @@ def api_permits():
     per_page = int(request.args.get('per_page', 50))
 
     # V32: Resolve city slug to name and state for cross-state filtering.
-    # V202-4: Fallback to prod_cities.city_slug → (city, state) when the
-    # CITY_REGISTRY slug lookup misses — top-10 pages (new-york-city,
-    # chicago-il, houston-tx, phoenix-az) were rendering 0 results because
-    # CITY_REGISTRY stores the shorter 'new-york' slug while the frontend
-    # URL uses the longer 'new-york-city' slug that prod_cities also uses.
-    # Falling back to prod_cities closes that gap without risky renames.
+    # V202-4 + V203: Two-stage lookup with a shared alias map.
+    # Some CITY_REGISTRY entries carry display names that don't match the
+    # value stored on permits rows — e.g. chicago_il has name='CHICAGO' while
+    # permits have city='Chicago', producing 0-result pages. And some slugs
+    # don't exist in CITY_REGISTRY at all (new-york-city, houston-tx,
+    # phoenix-az, jacksonville-fl) but do exist in prod_cities. Resolve
+    # against both, then normalize through PERMIT_CITY_ALIAS before querying.
+    PERMIT_CITY_ALIAS = {
+        ('New York City', 'NY'): 'New York',  # prod_cities display vs permits.city
+        ('CHICAGO', 'IL'): 'Chicago',          # CITY_REGISTRY chicago_il uppercase
+    }
     city_name = None
     city_state = None
     if city:
@@ -9808,19 +9813,13 @@ def api_permits():
                 if row:
                     city_name = row['city'] if isinstance(row, dict) else row[0]
                     city_state = row['state'] if isinstance(row, dict) else row[1]
-                    # V202-4: prod_cities display-name can diverge from the
-                    # city value actually stored on permits rows (e.g. NYC
-                    # stores 'New York' in permits.city even though the card
-                    # says 'New York City'). Remap here for the query only;
-                    # the display name is set separately by the template.
-                    CITY_ALIAS = {
-                        ('New York City', 'NY'): 'New York',
-                    }
-                    city_name = CITY_ALIAS.get((city_name, city_state), city_name)
                 else:
                     city_name = city  # Use as-is if not a valid slug
             except Exception:
                 city_name = city
+        # Apply alias after resolution — covers both registry and prod_cities paths.
+        if city_name is not None:
+            city_name = PERMIT_CITY_ALIAS.get((city_name, city_state), city_name)
 
     # Resolve trade slug to name if needed
     trade_name = None
@@ -15067,43 +15066,65 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")
 
-        # V201: Google Places enrichment — budget-capped per cycle.
-        # Places API verified enabled on GCP project 4054277856 (was blocked
-        # V198-V200). At $0.017/lookup a $6.40 cap = ~377 profiles per cycle;
-        # cycles run hourly so ~9K profiles/day, ~$150/day absolute max.
-        # In practice most cities exhaust their 'pending' rows in a few cycles
-        # and the loop short-circuits via `profiles_seen == 0`.
+        # V201/V203: Google Places enrichment — priority cities first, then
+        # longer-tail cities up to a cap.
+        #
+        # Places API is enabled on GCP project 4054277856 (V201-2).
+        # At $0.017/lookup:
+        #   - Priority cities: $25/city cap (~1,470 lookups), top 10 by ad spend
+        #   - Tail cities:     $6.40 combined cap (~377 lookups) across up to 20 others
+        # Running priority first drains the Google Ads landing pages quickly while
+        # the hourly cadence still chips away at everything else.
         try:
             import os as _os
             if _os.environ.get('GOOGLE_PLACES_API_KEY'):
                 from contractor_profiles import enrich_city_profiles
-                CYCLE_COST_CAP = 6.40
+                # V203-1: Priority slugs aligned with prod_cities.city_slug values
+                # that actually exist today (per V202 audit). Bad slugs would
+                # just no-op via `profiles_seen == 0`.
+                PRIORITY_CITIES = [
+                    'new-york-city', 'los-angeles', 'chicago-il', 'houston-tx',
+                    'phoenix-az', 'philadelphia', 'san-antonio-tx', 'san-diego',
+                    'dallas-tx', 'austin-tx', 'jacksonville-fl',
+                ]
+                PRIORITY_CAP_PER_CITY = 25.0
+                TAIL_CYCLE_CAP = 6.40
                 spent = 0.0
                 enriched_total = 0
+                # --- Priority pass ---
+                for slug in PRIORITY_CITIES:
+                    result = enrich_city_profiles(city_slug=slug, max_cost=PRIORITY_CAP_PER_CITY)
+                    spent += result.get('cost', 0.0)
+                    enriched_total += result.get('enriched', 0)
+                # --- Tail pass: up to 20 remaining cities by pending count ---
                 conn = permitdb.get_connection()
                 try:
-                    cities = conn.execute("""
+                    placeholders = ','.join('?' * len(PRIORITY_CITIES))
+                    cities = conn.execute(f"""
                         SELECT source_city_key, COUNT(*) cnt
                         FROM contractor_profiles
                         WHERE enrichment_status = 'pending' AND is_active = 1
                           AND source_city_key IS NOT NULL AND source_city_key != ''
+                          AND source_city_key NOT IN ({placeholders})
                         GROUP BY source_city_key
                         ORDER BY cnt DESC
                         LIMIT 20
-                    """).fetchall()
+                    """, PRIORITY_CITIES).fetchall()
                 finally:
                     conn.close()
+                tail_spent = 0.0
                 for row in cities:
-                    if spent >= CYCLE_COST_CAP:
+                    if tail_spent >= TAIL_CYCLE_CAP:
                         break
                     slug = row['source_city_key'] if isinstance(row, dict) else row[0]
-                    remaining = max(CYCLE_COST_CAP - spent, 0.01)
+                    remaining = max(TAIL_CYCLE_CAP - tail_spent, 0.01)
                     result = enrich_city_profiles(city_slug=slug, max_cost=remaining)
-                    spent += result.get('cost', 0.0)
+                    tail_spent += result.get('cost', 0.0)
                     enriched_total += result.get('enriched', 0)
+                spent += tail_spent
                 print(f"[{datetime.now()}] [V201] Enrichment: "
                       f"{enriched_total} enriched, ${spent:.2f} spent "
-                      f"(cap ${CYCLE_COST_CAP:.2f})")
+                      f"(priority+tail; tail cap ${TAIL_CYCLE_CAP:.2f})")
             else:
                 print(f"[{datetime.now()}] [V201] Enrichment skipped (no GOOGLE_PLACES_API_KEY)")
         except Exception as e:
