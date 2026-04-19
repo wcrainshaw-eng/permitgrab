@@ -403,6 +403,36 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V198: Charlotte NC — ArcGIS, fresh (sampled 2026-04-18)
+    'charlotte-nc': {
+        'prod_city_id': None,
+        'city': 'Charlotte',
+        'state': 'NC',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases All',
+                'platform': 'arcgis',
+                'resource_id': 'charlotte-code-enforcement',
+                'arcgis_url': 'https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0',
+                'date_field': 'DateCreated',
+                'id_field': 'CaseNumber',
+                'description_field': 'DetailedDescription',
+                'status_field': 'CaseStatus',
+                'type_field': 'CaseType',
+                'address_fields': {'full': 'FullAddress'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
+    #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
+    #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
+    #   - Baltimore MD: egisdata Housing FS has no single "all violations" layer
+    #       (only Vacant Building Notices and filtered subsets in dmxPermitsCodeEnforcement)
+    #   - San Antonio TX: opendata-cosagis DCAT has 0 violation/enforcement datasets
+    #   - Atlanta GA: dpcd-coaplangis DCAT has 0 violation/enforcement datasets
     # V197 PHASE 1 SKIPS (tested via SSH, documented to prevent re-investigation):
     #   - Nashville data.nashville.gov/479w-kw2x — 302 to hub.arcgis.com (migrated, new source added above)
     #   - Baltimore data.baltimorecity.gov/pugq-wdem — 302 to hub.arcgis.com; egisdata housing FS
@@ -570,7 +600,10 @@ def collect_violations_from_endpoint(city_config, endpoint):
         last_date = None
 
     if not last_date:
-        last_date = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
+        # V198: Widen first-time window to 365 days so newly-added cities
+        # with slower-updating feeds (e.g. KC vq3e-m9ge, 2025-07 max) still
+        # backfill something meaningful on the first collection pass.
+        last_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%dT00:00:00')
 
     print(f"  [V162] {city_config['city']} / {endpoint['name']}: fetching since {last_date[:10]}")
 
@@ -579,14 +612,16 @@ def collect_violations_from_endpoint(city_config, endpoint):
     total_inserted = 0
     max_records = 5000  # V166: Reduced from 50K to 5K per run to limit memory
 
-    # V197: ArcGIS uses epoch ms for date comparison
-    last_date_ms = None
+    # V197/V198: ArcGIS needs `timestamp 'YYYY-MM-DD HH:MM:SS'` format for
+    # esriFieldTypeDate where clauses. Raw epoch ms is rejected by hosted
+    # FeatureServer/MapServer with "Invalid query parameters".
+    arcgis_ts_literal = None
     if is_arcgis:
         try:
             last_dt = datetime.strptime(last_date[:10], '%Y-%m-%d')
-            last_date_ms = int(last_dt.timestamp() * 1000)
         except ValueError:
-            last_date_ms = int((datetime.now() - timedelta(days=180)).timestamp() * 1000)
+            last_dt = datetime.now() - timedelta(days=180)
+        arcgis_ts_literal = last_dt.strftime('%Y-%m-%d %H:%M:%S')
 
     while total_inserted < max_records:
         # V170: Build request based on platform (SODA vs Carto vs ArcGIS)
@@ -597,7 +632,7 @@ def collect_violations_from_endpoint(city_config, endpoint):
             params = {'q': sql, 'format': 'json'}
         elif is_arcgis:
             params = {
-                'where': f"{date_field} > {last_date_ms}",
+                'where': f"{date_field} >= timestamp '{arcgis_ts_literal}'",
                 'outFields': '*',
                 'orderByFields': f"{date_field} DESC",
                 'resultOffset': offset,
