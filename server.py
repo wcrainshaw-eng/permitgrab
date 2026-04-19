@@ -15040,6 +15040,48 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")
 
+        # V201: Google Places enrichment — budget-capped per cycle.
+        # Places API verified enabled on GCP project 4054277856 (was blocked
+        # V198-V200). At $0.017/lookup a $6.40 cap = ~377 profiles per cycle;
+        # cycles run hourly so ~9K profiles/day, ~$150/day absolute max.
+        # In practice most cities exhaust their 'pending' rows in a few cycles
+        # and the loop short-circuits via `profiles_seen == 0`.
+        try:
+            import os as _os
+            if _os.environ.get('GOOGLE_PLACES_API_KEY'):
+                from contractor_profiles import enrich_city_profiles
+                CYCLE_COST_CAP = 6.40
+                spent = 0.0
+                enriched_total = 0
+                conn = permitdb.get_connection()
+                try:
+                    cities = conn.execute("""
+                        SELECT source_city_key, COUNT(*) cnt
+                        FROM contractor_profiles
+                        WHERE enrichment_status = 'pending' AND is_active = 1
+                          AND source_city_key IS NOT NULL AND source_city_key != ''
+                        GROUP BY source_city_key
+                        ORDER BY cnt DESC
+                        LIMIT 20
+                    """).fetchall()
+                finally:
+                    conn.close()
+                for row in cities:
+                    if spent >= CYCLE_COST_CAP:
+                        break
+                    slug = row['source_city_key'] if isinstance(row, dict) else row[0]
+                    remaining = max(CYCLE_COST_CAP - spent, 0.01)
+                    result = enrich_city_profiles(city_slug=slug, max_cost=remaining)
+                    spent += result.get('cost', 0.0)
+                    enriched_total += result.get('enriched', 0)
+                print(f"[{datetime.now()}] [V201] Enrichment: "
+                      f"{enriched_total} enriched, ${spent:.2f} spent "
+                      f"(cap ${CYCLE_COST_CAP:.2f})")
+            else:
+                print(f"[{datetime.now()}] [V201] Enrichment skipped (no GOOGLE_PLACES_API_KEY)")
+        except Exception as e:
+            print(f"[{datetime.now()}] [V201] Enrichment error (non-fatal): {e}")
+
         # V168: Removed dead signal_collector, city_health, discovery calls (files deleted in V163)
 
         print(f"[{datetime.now()}] All collection tasks complete.")
