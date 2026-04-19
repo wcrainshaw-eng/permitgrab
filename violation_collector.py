@@ -495,6 +495,17 @@ VIOLATION_SOURCES = {
     #   - Dallas TX: dallasgis.maps.arcgis.com has only 2020 monthly snapshots
     #       ('Code Enforcement Cases <Month> 2020'), last modified 2021-04.
     #       No current/rolling dataset.
+    # V206 S3 SKIPS (web-searched + SSH-probed, documented):
+    #   - Las Vegas NV: Code_Enforcement_Open_Data FeatureServer EXISTS at
+    #     services1.arcgis.com/F1v0ufATbBQScMtY/...FeatureServer/0 but
+    #     max Event_Date is 2024-02-27 (stale, same pattern as Indianapolis
+    #     + Greensboro). Deferred — needs either a current-year feed or
+    #     an initial-window override to pick up the 2024-and-earlier backlog.
+    #   - Detroit MI: data.detroitmi.gov portal responds but no code
+    #     enforcement dataset published via DCAT; D3 portal is a different
+    #     platform layer that would need its own adapter.
+    #   - Sacramento CA: SACOG exposes Code Enforcement Violations only
+    #     for West Sacramento, not the main City of Sacramento.
     # V200 PHASE 3 SKIPS (probed via DCAT/SSH, documented):
     #   - Pittsburgh PA: WPRDC CKAN has fresh daily-updated violations (CSV/GeoJSON,
     #       resource 70c06278-...), but violation_collector.py has no CKAN backend —
