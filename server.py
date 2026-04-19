@@ -8753,50 +8753,14 @@ def add_lead_scores(permits):
 # ===========================
 # TRADE CLASSIFICATION
 # ===========================
-def classify_trade(text):
-    """Classify a permit into a trade category based on description text."""
-    if not text:
-        return "General Construction"
-
-    text_lower = text.lower()
-    scores = {}
-
-    for trade, keywords in TRADE_CATEGORIES.items():
-        score = sum(1 for kw in keywords if kw in text_lower)
-        if score > 0:
-            scores[trade] = score
-
-    if not scores:
-        return "General Construction"
-
-    # Priority order for ties
-    priority_trades = [
-        "Electrical", "Plumbing", "HVAC", "Roofing", "Solar", "Fire Protection",
-        "Demolition", "Signage", "Windows & Doors", "Structural",
-        "Interior Renovation", "Landscaping & Exterior",
-        "New Construction", "Addition", "General Construction"
-    ]
-
-    specific_matches = {t: s for t, s in scores.items() if t != "General Construction"}
-
-    if specific_matches:
-        max_score = max(specific_matches.values())
-        top_matches = [t for t, s in specific_matches.items() if s == max_score]
-
-        if len(top_matches) == 1:
-            return top_matches[0]
-
-        for trade in priority_trades:
-            if trade in top_matches:
-                return trade
-
-        return top_matches[0]
-
-    return "General Construction"
+# V200-1: Removed duplicate classify_trade definition here (was drifting from
+# the canonical one in collector.py against the same TRADE_CATEGORIES dict).
+# reclassify_permit now imports the canonical version.
 
 
 def reclassify_permit(permit):
     """Re-classify a permit's trade category based on its description and type fields."""
+    from collector import classify_trade
     text_parts = [
         permit.get('description', ''),
         permit.get('work_type', ''),
