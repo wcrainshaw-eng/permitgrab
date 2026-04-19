@@ -570,7 +570,10 @@ def collect_violations_from_endpoint(city_config, endpoint):
         last_date = None
 
     if not last_date:
-        last_date = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%dT00:00:00')
+        # V198: Widen first-time window to 365 days so newly-added cities
+        # with slower-updating feeds (e.g. KC vq3e-m9ge, 2025-07 max) still
+        # backfill something meaningful on the first collection pass.
+        last_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%dT00:00:00')
 
     print(f"  [V162] {city_config['city']} / {endpoint['name']}: fetching since {last_date[:10]}")
 
@@ -579,14 +582,16 @@ def collect_violations_from_endpoint(city_config, endpoint):
     total_inserted = 0
     max_records = 5000  # V166: Reduced from 50K to 5K per run to limit memory
 
-    # V197: ArcGIS uses epoch ms for date comparison
-    last_date_ms = None
+    # V197/V198: ArcGIS needs `timestamp 'YYYY-MM-DD HH:MM:SS'` format for
+    # esriFieldTypeDate where clauses. Raw epoch ms is rejected by hosted
+    # FeatureServer/MapServer with "Invalid query parameters".
+    arcgis_ts_literal = None
     if is_arcgis:
         try:
             last_dt = datetime.strptime(last_date[:10], '%Y-%m-%d')
-            last_date_ms = int(last_dt.timestamp() * 1000)
         except ValueError:
-            last_date_ms = int((datetime.now() - timedelta(days=180)).timestamp() * 1000)
+            last_dt = datetime.now() - timedelta(days=180)
+        arcgis_ts_literal = last_dt.strftime('%Y-%m-%d %H:%M:%S')
 
     while total_inserted < max_records:
         # V170: Build request based on platform (SODA vs Carto vs ArcGIS)
@@ -597,7 +602,7 @@ def collect_violations_from_endpoint(city_config, endpoint):
             params = {'q': sql, 'format': 'json'}
         elif is_arcgis:
             params = {
-                'where': f"{date_field} > {last_date_ms}",
+                'where': f"{date_field} >= timestamp '{arcgis_ts_literal}'",
                 'outFields': '*',
                 'orderByFields': f"{date_field} DESC",
                 'resultOffset': offset,
