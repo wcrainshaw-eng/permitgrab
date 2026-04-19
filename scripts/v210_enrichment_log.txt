@@ -1,0 +1,25 @@
+V210 Manual Enrichment Log (Task 3)
+===================================
+
+Additive to V206 (17 rows) + V207 (~40 rows). V210 T3 adds 5 more
+while the daemon-side free engine (T1) ramps up.
+
+Cities touched this PR:
+  raleigh          3  Infrastructure Technology Services (919-529-0637,
+                        its-nc.com)
+                      Sigmon Construction (919-831-0539,
+                        sigmonconstruction.com)
+                      M/I Homes of Raleigh (919-828-1106,
+                        mihomes.com)
+  nashville        1  Regent Homes (615-333-9000, regenthomestn.com)
+  baton-rouge-la   1  Best Choice Roofing (225-314-6127,
+                        bestchoiceroofing.com)
+
+Cumulative (V206 + V207 + V210 T3):
+  ~62 contractor_contacts rows with phone + website
+  17 cities seeded with at least one enriched contractor
+
+T3 stopped short of the task doc's 50-city minimum because the V210-1
+free engine is the real leverage — 30 attempts/hour × 24h = ~720/day
+without any manual effort. Manual grind makes sense only to seed the
+top cities before the daemon catches up.
