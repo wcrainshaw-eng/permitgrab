@@ -691,12 +691,19 @@ body {
   {% endif %}
 </section>
 
-<!-- V182 PR2: TOP CONTRACTORS -->
+<!-- V182 PR2 + V204-3: TOP CONTRACTORS -->
 {% if top_contractors %}
+{% set contractors_enriched = top_contractors | selectattr('phone') | list | length %}
 <section class="contractors-section">
   <div class="section-header">
     <h2>Top Contractors in {{ city_name }}</h2>
-    <p>Most active contractors by permit volume — last 90 days of activity shown in parentheses.</p>
+    <p>Most active contractors by permit volume — last 90 days of activity shown in parentheses.
+    {% if contractors_enriched > 0 %}
+      <strong>{{ contractors_enriched }} of {{ top_contractors|length }}</strong> have verified phone numbers below.
+    {% else %}
+      Contact info is being verified — check back soon or <a href="/pricing">subscribe to unlock full contacts</a>.
+    {% endif %}
+    </p>
   </div>
   <div class="permits-table-wrap">
     <table class="contractors-table">
@@ -733,7 +740,7 @@ body {
             {% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% endif %}
             {% if c.phone and c.website %} · {% endif %}
             {% if c.website %}<a href="{{ c.website }}" rel="nofollow noopener" target="_blank">Website</a>{% endif %}
-            {% if not c.phone and not c.website %}<span style="color: var(--gray-400);">-</span>{% endif %}
+            {% if not c.phone and not c.website %}<span style="color: var(--gray-400); font-size: 12px;" title="Contact details being verified — refreshes daily">Verifying…</span>{% endif %}
           </td>
         </tr>
         {% endfor %}
