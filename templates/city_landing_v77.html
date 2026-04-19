@@ -534,6 +534,73 @@ body {
   .types-grid { grid-template-columns: repeat(2, 1fr); }
   .nearby-cities-grid { grid-template-columns: 1fr; }
 }
+
+/* V209-3: NEW badge + trade filter tabs + leaderboard rank */
+.badge-new {
+    background: #22c55e;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    display: inline-block;
+    vertical-align: middle;
+}
+.trade-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+    margin: 0;
+}
+.trade-tabs button {
+    padding: 6px 14px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #374151;
+    font-weight: 500;
+}
+.trade-tabs button.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+.trade-tabs button:hover:not(.active) {
+    background: #e5e7eb;
+}
+.leader-rank {
+    display: inline-block;
+    width: 20px;
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 12px;
+    margin-right: 8px;
+}
+.contractor-enriched-icon {
+    color: #16a34a;
+    font-size: 13px;
+    margin-left: 4px;
+}
+.violation-leads-section {
+    background: #fff7ed;
+    padding: 32px;
+    margin-top: 24px;
+    border-radius: 8px;
+    border: 1px solid #fed7aa;
+}
+.violation-leads-section h2 {
+    color: #9a3412;
+    margin-top: 0;
+}
+.violation-pitch {
+    color: #7c2d12;
+    font-size: 14px;
+    margin: 8px 0 16px;
+}
 </style>
 </head>
 <body>
@@ -604,6 +671,23 @@ body {
     </div>
   </div>
 </section>
+
+<!-- V209-3: Scarcity banner -->
+<section style="background: #fffbeb; padding: 12px 32px; border-bottom: 1px solid #fde68a;">
+  <div style="max-width: 1200px; margin: 0 auto; font-size: 13px; color: #92400e;">
+    <strong>&#9889; Limited availability:</strong>
+    Each trade gets <strong>3 subscriber slots</strong> per city.
+    {% set top_trade = (permit_types | list | first) if permit_types else None %}
+    {% if top_trade %}
+      Currently <strong>2 slots remaining</strong> for
+      <strong>{{ top_trade[0] if top_trade is iterable and top_trade is not string else top_trade }}</strong>
+      contractors in {{ city_name }}.
+    {% else %}
+      Reserve your seat before competitors in your trade fill the roster.
+    {% endif %}
+    <a href="/pricing" style="color: #92400e; text-decoration: underline; margin-left: 8px;">Claim a slot &rarr;</a>
+  </div>
+</section>
 {% endif %}
 
 <!-- V177: FILTER BAR -->
@@ -656,6 +740,21 @@ body {
   </div>
 
   {% if recent_permits or permit_count > 0 %}
+  <!-- V209-3: Trade filter tabs (client-side filtering of visible rows) -->
+  {% if recent_permits %}
+  <div class="trade-tabs" data-tabs-for="permits-tbody">
+    <button data-trade="" class="active">All</button>
+    {% set seen_trades = [] %}
+    {% for p in recent_permits[:25] %}
+      {% if p.trade_category and p.trade_category not in seen_trades %}
+        {% set _ = seen_trades.append(p.trade_category) %}
+      {% endif %}
+    {% endfor %}
+    {% for t in seen_trades[:6] %}
+      <button data-trade="{{ t }}">{{ t }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
   <div class="permits-table-container">
     <div class="permits-table-header">
       <h3>Recent Permits</h3>
@@ -672,10 +771,15 @@ body {
             <th>Contractor/Applicant</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="permits-tbody">
           {% for permit in recent_permits[:25] %}
-          <tr>
-            <td>{{ permit.filing_date or 'N/A' }}</td>
+          {# V209-3: NEW badge for permits filed in the last 7 days #}
+          {% set is_new = permit.filing_date and permit.filing_date >= current_week_start %}
+          <tr data-trade="{{ permit.trade_category or '' }}">
+            <td>
+              {{ permit.filing_date or 'N/A' }}
+              {% if is_new %}<span class="badge-new">NEW</span>{% endif %}
+            </td>
             <td class="address">{{ permit.address or 'Address not listed' }}</td>
             <td>
               {% if permit.permit_type %}
@@ -736,11 +840,14 @@ body {
         {% for c in top_contractors %}
         <tr>
           <td>
+            {# V209-3: rank number + enriched icon (visible even before mobile column shows) #}
+            <span class="leader-rank">{{ loop.index }}.</span>
             {% if c.is_license_number %}
               <span class="contractor-license">{{ c.display_name }}</span>
             {% else %}
               <span class="contractor-name">{{ c.display_name }}</span>
             {% endif %}
+            {% if c.phone %}<span class="contractor-enriched-icon" title="Verified phone number available">📞</span>{% endif %}
             {% if c.permit_frequency == 'high' %}<span class="contractor-freq high">Active</span>{% endif %}
           </td>
           <td>{{ "{:,}".format(c.total_permits) }}<span style="color: var(--gray-500);"> ({{ c.permits_90d }})</span></td>
@@ -814,13 +921,13 @@ body {
   </div>
 </section>
 
-<!-- V162: CODE VIOLATIONS SECTION -->
+<!-- V162 / V209-3: CODE VIOLATIONS SECTION — positioned as lead source -->
 {% if violations and violations|length > 0 %}
 <section class="section" style="background: var(--gray-100); max-width: none; padding-left: 32px; padding-right: 32px;">
   <div style="max-width: 1200px; margin: 0 auto;">
     <div class="section-header">
-      <h2>Code Violations in {{ city_name }} <span style="background: #dc2626; color: white; font-size: 13px; padding: 2px 10px; border-radius: 12px; margin-left: 8px; font-weight: 500;">{{ violations_count|default(0) }}</span></h2>
-      <p>Recent code enforcement cases and building violations</p>
+      <h2>&#128293; Active Code Violations in {{ city_name }} <span style="background: #dc2626; color: white; font-size: 13px; padding: 2px 10px; border-radius: 12px; margin-left: 8px; font-weight: 500;">{{ violations_count|default(0) }}</span></h2>
+      <p class="violation-pitch">Contractors who fix code violations get called first. These properties MUST hire a contractor to resolve their violations &mdash; sorted by most recent.</p>
     </div>
 
     <div style="overflow-x: auto;">
@@ -925,6 +1032,28 @@ body {
 {% include 'partials/footer.html' %}
 
 <script>
+// V209-3: Client-side trade tab filter for the recent-permits tbody.
+// Pure DOM filter, no network round-trip. If visitor wants server-side
+// filtering they still have the dropdown + Filter button below.
+(function() {
+    document.querySelectorAll('.trade-tabs').forEach(function(tabs) {
+        var tbodyId = tabs.getAttribute('data-tabs-for');
+        var tbody = tbodyId ? document.getElementById(tbodyId) : null;
+        if (!tbody) return;
+        tabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('button[data-trade]');
+            if (!btn) return;
+            tabs.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var want = btn.getAttribute('data-trade') || '';
+            tbody.querySelectorAll('tr').forEach(function(row) {
+                var t = row.getAttribute('data-trade') || '';
+                row.style.display = (!want || t === want) ? '' : 'none';
+            });
+        });
+    });
+})();
+
 // V177: Filter functionality
 function applyFilters() {
   const params = new URLSearchParams();

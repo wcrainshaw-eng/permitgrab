@@ -13776,6 +13776,7 @@ def city_landing_inner(city_slug):
         nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
         current_year=datetime.now().year,
         current_date=datetime.now().strftime('%Y-%m-%d'),
+        current_week_start=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),  # V209-3: for NEW badge
         last_collected=last_collected,  # V17c: Freshness badge
         related_articles=related_articles,  # V17d: Cross-linked blog articles
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
@@ -14039,6 +14040,7 @@ def state_city_landing(state_slug, city_slug):
         blog_posts=city_blog_posts,
         violations=violations_data,
         violations_count=violations_count,
+        current_week_start=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),  # V209-3: NEW badge
     )
 
 
@@ -15129,6 +15131,17 @@ def scheduled_collection():
                 print(f"[{datetime.now()}] [V201] Enrichment skipped (no GOOGLE_PLACES_API_KEY)")
         except Exception as e:
             print(f"[{datetime.now()}] [V201] Enrichment error (non-fatal): {e}")
+
+        # V209: Bulk web enrichment — complements the V201 priority+tail loop by
+        # sweeping pending profiles across ALL cities (ordered by total_permits
+        # DESC), not just the top-20 buckets. Cap of 50 lookups/cycle at
+        # ~$0.034 each = ~$1.70/cycle extra, $40/day at hourly cadence.
+        try:
+            from web_enrichment import enrich_batch as _v209_enrich
+            v209_result = _v209_enrich(limit=50)
+            print(f"[{datetime.now()}] [V209] web_enrichment cycle: {v209_result}")
+        except Exception as e:
+            print(f"[{datetime.now()}] [V209] web_enrichment error (non-fatal): {e}")
 
         # V168: Removed dead signal_collector, city_health, discovery calls (files deleted in V163)
 
