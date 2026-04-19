@@ -15130,6 +15130,17 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] [V201] Enrichment error (non-fatal): {e}")
 
+        # V209: Bulk web enrichment — complements the V201 priority+tail loop by
+        # sweeping pending profiles across ALL cities (ordered by total_permits
+        # DESC), not just the top-20 buckets. Cap of 50 lookups/cycle at
+        # ~$0.034 each = ~$1.70/cycle extra, $40/day at hourly cadence.
+        try:
+            from web_enrichment import enrich_batch as _v209_enrich
+            v209_result = _v209_enrich(limit=50)
+            print(f"[{datetime.now()}] [V209] web_enrichment cycle: {v209_result}")
+        except Exception as e:
+            print(f"[{datetime.now()}] [V209] web_enrichment error (non-fatal): {e}")
+
         # V168: Removed dead signal_collector, city_health, discovery calls (files deleted in V163)
 
         print(f"[{datetime.now()}] All collection tasks complete.")
