@@ -113,7 +113,14 @@ def _lookup_via_places(name, city, state):
 def _select_pending(conn, limit):
     """Pick contractors that have no contact cache row yet (or a stale
     cache miss), ordered by permit_count DESC so the most valuable ones
-    get enriched first. Oldest profile first as a tie-breaker."""
+    get enriched first. Oldest profile first as a tie-breaker.
+
+    Filter out junk names that aren't worth an API call:
+      - 'NOT GIVEN' / 'OWNER' / 'HOMEOWNER' / 'SELF CONTRACTOR' placeholders
+      - Pure numeric IDs (Portland WI, Fenner NY — permit nums, not names)
+      - Utility placeholders (CenterPoint, Energy Resource Corp)
+      - Template placeholder text (****SELECT EDIT BELOW...)
+    """
     rows = conn.execute("""
         SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
                cp.city, cp.state, cp.source_city_key
@@ -123,7 +130,14 @@ def _select_pending(conn, limit):
         WHERE cp.is_active = 1
           AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
           AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
-          AND LENGTH(cp.contractor_name_raw) > 3
+          AND LENGTH(cp.contractor_name_raw) >= 5
+          AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
+          AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
+          AND cp.contractor_name_raw NOT LIKE 'OWNER %'
+          AND UPPER(cp.contractor_name_raw) NOT LIKE '%SELF CONTRACTOR%'
+          AND UPPER(cp.contractor_name_raw) NOT LIKE '%SELECT EDIT%'
+          AND UPPER(cp.contractor_name_raw) NOT LIKE '%ENERGY RESOURCE%'
+          AND cp.contractor_name_raw NOT GLOB '[0-9]*'
           AND (cc.id IS NULL
                OR (cc.phone IS NULL AND cc.website IS NULL
                    AND (cc.last_error IS NULL OR cc.last_error != 'no results')))
