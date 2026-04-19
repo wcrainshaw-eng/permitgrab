@@ -590,6 +590,22 @@ body {
   </div>
 </section>
 
+<!-- V204-4: Subscription CTA banner (above the fold, below hero) -->
+{% if permit_count > 0 %}
+<section style="background: #eef5ff; padding: 20px 32px; border-top: 1px solid #dbeafe; border-bottom: 1px solid #dbeafe;">
+  <div style="max-width: 1200px; margin: 0 auto; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">Get full access to {{ city_name }} contractor leads</div>
+      <div style="font-size: 13px; color: #1e40af; margin-top: 2px;">Phone numbers, websites, and daily new-permit alerts. Cancel anytime.</div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <a href="/pricing" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">See Pricing — $149/mo</a>
+      <a href="/get-alerts" style="display: inline-block; padding: 10px 16px; background: white; color: #2563eb; border: 1px solid #2563eb; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">Try Free Alerts</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <!-- V177: FILTER BAR -->
 {% if permit_count > 0 %}
 <section style="background: white; max-width: none; padding: 16px 32px;">
@@ -896,11 +912,14 @@ body {
   </a>
 </section>
 
-<!-- CTA -->
+<!-- V204-4: Bottom CTA — free alerts + pricing -->
 <section class="cta-section">
-  <h2>Get {{ city_name }} Permit Alerts</h2>
-  <p>Daily email digest of new permits. Be the first contractor to call.</p>
-  <a href="/get-alerts" class="cta-btn">Set Up Free Alerts</a>
+  <h2>Turn {{ city_name }} permits into leads</h2>
+  <p>Daily email digest of new permits, plus verified contractor phone &amp; website data. Free tier for alerts; $149/mo unlocks full contractor contacts.</p>
+  <div style="display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+    <a href="/pricing" class="cta-btn">See Pricing</a>
+    <a href="/get-alerts" class="cta-btn" style="background: white; color: #2563eb;">Set Up Free Alerts</a>
+  </div>
 </section>
 
 {% include 'partials/footer.html' %}
