@@ -9785,12 +9785,17 @@ def api_permits():
     per_page = int(request.args.get('per_page', 50))
 
     # V32: Resolve city slug to name and state for cross-state filtering.
-    # V202-4: Fallback to prod_cities.city_slug → (city, state) when the
-    # CITY_REGISTRY slug lookup misses — top-10 pages (new-york-city,
-    # chicago-il, houston-tx, phoenix-az) were rendering 0 results because
-    # CITY_REGISTRY stores the shorter 'new-york' slug while the frontend
-    # URL uses the longer 'new-york-city' slug that prod_cities also uses.
-    # Falling back to prod_cities closes that gap without risky renames.
+    # V202-4 + V203: Two-stage lookup with a shared alias map.
+    # Some CITY_REGISTRY entries carry display names that don't match the
+    # value stored on permits rows — e.g. chicago_il has name='CHICAGO' while
+    # permits have city='Chicago', producing 0-result pages. And some slugs
+    # don't exist in CITY_REGISTRY at all (new-york-city, houston-tx,
+    # phoenix-az, jacksonville-fl) but do exist in prod_cities. Resolve
+    # against both, then normalize through PERMIT_CITY_ALIAS before querying.
+    PERMIT_CITY_ALIAS = {
+        ('New York City', 'NY'): 'New York',  # prod_cities display vs permits.city
+        ('CHICAGO', 'IL'): 'Chicago',          # CITY_REGISTRY chicago_il uppercase
+    }
     city_name = None
     city_state = None
     if city:
@@ -9808,19 +9813,13 @@ def api_permits():
                 if row:
                     city_name = row['city'] if isinstance(row, dict) else row[0]
                     city_state = row['state'] if isinstance(row, dict) else row[1]
-                    # V202-4: prod_cities display-name can diverge from the
-                    # city value actually stored on permits rows (e.g. NYC
-                    # stores 'New York' in permits.city even though the card
-                    # says 'New York City'). Remap here for the query only;
-                    # the display name is set separately by the template.
-                    CITY_ALIAS = {
-                        ('New York City', 'NY'): 'New York',
-                    }
-                    city_name = CITY_ALIAS.get((city_name, city_state), city_name)
                 else:
                     city_name = city  # Use as-is if not a valid slug
             except Exception:
                 city_name = city
+        # Apply alias after resolution — covers both registry and prod_cities paths.
+        if city_name is not None:
+            city_name = PERMIT_CITY_ALIAS.get((city_name, city_state), city_name)
 
     # Resolve trade slug to name if needed
     trade_name = None
