@@ -403,6 +403,36 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V198: Charlotte NC — ArcGIS, fresh (sampled 2026-04-18)
+    'charlotte-nc': {
+        'prod_city_id': None,
+        'city': 'Charlotte',
+        'state': 'NC',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases All',
+                'platform': 'arcgis',
+                'resource_id': 'charlotte-code-enforcement',
+                'arcgis_url': 'https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0',
+                'date_field': 'DateCreated',
+                'id_field': 'CaseNumber',
+                'description_field': 'DetailedDescription',
+                'status_field': 'CaseStatus',
+                'type_field': 'CaseType',
+                'address_fields': {'full': 'FullAddress'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
+    #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
+    #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
+    #   - Baltimore MD: egisdata Housing FS has no single "all violations" layer
+    #       (only Vacant Building Notices and filtered subsets in dmxPermitsCodeEnforcement)
+    #   - San Antonio TX: opendata-cosagis DCAT has 0 violation/enforcement datasets
+    #   - Atlanta GA: dpcd-coaplangis DCAT has 0 violation/enforcement datasets
     # V197 PHASE 1 SKIPS (tested via SSH, documented to prevent re-investigation):
     #   - Nashville data.nashville.gov/479w-kw2x — 302 to hub.arcgis.com (migrated, new source added above)
     #   - Baltimore data.baltimorecity.gov/pugq-wdem — 302 to hub.arcgis.com; egisdata housing FS
