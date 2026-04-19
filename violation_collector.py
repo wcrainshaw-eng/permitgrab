@@ -297,6 +297,8 @@ VIOLATION_SOURCES = {
         'prod_city_id': None,
         'city': 'Indianapolis',
         'state': 'IN',
+        # V200-T2: endpoint stopped updating — max OPEN_DATE on server is 2024-02-27
+        # (910K historical rows, no new rows since). Retained for future backfill.
         'endpoints': [
             {
                 'name': 'Code Enforcement Violations',
@@ -341,6 +343,8 @@ VIOLATION_SOURCES = {
         'prod_city_id': None,
         'city': 'Greensboro',
         'state': 'NC',
+        # V200-T2: endpoint stale — max IssuedDate on server is 2024-06-18
+        # (96K historical rows). Retained for future backfill.
         'endpoints': [
             {
                 'name': 'Code Compliance All Violations',
@@ -400,6 +404,52 @@ VIOLATION_SOURCES = {
                 'zip_field': None,
                 'lat_field': 'Latitude',
                 'lng_field': 'Longitude',
+            },
+        ],
+    },
+    # V200: San Jose CA — ArcGIS Code Complaints (Open), fresh
+    'san-jose-ca': {
+        'prod_city_id': None,
+        'city': 'San Jose',
+        'state': 'CA',
+        'endpoints': [
+            {
+                'name': 'Code Complaints (Open)',
+                'platform': 'arcgis',
+                'resource_id': 'san-jose-code-complaints',
+                'arcgis_url': 'https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/1',
+                'date_field': 'OPENDATE',
+                'id_field': 'CASENUMBER',
+                'description_field': 'DESCRIPTION',
+                'status_field': 'CASESTATUS',
+                'type_field': 'PROGRAM',
+                'address_fields': {'full': 'LOCATION'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V200: Miami-Dade FL — ArcGIS Code Compliance Violations, fresh
+    'miami-dade-fl': {
+        'prod_city_id': None,
+        'city': 'Miami',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'Code Compliance Violations (MDC)',
+                'platform': 'arcgis',
+                'resource_id': 'miami-dade-code-compliance',
+                'arcgis_url': 'https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/CCVIOL_gdb/FeatureServer/0',
+                'date_field': 'CASE_DATE',
+                'id_field': 'CASE_NUM',
+                'description_field': 'PROBLEM_DESC',
+                'status_field': 'STAT_DESC',
+                'type_field': 'PROBLEM',
+                'address_fields': {'full': 'ADDRESS'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
             },
         ],
     },
