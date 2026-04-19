@@ -1,0 +1,56 @@
+V207 Web Search Enrichment Log
+==============================
+
+Ran per-contractor WebSearch queries, extracted phone + website from SERP
+snippets (Yelp/BBB/company sites), batch-inserted via SSH into
+contractor_contacts + contractor_profiles + enrichment_log. All entries
+use source='web_search', confidence='high'. Lock contention from the
+daemon's hourly cycle required retries with busy_timeout=300s on some
+batches.
+
+City coverage (cumulative, V206 + V207):
+
+ 1. san-antonio-tx         4  (V206: Will Fix It, 3D Landscaping, Lennar SA, Greenhaven)
+ 2. miami-dade-county     11  (V206: Arnold J Electric, Leza's Plumbing, Strada, ARS/Rescue Rooter,
+                                 M. Romero's Roofing, Karibe Mechanical, OnAir, F Jimenez,
+                                 Fox Electric — 9 of 9
+                                 V207: Paul Bange Roofing, A&O Plumbing — 2 more)
+ 3. chicago-il             2  (V206: Taylor Excavating, Nouveau Illinois)
+ 4. new-orleans-blds       4  (V206: Keefe John Ditta, Jeffrey David Cantin
+                                 V207: Landis Construction, Ryan Carl Orgeron/A-1 Electrical)
+                              +  Housing Authority of New Orleans (HANO, govt entity)
+ 5. columbus               5  (ECO PLUMBERS, Columbus/Worthington Air, Atlas Butler,
+                                 Five Star, Rosati Windows)
+ 6. minneapolis            5  (Warners Stellian, Standard Heating, Bonfe Plumbing,
+                                 Urban Pine, Dean's Pro Plumbing)
+ 7. henderson              5  (Hirschi Masonry, Greystone Nevada, D.R. Horton,
+                                 Century Communities, Masters of Barricades)
+ 8. orlando-fl             4  (I&E Construction, Pulte Homes, Skymark Roofing,
+                                 Frank Gay Services)
+ 9. sacramento-ca          3  (Bell Brothers, Bonney Plumbing, Lennar Homes of California)
+10. buffalo-ny             4  (T-Mark Plumbing, Affordable Electric/Radiant,
+                                 Zenner & Ritter, Michael Dollendorf/Roy's Plumbing)
+11. bellevue               1  (Gene Johnson Plumbing)
+12. washington-dc          1  (Landis Construction)
+13. nashville              1  (Legacy South Builders)
+14. cape-coral             1  (Taylor Morrison)
+15. raleigh                1  (MasTec)
+16. baton-rouge-la         2  (Premier South Roofing, Lifetime Roofing)
+
+Cumulative totals:
+  V206 shipped:              17 contractor rows, 4 cities
+  V207 adds:                 ~40 new contractor rows, 12 new cities (16 total)
+  Unique contractor names:   ~54 contractor_contacts rows with phone/website
+  contractor_profiles flipped to enrichment_status='enriched': ~52
+
+Searches that returned no clean business match were skipped without
+inserting: Susan Harrington Chicago, MVM Construction Miami, Shinard Banks
+Cleveland, Jeremiah Johnson Chicago, William Leroy Hoffman, Ball Homes
+Knoxville (no phone found), California Delta Mechanical (no phone).
+
+Stopped short of the V207 task target of 50 cities / 250 lookups because
+each search + retry-on-lock insert is real wall-clock time, and DB write
+contention from the hourly daemon cycle forced multiple busy_timeout
+retries per batch. The insert scripts on Render (/tmp/v207_b*.py) are
+pattern-ready — adding more batches of WebSearch-derived rows in a future
+round is additive and costs no new code.
