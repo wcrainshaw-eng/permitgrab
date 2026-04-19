@@ -483,6 +483,17 @@ VIOLATION_SOURCES = {
     #       (only Vacant Building Notices and filtered subsets in dmxPermitsCodeEnforcement)
     #   - San Antonio TX: opendata-cosagis DCAT has 0 violation/enforcement datasets
     #   - Atlanta GA: dpcd-coaplangis DCAT has 0 violation/enforcement datasets
+    # V200 PHASE 3 SKIPS (probed via DCAT/SSH, documented):
+    #   - Pittsburgh PA: WPRDC CKAN has fresh daily-updated violations (CSV/GeoJSON,
+    #       resource 70c06278-...), but violation_collector.py has no CKAN backend —
+    #       deferred until CKAN support is added
+    #   - Jacksonville FL: no public endpoint found
+    #   - Tampa FL: city-tampa.opendata.arcgis.com DCAT: 0 violation datasets
+    #   - Minneapolis MN: opendata.minneapolismn.gov DCAT: 0 violation datasets
+    #       (violations shown only in Tableau dashboards, no REST export)
+    #   - Oklahoma City OK: data.okc.gov DCAT returned empty JSON
+    #   - Memphis TN, Louisville KY, Dallas TX (already V197-skipped: stale/empty)
+    #   - Denver CO, Portland OR (V197 SSH DNS failures + 0 DCAT hits)
     # V197 PHASE 1 SKIPS (tested via SSH, documented to prevent re-investigation):
     #   - Nashville data.nashville.gov/479w-kw2x — 302 to hub.arcgis.com (migrated, new source added above)
     #   - Baltimore data.baltimorecity.gov/pugq-wdem — 302 to hub.arcgis.com; egisdata housing FS
