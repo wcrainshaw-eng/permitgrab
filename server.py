@@ -15246,7 +15246,23 @@ def scheduled_collection():
                     elif _api_rows > 0:
                         _status = 'caught_up'
                     else:
-                        _status = 'no_api_data'
+                        # V220 T2: 0 rows returned is ambiguous — could be a
+                        # broken endpoint OR legitimately caught up when the
+                        # date filter excludes everything. Disambiguate by
+                        # checking whether we have any existing violations
+                        # for this city. If we do, the source has worked
+                        # before and this cycle just had nothing new.
+                        _has_prior = False
+                        try:
+                            _cnt_row = _v214_conn.execute(
+                                "SELECT 1 FROM violations WHERE prod_city_id IN "
+                                "(SELECT id FROM prod_cities WHERE city_slug = ?) LIMIT 1",
+                                (_slug,),
+                            ).fetchone()
+                            _has_prior = _cnt_row is not None
+                        except Exception:
+                            pass
+                        _status = 'caught_up' if _has_prior else 'no_api_data'
                     _v214_conn.execute("""
                         INSERT INTO collection_log
                           (city_slug, collection_type, status,

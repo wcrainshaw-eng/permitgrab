@@ -882,8 +882,22 @@ def collect_violations():
     # (inserted, api_rows_returned, duplicate_rows_skipped, api_url,
     # query_params) so the daemon can decide between success /
     # caught_up / no_api_data and write them to collection_log.
+    # V220 T2: skip sources known to be permanently stale. These endpoints
+    # respond (not dead) but have stopped updating upstream — every poll
+    # cycle wastes an HTTP round trip and fills collection_log with
+    # no_api_data noise for nothing. Keep the entries in VIOLATION_SOURCES
+    # so historical data stays queryable; just skip polling.
+    PAUSED_VIOLATION_SOURCES = {
+        'greensboro-nc',     # max IssuedDate 2024-06-18
+        'indianapolis-in',   # max OPEN_DATE 2024-02-27
+        'kansas-city-mo',    # max date_found 2025-07-04
+    }
+
     results = {}
     for slug, config in VIOLATION_SOURCES.items():
+        if slug in PAUSED_VIOLATION_SOURCES:
+            print(f"  [V220] skipping {slug} — permanently stale upstream")
+            continue
         agg = {
             'inserted': 0,
             'api_rows_returned': 0,
