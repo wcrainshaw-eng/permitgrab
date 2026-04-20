@@ -809,20 +809,26 @@ def init_db():
             processed_at TEXT
         );
 
-        -- V214: collection_log — observability for daemon collection cycles.
-        -- One row per (city, cycle, collection_type) so silent failures like the
-        -- V213 Carto parse bug would show up here as status='error' or
-        -- records_inserted=0 instead of disappearing into a try/except.
+        -- V214 + V215: collection_log — observability for daemon collection
+        -- cycles. One row per (city, cycle, collection_type). V215 adds three-
+        -- state status + diagnostic columns so 0-insert rows can be
+        -- distinguished between "caught up" (API had rows, all dupes = healthy)
+        -- and "no_api_data" (API returned 0 rows = investigate the URL).
         CREATE TABLE IF NOT EXISTS collection_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             city_slug TEXT NOT NULL,
             collection_type TEXT DEFAULT 'permits',
-            status TEXT NOT NULL,
+            status TEXT NOT NULL,       -- success|caught_up|no_api_data|error|empty
             records_fetched INTEGER DEFAULT 0,
             records_inserted INTEGER DEFAULT 0,
             error_message TEXT,
             duration_seconds REAL,
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at TEXT DEFAULT (datetime('now')),
+            -- V215: diagnostic columns for no_api_data triage
+            api_url TEXT,                   -- full URL hit
+            query_params TEXT,              -- where/filter params
+            api_rows_returned INTEGER,      -- raw rows from API (pre-dedup)
+            duplicate_rows_skipped INTEGER  -- rows the insert silently dropped
         );
         CREATE INDEX IF NOT EXISTS idx_collection_log_city ON collection_log(city_slug);
         CREATE INDEX IF NOT EXISTS idx_collection_log_created ON collection_log(created_at);

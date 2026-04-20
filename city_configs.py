@@ -189,7 +189,18 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": True,
-        "notes": "V12.6: Fixed domain to datahub.austintexas.gov",
+        # V215 T4: Austin Socrata (3syk-w9eu) has NO contractor/applicant/
+        # permittee/contact field in the public dataset — the permit record
+        # is structural only (permit_number, type, location, dates).
+        # Contractor identity lives behind the public-search UI at
+        # abc.austintexas.gov and requires a scraper to surface. That's a
+        # separate project; leaving field_map as-is rather than mapping
+        # ghost fields that would silently null.
+        "notes": (
+            "V215: Source dataset has no contractor field. Contractor "
+            "enrichment for Austin requires scraping abc.austintexas.gov; "
+            "out of scope for Socrata-only collection."
+        ),
     },
 
     "san_francisco": {
@@ -965,7 +976,18 @@ CITY_REGISTRY = {
         "date_field": "Date",
         "limit": 2000,
         "active": True,
-        "notes": "V54: Reactivated Accela with field_map. Agency=SANDIEGO, module=DSD. Top-10 city.",
+        # V215 T4: Accela Citizen Access for San Diego returns per-record
+        # detail pages that can include applicant/contractor, but the
+        # generic Accela collector currently doesn't populate contractor_name
+        # from those pages — only 2/10 of collected permits have a name,
+        # both from secondary sources. To close the gap San Diego needs an
+        # Accela collector enhancement that follows the Record link and
+        # parses the "People" / "Contractor" section. Deferred.
+        "notes": (
+            "V215: Accela generic collector doesn't pull contractor info "
+            "from the detail page — needs a San Diego-specific parser "
+            "to populate contractor_name. Current coverage: ~20%."
+        ),
     },
 
     "sacramento": {
@@ -12537,12 +12559,30 @@ CITY_REGISTRY = {
         "platform": "ckan",
         "endpoint": "",
         "dataset_id": "",
-        "description": "Building Permits - Aggregate data only",
+        "description": "Building Permits - No per-permit open-data feed available",
         "field_map": {},
         "date_field": "",
         "limit": 2000,
-        "active": True,  # V101: Reactivated — gets data from TX bulk Socrata sources. 3,913 permits orphaned without active row.
-        "notes": "V101: No individual endpoint, but receives permits from TX bulk sources. Must be active for permit linking.",
+        "active": True,
+        # V215 T2: Houston has no usable per-permit API.
+        # - data.houstontx.gov only publishes aggregate XLSX roll-ups of
+        #   residential permits by month/year (no contractor names, no
+        #   per-permit rows).
+        # - No TX statewide bulk source currently exists in bulk_sources
+        #   that routes to Houston. The 3,395 existing Houston permits
+        #   (PG-TEX-*) came from a now-removed state bulk source.
+        # - City of Houston runs its permit system via IMS which is not
+        #   exposed as a public API.
+        # Field_map is intentionally empty — there is no source field to
+        # map contractor_name from. Leave city active so prod_cities still
+        # links (stale permits stay reachable); document that Houston
+        # requires a NEW source to produce contractor-enriched leads.
+        "notes": (
+            "V215: No public per-permit API for Houston. "
+            "Field_map is empty by design — do not fabricate mappings. "
+            "Needs a new data source (e.g. paid feed or IMS scraper) to "
+            "produce contractor-level leads."
+        ),
     },
 
     # =========================================================================
