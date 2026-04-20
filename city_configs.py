@@ -947,25 +947,33 @@ CITY_REGISTRY = {
         "lon": -121.886,
         "platform": "ckan",
         "endpoint": "https://data.sanjoseca.gov/api/3/action/datastore_search",
-        "dataset_id": "89ccdad9-7309-4826-a5f3-2fcf1fcb20fa",
-        "description": "Building Permits Under Inspection - current permits being inspected",
+        # V219 T2: Reactivated with the working "Building Permits - Last 30
+        # Days" resource id (045b3678). The prior 89ccdad9 / 761b7ae8
+        # resources return 0 rows; this one returns ~2,200 fresh permits
+        # with full contractor/applicant/owner columns.
+        "dataset_id": "045b3678-e923-4002-b696-300955bc6d06",
+        "description": "Building Permits - Last 30 Days (data.sanjoseca.gov CKAN)",
         "field_map": {
             "permit_number": "FOLDERNUMBER",
             "permit_type": "FOLDERDESC",
+            "permit_subtype": "SUBTYPEDESCRIPTION",
             "address": "gx_location",
             "description": "WORKDESCRIPTION",
             "issued_date": "ISSUEDATE",
             "status": "Status",
             "owner_name": "OWNERNAME",
+            "applicant_name": "APPLICANT",
             "contractor_name": "CONTRACTOR",
             "estimated_cost": "PERMITVALUATION",
             "square_feet": "SQUAREFOOTAGE",
+            "parcel": "ASSESSORS_PARCEL_NUMBER",
+            "num_units": "DWELLINGUNITS",
         },
         "date_field": "ISSUEDATE",
         "date_format": "string",
         "limit": 2000,
-        "active": False,  # V102: Deactivated — CKAN resource not found (404). 36 runs with 0 permits. Need new resource ID.
-        "notes": "V102: Deactivated. CKAN resource 761b7ae8 dead, 89ccdad9 also returns 0 permits. Need to find current dataset on data.sanjoseca.gov.",
+        "active": True,
+        "notes": "V219: Reactivated with resource_id 045b3678 (Last 30 Days). Prior resources (89ccdad9, 761b7ae8) are dead. ~2,200 current permits w/ CONTRACTOR + APPLICANT + OWNER fields.",
     },
 
     # V23 AUDIT: 2026-03-28 - STALE - County data from 2017, City portal access denied
