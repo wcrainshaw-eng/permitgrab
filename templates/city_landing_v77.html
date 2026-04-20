@@ -601,6 +601,22 @@ body {
     font-size: 14px;
     margin: 8px 0 16px;
 }
+
+/* V211-1: inline email capture */
+.email-capture {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 2px solid #2563eb;
+    border-radius: 12px;
+    padding: 24px 20px;
+    margin: 16px auto 24px;
+    max-width: 1140px;
+    text-align: center;
+    color: #1e3a8a;
+}
+.email-capture h3 {
+    color: #1e3a8a;
+    font-size: 20px;
+}
 </style>
 </head>
 <body>
@@ -657,7 +673,7 @@ body {
   </div>
 </section>
 
-<!-- V204-4: Subscription CTA banner (above the fold, below hero) -->
+<!-- V204-4 / V211-1: Subscription CTA banner + inline email capture -->
 {% if permit_count > 0 %}
 <section style="background: #eef5ff; padding: 20px 32px; border-top: 1px solid #dbeafe; border-bottom: 1px solid #dbeafe;">
   <div style="max-width: 1200px; margin: 0 auto; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
@@ -667,9 +683,27 @@ body {
     </div>
     <div style="display: flex; gap: 10px;">
       <a href="/pricing" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">See Pricing — $149/mo</a>
-      <a href="/get-alerts" style="display: inline-block; padding: 10px 16px; background: white; color: #2563eb; border: 1px solid #2563eb; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">Try Free Alerts</a>
+      <a href="#email-capture" style="display: inline-block; padding: 10px 16px; background: white; color: #2563eb; border: 1px solid #2563eb; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">Free Alerts &darr;</a>
     </div>
   </div>
+</section>
+
+<!-- V211-1: Inline email capture — writes to /api/subscribe which already
+     backs the User digest system (Postgres) — no new table needed -->
+<section class="email-capture" id="email-capture">
+  <h3 style="margin: 0 0 8px 0;">&#128276; Get Daily {{ city_name }} Permit Alerts</h3>
+  <p style="margin: 0 0 14px 0; color: #1e3a8a;">New permits, violations, and contractor activity delivered to your inbox. Free &mdash; no credit card.</p>
+  <form id="subscribe-form" onsubmit="v211Subscribe(event)" style="max-width: 520px; margin: 0 auto;">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <input type="email" id="v211-sub-email" required placeholder="your@email.com"
+             style="flex: 1 1 240px; padding: 12px 14px; border: 2px solid #2563eb; border-radius: 8px; font-size: 16px;">
+      <button type="submit" id="v211-sub-btn"
+              style="background: #2563eb; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 16px; white-space: nowrap;">
+        Get Alerts Free
+      </button>
+    </div>
+    <p id="v211-sub-message" style="margin: 8px 0 0; font-size: 14px; min-height: 20px;"></p>
+  </form>
 </section>
 
 <!-- V209-3: Scarcity banner -->
@@ -1032,6 +1066,52 @@ body {
 {% include 'partials/footer.html' %}
 
 <script>
+// V211-1: Email capture form — POSTs to /api/subscribe (existing endpoint
+// that backs User digest subscriptions). Shows inline status message.
+function v211Subscribe(ev) {
+    ev.preventDefault();
+    var emailEl = document.getElementById('v211-sub-email');
+    var msgEl = document.getElementById('v211-sub-message');
+    var btn = document.getElementById('v211-sub-btn');
+    var email = (emailEl.value || '').trim();
+    if (!email || email.indexOf('@') < 0) {
+        msgEl.textContent = 'Please enter a valid email.';
+        msgEl.style.color = '#dc2626';
+        return false;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Subscribing...';
+    fetch('/api/subscribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            email: email,
+            city: '{{ city_name | e }}',
+            trade: ''
+        })
+    }).then(function(r) { return r.json().then(function(body) { return {status: r.status, body: body}; }); })
+      .then(function(res) {
+          if (res.status >= 200 && res.status < 300) {
+              msgEl.textContent = '\u2705 You\'re on the list. Daily ' + '{{ city_name | e }}' + ' permit alerts incoming.';
+              msgEl.style.color = '#16a34a';
+              emailEl.value = '';
+              btn.textContent = 'Subscribed';
+          } else {
+              msgEl.textContent = '\u274c ' + ((res.body && res.body.error) || 'Something went wrong.');
+              msgEl.style.color = '#dc2626';
+              btn.disabled = false;
+              btn.textContent = 'Get Alerts Free';
+          }
+      })
+      .catch(function() {
+          msgEl.textContent = '\u274c Network error, please try again.';
+          msgEl.style.color = '#dc2626';
+          btn.disabled = false;
+          btn.textContent = 'Get Alerts Free';
+      });
+    return false;
+}
+
 // V209-3: Client-side trade tab filter for the recent-permits tbody.
 // Pure DOM filter, no network round-trip. If visitor wants server-side
 // filtering they still have the dropdown + Filter button below.
