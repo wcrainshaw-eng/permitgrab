@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome to PermitGrab — Subscription Active</title>
+<meta name="description" content="Your PermitGrab subscription is active. Your first daily digest lands in your inbox tomorrow morning.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --accent: #f97316;
+  --green: #10b981;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+.nav { background: var(--gray-900); padding: 16px 32px; }
+.nav-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 22px; font-weight: 700; color: white; text-decoration: none; }
+.logo span { color: var(--accent); }
+.hero {
+  background: linear-gradient(135deg, var(--gray-900) 0%, #374151 100%);
+  color: white;
+  text-align: center;
+  padding: 80px 32px 60px;
+}
+.hero-inner { max-width: 640px; margin: 0 auto; }
+.check-circle {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--green); color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 38px; margin-bottom: 20px;
+}
+h1 { font-size: 34px; font-weight: 800; margin-bottom: 12px; }
+.subtitle { font-size: 17px; color: rgba(255,255,255,.75); margin-bottom: 28px; }
+.next-steps {
+  background: white; border-radius: 12px;
+  padding: 40px 32px; max-width: 640px;
+  margin: -40px auto 40px; box-shadow: 0 12px 40px rgba(0,0,0,.08);
+  position: relative;
+}
+.next-steps h2 { font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 24px; }
+.step { display: flex; gap: 18px; margin-bottom: 20px; align-items: flex-start; }
+.step-num {
+  flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--primary); color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px;
+}
+.step-body h3 { font-size: 16px; font-weight: 600; color: var(--gray-900); margin-bottom: 4px; }
+.step-body p { font-size: 14px; color: var(--gray-500); }
+.cta-row {
+  display: flex; gap: 14px; margin-top: 28px; flex-wrap: wrap;
+  justify-content: center;
+}
+.btn {
+  display: inline-block; padding: 14px 26px;
+  border-radius: 8px; font-size: 15px; font-weight: 600;
+  text-decoration: none; transition: all .2s; border: none; cursor: pointer;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-2px); }
+.btn-outline {
+  background: transparent; border: 2px solid var(--gray-200);
+  color: var(--gray-700);
+}
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.footer {
+  margin-top: auto;
+  background: var(--gray-900); color: rgba(255,255,255,.5);
+  padding: 32px; text-align: center; font-size: 13px;
+}
+.footer a { color: rgba(255,255,255,.7); }
+@media (max-width: 640px) {
+  h1 { font-size: 26px; }
+  .next-steps { margin: -20px 16px 32px; padding: 28px 22px; }
+  .cta-row { flex-direction: column; }
+  .cta-row .btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' ignore missing %}
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="check-circle">&#10003;</div>
+    <h1>Welcome to PermitGrab.</h1>
+    <p class="subtitle">Your subscription is active. Your first daily digest lands in your inbox tomorrow morning.</p>
+  </div>
+</section>
+
+<section class="next-steps">
+  <h2>What happens next</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h3>Daily digest at 6am local</h3>
+      <p>Every morning we'll email you the permits and code violations filed in your target cities over the last 24 hours — addresses, owner contacts, project value, and contractor names where available.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h3>Watch for violations too</h3>
+      <p>Your subscription includes code violation leads on top of permits. These are properties where the owner has an open-and-shut reason to hire you tomorrow.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h3>Browse the live feed any time</h3>
+      <p>Your dashboard at <a href="/dashboard">permitgrab.com/dashboard</a> shows every permit and violation in real time. Filter by trade, cost, and neighborhood.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <h3>Questions?</h3>
+      <p>Reply to any digest email — it goes straight to Wes. You can also reach us at <a href="mailto:wcrainshaw@gmail.com">wcrainshaw@gmail.com</a>.</p>
+    </div>
+  </div>
+
+  <div class="cta-row">
+    <a href="/dashboard" class="btn btn-primary">Open Your Dashboard</a>
+    <a href="/" class="btn btn-outline">Browse Permits</a>
+  </div>
+</section>
+
+<footer class="footer">
+  &copy; PermitGrab — permits and code violations for contractors.
+  Need to unsubscribe? Every digest email has a one-click link.
+</footer>
+
+</body>
+</html>

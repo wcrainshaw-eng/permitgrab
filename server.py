@@ -10053,6 +10053,15 @@ def api_subscribe():
         return jsonify({'error': 'Email required'}), 400
 
     email = data['email'].strip().lower()
+    # V218 T5B: server-side email format validation. The previous 'email
+    # required' check let literal 'notanemail' land in the User table,
+    # polluting subscriber lists and breaking downstream SendGrid calls.
+    # RFC 5322 is more permissive than this but for our digest signup
+    # the local@domain.tld shape is exactly what we want to enforce.
+    import re as _re
+    if not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email) or len(email) > 254:
+        return jsonify({'error': 'Please enter a valid email address'}), 400
+
     city = data.get('city', '').strip().title()  # V12.64: Normalize to titlecase
     trade = data.get('trade', '')
 
@@ -11707,8 +11716,11 @@ def create_checkout_session():
                 'quantity': 1,
             }],
             mode='subscription',
-            success_url=f'{SITE_URL}/?payment=success',
-            cancel_url=f'{SITE_URL}/?payment=cancelled',
+            # V218 T5D: route to the dedicated /success page so customers
+            # land on a real confirmation with "what happens next" steps
+            # instead of the generic homepage.
+            success_url=f'{SITE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{SITE_URL}/pricing?payment=cancelled',
             customer_email=customer_email,
             metadata={
                 'plan': plan_name,
@@ -11719,6 +11731,15 @@ def create_checkout_session():
         return jsonify({'url': checkout_session.url})
     except stripe.error.StripeError as e:
         return jsonify({'error': str(e), 'fallback': mailto_fallback}), 400
+
+
+@app.route('/success', methods=['GET'])
+def checkout_success():
+    """V218 T5D: Dedicated post-payment landing page. Stripe success_url
+    redirects here with ?session_id=cs_xxx. We don't verify the session
+    server-side (the webhook handler does that for real subscription
+    state) — this page is purely the customer-facing confirmation."""
+    return render_template('success.html')
 
 
 @app.route('/api/stripe-webhook', methods=['POST'])
@@ -11746,7 +11767,39 @@ def stripe_webhook():
         return jsonify({'error': 'Invalid signature'}), 400
 
     event_type = event['type']
-    print(f"[Stripe] Received event: {event_type}")
+    event_id = event.get('id') or ''
+    print(f"[Stripe] Received event: {event_type} ({event_id})")
+
+    # V218 T5C: webhook idempotency. Stripe retries on delivery failure,
+    # and the current handler would re-fire payment_success emails each
+    # time. Track event IDs we've already processed and no-op on repeat.
+    if event_id:
+        try:
+            _wh_conn = permitdb.get_connection()
+            _wh_conn.execute("""
+                CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+                    event_id TEXT PRIMARY KEY,
+                    event_type TEXT,
+                    processed_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            _wh_conn.commit()
+            already = _wh_conn.execute(
+                "SELECT 1 FROM stripe_webhook_events WHERE event_id = ?",
+                (event_id,),
+            ).fetchone()
+            if already:
+                print(f"[Stripe] event {event_id} already processed — skipping")
+                return jsonify({'status': 'duplicate', 'event_id': event_id})
+            _wh_conn.execute(
+                "INSERT OR IGNORE INTO stripe_webhook_events (event_id, event_type) VALUES (?, ?)",
+                (event_id, event_type),
+            )
+            _wh_conn.commit()
+        except Exception as _e:
+            # Don't fail the webhook over idempotency bookkeeping — better
+            # to risk a duplicate email than 500 and let Stripe retry.
+            print(f"[Stripe] idempotency check skipped (non-fatal): {_e}")
 
     # V12.53: Handle all subscription lifecycle events
     if event_type == 'checkout.session.completed':

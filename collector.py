@@ -2195,10 +2195,20 @@ def normalize_permit(raw_record, city_key):
     if not permit_num:
         return None  # V126: REQUIRED — drop records without permit number
 
+    # V218 T4: force NYC to canonical "New York City" at insert time so
+    # we stop regressing after V217's one-shot rename. Some upstream
+    # datasets label NYC rows "New York"; others (the new_york config)
+    # label them "New York City". Normalize on write to match the name
+    # used everywhere else (prod_cities, violations, contractor_profiles).
+    _city_name = config.get("name", city_key)
+    _state = config.get("state", "")
+    if _state == "NY" and _city_name == "New York":
+        _city_name = "New York City"
+
     return {
         "id": f"{city_key}_{permit_num}",
-        "city": config.get("name", city_key),
-        "state": config.get("state", ""),
+        "city": _city_name,
+        "state": _state,
         "permit_number": sanitize_string(permit_num),
         "permit_type": sanitize_string(get_field("permit_type")),
         "work_type": sanitize_string(get_field("work_type")),
