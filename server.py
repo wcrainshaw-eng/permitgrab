@@ -5917,6 +5917,49 @@ def admin_backfill_trade_tags():
     return jsonify({'status': 'started', 'message': 'Trade tag backfill running in background'})
 
 
+@app.route('/api/admin/collection-log', methods=['GET'])
+def admin_collection_log():
+    """V214: Show the N most-recent entries from collection_log — gives operators
+    (and future debuggers) a view into silent-failure patterns like the V213
+    Carto-parse bug. Requires the usual admin auth."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        limit = int(request.args.get('limit', 50))
+    except ValueError:
+        limit = 50
+    limit = min(max(limit, 1), 500)
+    conn = permitdb.get_connection()
+    try:
+        rows = conn.execute("""
+            SELECT city_slug, collection_type, status,
+                   records_fetched, records_inserted, error_message,
+                   duration_seconds, created_at
+            FROM collection_log
+            ORDER BY created_at DESC LIMIT ?
+        """, (limit,)).fetchall()
+    except Exception as e:
+        return jsonify({'error': f'table query failed: {e}'}), 500
+    out = []
+    for r in rows:
+        if hasattr(r, 'keys'):
+            out.append({k: r[k] for k in r.keys()})
+        else:
+            out.append({
+                'city_slug': r[0], 'collection_type': r[1], 'status': r[2],
+                'records_fetched': r[3], 'records_inserted': r[4],
+                'error_message': r[5],
+                'duration_seconds': round(r[6], 2) if r[6] is not None else None,
+                'created_at': r[7],
+            })
+    # Summary stats for quick triage
+    totals = {'success': 0, 'error': 0, 'empty': 0}
+    for row in out:
+        totals[row.get('status', 'unknown')] = totals.get(row.get('status', 'unknown'), 0) + 1
+    return jsonify({'rows': out, 'totals': totals, 'limit': limit})
+
+
 @app.route('/api/admin/recalc-freshness', methods=['POST'])
 def admin_recalc_freshness():
     """V170: One-shot freshness recalc using correct Postgres schema.
@@ -15098,12 +15141,45 @@ def scheduled_collection():
         # V162: Violation collection (daily)
         # V182 PR2: collect_violations() calls update_city_emblems() at end,
         # which sets has_enrichment (from profiles above) + has_violations.
+        # V214: wrap in collection_log so silent insert failures (V213 Carto
+        # bug class) show up as status='error' / records_inserted=0 instead of
+        # disappearing into the underlying try/except in violation_collector.
         try:
+            import time as _v214_t
             from violation_collector import collect_violations
-            collect_violations()
+            _v214_start = _v214_t.time()
+            results = collect_violations()
+            _v214_elapsed = _v214_t.time() - _v214_start
             print(f"[{datetime.now()}] Violation collection complete.")
+            # results is a dict of city_slug -> inserted_count from
+            # violation_collector.collect_violations. Log a row per city.
+            try:
+                _v214_conn = permitdb.get_connection()
+                for _slug, _inserted in (results or {}).items():
+                    _status = 'success' if _inserted and _inserted > 0 else 'empty'
+                    _v214_conn.execute("""
+                        INSERT INTO collection_log
+                          (city_slug, collection_type, status,
+                           records_fetched, records_inserted, duration_seconds)
+                        VALUES (?, 'violations', ?, ?, ?, ?)
+                    """, (_slug, _status, _inserted or 0, _inserted or 0,
+                          round(_v214_elapsed, 2)))
+                _v214_conn.commit()
+            except Exception as _e:
+                print(f"[{datetime.now()}] [V214] collection_log write failed "
+                      f"(non-fatal): {_e}")
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")
+            try:
+                _v214_conn = permitdb.get_connection()
+                _v214_conn.execute("""
+                    INSERT INTO collection_log
+                      (city_slug, collection_type, status, error_message)
+                    VALUES ('__all__', 'violations', 'error', ?)
+                """, (str(e)[:500],))
+                _v214_conn.commit()
+            except Exception:
+                pass
 
         # V201/V203: Google Places enrichment — priority cities first, then
         # longer-tail cities up to a cap.
