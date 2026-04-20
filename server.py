@@ -11582,25 +11582,61 @@ SITE_URL = os.environ.get('SITE_URL', 'http://localhost:5000')
 
 @app.route('/api/create-checkout-session', methods=['POST'])
 def create_checkout_session():
-    """Create a Stripe Checkout Session for Professional plan (monthly or annual)."""
-    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
-        return jsonify({'error': 'Stripe not configured'}), 500
+    """Create a Stripe Checkout Session for the requested plan.
 
-    stripe.api_key = STRIPE_SECRET_KEY
+    V211-2: If Stripe env vars aren't configured yet, return a graceful
+    200 with a `fallback` mailto URL so the JS on /pricing can redirect
+    the visitor to an email signup instead of alerting 'Stripe not
+    configured'. Same behaviour when a plan's price id is missing.
 
+    Plan-aware: accepts {plan: 'starter'|'pro'|'enterprise'}, looks up
+    STRIPE_PRICE_STARTER / STRIPE_PRICE_PRO / STRIPE_PRICE_ENTERPRISE
+    env vars first, falls back to the V12-era STRIPE_PRICE_ID + billing
+    period for the existing Professional plan.
+    """
     data = request.get_json() or {}
+    plan = (data.get('plan') or '').strip().lower()
     customer_email = data.get('email')
     billing_period = data.get('billing_period', 'monthly')
 
-    # Choose the correct price based on billing period
-    if billing_period == 'annual' and STRIPE_ANNUAL_PRICE_ID:
-        price_id = STRIPE_ANNUAL_PRICE_ID
-        plan_name = 'professional_annual'
-    else:
-        price_id = STRIPE_PRICE_ID
-        plan_name = 'professional_monthly'
+    # V211-2: Graceful fallback — no Stripe keys means 'payments launching
+    # soon' not 500 error. Let the pricing page JS direct to mailto.
+    mailto_fallback = (
+        f"mailto:wcrainshaw@gmail.com?subject=PermitGrab+"
+        f"{plan.title() or 'Professional'}+Signup"
+    )
+    if not STRIPE_SECRET_KEY:
+        return jsonify({
+            'error': 'Payments launching soon!',
+            'fallback': mailto_fallback,
+        }), 200
 
-    # Track checkout started event
+    # Plan-aware price lookup (new path, V211-2)
+    per_plan_price = {
+        'starter': os.environ.get('STRIPE_PRICE_STARTER', ''),
+        'pro': os.environ.get('STRIPE_PRICE_PRO', ''),
+        'enterprise': os.environ.get('STRIPE_PRICE_ENTERPRISE', ''),
+    }
+    price_id = per_plan_price.get(plan)
+    plan_name = plan + '_monthly' if plan else None
+
+    # Legacy path: if no per-plan env var, use V12-era single-price flow
+    if not price_id:
+        if billing_period == 'annual' and STRIPE_ANNUAL_PRICE_ID:
+            price_id = STRIPE_ANNUAL_PRICE_ID
+            plan_name = 'professional_annual'
+        elif STRIPE_PRICE_ID:
+            price_id = STRIPE_PRICE_ID
+            plan_name = 'professional_monthly'
+
+    if not price_id:
+        return jsonify({
+            'error': 'Plan not fully configured yet',
+            'fallback': mailto_fallback,
+        }), 200
+
+    stripe.api_key = STRIPE_SECRET_KEY
+
     analytics.track_event('checkout_started', event_data={
         'plan': plan_name,
         'billing': billing_period
@@ -11621,10 +11657,11 @@ def create_checkout_session():
                 'plan': plan_name,
                 'billing_period': billing_period,
             },
+            allow_promotion_codes=True,
         )
         return jsonify({'url': checkout_session.url})
     except stripe.error.StripeError as e:
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': str(e), 'fallback': mailto_fallback}), 400
 
 
 @app.route('/api/stripe-webhook', methods=['POST'])

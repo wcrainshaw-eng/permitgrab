@@ -450,7 +450,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
     <div class="pricing-grid">
 
-      <!-- V209-4: STARTER TIER -->
+      <!-- V209-4 / V211-2: STARTER TIER -->
       <div class="pricing-card">
         <div class="plan-name">Starter</div>
         <div class="plan-price">$99<span>/month</span></div>
@@ -465,11 +465,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <li><span class="check">&#10003;</span> CSV export for your city</li>
         </ul>
 
-        <a href="mailto:wcrainshaw@gmail.com?subject=PermitGrab%20Starter%20Signup" class="btn btn-outline">Start Free Trial</a>
-        <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free, email us to start</p>
+        <button type="button" onclick="startCheckout('starter')" class="btn btn-outline">Start Free Trial</button>
+        <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free</p>
       </div>
 
-      <!-- V209-4: PRO TIER (most popular) -->
+      <!-- V209-4 / V211-2: PRO TIER (most popular) -->
       <div class="pricing-card featured">
         <div class="popular-badge">⭐ Most Popular</div>
         <div class="plan-name">Pro</div>
@@ -487,11 +487,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <li><span class="check">&#10003;</span> Priority support</li>
         </ul>
 
-        <a href="mailto:wcrainshaw@gmail.com?subject=PermitGrab%20Pro%20Signup" class="btn btn-primary">Start Free Trial</a>
+        <button type="button" onclick="startCheckout('pro')" class="btn btn-primary">Start Free Trial</button>
         <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free, no credit card required</p>
       </div>
 
-      <!-- V209-4: ENTERPRISE TIER -->
+      <!-- V209-4 / V211-2: ENTERPRISE TIER -->
       <div class="pricing-card">
         <div class="plan-name">Enterprise</div>
         <div class="plan-price">$299<span>/month</span></div>
@@ -506,11 +506,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <li><span class="check">&#10003;</span> Priority support + onboarding call</li>
         </ul>
 
-        <a href="mailto:wcrainshaw@gmail.com?subject=PermitGrab%20Enterprise%20Inquiry" class="btn btn-outline">Contact Us</a>
+        <button type="button" onclick="startCheckout('enterprise')" class="btn btn-outline">Contact Us</button>
         <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">Talk to a human about your markets</p>
       </div>
 
     </div>
+
+    <!-- V211-2: unified checkout JS — calls /api/create-checkout-session,
+         falls back to mailto when Stripe env vars aren't set yet. -->
+    <script>
+    function startCheckout(plan) {
+        fetch('/api/create-checkout-session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({plan: plan})
+        }).then(function(r) { return r.json().then(function(body) { return {status: r.status, body: body}; }); })
+          .then(function(res) {
+              var body = res.body || {};
+              if (body.url) {
+                  window.location.href = body.url;
+              } else if (body.fallback) {
+                  window.location.href = body.fallback;
+              } else {
+                  window.location.href = 'mailto:wcrainshaw@gmail.com?subject=PermitGrab+' + plan + '+Signup';
+              }
+          })
+          .catch(function() {
+              window.location.href = 'mailto:wcrainshaw@gmail.com?subject=PermitGrab+' + plan + '+Signup';
+          });
+    }
+    </script>
   </div>
 </section>
 
