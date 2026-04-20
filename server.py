@@ -9846,14 +9846,11 @@ def api_permits():
 
     # V32: Resolve city slug to name and state for cross-state filtering.
     # V202-4 + V203: Two-stage lookup with a shared alias map.
-    # Some CITY_REGISTRY entries carry display names that don't match the
-    # value stored on permits rows — e.g. chicago_il has name='CHICAGO' while
-    # permits have city='Chicago', producing 0-result pages. And some slugs
-    # don't exist in CITY_REGISTRY at all (new-york-city, houston-tx,
-    # phoenix-az, jacksonville-fl) but do exist in prod_cities. Resolve
-    # against both, then normalize through PERMIT_CITY_ALIAS before querying.
+    # V217 T4: NYC permits have been normalized to city='New York City', so
+    # the old ('New York City','NY')→'New York' alias is removed. Kept the
+    # CHICAGO case because CITY_REGISTRY chicago_il still carries the
+    # uppercase display name while permits rows use titlecase.
     PERMIT_CITY_ALIAS = {
-        ('New York City', 'NY'): 'New York',  # prod_cities display vs permits.city
         ('CHICAGO', 'IL'): 'Chicago',          # CITY_REGISTRY chicago_il uppercase
     }
     city_name = None
