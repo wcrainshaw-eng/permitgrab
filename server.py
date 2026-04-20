@@ -15180,6 +15180,50 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] [V209] web_enrichment error (non-fatal): {e}")
 
+        # V212-3: Resync prod_cities.newest_permit_date from actual permits each
+        # cycle so the freshness badge doesn't go stale while the collector
+        # itself is still working. The existing admin recalc endpoint
+        # (/api/admin/recalc-freshness V170) only fills NULL rows; this covers
+        # the case where a row has a valid-but-stale newest_permit_date and the
+        # permits table has fresher data for the same (city,state).
+        try:
+            _freshness_conn = permitdb.get_connection()
+            _fc = _freshness_conn.cursor()
+            _fc.execute("""
+                UPDATE prod_cities
+                SET newest_permit_date = COALESCE(
+                        (SELECT MAX(filing_date) FROM permits
+                         WHERE permits.city = prod_cities.city
+                           AND permits.state = prod_cities.state),
+                        newest_permit_date),
+                    last_permit_date = COALESCE(
+                        (SELECT MAX(filing_date) FROM permits
+                         WHERE permits.city = prod_cities.city
+                           AND permits.state = prod_cities.state),
+                        last_permit_date)
+                WHERE source_type IS NOT NULL
+                  AND source_type NOT IN ('', 'none')
+                  AND total_permits > 0
+            """)
+            _freshness_conn.commit()
+            # V212-3: Re-bucket data_freshness from the just-refreshed dates
+            _fc.execute("""
+                UPDATE prod_cities
+                SET data_freshness = CASE
+                    WHEN newest_permit_date IS NULL OR newest_permit_date = '' THEN 'no_data'
+                    WHEN DATE(SUBSTR(newest_permit_date, 1, 10)) >= DATE('now', '-7 days') THEN 'fresh'
+                    WHEN DATE(SUBSTR(newest_permit_date, 1, 10)) >= DATE('now', '-30 days') THEN 'current'
+                    WHEN DATE(SUBSTR(newest_permit_date, 1, 10)) >= DATE('now', '-60 days') THEN 'aging'
+                    WHEN DATE(SUBSTR(newest_permit_date, 1, 10)) >= DATE('now', '-90 days') THEN 'stale'
+                    ELSE 'very_stale'
+                END
+                WHERE source_type IS NOT NULL AND source_type NOT IN ('', 'none')
+            """)
+            _freshness_conn.commit()
+            print(f"[{datetime.now()}] [V212] prod_cities freshness resync complete.")
+        except Exception as e:
+            print(f"[{datetime.now()}] [V212] freshness resync error (non-fatal): {e}")
+
         # V168: Removed dead signal_collector, city_health, discovery calls (files deleted in V163)
 
         print(f"[{datetime.now()}] All collection tasks complete.")
