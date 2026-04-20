@@ -228,6 +228,16 @@ CITY_REGISTRY = {
         "date_field": "filed_date",
         "limit": 2000,
         "active": True,
+        # V218 T2: i98e-djp9 has no contractor/applicant/permittee field.
+        # SF publishes a separate "Contractors" licensing dataset but it
+        # isn't joinable by permit_number. Leaving field_map as-is rather
+        # than mapping ghost fields.
+        "notes": (
+            "V218: Source dataset has no contractor field. Contractor "
+            "identity would require either scraping the DBI portal or "
+            "joining the separate SF Contractors licensing dataset by "
+            "name — deferred."
+        ),
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Switched to Issued Building Permits dataset
@@ -251,11 +261,18 @@ CITY_REGISTRY = {
             "expiration_date": "expiresdate",
             "num_units": "housingunits",
             "latitude": "latitude",
+            # V218 T3: Seattle's 8tqq-u7ib dataset exposes contractor name
+            # as `contractorcompanyname`. Wire it through so refresh_contractor_
+            # profiles actually picks Seattle rows up.
+            "contractor_name": "contractorcompanyname",
+            "zip": "originalzip",
+            "estimated_cost": "estprojectcost",
+            "status": "statuscurrent",
         },
         "date_field": "issueddate",
         "limit": 2000,
         "active": True,
-        "notes": "V23: Switched to Issued Building Permits (8tqq-u7ib) - has issueddate field. Mar 2026 data confirmed.",
+        "notes": "V218: Added contractorcompanyname → contractor_name mapping + zip/cost/status. V23: Issued Building Permits (8tqq-u7ib).",
     },
 
     "new_orleans": {
@@ -38142,8 +38159,16 @@ BULK_SOURCES = {
             "description": "B1_WORK_DESC",
             "status": "Current_Status",
             "filing_date": "File_Date",
-            "address": "Street_Name",
+            # V218 T1: was Street_Name (just the street name minus number).
+            # Full_Street_Address is the full string — better for enrichment.
+            "address": "Full_Street_Address",
             "zip": "Zip_Code",
+            # V218 T1: Fort Worth's feed has no contractor field (only owner).
+            # Map owner so refresh_contractor_profiles has at least something
+            # to group by. Collector's contact fallback (V180 P1v2.2r1) will
+            # also populate contact_name from the same value.
+            "owner_name": "Owner_Full_Name",
+            "estimated_cost": "JobValue",
         },
         "date_field": "File_Date",
         "date_format": "epoch_ms",
