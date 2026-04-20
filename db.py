@@ -809,6 +809,24 @@ def init_db():
             processed_at TEXT
         );
 
+        -- V214: collection_log — observability for daemon collection cycles.
+        -- One row per (city, cycle, collection_type) so silent failures like the
+        -- V213 Carto parse bug would show up here as status='error' or
+        -- records_inserted=0 instead of disappearing into a try/except.
+        CREATE TABLE IF NOT EXISTS collection_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city_slug TEXT NOT NULL,
+            collection_type TEXT DEFAULT 'permits',
+            status TEXT NOT NULL,
+            records_fetched INTEGER DEFAULT 0,
+            records_inserted INTEGER DEFAULT 0,
+            error_message TEXT,
+            duration_seconds REAL,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_collection_log_city ON collection_log(city_slug);
+        CREATE INDEX IF NOT EXISTS idx_collection_log_created ON collection_log(created_at);
+
         -- V17: system_state for tracking daily tasks (discovery, etc.)
         CREATE TABLE IF NOT EXISTS system_state (
             key TEXT PRIMARY KEY,
