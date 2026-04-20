@@ -2936,6 +2936,216 @@ BLOG_POSTS = [
 <p><em>PermitGrab helps electrical contractors, HVAC companies, plumbers, and other trades discover new projects the moment permits are filed. Monitor your metro area, get daily email alerts, and reach out before the competition.</em></p>'''
     },
 
+    # V221 T2: High-intent blog posts targeting the keyword set from the SEO
+    # audit. Scoped to 5 of the 10 proposed posts this PR; 5 more queued for
+    # V222. Each post is server-rendered (Jinja), linked from /blog, and
+    # crawlable on first fetch.
+    {
+        'slug': 'stop-paying-per-lead-permit-data-vs-angi-homeadvisor',
+        'title': 'Stop Paying Per Lead: Why Smart Contractors Track Building Permits',
+        'meta_description': 'Angi and HomeAdvisor charge $30-80 per shared lead. Building permit data is $149/mo for every permit in your market — with owner contact info.',
+        'date': '2026-04-20',
+        'category': 'contractor-leads',
+        'city_link': '/pricing',
+        'city_name': 'All Cities',
+        'excerpt': 'Angi sends the same lead to four contractors. Building permit data sends you every active project in your market before anyone else sees it.',
+        'content': '''
+<p>If you've used Angi (formerly Angie's List) or HomeAdvisor to find leads, you know the math doesn't work. You pay $30 to $80 per lead. The lead is sent to three or four other contractors at the same time. The homeowner has already decided they're "getting quotes" — meaning your conversion rate is whatever the best sales pitch of the four delivers. And the leads are filtered through the platform's algorithm, not by what your business actually wants.</p>
+<p>Building permit data works the opposite way. A permit is a public record that says: <em>someone just committed money and paperwork to a specific construction project at a specific address</em>. There's no auction. There's no shared inbox. If you see the permit first, you get the call first.</p>
+
+<h2>The cost comparison, unvarnished</h2>
+<p>Let's say you buy 50 shared leads per month from HomeAdvisor at $50 each. That's $2,500 a month. Your close rate on those leads, industry-wide, runs 4 to 8 percent. So out of 50 leads, you book between 2 and 4 jobs. Your acquisition cost per booked job: $625 to $1,250.</p>
+<p>Compare that to a permit subscription. For a flat $149 a month, you see every permit filed in your target metros — typically 2,000 to 15,000 permits per month in a large market, filtered by trade. At a much lower contact rate (you're doing the outreach yourself), but a dramatically higher close rate (you're the only contractor contacting, and you already know what work they need), acquisition cost per booked job drops below $100.</p>
+
+<h2>Permits beat paid leads on four dimensions</h2>
+<p><strong>Exclusivity.</strong> Permits are a public record, which means everyone <em>could</em> see them — but almost no contractors actually do, because pulling structured permit data from dozens of city portals takes real infrastructure. In practice, a permit feed gives you the same kind of exclusivity that lead platforms charge you for, without the $30/lead cover charge.</p>
+<p><strong>Timing.</strong> A HomeAdvisor lead hits your inbox the moment the homeowner fills out a form. By then they're shopping. A permit hits your inbox the moment the contractor files paperwork with the city — often months before construction starts, and always before the homeowner has shortlisted trades.</p>
+<p><strong>Specificity.</strong> A HomeAdvisor lead says "wants HVAC service." A permit says "Mechanical Permit, Residential, 3-ton heat pump replacement, $7,400 project value, permit number X." You bid from facts instead of guesses.</p>
+<p><strong>Owner contact.</strong> Every permit names the owner or contractor who pulled it. Public record. You reach them directly without paying a platform to gatekeep.</p>
+
+<h2>The first-mover advantage is real</h2>
+<p>Most permit filings in our index appear in our feed within 24 hours of being filed. That window — between "permit filed" and "homeowner starts asking around for quotes" — is where the best jobs get won. If you're the only contractor who emails with a prepared bid before the homeowner has even thought to shop, you're not competing on price.</p>
+<p>Roofers use this to get in front of re-roof permits after hailstorms. HVAC contractors use it to catch AC replacements filed in spring before the summer rush. Plumbers scan for sewer-line and water-heater permits. General contractors watch for remodel and addition permits that require a dozen subs each.</p>
+
+<h2>Try it for one month</h2>
+<p>We're confident enough in the math that we'll show it on your market. Pick a city — <a href="/permits/chicago">Chicago</a>, <a href="/permits/new-york">New York</a>, <a href="/permits/houston">Houston</a>, <a href="/permits/los-angeles">Los Angeles</a>, <a href="/permits/austin">Austin</a> — browse the live permit feed for free, then <a href="/pricing">start a subscription</a>. If permit leads don't outperform your current lead source after 30 days, cancel and we'll refund.</p>
+<p>The contractors who dominate their markets over the next decade will be the ones who figured out how to source leads from public data instead of paying a platform for access. This is the easiest version of that — just permits, delivered daily, by trade.</p>
+'''
+    },
+    {
+        'slug': 'roofing-contractor-leads-building-permits',
+        'title': 'How Roofing Contractors Use Building Permit Data to Find Leads',
+        'meta_description': 'Roofing contractors who track permit filings book more jobs with less spend. Here is how roofing leads work in the permit data.',
+        'date': '2026-04-20',
+        'category': 'trade-guides',
+        'city_link': '/pricing',
+        'city_name': 'All Cities',
+        'excerpt': 'Re-roof permits, reroof-after-hail permits, and new-construction roof decks are all in the public permit feed. Here is how smart roofing contractors work them.',
+        'content': '''
+<p>Roofing is one of the purest permit-driven trades. Every substantial roof job — a full re-roof, a roof-deck replacement on a new build, a tear-off after hail damage — requires a building permit. That permit shows up in the city's open-data feed as soon as it's filed. Which means roofing contractors who watch permit data are seeing leads that don't exist on Angi or HomeAdvisor yet.</p>
+
+<h2>The three kinds of roofing permits you want to see</h2>
+<p><strong>Re-roof permits.</strong> A homeowner who pulls a re-roof permit has already committed. They've paid the permit fee, they've filed paperwork, they're planning to do this job. If you get in front of them while they're still collecting bids — not after they've signed with someone — your odds of winning are much higher than a cold lead from a platform.</p>
+<p><strong>Roof permits after a hailstorm.</strong> Hail runs the roofing business. After a significant storm, insurance claims drive a surge of re-roof permits over the next 30-60 days. Watching the permit feed for your market is the cleanest way to see the hail response before your competitors do. Every re-roof permit filed in a ZIP code hit by a storm is, statistically, a lead.</p>
+<p><strong>New-construction roof deck permits.</strong> In most cities, new builds pull a separate roofing permit once framing is done. That's your signal to contact the GC (named on the permit) and bid the roof. Production builders do roofing in-house; custom builds almost always sub it out.</p>
+
+<h2>What the permit actually tells you</h2>
+<p>A well-indexed permit feed gives you the job address, the permit type (re-roof vs new build), the project value (a proxy for square footage and complexity), the owner or contractor of record, and the filing date. Often you'll also get the city's permit subtype — "composition shingle," "metal roof," "tile roof" — which helps you filter to the jobs that match your capabilities.</p>
+<p>What you don't get from a permit: a pre-qualified homeowner who's already shopping. You do the outreach. But because you're one of the first (and often the only) contractors to reach out with a prepared bid, conversion dwarfs shared-lead platforms.</p>
+
+<h2>The operational playbook</h2>
+<ol>
+<li>Subscribe to the permit feed for the metros you serve.</li>
+<li>Filter by trade = "Roofing" and permit type containing "roof" or "re-roof."</li>
+<li>Every morning, get the list of new roofing permits filed in the last 24 hours.</li>
+<li>For each one, look up the owner on the county assessor and reach out within 48 hours.</li>
+<li>Track which permits convert, by neighborhood, by permit type, by owner type.</li>
+</ol>
+<p>Within 60 days you'll have a clear picture of which neighborhoods are producing your best-converting leads and can double down on those areas.</p>
+
+<h2>Cities with strong roofing permit coverage</h2>
+<p>PermitGrab indexes roofing permits across every top-10 metro. High-volume markets to start with:
+<a href="/permits/chicago">Chicago</a> (hailstorm country),
+<a href="/permits/houston">Houston</a> (storm damage + new construction),
+<a href="/permits/phoenix">Phoenix</a> (tile and solar roofing),
+<a href="/permits/dallas">Dallas</a> and
+<a href="/permits/fort-worth">Fort Worth</a> (major hail seasons),
+<a href="/permits/denver">Denver</a> (high-frequency hail + steep-slope), and
+<a href="/permits/austin">Austin</a> (strong new construction).</p>
+<p><a href="/pricing">See pricing</a> or <a href="/get-alerts">start a free trial</a> to see what roofing leads look like in your market today.</p>
+'''
+    },
+    {
+        'slug': 'find-new-construction-projects-area-permit-data',
+        'title': 'How to Find New Construction Projects in Your Area Using Permit Data',
+        'meta_description': 'Every new construction project in the United States starts with a building permit. Here is how contractors use permit data to find projects before they break ground.',
+        'date': '2026-04-20',
+        'category': 'contractor-leads',
+        'city_link': '/pricing',
+        'city_name': 'All Cities',
+        'excerpt': 'Every new commercial or residential construction project starts with a building permit. Here is the step-by-step for finding them in your ZIP code.',
+        'content': '''
+<p>If you're a subcontractor, a materials supplier, a real estate investor, or any trade that benefits from knowing about construction projects early, building permit data is the cleanest signal available. Every new build in the United States — commercial, residential, interior fit-out, roof replacement, solar install — starts with a permit filed at a city or county building department. Those permits are public records. Most are online. Very few contractors actually use them.</p>
+
+<h2>What counts as "new construction" in permit data</h2>
+<p>Cities tag permits by type. The ones most contractors care about:</p>
+<ul>
+<li><strong>New residential construction</strong> — single-family, multi-family, ADUs. Filed months before framing starts.</li>
+<li><strong>New commercial construction</strong> — office, retail, industrial, mixed-use. Usually includes subsequent MEP permits once the shell is approved.</li>
+<li><strong>Major additions</strong> — room additions, second stories, rear extensions. Often driven by families growing in-place.</li>
+<li><strong>Tenant improvements</strong> — interior fit-out permits for a new tenant moving into existing commercial space. Very high volume in the top metros.</li>
+<li><strong>Demolition permits</strong> — a leading indicator of new construction at the same address within 6-12 months.</li>
+</ul>
+
+<h2>Step 1: Pick your markets</h2>
+<p>Most contractors over-index on one or two metros. Start there. If you serve Dallas and Fort Worth, your permit feed should be filtered to Dallas County and Tarrant County. Our city pages list coverage for each top metro:
+<a href="/permits/dallas">Dallas</a>,
+<a href="/permits/fort-worth">Fort Worth</a>,
+<a href="/permits/houston">Houston</a>,
+<a href="/permits/austin">Austin</a>,
+<a href="/permits/san-antonio">San Antonio</a>,
+<a href="/permits/los-angeles">Los Angeles</a>,
+<a href="/permits/san-diego">San Diego</a>,
+<a href="/permits/san-francisco">San Francisco</a>,
+<a href="/permits/san-jose">San Jose</a>,
+<a href="/permits/seattle">Seattle</a>,
+<a href="/permits/denver">Denver</a>,
+<a href="/permits/phoenix">Phoenix</a>,
+<a href="/permits/chicago">Chicago</a>,
+<a href="/permits/new-york">New York</a>,
+<a href="/permits/philadelphia">Philadelphia</a>,
+<a href="/permits/columbus">Columbus</a>,
+<a href="/permits/nashville">Nashville</a>.</p>
+
+<h2>Step 2: Filter by permit type and value</h2>
+<p>The permit feed is the raw data; the value comes from filtering. Filter by:</p>
+<ul>
+<li><strong>Permit type</strong> — match the work you bid. "New Construction," "Addition," "TI," "Mechanical," etc.</li>
+<li><strong>Project value</strong> — your sweet spot is probably projects between $X and $Y. Below that is often owner-builder; above that is usually already spoken for. Filter to your real-world bid range.</li>
+<li><strong>Neighborhood or ZIP</strong> — if you have service-area limits, filter them upfront.</li>
+</ul>
+<p>PermitGrab's dashboard lets you save a filter combination so each day's feed shows only the permits that match your business.</p>
+
+<h2>Step 3: Act in the first 48 hours</h2>
+<p>The window between "permit filed" and "homeowner/GC has selected their subs" is usually short — days, not weeks. If you see a permit in your feed Monday morning, reach out Monday or Tuesday. Past that, you're competing with whoever the GC already called.</p>
+<p>For commercial and TI permits, the contact on the permit is usually the GC. For residential, it's usually the owner or the architect. Either way, the permit gives you a name and a legitimate reason to reach out: "I saw the permit was filed for 123 Main St last week — I'd like to bid the [electrical/plumbing/HVAC/roofing] portion."</p>
+
+<h2>Step 4: Track conversion and iterate</h2>
+<p>Within 30-60 days you'll know which permit types, neighborhoods, and project values produce your best-converting leads. Double down on those and prune the rest. The permit feed is infinite; your time isn't.</p>
+<p><a href="/pricing">See pricing</a> or browse a free city feed to see what the permits in your market actually look like.</p>
+'''
+    },
+    {
+        'slug': 'chicago-building-permits-2026-contractors',
+        'title': 'Chicago Building Permits 2026: Where Contractors Are Finding Work',
+        'meta_description': 'Chicago building permit data for 2026. Where contractors are bidding, which trades are busy, and how to find leads with the city permit feed.',
+        'date': '2026-04-20',
+        'category': 'contractor-leads',
+        'city_link': '/permits/chicago',
+        'city_name': 'Chicago',
+        'excerpt': 'Chicago is running over 20,000 active building permits and roughly 20,000 open code violations in 2026. Here is where the construction money is flowing.',
+        'content': '''
+<p>Chicago in 2026 is one of the most active permit markets in the country. The city's Department of Buildings publishes a live stream of every building permit issued — residential, commercial, tenant improvement, demolition — and that stream shows where the construction money is going in real time. For contractors, it's the cleanest lead source that exists in Chicago.</p>
+
+<h2>The 2026 numbers</h2>
+<p>As of this writing, Chicago has over 20,000 active building permits in our index, with the newest filings landing inside 48 hours of issuance. Alongside permits, the city publishes roughly 20,000 open building code violations at any given time — every one of them a potential job for the right contractor.</p>
+<p>Most of the permit volume is concentrated in:</p>
+<ul>
+<li><strong>Electrical permits</strong> — Chicago's older housing stock means panel upgrades, EV charger installs, and rewiring are running high.</li>
+<li><strong>Mechanical (HVAC)</strong> — the city's harsh winters keep heating-system replacements and retrofits at high volume year-round.</li>
+<li><strong>Plumbing</strong> — sewer-line replacements and water-heater permits are steady; lead-service-line replacements are pushing volume upward as the city rolls through its replacement mandate.</li>
+<li><strong>Roofing</strong> — reroof permits spike after hailstorms and through summer.</li>
+<li><strong>New construction and major renovation</strong> — both concentrated in neighborhoods where property values are appreciating fastest.</li>
+</ul>
+
+<h2>Where the permits are being filed</h2>
+<p>Chicago's permit volume is not distributed evenly. A handful of neighborhoods produce disproportionate permit activity — Logan Square, West Loop, Lincoln Park, Avondale, Humboldt Park, Pilsen, and the north lakefront. If you're a Chicago contractor, knowing which neighborhoods are hot for your trade in a given month is the difference between a full schedule and chasing work.</p>
+
+<h2>Code violations as a second lead channel</h2>
+<p>Chicago's violation data is one of the most underused lead sources in the city. Every open building code violation has an owner, a deadline, and a financial incentive to fix the problem. For contractors who want to skip the bidding dance, violation leads are as direct as it gets — "I saw you have an open violation at 123 Main, I can have it corrected before the next inspection." Violation categories in Chicago include electrical, plumbing, structural, porch and deck, dangerous and hazardous, and heating.</p>
+
+<h2>How to use the Chicago permit feed</h2>
+<p>PermitGrab's <a href="/permits/chicago">Chicago permits page</a> shows the live feed with filters for trade, project value, neighborhood, and permit type. A contractor who spends 15 minutes a morning going through the new permits filed in their trade and neighborhood will outperform any shared-lead platform on cost per booked job.</p>
+<p>For roofing contractors: see <a href="/blog/roofing-contractor-leads-building-permits">our guide to using permit data for roofing leads</a>.</p>
+<p>For contractors comparing permit data to Angi and HomeAdvisor: <a href="/blog/stop-paying-per-lead-permit-data-vs-angi-homeadvisor">here's the math</a>.</p>
+<p><a href="/pricing">See pricing</a> or <a href="/permits/chicago">browse Chicago permits live</a>.</p>
+'''
+    },
+    {
+        'slug': 'los-angeles-building-permits-2026-contractors',
+        'title': 'Los Angeles Building Permits 2026: New Construction Leads for Contractors',
+        'meta_description': 'LA building permit data for 2026. ADUs, solar, seismic retrofits, and tenant improvements — here is what the city feed shows for contractors.',
+        'date': '2026-04-20',
+        'category': 'contractor-leads',
+        'city_link': '/permits/los-angeles',
+        'city_name': 'Los Angeles',
+        'excerpt': 'LA is one of the most permit-dense markets in the country — 30,000+ active permits and heavy volume in ADUs, solar, and seismic retrofits.',
+        'content': '''
+<p>Los Angeles runs one of the highest-volume building permit markets in the country. The Department of Building and Safety publishes every permit issued across the city, and in 2026 that stream sits at over 30,000 active filings with thousands more added each month. For contractors who work LA, the permit feed is the single best view of who's building what, and where.</p>
+
+<h2>What's driving 2026 permit volume in LA</h2>
+<ul>
+<li><strong>ADU construction.</strong> California's state housing laws have turned LA into the ADU capital of the country. Every new ADU is a permit, and each one typically pulls follow-on electrical, plumbing, and mechanical permits. For GC's and framing subs, ADUs are the most consistent volume play in LA in 2026.</li>
+<li><strong>Solar installations.</strong> LA's solar permit volume is enormous — thousands of residential PV permits per year, plus commercial and battery storage. Electrical contractors who specialize in solar should be watching every new solar permit in their ZIP codes.</li>
+<li><strong>Seismic retrofits.</strong> The city's mandatory soft-story retrofit ordinance and ongoing voluntary retrofits generate steady structural permit volume. Structural and foundation contractors with retrofit experience have a lane here.</li>
+<li><strong>Tenant improvements.</strong> LA's commercial market runs on TI permits — every new tenant in existing space pulls a TI permit for interior build-out. This is where commercial GC's and MEP subs find most of their work.</li>
+<li><strong>Pool construction.</strong> LA pool permit volume is high year-round — pool contractors who track permits have a clean lead source that most don't touch.</li>
+</ul>
+
+<h2>Where the LA permit volume is concentrated</h2>
+<p>Permit activity in LA is uneven across the city. West LA, Mar Vista, Palms, Mid-City, Silver Lake, Echo Park, Eagle Rock, Highland Park, Studio City, Sherman Oaks, and parts of the Valley are producing the highest volumes in 2026. Contractors who filter their feed by ZIP can focus their outreach where the density is actually worth chasing.</p>
+
+<h2>Contact information is on the permit</h2>
+<p>Every LA permit names the applicant — usually the contractor of record or the owner. That's your contact point. No shared-lead platform sits between you and the project. If you see an ADU permit filed at 1234 Main in Mar Vista yesterday, today is the day to reach out with a prepared subcontractor bid.</p>
+
+<h2>Using the LA feed</h2>
+<p><a href="/permits/los-angeles">Browse LA permits live</a>. Filter by trade, project value, and permit type. Save your filter; new permits matching your criteria show up in the daily digest.</p>
+<p>For more on using permit data vs paid-lead platforms: <a href="/blog/stop-paying-per-lead-permit-data-vs-angi-homeadvisor">the cost comparison</a>.</p>
+<p>For a step-by-step on finding new construction projects via permits: <a href="/blog/find-new-construction-projects-area-permit-data">the discovery guide</a>.</p>
+<p><a href="/pricing">See pricing</a> to unlock the full LA feed.</p>
+'''
+    },
+
 ]
 
 # V79: Helper function to get blog posts by category
@@ -13593,7 +13803,12 @@ def _get_top_contractors_for_city(city_slug, limit=25):
 
 def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
-    # V157: Slug aliases for cities where URL slug differs from DB slug
+    # V157: Slug aliases for cities where URL slug differs from DB slug.
+    # V221 T1B: keep the original request slug for canonical + display; use
+    # the aliased `db_slug` only for internal DB lookups. Previously the
+    # whole function saw `city_slug='chicago-il'` when the visitor typed
+    # `/permits/chicago`, so the canonical link pointed at
+    # `/permits/chicago-il` — a canonical mismatch Google flagged.
     _INNER_ALIASES = {
         'new-york': 'new-york-city',
         'chicago': 'chicago-il',
@@ -13601,7 +13816,9 @@ def city_landing_inner(city_slug):
         'little-rock': 'little-rock-ar',
         'mesa': 'mesa-az-accela',
     }
-    city_slug = _INNER_ALIASES.get(city_slug, city_slug)
+    request_slug = city_slug
+    db_slug = _INNER_ALIASES.get(city_slug, city_slug)
+    city_slug = db_slug  # legacy var name used below for internal queries
 
     # V15: Check prod_cities status for this city
     is_prod_city = False
@@ -13626,7 +13843,7 @@ def city_landing_inner(city_slug):
                         city_name=row['city'],
                         state=row['state'],
                         last_updated=row['newest_permit_date'],
-                        canonical_url=f"{SITE_URL}/permits/{city_slug}",
+                        canonical_url=f"{SITE_URL}/permits/{request_slug}",
                         robots="noindex, follow"
                     )
 
@@ -13909,7 +14126,7 @@ def city_landing_inner(city_slug):
         meta_title=config['meta_title'],
         meta_description=config['meta_description'],
         seo_content=config['seo_content'],
-        canonical_url=f"{SITE_URL}/permits/{city_slug}",
+        canonical_url=f"{SITE_URL}/permits/{request_slug}",
         robots_directive=robots_directive,  # V12.5: noindex empty pages
         permit_count=permit_count,
         total_value=total_value,
