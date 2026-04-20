@@ -75,11 +75,20 @@ KNOWN_SOCRATA = [
     ('data.buffalony.gov', 'Buffalo', 'NY'),
 ]
 
-# Keyword heuristic for dataset titles.
+# Keyword heuristic for dataset titles. V210-2: excluded bare 'citation'
+# because Oakland's 'Citation Data Portal' is parking meters, not code
+# enforcement. Require building/code/housing/property context.
 VIOLATION_KEYWORDS = [
     'code enforcement', 'code violation', 'housing violation',
     'property maintenance', 'building complaint', 'housing inspection',
-    'nuisance', 'blight', 'citation'
+    'code citation', 'building citation', 'nuisance', 'blight',
+]
+
+# Reject titles that clearly aren't building/code enforcement even if
+# they match the above (e.g. parking citations, traffic tickets).
+ANTI_KEYWORDS = [
+    'parking', 'traffic', 'meter', 'tow', 'vehicle',
+    'school', 'police', 'fire inspection',
 ]
 
 
@@ -87,6 +96,8 @@ def _title_looks_like_violations(title):
     if not title:
         return False
     t = title.lower()
+    if any(a in t for a in ANTI_KEYWORDS):
+        return False
     return any(k in t for k in VIOLATION_KEYWORDS)
 
 
