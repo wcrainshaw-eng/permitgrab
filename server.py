@@ -5935,7 +5935,9 @@ def admin_collection_log():
         rows = conn.execute("""
             SELECT city_slug, collection_type, status,
                    records_fetched, records_inserted, error_message,
-                   duration_seconds, created_at
+                   duration_seconds, created_at,
+                   api_url, query_params,
+                   api_rows_returned, duplicate_rows_skipped
             FROM collection_log
             ORDER BY created_at DESC LIMIT ?
         """, (limit,)).fetchall()
@@ -5952,11 +5954,15 @@ def admin_collection_log():
                 'error_message': r[5],
                 'duration_seconds': round(r[6], 2) if r[6] is not None else None,
                 'created_at': r[7],
+                'api_url': r[8], 'query_params': r[9],
+                'api_rows_returned': r[10], 'duplicate_rows_skipped': r[11],
             })
-    # Summary stats for quick triage
-    totals = {'success': 0, 'error': 0, 'empty': 0}
+    # V215: three-state status surface for quick triage
+    totals = {'success': 0, 'caught_up': 0, 'no_api_data': 0,
+              'error': 0, 'empty': 0}
     for row in out:
-        totals[row.get('status', 'unknown')] = totals.get(row.get('status', 'unknown'), 0) + 1
+        s = row.get('status', 'unknown')
+        totals[s] = totals.get(s, 0) + 1
     return jsonify({'rows': out, 'totals': totals, 'limit': limit})
 
 
@@ -6085,8 +6091,19 @@ def admin_collect_violations():
             "SELECT city, state, COUNT(*) as cnt, MAX(violation_date) as newest "
             "FROM violations GROUP BY city, state ORDER BY cnt DESC"
         ).fetchall()
+        # V215: results[slug] is a diagnostic dict — flatten 'inserted'
+        # to preserve the shape older consumers of this endpoint expect,
+        # but also pass the full diagnostics through.
+        _flat = {}
+        if isinstance(results, dict):
+            for _slug, _agg in results.items():
+                if isinstance(_agg, dict):
+                    _flat[_slug] = _agg.get('inserted', 0) or 0
+                else:
+                    _flat[_slug] = int(_agg or 0)
         return jsonify({
-            'collection_results': results,
+            'collection_results': _flat,
+            'diagnostics': results,
             'totals': [dict(r) for r in totals],
         })
     except Exception as e:
@@ -15151,22 +15168,50 @@ def scheduled_collection():
             results = collect_violations()
             _v214_elapsed = _v214_t.time() - _v214_start
             print(f"[{datetime.now()}] Violation collection complete.")
-            # results is a dict of city_slug -> inserted_count from
-            # violation_collector.collect_violations. Log a row per city.
+            # V215: results[slug] is now a dict with per-city diagnostics
+            # (inserted, api_rows_returned, duplicate_rows_skipped, api_url,
+            # query_params). Three-state status:
+            #   success      — actually inserted rows
+            #   caught_up    — API returned rows but all were dupes (healthy)
+            #   no_api_data  — API returned nothing (broken feed / bad query)
+            #   error        — endpoint raised
             try:
                 _v214_conn = permitdb.get_connection()
-                for _slug, _inserted in (results or {}).items():
-                    _status = 'success' if _inserted and _inserted > 0 else 'empty'
+                for _slug, _agg in (results or {}).items():
+                    if not isinstance(_agg, dict):
+                        # Back-compat path if collector ever reverts to int
+                        _agg = {'inserted': int(_agg or 0),
+                                'api_rows_returned': 0,
+                                'duplicate_rows_skipped': 0,
+                                'api_url': None, 'query_params': None,
+                                'error': None}
+                    _ins = _agg.get('inserted') or 0
+                    _api_rows = _agg.get('api_rows_returned') or 0
+                    _dupes = _agg.get('duplicate_rows_skipped') or 0
+                    _err = _agg.get('error')
+                    if _err:
+                        _status = 'error'
+                    elif _ins > 0:
+                        _status = 'success'
+                    elif _api_rows > 0:
+                        _status = 'caught_up'
+                    else:
+                        _status = 'no_api_data'
                     _v214_conn.execute("""
                         INSERT INTO collection_log
                           (city_slug, collection_type, status,
-                           records_fetched, records_inserted, duration_seconds)
-                        VALUES (?, 'violations', ?, ?, ?, ?)
-                    """, (_slug, _status, _inserted or 0, _inserted or 0,
-                          round(_v214_elapsed, 2)))
+                           records_fetched, records_inserted,
+                           duration_seconds, api_url, query_params,
+                           api_rows_returned, duplicate_rows_skipped,
+                           error_message)
+                        VALUES (?, 'violations', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (_slug, _status, _api_rows, _ins,
+                          round(_v214_elapsed, 2),
+                          _agg.get('api_url'), _agg.get('query_params'),
+                          _api_rows, _dupes, _err))
                 _v214_conn.commit()
             except Exception as _e:
-                print(f"[{datetime.now()}] [V214] collection_log write failed "
+                print(f"[{datetime.now()}] [V215] collection_log write failed "
                       f"(non-fatal): {_e}")
         except Exception as e:
             print(f"[{datetime.now()}] Violation collection error: {e}")

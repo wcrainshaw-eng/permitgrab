@@ -710,6 +710,9 @@ def collect_violations_from_endpoint(city_config, endpoint):
     offset = 0
     batch_size = 1000
     total_inserted = 0
+    total_api_rows = 0  # V215: rows returned by upstream API (any page)
+    total_dupes = 0     # V215: rows that hit INSERT OR IGNORE and no-op'd
+    first_page_params = None  # V215: captured for diagnostic log
     max_records = 5000  # V166: Reduced from 50K to 5K per run to limit memory
 
     # V197/V198: ArcGIS needs `timestamp 'YYYY-MM-DD HH:MM:SS'` format for
@@ -747,6 +750,14 @@ def collect_violations_from_endpoint(city_config, endpoint):
                 '$where': f"{date_field} > '{last_date}'",
             }
 
+        if first_page_params is None:
+            # V215: capture the first page's params — that's what a human
+            # running the query themselves would need to reproduce it.
+            try:
+                first_page_params = json.dumps(params, default=str)[:1000]
+            except Exception:
+                first_page_params = None
+
         try:
             resp = SESSION.get(base_url, params=params, timeout=30)
             resp.raise_for_status()
@@ -771,6 +782,7 @@ def collect_violations_from_endpoint(city_config, endpoint):
 
         if not records or not isinstance(records, list):
             break
+        total_api_rows += len(records)
 
         # V166: Stream-process — normalize and insert immediately per page, don't accumulate
         batch = []
@@ -783,8 +795,9 @@ def collect_violations_from_endpoint(city_config, endpoint):
                 continue
 
         if batch:
-            inserted = _insert_batch(batch)
+            inserted, dupes = _insert_batch(batch)
             total_inserted += inserted
+            total_dupes += dupes
         del batch, records  # V166: Free memory immediately
 
         if total_inserted >= max_records:
@@ -793,17 +806,31 @@ def collect_violations_from_endpoint(city_config, endpoint):
         offset += batch_size
         time.sleep(1)
 
-    print(f"  [V162] {city_config['city']} / {endpoint['name']}: {total_inserted} violations inserted")
-    return total_inserted
+    print(f"  [V162] {city_config['city']} / {endpoint['name']}: "
+          f"{total_inserted} inserted, {total_dupes} dupes skipped, "
+          f"{total_api_rows} api rows")
+    return {
+        'inserted': total_inserted,
+        'api_rows_returned': total_api_rows,
+        'duplicate_rows_skipped': total_dupes,
+        'api_url': base_url,
+        'query_params': first_page_params,
+    }
 
 
 def _insert_batch(violations):
-    """Insert a batch of violations, skip duplicates."""
+    """Insert a batch of violations, skip duplicates.
+
+    V215: returns (inserted, duplicates_skipped). Previously returned just
+    a count that double-counted dupes because INSERT OR IGNORE does not
+    raise on conflict — rowcount is the source of truth.
+    """
     conn = permitdb.get_connection()
     inserted = 0
+    dupes = 0
     for v in violations:
         try:
-            conn.execute("""
+            cur = conn.execute("""
                 INSERT OR IGNORE INTO violations
                 (prod_city_id, city, state, source_violation_id, violation_date,
                  violation_type, violation_description, status, address, zip,
@@ -815,11 +842,14 @@ def _insert_batch(violations):
                 v['status'], v['address'], v['zip'],
                 v['latitude'], v['longitude'], v['raw_data'],
             ))
-            inserted += 1
+            if cur.rowcount and cur.rowcount > 0:
+                inserted += 1
+            else:
+                dupes += 1
         except Exception:
             pass
     conn.commit()
-    return inserted
+    return inserted, dupes
 
 
 def collect_violations():
@@ -830,22 +860,47 @@ def collect_violations():
     print(f"V162: Violation Collection — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*60}")
 
+    # V215: results[slug] is a dict with per-city aggregated diagnostics
+    # (inserted, api_rows_returned, duplicate_rows_skipped, api_url,
+    # query_params) so the daemon can decide between success /
+    # caught_up / no_api_data and write them to collection_log.
     results = {}
     for slug, config in VIOLATION_SOURCES.items():
-        city_total = 0
+        agg = {
+            'inserted': 0,
+            'api_rows_returned': 0,
+            'duplicate_rows_skipped': 0,
+            'api_url': None,
+            'query_params': None,
+            'error': None,
+        }
         for endpoint in config['endpoints']:
             try:
-                count = collect_violations_from_endpoint(config, endpoint)
-                city_total += count
+                out = collect_violations_from_endpoint(config, endpoint)
+                # Back-compat: older callers may still return an int
+                if isinstance(out, dict):
+                    agg['inserted'] += out.get('inserted', 0) or 0
+                    agg['api_rows_returned'] += out.get('api_rows_returned', 0) or 0
+                    agg['duplicate_rows_skipped'] += out.get('duplicate_rows_skipped', 0) or 0
+                    if not agg['api_url']:
+                        agg['api_url'] = out.get('api_url')
+                    if not agg['query_params']:
+                        agg['query_params'] = out.get('query_params')
+                else:
+                    agg['inserted'] += int(out or 0)
             except Exception as e:
                 print(f"  [V162] Error on {config['city']}/{endpoint['name']}: {e}")
-        results[slug] = city_total
+                agg['error'] = str(e)[:500]
+        results[slug] = agg
 
     print(f"\n{'='*60}")
     print(f"VIOLATION COLLECTION COMPLETE")
-    for slug, count in results.items():
-        print(f"  {VIOLATION_SOURCES[slug]['city']}: {count:,} new violations")
-    print(f"  Total: {sum(results.values()):,}")
+    for slug, agg in results.items():
+        print(f"  {VIOLATION_SOURCES[slug]['city']}: "
+              f"{agg['inserted']:,} new violations "
+              f"(api_rows={agg['api_rows_returned']}, "
+              f"dupes={agg['duplicate_rows_skipped']})")
+    print(f"  Total: {sum(a['inserted'] for a in results.values()):,}")
     print(f"{'='*60}\n")
 
     # V182 PR2: refresh emblem flags so cities that just gained violations
