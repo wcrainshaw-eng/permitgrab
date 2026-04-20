@@ -160,12 +160,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .dropdown-menu a:hover { background: var(--gray-50); color: var(--primary) !important; }
 
 /* HERO */
-.hero { text-align: center; padding: 80px 32px 60px; background: white; }
+.hero { text-align: center; padding: 48px 32px 32px; background: white; } /* V212-4: tighter — was 80/60 */
 .hero h1 { font-size: 48px; font-weight: 800; color: var(--gray-900); margin-bottom: 16px; }
 .hero p { font-size: 20px; color: var(--gray-500); max-width: 500px; margin: 0 auto; }
 
 /* PRICING CARDS */
-.pricing-section { padding: 60px 32px 80px; }
+.pricing-section { padding: 32px 32px 48px; } /* V212-4: was 60/80 */
 .pricing-inner { max-width: 900px; margin: 0 auto; }
 .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
 
@@ -240,7 +240,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 /* TESTIMONIALS */
 .testimonials-section {
-  padding: 80px 32px;
+  padding: 48px 32px; /* V212-4: was 80px */
   background: var(--gray-50);
 }
 .testimonials-inner {
@@ -305,7 +305,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 
 /* FAQ */
-.faq-section { padding: 80px 32px; background: white; }
+.faq-section { padding: 48px 32px; background: white; } /* V212-4: was 80px */
 .faq-inner { max-width: 700px; margin: 0 auto; }
 .faq-title { font-size: 32px; font-weight: 800; color: var(--gray-900); text-align: center; margin-bottom: 48px; }
 .faq-item { border-bottom: 1px solid var(--gray-200); padding: 24px 0; }
