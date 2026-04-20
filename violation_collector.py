@@ -248,6 +248,24 @@ VIOLATION_SOURCES = {
     #   - Phila (hq7x): aggregated monthly counts, not individual violations
     #   - Phila (jr6a): crime incidents, not building violations
     #   - data.mesaaz.gov resources nnr9-eg5e returns empty, amsn-zipb 404s
+    #
+    # V216 audit — top-10 cities still without violations (Dallas/Phoenix/SA/SD/Houston):
+    #   - Dallas: www.dallasopendata.com has food inspections + parking only, no code
+    #     enforcement. DallasGIS ArcGIS has CRM_30Days but rows are 311 service events
+    #     (ANTI_KEYWORDS: event requests), not building code violations.
+    #   - Phoenix: maps.phoenix.gov NSD_Property_Maintenance has 25,820 real code-
+    #     enforcement cases (FY2024-FY2026, still updating). BLOCKED: schema has no
+    #     date field — only CSM_CASENO, CSM_ADDRESS, CSM_STATUS, NOTES, TOTAL_INSP.
+    #     Needs a no-date-field mode (OID pagination + no WHERE filter) in this
+    #     collector to ingest. Candidate for follow-up PR.
+    #   - San Antonio: 311_Cases_WFL1 'Property Maintenance' category has 12,310
+    #     code-enforcement rows but CREATE_DATE is a STRING field (not esri date)
+    #     AND the dataset is frozen at 2020-07-30 (stopped updating). Not usable.
+    #   - San Diego: data.sandiego.gov is S3-hosted static files with no live search
+    #     API; ArcGIS Hub returns no code-enforcement dataset. No viable source.
+    #   - Houston: data.houstontx.gov has "Building Code Enforcement Violations (DON)"
+    #     but it's distributed as XLSX files only — no API. Would need an xlsx-fetch
+    #     path (openpyxl dep + periodic re-download). Candidate for follow-up PR.
     # Document here to prevent re-investigation next iteration.
     'philadelphia': {
         'prod_city_id': None,  # Looked up dynamically
