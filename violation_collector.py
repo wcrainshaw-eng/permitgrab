@@ -608,6 +608,12 @@ def _parse_date(date_str):
     # Skip obviously bad dates
     if s.startswith('Y') or len(s) < 8:
         return None
+    # V213: strip trailing 'Z' (UTC marker) that Carto / Socrata sometimes
+    # emit. Python's strptime with %S can't match 'Z' directly — without
+    # this step Philly's L&I Carto values ('2026-04-18T18:59:18Z') were
+    # failing to parse and dropping every row during insert.
+    if s.endswith('Z'):
+        s = s[:-1]
     for fmt in ('%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
         try:
             dt = datetime.strptime(s[:26], fmt)
@@ -623,7 +629,17 @@ def normalize_violation(record, city_config, endpoint):
     """Map source fields to normalized schema."""
     address = _build_address(record, endpoint['address_fields'])
     vid = record.get(endpoint['id_field'], '')
-    source_id = f"{endpoint['resource_id']}_{vid}" if vid else None
+    # V213: Carto endpoints don't set 'resource_id' (they use 'carto_table'
+    # + 'carto_base'). Fall back through a sane prefix ladder so the
+    # source_violation_id stays unique across sources and Philly's L&I
+    # Carto feed stops raising KeyError here and getting silently dropped.
+    id_prefix = (
+        endpoint.get('resource_id')
+        or endpoint.get('carto_table')
+        or endpoint.get('arcgis_url', '').rsplit('/', 2)[-2]
+        or 'violations'
+    )
+    source_id = f"{id_prefix}_{vid}" if vid else None
 
     return {
         'prod_city_id': city_config['prod_city_id'],
