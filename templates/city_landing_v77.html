@@ -1031,11 +1031,15 @@ body {
     </div>
 
     <div class="nearby-cities-grid">
+      {# V223 T3: hide the permit count when it's 0. Advertising "0
+         permits" on every nearby-city tile made the whole grid look
+         empty even when the current city's page was full. Show a real
+         count when we have one, otherwise "View →". #}
       {% for city in nearby_cities %}
       <a href="/permits/{{ state_slug }}/{{ city.city_slug }}" class="nearby-city-link">
         <div>
           <div class="name">{{ city.city }}</div>
-          <div class="permits">{{ city.total_permits or 0 }} permits</div>
+          <div class="permits">{% if city.total_permits and city.total_permits > 0 %}{{ city.total_permits }} permits{% else %}View &rarr;{% endif %}</div>
         </div>
         <span class="arrow">&rarr;</span>
       </a>

@@ -13950,6 +13950,39 @@ def city_landing_inner(city_slug):
     high_value_count = stats_row['high_value_count']
     city_permits = [dict(row) for row in cursor]
 
+    # V223 T2: freshness badge fallback. Some cities (Houston, Dallas, SA,
+    # Austin) have prod_cities.newest_permit_date = NULL even though real
+    # permits exist — the badge template hides itself in that case. Pull
+    # MAX(filing_date) straight from the permits table as a fallback so
+    # every city with any permit data shows an "Updated as of" line.
+    if permit_count > 0 and not newest_permit_date:
+        try:
+            if _prod_city_id:
+                _max_row = conn.execute(
+                    "SELECT MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
+                    "FROM permits WHERE prod_city_id = ?",
+                    (_prod_city_id,),
+                ).fetchone()
+            else:
+                _max_row = conn.execute(f"""
+                    SELECT MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,'')))
+                    FROM permits WHERE city = ?{state_clause}
+                """, state_params).fetchone()
+            if _max_row and _max_row[0]:
+                newest_permit_date = _max_row[0]
+        except Exception:
+            pass
+
+    # V223 T1: clean up literal "None" values in permit rows before the
+    # Jinja2 template renders them. SQLite returns NULL for missing
+    # fields, which Python stores as None, which {{ permit.x }} renders
+    # as the literal string "None". Replace with an em-dash here so the
+    # table shows "—" for missing values instead of spelling out "None".
+    for _p in city_permits:
+        for _k, _v in list(_p.items()):
+            if _v is None or _v == 'None':
+                _p[_k] = '—'
+
     # V15: noindex for non-prod cities or empty cities
     # If prod_cities table is active and this city isn't in it, treat as coming soon
     if permitdb.prod_cities_table_exists() and not is_prod_city:
