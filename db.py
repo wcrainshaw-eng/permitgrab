@@ -828,7 +828,11 @@ def init_db():
             api_url TEXT,                   -- full URL hit
             query_params TEXT,              -- where/filter params
             api_rows_returned INTEGER,      -- raw rows from API (pre-dedup)
-            duplicate_rows_skipped INTEGER  -- rows the insert silently dropped
+            duplicate_rows_skipped INTEGER, -- rows the insert silently dropped
+            -- V227: per-call timing + max date + circuit-breaker state
+            newest_record_date TEXT,        -- max record date in this response
+            response_time_ms INTEGER,       -- wall-clock latency of the API call
+            circuit_state TEXT DEFAULT 'closed'  -- closed|open|half-open at call time
         );
         CREATE INDEX IF NOT EXISTS idx_collection_log_city ON collection_log(city_slug);
         CREATE INDEX IF NOT EXISTS idx_collection_log_created ON collection_log(created_at);

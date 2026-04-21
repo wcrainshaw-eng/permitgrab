@@ -4742,6 +4742,202 @@ def admin_dashboard():
     })
 
 
+@app.route('/admin', methods=['GET'])
+@app.route('/admin/dashboard', methods=['GET'])
+def admin_dashboard_html():
+    """V227 T6: Interactive HTML command center — one page, force-collect
+    and force-enrich buttons per city, inline JS that calls the existing
+    JSON admin endpoints. Auth via ?key=... query param (same value as
+    the X-Admin-Key header; this is admin-only so it isn't sensitive in a
+    logged URL relative to the key itself)."""
+    key = request.args.get('key') or request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
+    if key != expected:
+        return Response(
+            '<h1>401</h1><p>Append ?key=... or send X-Admin-Key header.</p>',
+            status=401, mimetype='text/html')
+
+    conn = permitdb.get_connection()
+    top_slugs = [
+        'new-york-city','los-angeles','chicago','houston','phoenix',
+        'philadelphia','dallas','austin','san-antonio','san-diego',
+        'nashville','seattle','san-francisco','fort-worth','columbus',
+        'denver','memphis','new-orleans','milwaukee','san-jose',
+    ]
+    placeholders = ','.join('?' * len(top_slugs))
+    rows = conn.execute(f"""
+        SELECT pc.city_slug, pc.state, pc.status, pc.source_type,
+               COALESCE(pc.expected_freshness_days, 14) expected_days,
+               COALESCE(pc.needs_attention, 0) needs_attention,
+               COALESCE(p.cnt, 0) permits,
+               p.newest as newest_permit,
+               COALESCE(v.cnt, 0) violations,
+               COALESCE(cp.cnt, 0) profiles,
+               COALESCE(cp.enriched, 0) enriched
+        FROM prod_cities pc
+        LEFT JOIN (
+            SELECT source_city_key, COUNT(*) cnt,
+                   MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) newest
+            FROM permits GROUP BY source_city_key
+        ) p ON p.source_city_key = pc.city_slug
+        LEFT JOIN (
+            SELECT prod_city_id, COUNT(*) cnt FROM violations GROUP BY prod_city_id
+        ) v ON v.prod_city_id = pc.id
+        LEFT JOIN (
+            SELECT source_city_key, COUNT(*) cnt,
+                   SUM(CASE WHEN (phone IS NOT NULL AND phone != '')
+                             OR (website IS NOT NULL AND website != '')
+                            THEN 1 ELSE 0 END) enriched
+            FROM contractor_profiles GROUP BY source_city_key
+        ) cp ON cp.source_city_key = pc.city_slug
+        WHERE pc.city_slug IN ({placeholders})
+        ORDER BY permits DESC
+    """, top_slugs).fetchall()
+
+    from datetime import datetime as _dt
+    today = _dt.utcnow().date()
+    table_rows = []
+    for r in rows:
+        row = {k: r[k] for k in r.keys()}
+        newest = (row.get('newest_permit') or '')[:10]
+        age = None
+        if newest and len(newest) == 10:
+            try:
+                age = (today - _dt.strptime(newest, '%Y-%m-%d').date()).days
+            except Exception:
+                pass
+        pct = round(100.0 * (row['enriched'] or 0) / row['profiles'], 1) if row['profiles'] else 0
+        expected = row.get('expected_days') or 14
+        if row['status'] != 'active':
+            status = 'paused'
+        elif age is None or row['permits'] == 0:
+            status = 'no_data'
+        elif age > expected * 3:
+            status = 'critical'
+        elif age > expected:
+            status = 'stale'
+        else:
+            status = 'healthy'
+        table_rows.append({
+            'slug': row['city_slug'], 'state': row['state'],
+            'status': status, 'days_stale': age,
+            'expected': expected, 'permits': row['permits'],
+            'violations': row['violations'], 'profiles': row['profiles'],
+            'enriched': row['enriched'], 'enrichment_pct': pct,
+            'source_type': row.get('source_type'),
+            'needs_attention': bool(row.get('needs_attention')),
+        })
+
+    # Summary counters
+    summary = {s: 0 for s in ('healthy','stale','critical','no_data','paused')}
+    for r in table_rows:
+        summary[r['status']] = summary.get(r['status'], 0) + 1
+
+    # Render inline (keep it self-contained, no new template file needed)
+    from markupsafe import escape
+    html_rows = []
+    for r in table_rows:
+        slug = escape(r['slug'])
+        status = r['status']
+        attn_badge = ' <span class="attn">!</span>' if r['needs_attention'] else ''
+        html_rows.append(
+            f"<tr><td>{slug}</td>"
+            f"<td class='{status}'>{status.upper()}{attn_badge}</td>"
+            f"<td>{r['days_stale'] if r['days_stale'] is not None else '?'}d</td>"
+            f"<td>{r['expected']}d</td>"
+            f"<td>{escape(r['source_type'] or '?')}</td>"
+            f"<td>{r['permits']:,}</td>"
+            f"<td>{r['violations']:,}</td>"
+            f"<td>{r['profiles']:,}</td>"
+            f"<td>{r['enrichment_pct']}%</td>"
+            f"<td><button class='btn-collect' onclick=\"forceCollect('{slug}')\">Collect</button>"
+            f"<button class='btn-enrich' onclick=\"enrich('{slug}')\">Enrich</button></td></tr>"
+        )
+
+    html = f"""<!DOCTYPE html>
+<html><head><title>PermitGrab Admin · Command Center</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+*{{box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;margin:0;padding:20px;background:#0f172a;color:#e2e8f0}}
+h1{{margin:0 0 4px;color:#f1f5f9}}
+.sub{{color:#94a3b8;font-size:14px;margin-bottom:18px}}
+.summary{{display:flex;gap:12px;margin:16px 0}}
+.stat{{background:#1e293b;padding:14px 20px;border-radius:10px;min-width:120px;border:1px solid #334155}}
+.stat .num{{font-size:28px;font-weight:700;display:block}}
+.stat .lbl{{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}}
+.healthy{{color:#4ade80}}.stale{{color:#facc15}}.critical{{color:#f87171}}
+.no_data{{color:#94a3b8}}.paused{{color:#64748b}}
+.attn{{display:inline-block;background:#dc2626;color:white;border-radius:50%;
+      width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;margin-left:6px}}
+table{{border-collapse:collapse;width:100%;background:#1e293b;border-radius:10px;overflow:hidden}}
+th,td{{padding:10px 14px;border-bottom:1px solid #334155;text-align:left}}
+th{{background:#0f172a;color:#cbd5e1;font-size:12px;text-transform:uppercase;letter-spacing:1px}}
+tr:last-child td{{border-bottom:none}}
+button{{padding:5px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px}}
+.btn-collect{{background:#2563eb;color:white}}
+.btn-enrich{{background:#8b5cf6;color:white}}
+.btn-collect:hover{{background:#1d4ed8}}.btn-enrich:hover{{background:#7c3aed}}
+#log{{background:#020617;padding:12px;margin-top:18px;border-radius:8px;
+     max-height:320px;overflow-y:auto;font-family:Menlo,monospace;font-size:12px;
+     border:1px solid #334155}}
+.log-line{{padding:2px 0;color:#94a3b8}}
+.log-line.ok{{color:#4ade80}}
+.log-line.err{{color:#f87171}}
+</style></head><body>
+<h1>PermitGrab · Command Center</h1>
+<p class="sub">V227 · {_dt.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+<div class="summary">
+  <div class="stat"><span class="num healthy">{summary['healthy']}</span><span class="lbl">Healthy</span></div>
+  <div class="stat"><span class="num stale">{summary['stale']}</span><span class="lbl">Stale</span></div>
+  <div class="stat"><span class="num critical">{summary['critical']}</span><span class="lbl">Critical</span></div>
+  <div class="stat"><span class="num no_data">{summary['no_data']}</span><span class="lbl">No Data</span></div>
+  <div class="stat"><span class="num paused">{summary['paused']}</span><span class="lbl">Paused</span></div>
+</div>
+<table>
+<tr><th>City</th><th>Status</th><th>Stale</th><th>Expected</th><th>Source</th>
+  <th>Permits</th><th>Violations</th><th>Profiles</th><th>Enrich%</th><th>Actions</th></tr>
+{''.join(html_rows)}
+</table>
+<div id="log"><div class="log-line">Ready.</div></div>
+<script>
+const KEY = new URLSearchParams(location.search).get('key') || '';
+function log(msg, cls){{
+  const l = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = 'log-line' + (cls ? ' '+cls : '');
+  d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+  l.prepend(d);
+}}
+async function forceCollect(city){{
+  log('→ collecting '+city);
+  try{{
+    const r = await fetch('/api/admin/force-collect?city_slug='+encodeURIComponent(city)+'&type=both', {{
+      method: 'GET', headers: {{'X-Admin-Key': KEY}}
+    }});
+    const d = await r.json();
+    log(city+': '+d.status+' permits+'+d.permits_inserted+' viols+'+(d.violations_inserted||0)+' ('+d.elapsed_seconds+'s)',
+        r.ok ? 'ok' : 'err');
+  }}catch(e){{ log(city+': '+e, 'err') }}
+}}
+async function enrich(city){{
+  log('→ enriching '+city);
+  try{{
+    const r = await fetch('/api/admin/enrich', {{
+      method: 'POST',
+      headers: {{'X-Admin-Key': KEY, 'Content-Type': 'application/json'}},
+      body: JSON.stringify({{city_slug: city, batch_size: 20}})
+    }});
+    const d = await r.json();
+    log(city+': '+d.enriched+'/'+d.attempted+' enriched ('+d.elapsed_seconds+'s)',
+        r.ok ? 'ok' : 'err');
+  }}catch(e){{ log(city+': '+e, 'err') }}
+}}
+</script>
+</body></html>"""
+    return Response(html, mimetype='text/html')
+
+
 @app.route('/api/admin/add-source', methods=['POST'])
 def admin_add_source():
     """V12.50: Add a single source and upsert to SQLite."""
@@ -15088,14 +15284,66 @@ def city_trade_landing(city_slug, trade_slug):
     # Other cities for cross-linking (exclude current)
     other_cities = [{"name": c['name'], "slug": c['slug']} for c in ALL_CITIES if c['slug'] != city_slug]
 
-    # V222 T1: Trade pages are in sitemap-trades.xml and do target long-tail
-    # keywords like "chicago roofing permits" — noindex-ing them creates a
-    # sitemap/HTML contradiction Search Console flags against the whole site.
-    # Only noindex pages that are both (a) fallback mode AND (b) genuinely
-    # empty. Anything with real permits — including thin pages with 1-4 —
-    # is fine for Google to index; internal linking will do the rest.
-    # (V30 had noindex on <5 permits OR fallback, which tagged ~1,015 URLs.)
-    robots_directive = "noindex, follow" if (trade_fallback and len(matching_permits) == 0) else "index, follow"
+    # V227 T9: Trade-page indexation policy.
+    # Google's 2025-2026 core updates have been deindexing programmatic
+    # pages that only differ by city/trade name in a data table. V222
+    # dropped noindex from any page with >=1 permits; this tightens to
+    # >=20 permits as the threshold for an indexable page (below that
+    # the page is thin enough that Google treats it as template spam and
+    # it hurts the site's overall crawl score). The remaining thin pages
+    # stay reachable by internal link but carry noindex.
+    _MIN_INDEX_PERMITS = 20
+    robots_directive = (
+        "noindex, follow"
+        if (trade_fallback or len(matching_permits) < _MIN_INDEX_PERMITS)
+        else "index, follow"
+    )
+
+    # V227 T9: Build an insights paragraph for the pages that ARE indexable.
+    # Pure template pages with just a data table rank poorly; a prose
+    # paragraph that can't exist on any other page is the cheapest way to
+    # make Google treat this as real content.
+    trade_insights = None
+    if robots_directive == "index, follow" and len(matching_permits) >= _MIN_INDEX_PERMITS:
+        try:
+            _t_conn = permitdb.get_connection()
+            # Last 30d vs prior 30d (for trend)
+            _this_30 = _t_conn.execute(
+                "SELECT COUNT(*) FROM permits WHERE source_city_key = ? "
+                "AND trade_category = ? AND filing_date >= date('now','-30 days')",
+                (city_slug, trade.get('name', ''))).fetchone()[0]
+            _prior_30 = _t_conn.execute(
+                "SELECT COUNT(*) FROM permits WHERE source_city_key = ? "
+                "AND trade_category = ? AND filing_date >= date('now','-60 days') "
+                "AND filing_date < date('now','-30 days')",
+                (city_slug, trade.get('name', ''))).fetchone()[0]
+            _six_mo = _t_conn.execute(
+                "SELECT COUNT(*) FROM permits WHERE source_city_key = ? "
+                "AND trade_category = ? AND filing_date >= date('now','-180 days')",
+                (city_slug, trade.get('name', ''))).fetchone()[0]
+            _top_contractors = [r[0] for r in _t_conn.execute(
+                "SELECT contractor_name, COUNT(*) c FROM permits "
+                "WHERE source_city_key = ? AND trade_category = ? "
+                "AND contractor_name IS NOT NULL AND contractor_name != '' "
+                "GROUP BY contractor_name ORDER BY c DESC LIMIT 3",
+                (city_slug, trade.get('name', ''))).fetchall()]
+
+            trend = "steady"
+            if _prior_30 > 0:
+                _delta = (_this_30 - _prior_30) / _prior_30 * 100
+                if _delta > 20:
+                    trend = "accelerating"
+                elif _delta < -20:
+                    trend = "slowing"
+            trade_insights = {
+                "trend": trend,
+                "this_month": _this_30,
+                "prior_month": _prior_30,
+                "avg_monthly": round((_six_mo or 0) / 6.0, 1),
+                "top_contractors": _top_contractors,
+            }
+        except Exception as e:
+            print(f"[V227] trade_insights error: {e}")
 
     # V14.0: Get state info for internal linking
     state_abbrev = city_config.get('state', '')
@@ -15128,6 +15376,7 @@ def city_trade_landing(city_slug, trade_slug):
         state_name=state_name,
         city_blog_url=city_blog_url,
         trade_fallback=trade_fallback,
+        trade_insights=trade_insights,  # V227 T9: per-page prose data insights
     )
 
 
@@ -16146,22 +16395,38 @@ def scheduled_collection():
         # might actually pick up newer rows on the next try.
         try:
             _stale_conn = permitdb.get_connection()
+            # V227 T5: pull expected_freshness_days (default 14 if NULL),
+            # compare actual age, escalate when age > 3 * expected by
+            # flipping prod_cities.needs_attention so the admin dashboard
+            # surfaces it without further SSH-ing.
             _stale_rows = _stale_conn.execute("""
-                SELECT pc.city_slug, pc.source_type,
+                SELECT pc.id, pc.city_slug, pc.source_type,
+                       COALESCE(pc.expected_freshness_days, 14) AS expected_days,
                        MAX(p.filing_date) newest,
                        CAST(julianday('now') - julianday(MAX(p.filing_date)) AS INTEGER) age_days
                 FROM prod_cities pc
                 JOIN permits p ON p.source_city_key = pc.city_slug
                 WHERE pc.status = 'active'
                 GROUP BY pc.city_slug
-                HAVING age_days > 7
+                HAVING age_days > expected_days
                 ORDER BY age_days DESC
-                LIMIT 30
+                LIMIT 50
             """).fetchall()
+            _escalated = 0
             for _row in _stale_rows:
-                _slug = _row[0] if not hasattr(_row, 'keys') else _row['city_slug']
-                _age = _row[3] if not hasattr(_row, 'keys') else _row['age_days']
-                _status = 'stale_warning' if _age and _age > 21 else 'aging'
+                if hasattr(_row, 'keys'):
+                    _pcid, _slug, _st, _exp, _new, _age = (
+                        _row['id'], _row['city_slug'], _row['source_type'],
+                        _row['expected_days'], _row['newest'], _row['age_days'])
+                else:
+                    _pcid, _slug, _st, _exp, _new, _age = _row
+                # Three-tier escalation
+                if _age is not None and _exp and _age > _exp * 3:
+                    _status = 'critical_stale'  # needs manual attention
+                elif _age is not None and _exp and _age > _exp:
+                    _status = 'stale_warning'
+                else:
+                    _status = 'aging'
                 try:
                     _stale_conn.execute("""
                         INSERT INTO collection_log
@@ -16169,15 +16434,27 @@ def scheduled_collection():
                            duration_seconds)
                         VALUES (?, 'staleness_check', ?, ?, 0)
                     """, (_slug, _status,
-                          f"newest permit is {_age} days old"))
+                          f"newest permit is {_age}d old (expected {_exp}d)"))
                 except Exception:
                     pass
+                # V227 T5: flip needs_attention for critical-stale cities
+                if _status == 'critical_stale':
+                    try:
+                        _stale_conn.execute("""
+                            UPDATE prod_cities
+                            SET needs_attention = 1,
+                                attention_reason = ?
+                            WHERE id = ?
+                        """, (f"stale {_age}d, {_exp*3}d threshold exceeded", _pcid))
+                        _escalated += 1
+                    except Exception:
+                        pass
             _stale_conn.commit()
             if _stale_rows:
-                print(f"[{datetime.now()}] [V226] staleness check logged "
-                      f"{len(_stale_rows)} cities > 7d behind")
+                print(f"[{datetime.now()}] [V227] staleness check logged "
+                      f"{len(_stale_rows)} stale cities, escalated {_escalated}")
         except Exception as e:
-            print(f"[{datetime.now()}] [V226] staleness check error: {e}")
+            print(f"[{datetime.now()}] [V227] staleness check error: {e}")
 
         # V212-3: Resync prod_cities.newest_permit_date from actual permits each
         # cycle so the freshness badge doesn't go stale while the collector

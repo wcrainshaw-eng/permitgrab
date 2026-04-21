@@ -13,3 +13,11 @@ pytz==2024.1
 beautifulsoup4==4.12.3
 psutil>=5.9
 # duckduckgo-search removed — causes build failures on Render, search done locally instead
+# V227: production-grade resilience libs (all pure Python, no C extensions).
+# duckduckgo-search intentionally NOT re-added — same Render build failure as
+# before. enrichment_engine.py uses httpx directly against html.duckduckgo.com
+# instead, which is what the old FreeEnrichmentEngine already did.
+httpx>=0.27.0
+selectolax>=0.3.21
+tenacity>=8.2.0
+pybreaker>=1.2.0
