@@ -13144,9 +13144,11 @@ def scheduled_collection():
             import traceback
             traceback.print_exc()
 
-        # V12.50: Prune old permits (keep last 90 days)
+        # V229 D2: Prune old permits (keep last 365 days; was 90).
+        # delete_old_permits also skips cities stale >30d so a dead-upstream
+        # city doesn't get its entire history wiped by the daily prune.
         try:
-            deleted = permitdb.delete_old_permits(days=90)
+            deleted = permitdb.delete_old_permits(days=365)
             if deleted > 0:
                 print(f"[{datetime.now()}] Pruned {deleted} old permits.")
         except Exception as e:
