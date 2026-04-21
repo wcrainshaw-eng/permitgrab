@@ -163,7 +163,11 @@ CITY_REGISTRY = {
         "date_field": "issue_date",
         "limit": 2000,
         "active": True,
-        "notes": "V19: Full 27-field map â zone, APC, CPA, neighborhood council (CNC), census tract, council district, APN, use code/desc, lat/lon, EV charger flag, solar flag, work description, valuation, status/status_date. Data through Mar 22, 2026. Verified.",
+        # V233 P1-1: data.lacity.org/resource/pi9x-tg5x has NO contractor/
+        # applicant/licensee/contact field. Schema fetched 2026-04-21 —
+        # only permit metadata + APN + zoning. Enrichment not possible.
+        "has_contractor_field": False,
+        "notes": "V233 P1-1: No contractor field upstream. V19: Full 27-field map â zone, APC, CPA, neighborhood council (CNC), census tract, council district, APN, use code/desc, lat/lon, EV charger flag, solar flag, work description, valuation, status/status_date. Data through Mar 22, 2026. Verified.",
     },
 
     "austin": {
@@ -747,7 +751,12 @@ CITY_REGISTRY = {
         "date_format": "epoch",
         "limit": 2000,
         "active": True,
-        "notes": "V91: Added Virginia Beach - current data through Apr 2026",
+        # V233 P1-1: VB's Building_Permits_Applications_view has no
+        # contractor/applicant/licensee field. Schema fetched 2026-04-21
+        # — only permit metadata + address + CreatedBy. No enrichment
+        # possible from this source.
+        "has_contractor_field": False,
+        "notes": "V233 P1-1: No contractor field upstream. V91: Added Virginia Beach - current data through Apr 2026",
     },
 
     # V23 AUDIT: 2026-03-28 - ACTIVE - Verified working with Mar 2026 data
@@ -806,6 +815,14 @@ CITY_REGISTRY = {
             "permit_type": "PermitType",
             "work_type": "ApplicationTypeDescription",
             "address": "PropertyAddress",
+            # V233 P1-1: Miami's ArcGIS source calls the field
+            # "ContractorName" — route it into contractor_name directly
+            # so contractor_profiles picks it up. Previously it only
+            # landed in contact_name, and the normalize_permit fallback
+            # (contractor = contact when contractor is empty) was
+            # inconsistent across code paths, leaving 99.5% of Miami
+            # permits with contractor_name=NULL.
+            "contractor_name": "ContractorName",
             "contact_name": "ContractorName",
             "contact_phone": "ContractorPhone",
             "contact_address": "ContractorAddress",

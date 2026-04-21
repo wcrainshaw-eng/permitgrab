@@ -148,14 +148,20 @@ NEIGHBORHOOD_TO_CITY = {
 # This fixes the issue where 180K+ permits aren't counted due to name mismatches
 # Format: lowercase variant -> canonical name
 CITY_NAME_CANONICALIZATION = {
-    # Major city variants
-    'new york city': 'New York',
-    'nyc': 'New York',
-    'manhattan': 'New York',
-    'brooklyn': 'New York',
-    'queens': 'New York',
-    'bronx': 'New York',
-    'staten island': 'New York',
+    # V233 P0-2: canonical NYC name is "New York City" — it matches
+    # prod_cities.city and the city_configs `name` field. Previously this
+    # table normalized everything to "New York" (the state's name),
+    # which broke every downstream query that joined permits to
+    # prod_cities (`WHERE city='New York City'` returned 0 rows while
+    # prod_cities.total_permits read 35K — because the 35K rows were
+    # sitting under `city='New York'`).
+    'new york': 'New York City',
+    'nyc': 'New York City',
+    'manhattan': 'New York City',
+    'brooklyn': 'New York City',
+    'queens': 'New York City',
+    'bronx': 'New York City',
+    'staten island': 'New York City',
 
     'washington dc': 'Washington',
     'washington d.c.': 'Washington',
