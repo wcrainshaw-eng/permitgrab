@@ -1505,8 +1505,14 @@ CITY_REGISTRY = {
         "date_field": "Date Issued",
         "date_format": "string",
         "limit": 2000,
-        "active": True,
-        "notes": "V222: Migrated Accela -> CKAN 828e9630 (16K rows). No contractor field in schema.",
+        # V225 T4: Pausing — the CKAN resource's newest Date Issued has been
+        # frozen at 2026-02-04 for 75+ days. The upstream dataset itself
+        # stopped updating; our collector is working correctly against a
+        # dead source. Showing "Data as of February" on the city page
+        # screams abandoned. Pause until Milwaukee republishes or we find
+        # an alternative endpoint.
+        "active": False,
+        "notes": "V225: Paused — CKAN dataset 828e9630 last updated 2026-02-04 (75d+ stale upstream). Revisit when Milwaukee publishes fresh data or a new dataset appears.",
     },
 
     # V23 AUDIT: 2026-03-28 - LOGIN_REQUIRED - Uses Accela
