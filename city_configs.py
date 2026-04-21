@@ -1479,22 +1479,34 @@ CITY_REGISTRY = {
         "slug": "milwaukee",
         "lat": 43.039,
         "lon": -87.906,
-        "platform": "accela",
-        "agency_code": "MILWAUKEE",
-        "_accela_city_key": "milwaukee",
-        "endpoint": "https://aca-prod.accela.com/MILWAUKEE/Cap/CapHome.aspx?module=Building&TabName=Building",
-        "description": "Building Permits (Accela Citizen Access)",
+        # V222: Migrated from Accela scraper to CKAN datastore. The Accela
+        # scrape was only producing ~54 permits despite running for weeks
+        # (rate-limited by the portal, doesn't batch well). Milwaukee's
+        # data.milwaukee.gov publishes the same data as a live CKAN
+        # resource — 16,187 rows, newest 2026-02-04 — we can paginate
+        # cleanly. Reusing the V217/V219 CKAN collector path. No
+        # contractor field in the schema, so contractor_name stays null.
+        "platform": "ckan",
+        "endpoint": "https://data.milwaukee.gov/api/3/action/datastore_search",
+        "dataset_id": "828e9630-d7cb-42e4-960e-964eae916397",
+        "description": "Residential and Commercial Permit Work Data (data.milwaukee.gov CKAN)",
         "field_map": {
-            "permit_number": "Record Number",
-            "permit_type": "Record Type",
+            "permit_number": "Record ID",
+            "permit_type": "Permit Type",
             "address": "Address",
-            "filing_date": "Date",
+            "filing_date": "Date Issued",
+            "issued_date": "Date Issued",
+            "opened_date": "Date Opened",
             "status": "Status",
-            "description": "Description",
+            "estimated_cost": "Construction Total Cost",
+            "description": "Use of Building",
+            "num_units": "Dwelling units impact",
         },
-        "date_field": "Date",
+        "date_field": "Date Issued",
+        "date_format": "string",
+        "limit": 2000,
         "active": True,
-        "notes": "V54: Reactivated Accela â Playwright confirmed working on Render. Top-30 city.",
+        "notes": "V222: Migrated Accela -> CKAN 828e9630 (16K rows). No contractor field in schema.",
     },
 
     # V23 AUDIT: 2026-03-28 - LOGIN_REQUIRED - Uses Accela
