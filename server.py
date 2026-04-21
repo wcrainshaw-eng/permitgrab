@@ -4172,12 +4172,20 @@ def google_verification():
 # ===========================
 
 def check_admin_key():
-    """V12.58: Validate admin key. Returns (is_valid, error_response)."""
+    """V12.58: Validate admin key. Returns (is_valid, error_response).
+
+    V229 A4: removed the hardcoded default value. If ADMIN_KEY env var isn't
+    set in Render, every admin endpoint denies access — prior behavior was
+    to fall back to a baked-in hex string, which meant anyone who could
+    read this file had full admin access. Side effect: the admin HTML
+    dashboard at /admin?key=... now requires ADMIN_KEY to be set in the
+    Render env before it works at all.
+    """
     secret = request.headers.get('X-Admin-Key')
-    if not secret:
-        return False, (jsonify({'error': 'Unauthorized'}), 401)
-    expected = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
-    if secret != expected:
+    expected = os.environ.get('ADMIN_KEY')
+    if not expected:
+        return False, (jsonify({'error': 'ADMIN_KEY not configured'}), 503)
+    if not secret or secret != expected:
         return False, (jsonify({'error': 'Unauthorized'}), 401)
     return True, None
 
@@ -4242,8 +4250,12 @@ def admin_force_collection():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     else:
-        # Background thread for full/filtered collection
-        def run_collection():
+        # Background thread for full/filtered collection.
+        # V229 A3: renamed from run_collection for clarity (3 inner functions
+        # with the same name across this module — shadowing-safe because each
+        # is scoped to its enclosing handler, but the name reuse made grep
+        # noisy and obscured intent).
+        def _run_refresh_collection():
             try:
                 from collector import collect_refresh
                 print(f"[Admin] Starting REFRESH collection (platform={platform_filter}, scrapers={include_scrapers})...")
@@ -4258,7 +4270,7 @@ def admin_force_collection():
                 import traceback
                 traceback.print_exc()
 
-        thread = threading.Thread(target=run_collection, daemon=True)
+        thread = threading.Thread(target=_run_refresh_collection, daemon=True)
         thread.start()
 
         return jsonify({
@@ -4278,7 +4290,8 @@ def admin_full_collection():
     if not valid:
         return error
 
-    def run_collection():
+    # V229 A3: renamed from run_collection (see _run_refresh_collection above)
+    def _run_full_collection():
         try:
             from collector import collect_full
             print("[Admin] Starting FULL collection (rebuild mode)...")
@@ -4287,7 +4300,7 @@ def admin_full_collection():
         except Exception as e:
             print(f"[Admin] Full collection error: {e}")
 
-    thread = threading.Thread(target=run_collection, daemon=True)
+    thread = threading.Thread(target=_run_full_collection, daemon=True)
     thread.start()
 
     return jsonify({
@@ -4743,7 +4756,11 @@ def admin_dashboard_html():
     the X-Admin-Key header; this is admin-only so it isn't sensitive in a
     logged URL relative to the key itself)."""
     key = request.args.get('key') or request.headers.get('X-Admin-Key')
-    expected = os.environ.get('ADMIN_KEY', '122f635f639857bd9296150ba2e64419')
+    expected = os.environ.get('ADMIN_KEY')
+    if not expected:
+        return Response(
+            '<h1>503</h1><p>ADMIN_KEY env var not configured on this instance.</p>',
+            status=503, mimetype='text/html')
     if key != expected:
         return Response(
             '<h1>401</h1><p>Append ?key=... or send X-Admin-Key header.</p>',
@@ -4943,7 +4960,8 @@ def admin_add_source():
     if not source_key:
         return jsonify({'error': 'Missing source parameter. Usage: ?source=nj_statewide&type=bulk'}), 400
 
-    def run_collection():
+    # V229 A3: renamed from run_collection
+    def _run_single_source_collection():
         try:
             from collector import collect_single_source
             print(f"[Admin] Adding single source: {source_key} ({source_type})...")
@@ -4952,7 +4970,7 @@ def admin_add_source():
         except Exception as e:
             print(f"[Admin] Add source error: {e}")
 
-    thread = threading.Thread(target=run_collection, daemon=True)
+    thread = threading.Thread(target=_run_single_source_collection, daemon=True)
     thread.start()
 
     return jsonify({
@@ -13048,9 +13066,13 @@ def api_unsubscribe():
 # ADMIN PAGE
 # ===========================
 
-@app.route('/admin')
+@app.route('/admin/legacy')
 def admin_page():
-    """GET /admin - Admin dashboard (password protected)."""
+    """GET /admin/legacy - V12-era admin dashboard, password-gated. V229 A1:
+    was @app.route('/admin') but silently shadowed V227's X-Admin-Key-gated
+    HTML command center at /admin. Flask registered both, last-decorator-
+    wins silently, so V227's dashboard was unreachable. Moved here; the
+    before_request handler below still matches legacy path."""
     # Check for admin password in query param or session
     password = request.args.get('password', '')
 
@@ -13294,7 +13316,7 @@ def admin_page():
 # Handle admin logout
 @app.before_request
 def check_admin_logout():
-    if request.path == '/admin' and request.args.get('logout'):
+    if request.path in ('/admin', '/admin/legacy') and request.args.get('logout'):
         session.pop('admin_authenticated', None)
 
 

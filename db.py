@@ -711,6 +711,12 @@ def init_db():
             earliest_permit_date TEXT,
             latest_permit_date TEXT,
             days_since_new_data INTEGER,
+            -- V227: per-city freshness expectations + needs-attention escalation
+            -- (added to prod via ALTER in V227 T3; now baked into CREATE TABLE
+            -- so fresh DBs don't need the migration + V229 A2 doesn't crash)
+            expected_freshness_days INTEGER DEFAULT 14,
+            needs_attention INTEGER DEFAULT 0,
+            attention_reason TEXT,
             UNIQUE(city, state)
         );
         CREATE INDEX IF NOT EXISTS idx_prod_cities_status ON prod_cities(status);
