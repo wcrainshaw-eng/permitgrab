@@ -14542,8 +14542,14 @@ def city_trade_landing(city_slug, trade_slug):
     # Other cities for cross-linking (exclude current)
     other_cities = [{"name": c['name'], "slug": c['slug']} for c in ALL_CITIES if c['slug'] != city_slug]
 
-    # V30: noindex for thin trade pages (fewer than 5 trade-specific permits, or fallback mode)
-    robots_directive = "noindex, follow" if (trade_fallback or len(matching_permits) < 5) else "index, follow"
+    # V222 T1: Trade pages are in sitemap-trades.xml and do target long-tail
+    # keywords like "chicago roofing permits" — noindex-ing them creates a
+    # sitemap/HTML contradiction Search Console flags against the whole site.
+    # Only noindex pages that are both (a) fallback mode AND (b) genuinely
+    # empty. Anything with real permits — including thin pages with 1-4 —
+    # is fine for Google to index; internal linking will do the rest.
+    # (V30 had noindex on <5 permits OR fallback, which tagged ~1,015 URLs.)
+    robots_directive = "noindex, follow" if (trade_fallback and len(matching_permits) == 0) else "index, follow"
 
     # V14.0: Get state info for internal linking
     state_abbrev = city_config.get('state', '')
@@ -15867,6 +15873,34 @@ def page_not_found(e):
     """Handle 404 errors with a styled page."""
     footer_cities = get_cities_with_data()
     return render_template('404.html', footer_cities=footer_cities), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    """V222 T2: Convert uncaught exceptions into 503 (Service Unavailable)
+    with a Retry-After hint. 500 signals to Googlebot that the URL is
+    permanently broken and should be removed from the index; 503 tells
+    Googlebot "try again later" and preserves the URL's indexation.
+    Search Console flagged 176 pages as 5xx before this change — each
+    one was hurting our crawl budget.
+
+    Also logs the exception so we can diagnose the root cause in Render
+    logs without depending on visible user reports.
+    """
+    try:
+        import traceback
+        print(f"[500->503] {request.path} — {e.__class__.__name__}: {e}", flush=True)
+        traceback.print_exc()
+    except Exception:
+        pass
+    try:
+        footer_cities = get_cities_with_data()
+    except Exception:
+        footer_cities = []
+    resp = render_template('404.html', footer_cities=footer_cities,
+                           show_city_suggestions=False)
+    # 503 + Retry-After tells Googlebot to try again, not drop the URL.
+    return resp, 503, {'Retry-After': '600'}
 
 
 # ===========================
