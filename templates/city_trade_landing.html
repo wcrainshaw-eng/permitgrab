@@ -281,7 +281,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div class="label">This Week</div>
   </div>
   <div class="stat-card">
-    <div class="value">${{ stats.avg_value | default('N/A') }}</div>
+    <div class="value">{% if stats.avg_value and stats.avg_value > 0 %}{% if stats.avg_value >= 1000000 %}${{ "%.1f" | format(stats.avg_value / 1000000) }}M{% else %}${{ "{:,.0f}".format(stats.avg_value) }}{% endif %}{% else %}N/A{% endif %}</div>
     <div class="label">Avg Value</div>
   </div>
   <div class="stat-card updated">
