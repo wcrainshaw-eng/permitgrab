@@ -711,6 +711,12 @@ def init_db():
             earliest_permit_date TEXT,
             latest_permit_date TEXT,
             days_since_new_data INTEGER,
+            -- V227: per-city freshness expectations + needs-attention escalation
+            -- (added to prod via ALTER in V227 T3; now baked into CREATE TABLE
+            -- so fresh DBs don't need the migration + V229 A2 doesn't crash)
+            expected_freshness_days INTEGER DEFAULT 14,
+            needs_attention INTEGER DEFAULT 0,
+            attention_reason TEXT,
             UNIQUE(city, state)
         );
         CREATE INDEX IF NOT EXISTS idx_prod_cities_status ON prod_cities(status);
@@ -1008,25 +1014,10 @@ def _run_v18_migrations(conn):
     except:
         pass
 
-    # Create stale_cities_review table if not exists
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS stale_cities_review (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            city TEXT NOT NULL,
-            state TEXT NOT NULL,
-            original_source TEXT,
-            last_permit_date TEXT,
-            stale_since TEXT,
-            auto_search_attempted INTEGER DEFAULT 0,
-            auto_search_result TEXT,
-            manual_notes TEXT,
-            alternate_source_url TEXT,
-            status TEXT DEFAULT 'needs_review',
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(city, state)
-        )
-    """)
+    # V229 D3: removed duplicate CREATE TABLE IF NOT EXISTS stale_cities_review
+    # here — the canonical definition lives at line ~729 in init_database().
+    # CREATE ... IF NOT EXISTS made this safe at runtime but the duplicate
+    # was confusing during schema audits.
     conn.commit()
 
 
@@ -3332,21 +3323,47 @@ def get_cities_with_permits():
         return []
 
 
-def delete_old_permits(days=90):
+def delete_old_permits(days=365):
     """
     Prune permits older than N days. Keeps the database from growing forever.
     This replaces the time-window filtering that was baked into collection.
+
+    V229 D2: default changed from 90 to 365. 90 days was too aggressive —
+    a city whose upstream API goes down for 3 months would have ALL its
+    permits deleted and show zero on the landing page before the daemon
+    even noticed. 365 gives real headroom for trend charts and SEO content
+    while still capping database growth.
+
+    Safety guard: skip the prune for any (city, state) that has had no
+    new permits in the last 30 days. Stale cities already lost their
+    recency; cutting the rest of their history out punishes them twice.
     """
     conn = get_connection()
     cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-    cursor = conn.execute(
-        "DELETE FROM permits WHERE date < ? AND date != '' AND date IS NOT NULL",
-        (cutoff,)
+    # V229 D2: stale cities get a pass. `recent_keys` are (city, state)
+    # tuples that DO have something in the last 30 days; we only prune
+    # rows in those cities.
+    stale_cutoff = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    recent_pairs = conn.execute(
+        "SELECT DISTINCT city, state FROM permits WHERE date >= ?",
+        (stale_cutoff,),
+    ).fetchall()
+    if not recent_pairs:
+        return 0
+    placeholders = ' OR '.join(['(city = ? AND state = ?)'] * len(recent_pairs))
+    params = []
+    for r in recent_pairs:
+        params.extend([r[0], r[1]])
+    sql = (
+        "DELETE FROM permits WHERE date < ? AND date != '' AND date IS NOT NULL "
+        "AND (" + placeholders + ")"
     )
+    cursor = conn.execute(sql, (cutoff, *params))
     conn.commit()
     deleted = cursor.rowcount
     if deleted > 0:
-        print(f"[DB] Pruned {deleted} permits older than {days} days")
+        print(f"[DB] Pruned {deleted} permits older than {days} days "
+              f"(from {len(recent_pairs)} cities that still get fresh data)")
     return deleted
 
 
