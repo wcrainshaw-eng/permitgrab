@@ -1747,13 +1747,22 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
             except (ValueError, OSError):
                 pass
         if not parsed_date:
+            # V225: strip trailing Z (UTC marker in ISO 8601). Philadelphia's
+            # Carto permit feed returns e.g. "2026-04-20T21:54:17Z", and
+            # strptime("%Y-%m-%dT%H:%M:%S") rejects the trailing Z, so
+            # filing_date was silently NULL on every new Philly permit —
+            # MAX(filing_date) stuck at 2026-03-31 even though collection
+            # ran every 3h.
+            ds = str(date_str)
+            if ds.endswith('Z'):
+                ds = ds[:-1]
             # V50: Added St. Louis format "February, 02 2026 00:00:00"
             for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
                         "%Y-%m-%d", "%Y/%m/%d",  # V185: YYYY/MM/DD (Virginia Beach ArcGIS)
                         "%m/%d/%Y", "%m/%d/%Y %H:%M:%S %p",
                         "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
                 try:
-                    parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
+                    parsed_date = datetime.strptime(ds[:26], fmt).strftime("%Y-%m-%d")
                     break
                 except ValueError:
                     continue
@@ -2116,13 +2125,22 @@ def normalize_permit(raw_record, city_key):
             except (ValueError, OSError):
                 pass
         if not parsed_date:
+            # V225: strip trailing Z (UTC marker in ISO 8601). Philadelphia's
+            # Carto permit feed returns e.g. "2026-04-20T21:54:17Z", and
+            # strptime("%Y-%m-%dT%H:%M:%S") rejects the trailing Z, so
+            # filing_date was silently NULL on every new Philly permit —
+            # MAX(filing_date) stuck at 2026-03-31 even though collection
+            # ran every 3h.
+            ds = str(date_str)
+            if ds.endswith('Z'):
+                ds = ds[:-1]
             # V50: Added St. Louis format "February, 02 2026 00:00:00"
             for fmt in ["%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
                         "%Y-%m-%d", "%Y/%m/%d",  # V185: YYYY/MM/DD (Virginia Beach ArcGIS)
                         "%m/%d/%Y", "%m/%d/%Y %H:%M:%S %p",
                         "%B, %d %Y %H:%M:%S", "%B %d, %Y", "%B %d %Y"]:
                 try:
-                    parsed_date = datetime.strptime(str(date_str)[:26], fmt).strftime("%Y-%m-%d")
+                    parsed_date = datetime.strptime(ds[:26], fmt).strftime("%Y-%m-%d")
                     break
                 except ValueError:
                     continue
