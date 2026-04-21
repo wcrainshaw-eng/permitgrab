@@ -737,7 +737,22 @@ def send_daily_digest():
             if success:
                 sent += 1
                 # Update last_sent in the JSON file
-                sub_data["last_digest_sent_at"] = datetime.utcnow().isoformat()
+                _now_iso = datetime.utcnow().isoformat()
+                sub_data["last_digest_sent_at"] = _now_iso
+                # V229 addendum H2: also update DB. V158 made subscriber
+                # loading DB-backed, but send_daily_digest only advanced
+                # the JSON copy, so the DB `last_digest_sent_at` column
+                # never moved and digest-dedup logic couldn't rely on it.
+                try:
+                    import db as permitdb
+                    _conn = permitdb.get_connection()
+                    _conn.execute(
+                        "UPDATE subscribers SET last_digest_sent_at=? WHERE email=?",
+                        (_now_iso, sub_data.get("email")),
+                    )
+                    _conn.commit()
+                except Exception:
+                    pass
             elif result == "no_cities":
                 skipped += 1
             else:
