@@ -828,6 +828,141 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V195c: Sync error (non-fatal): {e}")
 
+    # V231 DC-1: merge Phoenix/PHOENIX duplicate prod_cities rows. Prod
+    # has two entries for Phoenix, AZ — one with 12K permits, one with
+    # 313 — and collectors keep writing to both. Pick the higher-permit
+    # row as canonical, reassign the other's permits, delete the dupe.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v231_phoenix'").fetchone()
+        if not m:
+            rows = conn2.execute("""
+                SELECT id, city, total_permits FROM prod_cities
+                WHERE LOWER(city)='phoenix' AND state='AZ'
+                ORDER BY COALESCE(total_permits, 0) DESC
+            """).fetchall()
+            if len(rows) > 1:
+                keep_id = rows[0][0] if isinstance(rows[0], tuple) else rows[0]['id']
+                keep_name = rows[0][1] if isinstance(rows[0], tuple) else rows[0]['city']
+                for r in rows[1:]:
+                    dupe_id = r[0] if isinstance(r, tuple) else r['id']
+                    conn2.execute(
+                        "UPDATE permits SET prod_city_id=?, city=? WHERE prod_city_id=?",
+                        (keep_id, keep_name, dupe_id)
+                    )
+                    conn2.execute("DELETE FROM prod_cities WHERE id=?", (dupe_id,))
+            # Also fix any permits with uppercase city = 'PHOENIX'
+            conn2.execute(
+                "UPDATE permits SET city='Phoenix' WHERE city='PHOENIX' AND state='AZ'"
+            )
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v231_phoenix', ?)", (str(len(rows)),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V231 DC-1: Phoenix merge — collapsed {max(0, len(rows)-1)} dupes")
+    except Exception as e:
+        print(f"[{datetime.now()}] V231 DC-1: Phoenix merge error (non-fatal): {e}")
+
+    # V231 DC-2: dedupe prod_cities by (LOWER(city), state). Hundreds of
+    # NJ towns have duplicates from old state-level ingestion. Keep the
+    # row with the most permits in each group, reassign permits from the
+    # losers, delete the loser rows. Legitimate same-name-different-state
+    # cities (Portland OR vs Portland WI) are NOT touched since the GROUP
+    # BY includes state.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v231_dedup'").fetchone()
+        if not m:
+            dup_groups = conn2.execute("""
+                SELECT LOWER(city) as lc, state, COUNT(*) as cnt
+                FROM prod_cities
+                GROUP BY LOWER(city), state HAVING COUNT(*) > 1
+            """).fetchall()
+            merged = 0
+            for g in dup_groups:
+                lc = g[0] if isinstance(g, tuple) else g['lc']
+                st = g[1] if isinstance(g, tuple) else g['state']
+                rows = conn2.execute("""
+                    SELECT id, total_permits FROM prod_cities
+                    WHERE LOWER(city)=? AND state=?
+                    ORDER BY COALESCE(total_permits, 0) DESC
+                """, (lc, st)).fetchall()
+                if len(rows) < 2:
+                    continue
+                keep_id = rows[0][0] if isinstance(rows[0], tuple) else rows[0]['id']
+                for r in rows[1:]:
+                    dupe_id = r[0] if isinstance(r, tuple) else r['id']
+                    conn2.execute(
+                        "UPDATE permits SET prod_city_id=? WHERE prod_city_id=?",
+                        (keep_id, dupe_id)
+                    )
+                    conn2.execute("DELETE FROM prod_cities WHERE id=?", (dupe_id,))
+                    merged += 1
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v231_dedup', ?)", (str(merged),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V231 DC-2: Deduped prod_cities — collapsed {merged} duplicate rows")
+    except Exception as e:
+        print(f"[{datetime.now()}] V231 DC-2: Dedup error (non-fatal): {e}")
+
+    # V231 DC-3: pause junk-data cities. Socrata/statewide ingestions
+    # have polluted prod_cities with entries like Lindley NY (pop 1,760
+    # holding 41K permits) where a tiny city attracted state-level
+    # records. Pause these so they stop showing up in footers/landings
+    # until the underlying ingestion is fixed.
+    #
+    # _v2 gate: the first pass matched `population < 5000` without
+    # requiring population > 0, which paused counties (Miami-Dade,
+    # Shelby, etc.) whose prod_cities row has population=0 because
+    # population is only hydrated for incorporated cities. This pass
+    # un-pauses any V231 victim with population <= 0 or >= 5000, then
+    # re-runs the filter with the tightened condition.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v231_junk_pause_v2'").fetchone()
+        if not m:
+            # Step 1: undo the too-broad first pass
+            conn2.execute("""
+                UPDATE prod_cities
+                SET status='active',
+                    pause_reason=REPLACE(pause_reason,
+                        ' | V231: paused, junk data — statewide permits in tiny city',
+                        '')
+                WHERE (population IS NULL OR population <= 0 OR population >= 5000)
+                  AND pause_reason LIKE '%V231: paused, junk data%'
+            """)
+            # Step 2: apply corrected filter (population strictly > 0)
+            junk = conn2.execute("""
+                UPDATE prod_cities
+                SET status='paused',
+                    pause_reason=COALESCE(pause_reason, '') ||
+                        ' | V231: paused, junk data — statewide permits in tiny city'
+                WHERE population > 0
+                  AND population < 5000
+                  AND total_permits > 1000
+                  AND status='active'
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v231_junk_pause_v2', ?)", (str(junk),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V231 DC-3: Paused {junk} junk-data cities (0 < pop < 5K, permits > 1K)")
+    except Exception as e:
+        print(f"[{datetime.now()}] V231 DC-3: Junk pause error (non-fatal): {e}")
+
+    # V231 DC-4: clip Portland future-dated permits. Portland OR's
+    # Socrata source returns filing_date values up to 7 days in the
+    # future (likely a scheduled-inspection column mis-mapped to
+    # filing_date). Rather than trust the upstream, cap any future
+    # filing_date to today during cleanup. A more permanent fix is to
+    # filter out future dates during collection.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v231_portland_dates'").fetchone()
+        if not m:
+            clipped = conn2.execute("""
+                UPDATE permits
+                SET filing_date = date('now')
+                WHERE city='Portland' AND state='OR'
+                  AND filing_date > date('now')
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v231_portland_dates', ?)", (str(clipped),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V231 DC-4: Clipped {clipped} Portland future-dated permits")
+    except Exception as e:
+        print(f"[{datetime.now()}] V231 DC-4: Portland date clip error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
@@ -1555,6 +1690,112 @@ def admin_enrich():
         'enriched': enriched,
         'failed': failed,
         'elapsed_seconds': round(_t.time() - t0, 2),
+    })
+
+
+@app.route('/api/admin/enrich-cities', methods=['POST'])
+def admin_enrich_cities():
+    """V231 Phase 4: run admin_enrich in series for a list of city_slugs.
+
+    Body: {"city_slugs": ["fort-worth", "san-francisco", "seattle", "houston"],
+           "batch_size": 50}
+
+    Phase 4 of the master launch plan wants enrichment fast-tracked on
+    specific cities without waiting for the 30-min daemon cycle to crawl
+    them in FIFO order. This is a convenience wrapper that calls the
+    same single-city enrichment logic once per slug and returns a
+    per-city summary.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.get_json() or {}
+    slugs = data.get('city_slugs') or []
+    batch_size = min(int(data.get('batch_size', 30)), 100)
+    if not slugs:
+        return jsonify({'error': 'city_slugs required'}), 400
+    if not isinstance(slugs, list):
+        return jsonify({'error': 'city_slugs must be a list'}), 400
+
+    import time as _t
+    from datetime import datetime as _dt
+    from web_enrichment import FreeEnrichmentEngine, normalize_name
+
+    t0 = _t.time()
+    engine = FreeEnrichmentEngine()
+    conn = permitdb.get_connection()
+    conn.row_factory = sqlite3.Row
+    results = []
+    for city_slug in slugs:
+        city_t0 = _t.time()
+        rows = conn.execute("""
+            SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
+                   cp.city, cp.state
+            FROM contractor_profiles cp
+            WHERE cp.source_city_key = ?
+              AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
+              AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
+              AND LENGTH(cp.contractor_name_raw) >= 5
+              AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
+              AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
+              AND cp.contractor_name_raw NOT LIKE 'OWNER %'
+              AND cp.contractor_name_raw NOT GLOB '[0-9]*'
+              AND (cp.phone IS NULL OR cp.phone = '')
+              AND (cp.website IS NULL OR cp.website = '')
+            ORDER BY cp.total_permits DESC
+            LIMIT ?
+        """, (city_slug, batch_size)).fetchall()
+        attempted = enriched = failed = 0
+        for r in rows:
+            attempted += 1
+            raw = r['contractor_name_raw']
+            norm = r['contractor_name_normalized'] or normalize_name(raw)
+            try:
+                phone, website = engine.enrich_one(raw, r['city'] or '', r['state'] or '')
+            except Exception:
+                phone, website = None, None
+            now = _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            try:
+                if phone or website:
+                    enriched += 1
+                    conn.execute("""INSERT OR REPLACE INTO contractor_contacts
+                            (contractor_name_normalized, display_name, phone, website,
+                             source, confidence, looked_up_at)
+                            VALUES (?, ?, ?, ?, 'web_enrichment', 'low', ?)""",
+                            (norm, raw, phone, website, now))
+                    conn.execute("""UPDATE contractor_profiles
+                            SET phone=?, website=?, enrichment_status='enriched',
+                                enriched_at=?, updated_at=?
+                            WHERE id=?""",
+                            (phone, website, now, now, r['id']))
+                    conn.execute("""INSERT INTO enrichment_log
+                            (contractor_profile_id, source, status, cost, created_at)
+                            VALUES (?, 'web_enrichment', 'enriched', 0.0, ?)""",
+                            (r['id'], now))
+                else:
+                    conn.execute("""UPDATE contractor_profiles
+                            SET enrichment_status='not_found',
+                                enriched_at=?, updated_at=?
+                            WHERE id=?""", (now, now, r['id']))
+                    conn.execute("""INSERT INTO enrichment_log
+                            (contractor_profile_id, source, status, cost, created_at)
+                            VALUES (?, 'web_enrichment', 'not_found', 0.0, ?)""",
+                            (r['id'], now))
+                conn.commit()
+            except Exception as e:
+                failed += 1
+                print(f"[V231 enrich-cities] {city_slug} {raw}: {e}", flush=True)
+        results.append({
+            'city_slug': city_slug,
+            'attempted': attempted,
+            'enriched': enriched,
+            'failed': failed,
+            'elapsed_seconds': round(_t.time() - city_t0, 2),
+        })
+
+    return jsonify({
+        'cities': results,
+        'total_elapsed_seconds': round(_t.time() - t0, 2),
     })
 
 
@@ -11560,7 +11801,26 @@ def city_landing_inner(city_slug):
 
     # Check for SEO config, or create fallback from city_configs
     if city_slug in CITY_SEO_CONFIG:
-        config = CITY_SEO_CONFIG[city_slug]
+        config = dict(CITY_SEO_CONFIG[city_slug])
+        # V231 P2-10: ensure ", <state>" appears in meta_title + description
+        # for SEO. The 51 hardcoded CITY_SEO_CONFIG entries were written
+        # city-only ("Los Angeles Building Permits …") before the fallback
+        # path standardized on "{City}, {State} Building Permits …". This
+        # normalizes at read time so every route goes through one format.
+        _city_display = config.get('name', '')
+        _state_abbrev = config.get('state', '')
+        if _city_display and _state_abbrev:
+            _city_comma_state = f"{_city_display}, {_state_abbrev}"
+            if (_city_comma_state not in config.get('meta_title', '')
+                    and config.get('meta_title')):
+                config['meta_title'] = config['meta_title'].replace(
+                    f"{_city_display} Building", f"{_city_comma_state} Building", 1
+                )
+            if (_city_comma_state not in config.get('meta_description', '')
+                    and config.get('meta_description')):
+                config['meta_description'] = config['meta_description'].replace(
+                    f" in {_city_display}.", f" in {_city_comma_state}.", 1
+                )
     else:
         # V12.32: Try both explicit configs AND auto-discovered bulk source cities
         city_key, city_config = get_city_by_slug_auto(city_slug)
@@ -11615,7 +11875,9 @@ def city_landing_inner(city_slug):
     except Exception:
         pass
 
-    # V161: Query by prod_city_id if available, fall back to city name
+    # V161: Query by prod_city_id if available, fall back to city name.
+    # V231 P0-7: LIMIT 50 (was 100). Template only renders 25 rows and
+    # state_city_landing already uses 50; no reason to haul back 100.
     if _prod_city_id:
         stats_row = conn.execute("""
             SELECT COUNT(*) as permit_count,
@@ -11624,7 +11886,7 @@ def city_landing_inner(city_slug):
             FROM permits WHERE prod_city_id = ?
         """, (_prod_city_id,)).fetchone()
         cursor = conn.execute("""
-            SELECT * FROM permits WHERE prod_city_id = ? ORDER BY estimated_cost DESC LIMIT 100
+            SELECT * FROM permits WHERE prod_city_id = ? ORDER BY estimated_cost DESC LIMIT 50
         """, (_prod_city_id,))
     else:
         if filter_state:
@@ -11640,7 +11902,7 @@ def city_landing_inner(city_slug):
             FROM permits WHERE city = ?{state_clause}
         """, state_params).fetchone()
         cursor = conn.execute(f"""
-            SELECT * FROM permits WHERE city = ?{state_clause} ORDER BY estimated_cost DESC LIMIT 100
+            SELECT * FROM permits WHERE city = ?{state_clause} ORDER BY estimated_cost DESC LIMIT 50
         """, state_params)
 
     permit_count = stats_row['permit_count']
@@ -11887,7 +12149,11 @@ def city_landing_inner(city_slug):
         new_this_month=new_this_month,
         unique_contractors=unique_contractors,
         trade_breakdown=trade_breakdown,
-        permits=sorted_permits,
+        # V231 P0-7: was `permits=sorted_permits` — a 100-row list that
+        # the template never iterates directly (only recent_permits[:25]
+        # is rendered). Passing 100 rows per request doubled memory for
+        # every city page and bloated the Jinja context for no benefit.
+        permits=sorted_permits[:50],
         top_contractors=top_contractors,  # V182 PR2
         other_cities=other_cities,
         nearby_cities=nearby_cities,  # V12.11: Same-state cities for internal linking
@@ -11929,14 +12195,26 @@ def state_city_landing(state_slug, city_slug):
     This is the primary city page route for SEO. Each city page targets
     "[city] building permits" keywords for contractors.
     """
+    # V231 P1-9: state-slug aliases. STATE_CONFIG keys "New York" as
+    # 'new-york-state' because the bare 'new-york' slug is reserved for
+    # NYC in the 1-segment city route. But the 2-segment
+    # /permits/<state>/<city> pattern sends 'new-york' as the state —
+    # so without this alias every /permits/new-york/new-york-city hit
+    # 404'd. Same family of aliases a human would naturally type.
+    _STATE_SLUG_ALIASES = {
+        'new-york': 'new-york-state',
+        'ny': 'new-york-state',
+    }
+    state_slug_key = _STATE_SLUG_ALIASES.get(state_slug, state_slug)
+
     # Check if state_slug is a valid state
-    if state_slug not in STATE_CONFIG:
+    if state_slug_key not in STATE_CONFIG:
         # Not a valid state — fall through to city/trade route
         # by calling city_trade_landing directly
         return city_trade_landing(state_slug, city_slug)
 
-    state_abbrev = STATE_CONFIG[state_slug]['abbrev']
-    state_name = STATE_CONFIG[state_slug]['name']
+    state_abbrev = STATE_CONFIG[state_slug_key]['abbrev']
+    state_name = STATE_CONFIG[state_slug_key]['name']
 
     # V156: Slug aliases for cities where URL slug differs from DB slug
     _SLUG_ALIASES = {
@@ -12061,17 +12339,21 @@ def state_city_landing(state_slug, city_slug):
 
     # V156: SEO-optimized meta for top cities, generic fallback for others
     _pc = f"{int(permit_count or 0):,}"
+    # V231 P2-10: every title includes ", <state>" for SEO parity with
+    # the CITY_SEO_CONFIG path. LA was showing a bare "Los Angeles"
+    # title while NYC had ", NY" — inconsistent and hurts the
+    # "<city> <state> building permits" search match.
     _SEO_TITLES = {
-        ('New York City', 'NY'): 'NYC Building Permits & Contractor Leads — Daily Updates | PermitGrab',
-        ('Los Angeles', 'CA'): 'Los Angeles Building Permits & Contractor Leads | PermitGrab',
-        ('Chicago', 'IL'): 'Chicago Building Permits & Contractor Leads | PermitGrab',
-        ('Austin', 'TX'): 'Austin Building Permits & Contractor Leads — Updated Daily | PermitGrab',
-        ('San Antonio', 'TX'): 'San Antonio Building Permits & Contractor Leads | PermitGrab',
-        ('Mesa', 'AZ'): 'Mesa AZ Building Permits & Contractor Leads | PermitGrab',
-        ('Fort Worth', 'TX'): 'Fort Worth Building Permits & Contractor Leads | PermitGrab',
-        ('Washington', 'DC'): 'Washington DC Building Permits & Contractor Leads | PermitGrab',
-        ('Little Rock', 'AR'): 'Little Rock Building Permits & Contractor Leads | PermitGrab',
-        ('Cape Coral', 'FL'): 'Cape Coral Building Permits & Contractor Leads | PermitGrab',
+        ('New York City', 'NY'): 'New York City, NY Building Permits & Contractor Leads — Daily Updates | PermitGrab',
+        ('Los Angeles', 'CA'): 'Los Angeles, CA Building Permits & Contractor Leads | PermitGrab',
+        ('Chicago', 'IL'): 'Chicago, IL Building Permits & Contractor Leads | PermitGrab',
+        ('Austin', 'TX'): 'Austin, TX Building Permits & Contractor Leads — Updated Daily | PermitGrab',
+        ('San Antonio', 'TX'): 'San Antonio, TX Building Permits & Contractor Leads | PermitGrab',
+        ('Mesa', 'AZ'): 'Mesa, AZ Building Permits & Contractor Leads | PermitGrab',
+        ('Fort Worth', 'TX'): 'Fort Worth, TX Building Permits & Contractor Leads | PermitGrab',
+        ('Washington', 'DC'): 'Washington, DC Building Permits & Contractor Leads | PermitGrab',
+        ('Little Rock', 'AR'): 'Little Rock, AR Building Permits & Contractor Leads | PermitGrab',
+        ('Cape Coral', 'FL'): 'Cape Coral, FL Building Permits & Contractor Leads | PermitGrab',
     }
     _SEO_METAS = {
         ('New York City', 'NY'): f'Track {_pc}+ NYC building permits updated daily. Find DOB permits, code violations, and contractor leads by address. 14-day free trial.',
@@ -12092,8 +12374,9 @@ def state_city_landing(state_slug, city_slug):
     # Robots directive
     robots_directive = "index, follow" if permit_count > 0 and is_active else "noindex, follow"
 
-    # Canonical URL
-    canonical_url = f"{SITE_URL}/permits/{state_slug}/{city_slug}"
+    # Canonical URL — use the canonical state slug so /permits/new-york/..
+    # and /permits/new-york-state/.. both point at the same canonical.
+    canonical_url = f"{SITE_URL}/permits/{state_slug_key}/{city_slug}"
 
     footer_cities = get_cities_with_data()
 
@@ -12327,10 +12610,15 @@ def city_trade_landing(city_slug, trade_slug):
         "slug": city_slug,
     }
 
+    # V231 P0-8: pass avg_value as a number (or None). V230 changed the
+    # template to do number formatting ($1.2M / $1,234) but the route was
+    # still passing a pre-formatted string ("1,234" / "N/A"), which blew
+    # up the new Jinja `avg_value > 0` comparison and 503'd every trade
+    # page. Template now does the number formatting.
     stats = {
         "monthly_count": monthly_count or len(matching_permits),
         "weekly_count": weekly_count,
-        "avg_value": f"{avg_value:,}" if avg_value else "N/A",
+        "avg_value": avg_value if avg_value else None,
     }
 
     # Other trades for cross-linking (exclude current)
