@@ -1423,6 +1423,12 @@ footer a:hover { color: white; }
   <div class="hero-content">
     <h1>Building Permit Data for <span>Contractors</span></h1>
     <p>Track building permits across {{ city_count | default(260) }}+ US cities. Find new construction, renovation, and remodeling permits daily. Be the first contractor to call.</p>
+    {# V224 T6: prominent hero CTAs — the nav "Sign Up" is too easy to
+       miss on a cold Google Ads click. #}
+    <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+      <a href="/pricing" style="display: inline-block; background: var(--accent); color: white; font-size: 17px; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Start Your Free Trial &rarr;</a>
+      <a href="/browse" style="display: inline-block; background: rgba(255,255,255,0.1); color: white; font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 8px; text-decoration: none; border: 1px solid rgba(255,255,255,0.25);">Browse Live Permits</a>
+    </div>
   </div>
   <div class="stats-bar">
     <div class="stat-item">
@@ -1548,6 +1554,11 @@ footer a:hover { color: white; }
 </section>
 
 <!-- FILTERS -->
+{# V224 T1: hide the filter bar and permit grid on the marketing homepage
+   — they're the dashboard view and add ~14,000px of locked cards the
+   cold Google-Ads visitor never scrolls through. Both sections still
+   render at /browse and for logged-in users. #}
+{% if not is_homepage %}
 <section class="filters-section" id="dashboard">
   <div class="filters-inner">
     <div class="filters-row">
@@ -1717,6 +1728,7 @@ footer a:hover { color: white; }
     </div>
   </aside>
 </div>
+{% endif %}{# /not is_homepage — closes filters + main-content #}
 
 <!-- PRICING (V10: Hidden for Pro users via JS) -->
 <section class="pricing-section" id="pricing">
