@@ -20,7 +20,11 @@ SESSION.headers.update({'Accept': 'application/json'})
 
 VIOLATION_SOURCES = {
     'new-york-city': {
-        'prod_city_id': 1,
+        # V229 addendum I3: was hardcoded prod_city_id=1. Removed so the
+        # runtime lookup in collect_for_city() resolves it dynamically —
+        # otherwise a prod_cities rebuild or ID shift would silently
+        # write violations against the wrong FK.
+        'prod_city_id': None,
         'city': 'New York City',
         'state': 'NY',
         'endpoints': [
@@ -55,7 +59,8 @@ VIOLATION_SOURCES = {
         ],
     },
     'los-angeles': {
-        'prod_city_id': 3,
+        # V229 addendum I3: was hardcoded prod_city_id=3; now dynamic.
+        'prod_city_id': None,
         'city': 'Los Angeles',
         'state': 'CA',
         'endpoints': [
@@ -90,7 +95,8 @@ VIOLATION_SOURCES = {
         ],
     },
     'chicago-il': {
-        'prod_city_id': 2,
+        # V229 addendum I3: was hardcoded prod_city_id=2; now dynamic.
+        'prod_city_id': None,
         'city': 'Chicago',
         'state': 'IL',
         'endpoints': [
