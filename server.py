@@ -9919,16 +9919,60 @@ def index():
                           default_city=default_city, default_trade=default_trade,
                           city_count=city_count, state_count=state_count,
                           all_dropdown_cities=all_dropdown_cities,
-                          initial_stats=initial_stats)
+                          initial_stats=initial_stats,
+                          # V224 T1: hide the sticky filter bar and the 50-card
+                          # permit grid on the homepage itself — they're from
+                          # the dashboard view and inflate the homepage to
+                          # 17,000+ px of mostly-locked cards that users never
+                          # scroll through. Moved behind a CTA link to /browse
+                          # so the homepage stays a marketing landing page.
+                          is_homepage=True)
 
 
 # V9 Fix 9: /dashboard redirects to homepage (V13.7: redirect to login if not authenticated)
 @app.route('/dashboard')
 def dashboard_redirect():
-    """Redirect /dashboard to / for authenticated users, /login for unauthenticated."""
+    """Redirect /dashboard to /browse for authenticated users, /login for unauthenticated."""
     if 'user_email' not in session:
         return redirect('/login?redirect=dashboard&message=login_required')
-    return redirect('/')
+    return redirect('/browse')
+
+
+@app.route('/browse')
+def browse_permits():
+    """V224 T1: Full interactive permit grid — this is what was living at /
+    (the homepage) and making it 17k px tall. Splitting the marketing
+    landing page from the data-browse experience: / stays short, /browse
+    is the filter-and-scroll dashboard."""
+    footer_cities = get_cities_with_data()
+    default_city = ''
+    default_trade = ''
+    if 'user_email' in session:
+        user = find_user_by_email(session['user_email'])
+        if user:
+            default_city = user.city or ''
+            default_trade = user.trade or ''
+    city_count = get_total_city_count_auto()
+    try:
+        _sc = permitdb.get_connection()
+        state_count = _sc.execute(
+            "SELECT COUNT(DISTINCT state) as cnt FROM prod_cities WHERE newest_permit_date >= date('now', '-30 days') AND source_type IS NOT NULL AND status = 'active'"
+        ).fetchone()['cnt']
+    except Exception:
+        state_count = 38
+    all_dropdown_cities = get_cities_with_data()
+    stats = permitdb.get_permit_stats()
+    initial_stats = {
+        'total_permits': stats.get('total_permits', 0),
+        'total_value': stats.get('total_value', 0),
+        'high_value_count': stats.get('high_value_count', 0),
+    }
+    return render_template('dashboard.html', footer_cities=footer_cities,
+                          default_city=default_city, default_trade=default_trade,
+                          city_count=city_count, state_count=state_count,
+                          all_dropdown_cities=all_dropdown_cities,
+                          initial_stats=initial_stats,
+                          is_homepage=False)
 
 
 # V10 Fix 5: /alerts redirects to account page
@@ -14095,11 +14139,22 @@ def city_landing_inner(city_slug):
     other_cities = [c for c in cities_by_volume if c['slug'] != city_slug]
 
     # V12.17: Nearby cities sorted by permit volume (not alphabetical)
-    nearby_cities = [c for c in cities_by_volume if c.get('state') == current_state and c['slug'] != city_slug]
+    # V224 T2: drop entries with empty city or zero permits — they were
+    # rendering as blank tiles with "0 permits" (up to 57 per page on LA),
+    # making the whole grid look empty. A nearby-city tile that won't
+    # surface useful data is worse than no tile at all.
+    def _nearby_ok(c):
+        return bool(c.get('city') or c.get('name')) and (c.get('total_permits') or c.get('permit_count') or 0) > 0
+    nearby_cities = [c for c in cities_by_volume
+                     if _nearby_ok(c)
+                     and c.get('state') == current_state
+                     and c['slug'] != city_slug]
     # If fewer than 6 same-state cities, add top cities from other states
     if len(nearby_cities) < 6:
-        other_state_cities = [c for c in cities_by_volume if c.get('state') != current_state][:6 - len(nearby_cities)]
+        other_state_cities = [c for c in cities_by_volume
+                              if _nearby_ok(c) and c.get('state') != current_state][:6 - len(nearby_cities)]
         nearby_cities = nearby_cities + other_state_cities
+    nearby_cities = nearby_cities[:12]  # cap so the grid stays visually tight
 
     # V14.0: Top neighborhoods by zip code for city enrichment
     top_neighborhoods = []
