@@ -1487,6 +1487,66 @@ footer a:hover { color: white; }
   </div>
 </section>
 
+<!-- V221 T1D: SEO content block — adds 4 H2 sections for keyword targeting
+     + internal linking to top city pages, violation coverage, and trade pages.
+     Server-rendered (no JS) so Googlebot sees it on first fetch. -->
+<section class="seo-content-section" style="padding: 48px 24px; background: #fff; border-top: 1px solid #e5e7eb;">
+  <div style="max-width: 1100px; margin: 0 auto;">
+
+    <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 16px;">
+      Building Permit Data Across {{ city_count }}+ Cities
+    </h2>
+    <p style="font-size: 15px; color: #4b5563; margin-bottom: 20px;">
+      PermitGrab tracks freshly-issued building permits from official city portals in {{ state_count }} states. Browse permits filtered by trade, project value, and neighborhood on any of our active city pages:
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 40px; font-size: 14px;">
+      <a href="/permits/new-york" style="color: #2563eb; text-decoration: none;">New York City Building Permits</a>
+      <a href="/permits/los-angeles" style="color: #2563eb; text-decoration: none;">Los Angeles Building Permits</a>
+      <a href="/permits/chicago" style="color: #2563eb; text-decoration: none;">Chicago Building Permits</a>
+      <a href="/permits/houston" style="color: #2563eb; text-decoration: none;">Houston Building Permits</a>
+      <a href="/permits/phoenix" style="color: #2563eb; text-decoration: none;">Phoenix Building Permits</a>
+      <a href="/permits/philadelphia" style="color: #2563eb; text-decoration: none;">Philadelphia Building Permits</a>
+      <a href="/permits/san-antonio" style="color: #2563eb; text-decoration: none;">San Antonio Building Permits</a>
+      <a href="/permits/san-diego" style="color: #2563eb; text-decoration: none;">San Diego Building Permits</a>
+      <a href="/permits/dallas" style="color: #2563eb; text-decoration: none;">Dallas Building Permits</a>
+      <a href="/permits/austin" style="color: #2563eb; text-decoration: none;">Austin Building Permits</a>
+      <a href="/permits/fort-worth" style="color: #2563eb; text-decoration: none;">Fort Worth Building Permits</a>
+      <a href="/permits/san-francisco" style="color: #2563eb; text-decoration: none;">San Francisco Building Permits</a>
+    </div>
+
+    <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 16px;">
+      Code Violation Leads for Contractors
+    </h2>
+    <p style="font-size: 15px; color: #4b5563; margin-bottom: 20px;">
+      Open building code violations are some of the strongest contractor leads you can buy. The owner has a deadline, a fine, and a written reason to hire someone tomorrow. PermitGrab indexes official city violation feeds alongside permit data so you see both in one place. Cities with violation coverage include
+      <a href="/permits/new-york" style="color: #2563eb;">New York</a>,
+      <a href="/permits/chicago" style="color: #2563eb;">Chicago</a>,
+      <a href="/permits/philadelphia" style="color: #2563eb;">Philadelphia</a>,
+      <a href="/permits/houston" style="color: #2563eb;">Houston</a>,
+      <a href="/permits/austin" style="color: #2563eb;">Austin</a>,
+      <a href="/permits/san-francisco" style="color: #2563eb;">San Francisco</a>,
+      <a href="/permits/seattle" style="color: #2563eb;">Seattle</a>,
+      <a href="/permits/nashville" style="color: #2563eb;">Nashville</a>,
+      <a href="/permits/columbus" style="color: #2563eb;">Columbus</a>, and
+      <a href="/permits/san-jose" style="color: #2563eb;">San Jose</a>.
+    </p>
+
+    <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin: 40px 0 16px;">
+      Real-Time Contractor Intelligence
+    </h2>
+    <p style="font-size: 15px; color: #4b5563; margin-bottom: 20px;">
+      Every permit in PermitGrab links back to the contractor who pulled it. We build contractor profiles from real permit history — project count, trade mix, typical value, and primary service area — and enrich the most-active ones with phone, website, and license lookups from public sources. That makes it easy to spot who's active in your market, who's busy, and who you're losing bids to. <a href="/pricing" style="color: #2563eb;">See pricing →</a>
+    </p>
+
+    <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin: 40px 0 16px;">
+      Built for Roofers, HVAC, Electricians, Plumbers &amp; General Contractors
+    </h2>
+    <p style="font-size: 15px; color: #4b5563; margin-bottom: 0;">
+      Every trade sees permits differently. A roofing contractor scans for re-roof permits after a hailstorm; an HVAC contractor hunts new-construction and AC replacements in August; an electrician wants solar permits and panel upgrades; a plumber watches sewer-line and water-heater permits. PermitGrab lets you filter the feed by trade so you only pay attention to the permits that match the work you bid.
+    </p>
+  </div>
+</section>
+
 <!-- FILTERS -->
 <section class="filters-section" id="dashboard">
   <div class="filters-inner">
