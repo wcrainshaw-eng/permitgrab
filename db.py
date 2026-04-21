@@ -511,8 +511,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_permits_date ON permits(date);
         -- V229-addendum G1: 78 WHEREs hit these columns without an index;
         -- every city page + trade page was doing a full table scan on 1M+ rows.
+        -- source_city_key is in the base schema above, so safe here.
+        -- prod_city_id is added by V86 migration and indexed after that (below).
         CREATE INDEX IF NOT EXISTS idx_permits_source_city_key ON permits(source_city_key);
-        CREATE INDEX IF NOT EXISTS idx_permits_prod_city_id ON permits(prod_city_id);
         -- V229-addendum G3: composite for trade-page insights (city + trade)
         CREATE INDEX IF NOT EXISTS idx_permits_city_trade ON permits(source_city_key, trade_category);
 
@@ -910,9 +911,6 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
         CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
         CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status);
-        -- V229-addendum G2: 211K violations + daily queries by prod_city_id;
-        -- was a full-scan on every city page violation section.
-        CREATE INDEX IF NOT EXISTS idx_violations_prod_city_id ON violations(prod_city_id);
     """)
     conn.commit()
 
@@ -955,6 +953,30 @@ def init_db():
 
     # V86: Add prod_city_id foreign keys and link data
     _run_v86_city_linking(conn)
+
+    # V229-addendum G1/G2: indexes on prod_city_id columns. Must run AFTER
+    # V86 (adds permits.prod_city_id) and after violation_collector's own
+    # V162 schema migration (adds violations.prod_city_id). Wrapped in
+    # try/except because on a fresh DB the violations table may still be
+    # the db.py-defined schema without prod_city_id — the collector
+    # recreates it with the full schema on first run, and the index will
+    # get created by violation_collector.py line 594 anyway.
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_permits_prod_city_id "
+            "ON permits(prod_city_id)"
+        )
+        conn.commit()
+    except Exception as _e:
+        print(f"[V229-addendum] permits.prod_city_id index skipped: {_e}")
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_violations_prod_city_id "
+            "ON violations(prod_city_id)"
+        )
+        conn.commit()
+    except Exception as _e:
+        print(f"[V229-addendum] violations.prod_city_id index skipped: {_e}")
 
     # V87: Clean up sources - separate bulk from city, remove garbage
     _run_v87_source_cleanup(conn)
