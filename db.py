@@ -3045,6 +3045,26 @@ def upsert_permits(permits, source_city_key=None):
     except Exception as e:
         print(f"[V30] State normalization warning: {e}")
 
+    # V231 DC-4: clamp future-dated filing_date values. Portland's
+    # Socrata dataset returns filing_date values up to 7 days out (likely
+    # a scheduled-inspection field mis-mapped upstream). A permit that
+    # claims to be "filed next Tuesday" breaks the "new this week"
+    # rollups and freshness badge. Any source with filing_date > today
+    # gets clipped to today; real filings can't be in the future.
+    try:
+        from datetime import date as _today_date
+        _today_iso = _today_date.today().isoformat()
+        _clipped = 0
+        for p in permits:
+            fd = p.get('filing_date')
+            if isinstance(fd, str) and len(fd) >= 10 and fd[:10] > _today_iso:
+                p['filing_date'] = _today_iso
+                _clipped += 1
+        if _clipped > 0:
+            print(f"[V231 DC-4] Clipped {_clipped} future filing_date values to today")
+    except Exception:
+        pass
+
     # V85: Canonicalize city names to ensure consistent matching
     canonicalized = 0
     filtered_garbage = 0
