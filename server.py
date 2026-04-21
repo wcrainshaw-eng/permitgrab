@@ -5827,9 +5827,15 @@ def admin_sweep_status():
 
 
 
-@app.route('/api/admin/city-health')
-def admin_city_health():
-    """V100: City health dashboard data."""
+@app.route('/api/admin/city-health-legacy')
+def admin_city_health_legacy():
+    """V100: Legacy city-health summary — health_status buckets + stale list
+    + never-worked platforms. Kept under a new path because V226 repurposed
+    the /api/admin/city-health route for the 20-top-cities per-row rollup
+    used by the /admin HTML dashboard. Same two endpoints collided at
+    deploy time (AssertionError: endpoint admin_city_health already
+    registered) which is what V228 is fixing.
+    """
     valid, error = check_admin_key()
     if not valid:
         return error
