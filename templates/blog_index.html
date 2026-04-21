@@ -87,6 +87,64 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <p>Expert insights on finding construction leads and growing your business</p>
 </div>
 
+<!-- V223 T6: Email capture — every blog visitor who isn't ready to pay
+     $149 is still a qualified email lead. Wired to the existing
+     /api/subscribe endpoint (V218 added server-side email validation). -->
+<section style="background: #f3f4f6; padding: 28px 20px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;">
+  <div style="max-width: 640px; margin: 0 auto; text-align: center;">
+    <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 6px;">Get free permit alerts for your city</h2>
+    <p style="font-size: 14px; color: #4b5563; margin: 0 0 16px;">Weekly digest of new building permits and code violations. No credit card.</p>
+    <form id="blog-email-capture" action="/api/subscribe" method="POST"
+          style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 520px; margin: 0 auto;">
+      <input type="email" name="email" placeholder="you@company.com" required
+             style="flex: 1 1 220px; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; min-width: 0;">
+      <input type="text" name="city" placeholder="City (e.g., Chicago)"
+             style="flex: 1 1 160px; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; min-width: 0;">
+      <button type="submit"
+              style="padding: 12px 22px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+        Get alerts
+      </button>
+    </form>
+    <p id="blog-capture-status" style="font-size: 13px; color: #059669; margin: 10px 0 0; display: none;"></p>
+  </div>
+</section>
+<script>
+(function(){
+  var f = document.getElementById('blog-email-capture');
+  if (!f) return;
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var data = {
+      email: f.querySelector('[name=email]').value,
+      city: f.querySelector('[name=city]').value
+    };
+    var status = document.getElementById('blog-capture-status');
+    fetch('/api/subscribe', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    }).then(function(r){
+      if (r.ok) {
+        status.textContent = 'Subscribed. Check your inbox for a confirmation.';
+        status.style.color = '#059669';
+        status.style.display = 'block';
+        f.reset();
+      } else {
+        return r.json().then(function(j){
+          status.textContent = j.error || 'Something went wrong — try again.';
+          status.style.color = '#b91c1c';
+          status.style.display = 'block';
+        });
+      }
+    }).catch(function(){
+      status.textContent = 'Network error — please try again.';
+      status.style.color = '#b91c1c';
+      status.style.display = 'block';
+    });
+  });
+})();
+</script>
+
 <div class="main">
   <!-- V79: Display posts by category -->
   {% for cat_key, cat_data in categories.items() %}
