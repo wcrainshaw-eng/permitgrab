@@ -13571,6 +13571,12 @@ def schedule_email_tasks():
 
     # V78: Track if we've already run digest today to prevent duplicates
     last_digest_date = None
+    # V229 addendum H1: Track lifecycle/onboarding runs too. Without these,
+    # the 5-min polling inside the 8:00-8:29 / 9:00-9:29 windows fired
+    # check_trial_lifecycle() and check_onboarding_nudges() up to 6 times
+    # per day, spamming trial users with duplicate emails.
+    last_lifecycle_date = None
+    last_onboarding_date = None
 
     while True:
         try:
@@ -13620,23 +13626,25 @@ def schedule_email_tasks():
                         except Exception:
                             pass
 
-                # Trial lifecycle at 8 AM ET
-                if now_et.hour == 8 and now_et.minute < 30:
+                # Trial lifecycle at 8 AM ET (V229 addendum H1: once-per-day guard)
+                if now_et.hour == 8 and last_lifecycle_date != today_date:
                     print(f"[{datetime.now()}] V64: Checking trial lifecycle...")
                     try:
                         results = check_trial_lifecycle()
                         print(f"[{datetime.now()}] V64: Trial lifecycle complete - {results}")
+                        last_lifecycle_date = today_date
                     except Exception as e:
                         print(f"[{datetime.now()}] [ERROR] Trial lifecycle failed: {e}")
                         import traceback
                         traceback.print_exc()
 
-                # Onboarding nudges at 9 AM ET
-                if now_et.hour == 9 and now_et.minute < 30:
+                # Onboarding nudges at 9 AM ET (V229 addendum H1: once-per-day guard)
+                if now_et.hour == 9 and last_onboarding_date != today_date:
                     print(f"[{datetime.now()}] V64: Checking onboarding nudges...")
                     try:
                         sent = check_onboarding_nudges()
                         print(f"[{datetime.now()}] V64: Onboarding nudges complete - {sent} sent")
+                        last_onboarding_date = today_date
                     except Exception as e:
                         print(f"[{datetime.now()}] [ERROR] Onboarding nudges failed: {e}")
                         import traceback
