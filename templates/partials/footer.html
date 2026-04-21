@@ -8,9 +8,20 @@
     <!-- V12.10: Show top cities by permit volume -->
     <div class="footer-links">
       <h4>Top Cities</h4>
+      {# V230 U3: exclude county/ambiguous entries from footer. "Shelby County"
+         and bare "Washington" look off next to Chicago/LA. The filter keeps
+         real city names and drops anything ending in " County" or a bare
+         state name. #}
       {% if footer_cities %}
-      {% for city in footer_cities[:8] %}
-      <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+      {% set _seen = [] %}
+      {% for city in footer_cities %}
+        {% if _seen|length < 8
+              and city.name
+              and ' County' not in city.name
+              and city.name not in ['Washington'] %}
+          <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
+          {% set _ = _seen.append(city.name) %}
+        {% endif %}
       {% endfor %}
       <a href="/cities" style="font-weight: 600;">Browse All Cities &rarr;</a>
       {% else %}

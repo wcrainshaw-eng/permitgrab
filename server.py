@@ -12145,10 +12145,17 @@ def state_city_landing(state_slug, city_slug):
         except Exception:
             _freshness_age_days = None
 
+    # V230 T1-T13: variable parity with city_landing_inner. Every kwarg
+    # that route passes must appear here or the template falls through to
+    # a broken/empty section (and one of them — freshness_age_days — was
+    # 500ing before the V229 hotfix). Aliases and zero-defaults are fine
+    # for the stats we don't compute here; the primary route can fill in
+    # richer values.
     return render_template('city_landing_v77.html',
         city_name=display_name,
         city_slug=city_slug,
         state_abbrev=city_state,
+        city_state=city_state,
         state_name=state_name,
         state_slug=state_slug,
         total_permits=total_permits,
@@ -12157,22 +12164,44 @@ def state_city_landing(state_slug, city_slug):
         latest_date=latest_date,
         newest_permit_date=newest_permit_date,
         last_collection=last_collection,
+        last_collected=last_collection,  # V230 T1: alias
         data_freshness=data_freshness,
         freshness_age_days=_freshness_age_days,  # V229-hotfix
         is_active=is_active,
+        is_coming_soon=not is_active,  # V230 T11
         recent_permits=recent_permits,
+        permits=recent_permits,  # V230: alias city_landing_inner uses
         top_contractors=top_contractors,  # V182 PR2
         permit_types=permit_types,
+        trade_breakdown=permit_types,  # V230 T6: template references either
         nearby_cities=nearby_cities,
+        other_cities=nearby_cities,  # V230 T7: alias
         meta_title=meta_title,
         meta_description=meta_description,
+        seo_content=None,  # V230 T8: only computed by legacy city_landing_inner
         robots_directive=robots_directive,
         canonical_url=canonical_url,
         footer_cities=footer_cities,
         blog_posts=city_blog_posts,
+        related_articles=city_blog_posts,  # V230 T10: alias
         violations=violations_data,
         violations_count=violations_count,
+        # V230 T2-T5: stats the legacy route computes. Keeping these at 0
+        # rather than running extra queries; if the template shows the
+        # "Total Construction Value" card it'll read $0 which is accurate
+        # until we wire per-city aggregates into this route.
+        total_value=0,
+        high_value_count=0,
+        new_this_month=0,
+        unique_contractors=0,
+        # V230 T9: footer/copyright
+        current_year=datetime.now().year,
+        current_date=datetime.now().strftime('%Y-%m-%d'),
         current_week_start=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),  # V209-3: NEW badge
+        # V230 T12/T13: safe defaults for optional sections
+        top_neighborhoods=[],
+        city_blog_url=None,
+        top_trades=[],
     )
 
 
@@ -13731,6 +13760,32 @@ def page_not_found(e):
     """Handle 404 errors with a styled page."""
     footer_cities = get_cities_with_data()
     return render_template('404.html', footer_cities=footer_cities), 404
+
+
+# V230 S2: dedicated Jinja UndefinedError handler. The 500->503 fallback
+# already catches these, but logging them under their own handler makes
+# them visible in Render logs with a "[TEMPLATE UNDEFINED]" prefix we
+# can grep for — these are nearly always missing render_template kwargs
+# (see V229 hotfix: freshness_age_days on state_city_landing).
+from jinja2.exceptions import UndefinedError as _JinjaUndefinedError
+
+@app.errorhandler(_JinjaUndefinedError)
+def handle_template_undefined(error):
+    try:
+        import traceback
+        print(f"[TEMPLATE UNDEFINED] {request.path} — {error}", flush=True)
+        traceback.print_exc()
+    except Exception:
+        pass
+    try:
+        footer_cities = get_cities_with_data()
+    except Exception:
+        footer_cities = []
+    # Reuse the 404 template as a graceful "try again" shell; Retry-After
+    # keeps Googlebot from dropping the URL while we fix the template.
+    resp = render_template('404.html', footer_cities=footer_cities,
+                           show_city_suggestions=False)
+    return resp, 503, {'Retry-After': '600'}
 
 
 @app.errorhandler(500)
