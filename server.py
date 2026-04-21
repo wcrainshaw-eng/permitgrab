@@ -13129,6 +13129,8 @@ def scheduled_collection():
     last_discovery_run = None
 
     while True:
+        # V229 C1: capture cycle start for dynamic sleep calculation below
+        _v229_cycle_start = time.time()
         print(f"[{datetime.now()}] V12.50: Starting scheduled collection cycle...")
 
         # V13.3: Each task has its own try/except so one failure doesn't block others
@@ -13265,7 +13267,11 @@ def scheduled_collection():
         # ~$0.034 each = ~$1.70/cycle extra, $40/day at hourly cadence.
         try:
             from web_enrichment import enrich_batch as _v209_enrich
-            v209_result = _v209_enrich(limit=50)
+            # V229 C5: bumped limit 50 -> 200. DDG accepts bursts of this size
+            # when spread over 3-5s per query. With 84K unenriched profiles
+            # and a 20-40% hit rate, 50/hour (= 1,200/day) would take 70+
+            # days to drain the queue; 200/hour is ~18 days.
+            v209_result = _v209_enrich(limit=200)
             print(f"[{datetime.now()}] [V209] web_enrichment cycle: {v209_result}")
         except Exception as e:
             print(f"[{datetime.now()}] [V209] web_enrichment error (non-fatal): {e}")
@@ -13415,8 +13421,16 @@ def scheduled_collection():
         global _last_collection_run
         _last_collection_run = datetime.now()
 
-        # V168: Sleep 1 hour between collection cycles (was 6 hours)
-        time.sleep(3600)
+        # V229 C1: dynamic cycle sleep. Was a flat time.sleep(3600) regardless
+        # of how long the cycle took, so a 45-min cycle became a real 1h45m
+        # interval. Target 30 min between cycle completions (minimum 5-min
+        # rest, maximum 1h rest) — under normal load that's ~2 full passes
+        # per hour instead of <1.
+        _duration = max(0, int(time.time() - _v229_cycle_start))
+        _sleep_for = max(300, min(3600, 1800 - _duration))
+        print(f"[{datetime.now()}] V229 C1: cycle took {_duration}s, "
+              f"sleeping {_sleep_for}s", flush=True)
+        time.sleep(_sleep_for)
 
 
 # ===========================
@@ -13730,6 +13744,33 @@ def start_collectors():
     collector_thread.start()
     print(f"[{datetime.now()}] V67: Scheduled collection thread started, waiting 30s...")
     time.sleep(30)
+
+    # V229 C5: dedicated enrichment daemon. scheduled_collection still runs
+    # enrich_batch(limit=200) per cycle, but that only fires when the
+    # collection cycle completes (30-60 min apart). This second thread
+    # runs enrichment on its own 30-min cadence so the queue drains
+    # steadily even when a collection cycle is slow/stuck.
+    def _enrichment_daemon():
+        time.sleep(600)  # let collection warm up first
+        while True:
+            try:
+                from web_enrichment import enrich_batch
+                result = enrich_batch(limit=200)
+                print(f"[{datetime.now()}] [V229 C5] enrichment daemon: {result}",
+                      flush=True)
+            except Exception as e:
+                print(f"[{datetime.now()}] [V229 C5] enrichment daemon error: {e}",
+                      flush=True)
+            time.sleep(1800)  # 30 min between passes
+
+    try:
+        enrichment_thread = threading.Thread(
+            target=_enrichment_daemon, name='enrichment_daemon', daemon=True
+        )
+        enrichment_thread.start()
+        print(f"[{datetime.now()}] V229 C5: enrichment daemon started")
+    except Exception as e:
+        print(f"[{datetime.now()}] V229 C5: enrichment daemon failed to start: {e}")
 
     # V12.53: Email scheduler thread
     # V229 B6: removed — _deferred_startup() at line ~1041 already spawns
