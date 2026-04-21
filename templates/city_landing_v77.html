@@ -660,29 +660,35 @@ body {
       {% endif %}
     </div>
 
-    {# V226 T10: freshness badge gradient. Showing "Data as of 2026-02-04"
-       in April is worse than showing nothing — reads as abandoned. Three
-       buckets: fresh (<= 14d) = green dot + date, aging (14-30d) = yellow
-       dot + date (honest), stale (>30d) = no date, just "Historical data
-       available" without alarming anyone. freshness_age_days is computed
-       server-side in city_landing_inner and passed alongside
-       newest_permit_date. #}
+    {# V227 T8: 4-tier freshness badge.
+         <=14d  green  "Updated recently"     + date
+         <=30d  yellow "Updated this month"   + date
+         <=90d  orange "Historical data" (no date — don't highlight staleness)
+         > 90d  grey   "Archival data"        (no date)
+       V226 T10 had 3 tiers; the extra orange tier avoids the cliff where
+       a 40-day-old page reads "Historical data" identical to a 2-year-old
+       page. freshness_age_days is computed server-side. #}
     {% if newest_permit_date %}
       {% set _age = freshness_age_days if freshness_age_days is not none else 0 %}
       {% if _age <= 14 %}
-      <div class="freshness-badge">
+      <div class="freshness-badge" title="Data from {{ _age }} days ago">
         <span class="freshness-dot" style="background: #4ade80;"></span>
-        Data as of {{ newest_permit_date[:10] }}
+        Updated recently · {{ newest_permit_date[:10] }}
       </div>
       {% elif _age <= 30 %}
-      <div class="freshness-badge">
+      <div class="freshness-badge" title="Data from {{ _age }} days ago">
         <span class="freshness-dot" style="background: #facc15;"></span>
-        Data as of {{ newest_permit_date[:10] }}
+        Updated this month · {{ newest_permit_date[:10] }}
+      </div>
+      {% elif _age <= 90 %}
+      <div class="freshness-badge" title="Last update {{ _age }} days ago">
+        <span class="freshness-dot" style="background: #fb923c;"></span>
+        Historical data available
       </div>
       {% else %}
-      <div class="freshness-badge">
+      <div class="freshness-badge" title="Last update {{ _age }} days ago — source may be inactive">
         <span class="freshness-dot" style="background: #94a3b8;"></span>
-        Historical data available
+        Archival data
       </div>
       {% endif %}
     {% elif data_freshness == 'no_data' %}

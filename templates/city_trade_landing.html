@@ -291,6 +291,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </div>
 
 <div class="main">
+  {# V227 T9: per-page market insights paragraph — unique content that can't
+     exist on any other template page. Server-rendered (not JS) so Googlebot
+     sees it on first fetch. Only rendered when trade_insights is non-null
+     (i.e. the page has >= 20 matching permits and isn't in fallback mode). #}
+  {% if trade_insights %}
+  <div class="section" style="background: #f9fafb; border-left: 4px solid #2563eb; padding: 18px 22px; margin-bottom: 24px;">
+    <h2 style="margin-top: 0; font-size: 20px;">{{ city.name }} {{ trade.name }} Market Overview</h2>
+    <p style="margin: 10px 0 0; color: #374151; line-height: 1.6;">
+      {{ city.name }}'s {{ trade.name | lower }} permit activity is currently {{ trade_insights.trend }},
+      with <strong>{{ trade_insights.this_month }}</strong> permits filed in the last 30 days{% if trade_insights.prior_month > 0 %}
+      compared to {{ trade_insights.prior_month }} in the prior 30-day window{% endif %}.
+      On average, {{ trade_insights.avg_monthly }} {{ trade.name | lower }} permits are filed per month here based on the last six months of data.
+      {% if trade_insights.top_contractors %}
+      The most active {{ trade.name | lower }} contractors in {{ city.name }} include
+      {% for c in trade_insights.top_contractors %}{{ c }}{% if not loop.last %}, {% endif %}{% endfor %}.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
   <div class="section">
     <h2>{% if trade_fallback %}Recent Building Permits in {{ city.name }}{% else %}Recent {{ trade.name }} Permits in {{ city.name }}{% endif %}</h2>
     {% if trade_fallback %}
