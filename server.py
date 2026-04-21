@@ -4301,29 +4301,33 @@ def admin_full_collection():
 # ===========================
 
 def _collect_city_sync(city_slug, collect_type='both'):
-    """V226 T2: synchronous per-city collection wrapper used by both the
-    force-collect endpoint and (optionally) the daemon's auto-retry path.
-    Returns the structured result schema the V226 task doc specifies."""
+    """V226 T2 / V228 hardened: synchronous per-city collection with
+    structured before/after diff. Re-fetches the DB handle after each
+    collector call because collector.collect_single_city and
+    violation_collector.collect_violations_from_endpoint both call
+    permitdb.get_connection() internally and may close shared handles
+    in their cleanup paths — V226's version held one conn across all
+    three phases and blew up with 'Cannot operate on a closed database'
+    on the post-call queries."""
     import time as _t
     from datetime import datetime as _dt
     t0 = _t.time()
-    conn = permitdb.get_connection()
 
-    # Baseline: what's the newest permit/violation for this city before we run?
-    pre_permit = conn.execute(
-        "SELECT COUNT(*), MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
-        "FROM permits WHERE source_city_key = ?",
-        (city_slug,),
-    ).fetchone()
-    pre_permit_count = pre_permit[0] or 0
+    def _snapshot():
+        c = permitdb.get_connection()
+        p = c.execute(
+            "SELECT COUNT(*), MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
+            "FROM permits WHERE source_city_key = ?",
+            (city_slug,),
+        ).fetchone()
+        v = c.execute(
+            "SELECT COUNT(*), MAX(violation_date) FROM violations WHERE prod_city_id IN "
+            "(SELECT id FROM prod_cities WHERE city_slug = ?)",
+            (city_slug,),
+        ).fetchone()
+        return (p[0] or 0, p[1], v[0] or 0, v[1])
 
-    pre_viol = conn.execute(
-        "SELECT COUNT(*) FROM violations WHERE prod_city_id IN "
-        "(SELECT id FROM prod_cities WHERE city_slug = ?)",
-        (city_slug,),
-    ).fetchone()
-    pre_viol_count = pre_viol[0] or 0
-
+    pre_permit_count, _, pre_viol_count, _ = _snapshot()
     permits_inserted = 0
     violations_inserted = 0
     error_messages = []
@@ -4331,13 +4335,7 @@ def _collect_city_sync(city_slug, collect_type='both'):
     if collect_type in ('permits', 'both'):
         try:
             from collector import collect_single_city
-            res = collect_single_city(city_slug, days_back=7)
-            # collect_single_city returns a dict; count delta as the measurement
-            post = conn.execute(
-                "SELECT COUNT(*) FROM permits WHERE source_city_key = ?",
-                (city_slug,),
-            ).fetchone()
-            permits_inserted = (post[0] or 0) - pre_permit_count
+            collect_single_city(city_slug, days_back=7)
         except Exception as e:
             error_messages.append(f"permits: {e}")
 
@@ -4355,22 +4353,16 @@ def _collect_city_sync(city_slug, collect_type='both'):
                             violations_inserted += int(out or 0)
                     except Exception as e:
                         error_messages.append(f"violations({endpoint.get('name','?')}): {e}")
-            else:
-                # Not a configured violation source — not an error
-                pass
         except Exception as e:
             error_messages.append(f"violations: {e}")
 
-    post_permit = conn.execute(
-        "SELECT COUNT(*), MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
-        "FROM permits WHERE source_city_key = ?",
-        (city_slug,),
-    ).fetchone()
-    post_viol = conn.execute(
-        "SELECT COUNT(*), MAX(violation_date) FROM violations WHERE prod_city_id IN "
-        "(SELECT id FROM prod_cities WHERE city_slug = ?)",
-        (city_slug,),
-    ).fetchone()
+    # Re-snapshot with a fresh connection — one of the collectors above may
+    # have closed the handle we started with.
+    post_permit_count, post_permit_newest, post_viol_count, post_viol_newest = _snapshot()
+    permits_inserted = post_permit_count - pre_permit_count
+    # post_permit / post_viol tuples from the old layout
+    post_permit = (post_permit_count, post_permit_newest)
+    post_viol = (post_viol_count, post_viol_newest)
 
     status = 'success' if (permits_inserted > 0 or violations_inserted > 0) else (
         'error' if error_messages else 'caught_up'
