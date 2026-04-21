@@ -991,6 +991,43 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V232: Seattle recollect migration error (non-fatal): {e}")
 
+    # V232b: Seattle cursor reset — the V232 Seattle recollect migration
+    # cleared permits + newest_permit_date but missed `last_permit_date`,
+    # which is the actual incremental-collection cursor. With the cursor
+    # still pointing at 2026-04-17, force-collect returned
+    # permits_inserted=0 ("already caught up"). Null out every Seattle
+    # checkpoint field — cursor, counts, status flags — so the next
+    # force-collect does a full backfill populating contractor_name.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v232b_seattle_cursor'").fetchone()
+        if not m:
+            conn2.execute("""
+                UPDATE prod_cities
+                SET last_permit_date = NULL,
+                    newest_permit_date = NULL,
+                    latest_permit_date = NULL,
+                    earliest_permit_date = NULL,
+                    total_permits = 0,
+                    permits_last_30d = 0,
+                    avg_daily_permits = 0,
+                    last_collection = NULL,
+                    last_successful_collection = NULL,
+                    first_successful_collection = NULL,
+                    consecutive_no_new = 0,
+                    consecutive_failures = 0,
+                    last_error = NULL,
+                    last_failure_reason = NULL,
+                    last_run_status = NULL,
+                    days_since_new_data = NULL,
+                    data_freshness = 'no_data'
+                WHERE city_slug = 'seattle' AND state = 'WA'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v232b_seattle_cursor', datetime('now'))")
+            conn2.commit()
+            print(f"[{datetime.now()}] V232b: Reset Seattle cursor + checkpoint fields for full backfill")
+    except Exception as e:
+        print(f"[{datetime.now()}] V232b: Seattle cursor reset error (non-fatal): {e}")
+
     # V232 Fix 3: deactivate 0-permit Houston rows in non-TX states. Six
     # legitimate-but-empty Houston entries (AK, DE, MN, MO, MS, PA) clutter
     # admin listings and footer logic. Leaving them active gates nothing —
