@@ -93,7 +93,18 @@ def get_related_posts(current_slug, limit=3):
 
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+# V229 E2: fall back to a process-random key when SECRET_KEY env var isn't
+# set, but loudly warn about it on startup. Without a stable SECRET_KEY,
+# every gunicorn restart rotates the key and invalidates all logged-in
+# user sessions. Prod has this env var set; the warning is for dev + for
+# anyone who forks the repo without carrying over env config.
+_v229_fallback_key = os.environ.get('SECRET_KEY')
+if not _v229_fallback_key:
+    _v229_fallback_key = secrets.token_hex(32)
+    print("[V229 E2] WARNING: SECRET_KEY env var is not set — using an "
+          "ephemeral random key. User sessions will be invalidated on every "
+          "restart. Set SECRET_KEY on Render to persist sessions.", flush=True)
+app.secret_key = _v229_fallback_key
 
 # V68: WSGI middleware to bypass ALL Flask processing for /api/health
 # This ensures health checks ALWAYS return 200, even during pool exhaustion
@@ -4185,6 +4196,66 @@ def admin_execute():
 def healthz():
     """V167: Lightweight health check for Render's TCP probe. NO DB queries."""
     return 'ok', 200
+
+
+@app.route('/healthz/deep')
+def healthz_deep():
+    """V229 F2: Deep health check — probes the pieces /healthz deliberately
+    skips. NOT wired to Render's probe (it's too slow and flaky-under-load);
+    use it from ops scripts / monitors / the admin dashboard.
+
+    Returns 200 when every subsystem is healthy, 503 when any one fails.
+    Always returns JSON with a per-check breakdown so a monitor can alert
+    on the specific failing check instead of "503 for reasons unknown".
+    """
+    import threading as _threading
+    checks = {}
+    overall_ok = True
+
+    # 1. SQLite reachable + responsive
+    try:
+        conn = permitdb.get_connection()
+        row = conn.execute("SELECT COUNT(*) FROM permits").fetchone()
+        checks['sqlite'] = {'ok': True, 'permits': row[0]}
+    except Exception as e:
+        checks['sqlite'] = {'ok': False, 'error': str(e)[:200]}
+        overall_ok = False
+
+    # 2. Daemon thread is alive
+    try:
+        alive = any(t.name == 'scheduled_collection' and t.is_alive()
+                    for t in _threading.enumerate())
+        checks['daemon'] = {'ok': alive}
+        if not alive:
+            overall_ok = False
+    except Exception as e:
+        checks['daemon'] = {'ok': False, 'error': str(e)[:200]}
+        overall_ok = False
+
+    # 3. Last collection_log entry is <2h old (else cycles are stuck)
+    try:
+        conn = permitdb.get_connection()
+        row = conn.execute(
+            "SELECT MAX(created_at) FROM collection_log"
+        ).fetchone()
+        last = row[0] if row else None
+        checks['last_collection'] = {'ok': True, 'at': last}
+        if last:
+            last_dt = datetime.strptime(last[:19], '%Y-%m-%d %H:%M:%S')
+            if (datetime.utcnow() - last_dt).total_seconds() > 7200:
+                checks['last_collection']['ok'] = False
+                checks['last_collection']['reason'] = 'older than 2 hours'
+                overall_ok = False
+        else:
+            checks['last_collection']['ok'] = False
+            checks['last_collection']['reason'] = 'no collection_log rows'
+            overall_ok = False
+    except Exception as e:
+        checks['last_collection'] = {'ok': False, 'error': str(e)[:200]}
+        overall_ok = False
+
+    status_code = 200 if overall_ok else 503
+    return jsonify({'ok': overall_ok, 'checks': checks}), status_code
 
 
 @app.route('/api/diagnostics')
