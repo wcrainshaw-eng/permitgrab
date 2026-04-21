@@ -12134,6 +12134,19 @@ def state_city_landing(state_slug, city_slug):
     # V182 PR2: top contractors (empty if city fails public filter)
     top_contractors = _get_top_contractors_for_city(city_slug, limit=25)
 
+    # V229-hotfix: compute freshness_age_days for template (same calc as
+    # city_landing_inner). Without this, city_landing_v77.html at line 672
+    # throws UndefinedError and every /permits/<state>/<city> page 500s.
+    _freshness_age_days = None
+    if newest_permit_date:
+        try:
+            _freshness_age_days = (
+                datetime.now().date()
+                - datetime.strptime(str(newest_permit_date)[:10], '%Y-%m-%d').date()
+            ).days
+        except Exception:
+            _freshness_age_days = None
+
     return render_template('city_landing_v77.html',
         city_name=display_name,
         city_slug=city_slug,
@@ -12147,6 +12160,7 @@ def state_city_landing(state_slug, city_slug):
         newest_permit_date=newest_permit_date,
         last_collection=last_collection,
         data_freshness=data_freshness,
+        freshness_age_days=_freshness_age_days,  # V229-hotfix
         is_active=is_active,
         recent_permits=recent_permits,
         top_contractors=top_contractors,  # V182 PR2

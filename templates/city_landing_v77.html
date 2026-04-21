@@ -669,7 +669,7 @@ body {
        a 40-day-old page reads "Historical data" identical to a 2-year-old
        page. freshness_age_days is computed server-side. #}
     {% if newest_permit_date %}
-      {% set _age = freshness_age_days if freshness_age_days is not none else 0 %}
+      {% set _age = freshness_age_days if freshness_age_days is defined and freshness_age_days is not none else 0 %}
       {% if _age <= 14 %}
       <div class="freshness-badge" title="Data from {{ _age }} days ago">
         <span class="freshness-dot" style="background: #4ade80;"></span>
