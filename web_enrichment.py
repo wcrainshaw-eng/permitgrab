@@ -227,33 +227,52 @@ class FreeEnrichmentEngine:
 # Batch driver + DB plumbing (compatible with V209 daemon wiring)
 # ---------------------------------------------------------------------------
 
-def _select_pending(conn, limit):
+def _select_pending(conn, limit, per_city_cap=25):
     """Pick contractors that have no contact cache row yet (or a stale
-    cache miss), ordered by total_permits DESC. Filter out known junk
-    names (NOT GIVEN, OWNER, utility placeholders, numeric IDs, etc)."""
+    cache miss). Filter out known junk names (NOT GIVEN, OWNER, utility
+    placeholders, numeric IDs, etc).
+
+    V234 P1: per-city fairness. The pre-V234 version ordered globally by
+    total_permits DESC, which meant cities with one massive profile
+    (Mesa at 16,859 profiles) monopolized every daemon cycle and cities
+    like Portland/Columbus/Philly — with thousands of profiles of their
+    own — almost never got their turn. The window-function cap rotates
+    top-N profiles per source_city_key so every city with pending work
+    gets a share of each cycle.
+    """
     rows = conn.execute("""
-        SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
-               cp.city, cp.state, cp.source_city_key
-        FROM contractor_profiles cp
-        LEFT JOIN contractor_contacts cc
-               ON cc.contractor_name_normalized = cp.contractor_name_normalized
-        WHERE cp.is_active = 1
-          AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
-          AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
-          AND LENGTH(cp.contractor_name_raw) >= 5
-          AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
-          AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
-          AND cp.contractor_name_raw NOT LIKE 'OWNER %'
-          AND UPPER(cp.contractor_name_raw) NOT LIKE '%SELF CONTRACTOR%'
-          AND UPPER(cp.contractor_name_raw) NOT LIKE '%SELECT EDIT%'
-          AND UPPER(cp.contractor_name_raw) NOT LIKE '%ENERGY RESOURCE%'
-          AND cp.contractor_name_raw NOT GLOB '[0-9]*'
-          AND (cc.id IS NULL
-               OR (cc.phone IS NULL AND cc.website IS NULL
-                   AND (cc.last_error IS NULL OR cc.last_error != 'no results')))
-        ORDER BY cp.total_permits DESC, cp.id ASC
+        WITH candidates AS (
+            SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
+                   cp.city, cp.state, cp.source_city_key, cp.total_permits,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY cp.source_city_key
+                       ORDER BY cp.total_permits DESC, cp.id ASC
+                   ) AS city_rank
+            FROM contractor_profiles cp
+            LEFT JOIN contractor_contacts cc
+                   ON cc.contractor_name_normalized = cp.contractor_name_normalized
+            WHERE cp.is_active = 1
+              AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
+              AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
+              AND LENGTH(cp.contractor_name_raw) >= 5
+              AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
+              AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
+              AND cp.contractor_name_raw NOT LIKE 'OWNER %'
+              AND UPPER(cp.contractor_name_raw) NOT LIKE '%SELF CONTRACTOR%'
+              AND UPPER(cp.contractor_name_raw) NOT LIKE '%SELECT EDIT%'
+              AND UPPER(cp.contractor_name_raw) NOT LIKE '%ENERGY RESOURCE%'
+              AND cp.contractor_name_raw NOT GLOB '[0-9]*'
+              AND (cc.id IS NULL
+                   OR (cc.phone IS NULL AND cc.website IS NULL
+                       AND (cc.last_error IS NULL OR cc.last_error != 'no results')))
+        )
+        SELECT id, contractor_name_raw, contractor_name_normalized,
+               city, state, source_city_key
+        FROM candidates
+        WHERE city_rank <= ?
+        ORDER BY city_rank ASC, total_permits DESC, id ASC
         LIMIT ?
-    """, (limit,)).fetchall()
+    """, (per_city_cap, limit)).fetchall()
     return rows
 
 

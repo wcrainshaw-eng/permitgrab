@@ -1768,6 +1768,43 @@ def admin_force_collect():
         except (TypeError, ValueError):
             return jsonify({'error': 'days_back must be an integer'}), 400
 
+    # V234 P2: async mode for long-running backfills. Render kills the
+    # HTTP connection at 30s; a 180-day force-collect can take several
+    # minutes. If the caller explicitly asks (?async=true) or passes a
+    # days_back >= 30 (implying backfill), spawn a background thread
+    # and return immediately. Short incremental calls stay synchronous
+    # so Cowork's tooling gets the before/after diff in one response.
+    if request.method == 'POST':
+        _async_flag = data.get('async')
+    else:
+        _async_flag = request.args.get('async')
+    _want_async = (
+        str(_async_flag).lower() in ('1', 'true', 'yes')
+        or (days_back is not None and days_back >= 30)
+    )
+    if _want_async:
+        import uuid as _uuid
+        job_id = _uuid.uuid4().hex[:12]
+        def _bg_collect():
+            try:
+                result = _collect_city_sync(city_slug, collect_type, days_back=days_back)
+                print(f"[V234] force-collect job {job_id} done: {result}", flush=True)
+            except Exception as _e:
+                import traceback as _tb
+                print(f"[V234] force-collect job {job_id} error: {_e}", flush=True)
+                _tb.print_exc()
+        threading.Thread(target=_bg_collect, daemon=True,
+                         name=f'force_collect_{city_slug}').start()
+        return jsonify({
+            'status': 'started',
+            'async': True,
+            'job_id': job_id,
+            'city_slug': city_slug,
+            'type': collect_type,
+            'days_back': days_back or 'auto',
+            'message': 'running in background — check collection_log / scraper_runs for status',
+        }), 202
+
     try:
         result = _collect_city_sync(city_slug, collect_type, days_back=days_back)
         return jsonify(result)
@@ -1985,6 +2022,15 @@ def admin_enrich_cities():
     data = request.get_json() or {}
     slugs = data.get('city_slugs') or []
     batch_size = min(int(data.get('batch_size', 30)), 100)
+    # V234 P0: default to async. Enrichment for 3-4 cities at batch_size=50
+    # regularly exceeds Render's 30s HTTP timeout (each DDG lookup is
+    # 1-3s, so a 200-profile batch can easily hit 10+ minutes). Spawn a
+    # background thread and return a job_id; Cowork can poll
+    # enrichment_log to see results as they stream in.
+    async_param = data.get('async')
+    run_async = True if async_param is None else (
+        str(async_param).lower() in ('1', 'true', 'yes')
+    )
     if not slugs:
         return jsonify({'error': 'city_slugs required'}), 400
     if not isinstance(slugs, list):
@@ -1994,82 +2040,110 @@ def admin_enrich_cities():
     from datetime import datetime as _dt
     from web_enrichment import FreeEnrichmentEngine, normalize_name
 
-    t0 = _t.time()
-    engine = FreeEnrichmentEngine()
-    conn = permitdb.get_connection()
-    conn.row_factory = sqlite3.Row
-    results = []
-    for city_slug in slugs:
-        city_t0 = _t.time()
-        rows = conn.execute("""
-            SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
-                   cp.city, cp.state
-            FROM contractor_profiles cp
-            WHERE cp.source_city_key = ?
-              AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
-              AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
-              AND LENGTH(cp.contractor_name_raw) >= 5
-              AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
-              AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
-              AND cp.contractor_name_raw NOT LIKE 'OWNER %'
-              AND cp.contractor_name_raw NOT GLOB '[0-9]*'
-              AND (cp.phone IS NULL OR cp.phone = '')
-              AND (cp.website IS NULL OR cp.website = '')
-            ORDER BY cp.total_permits DESC
-            LIMIT ?
-        """, (city_slug, batch_size)).fetchall()
-        attempted = enriched = failed = 0
-        for r in rows:
-            attempted += 1
-            raw = r['contractor_name_raw']
-            norm = r['contractor_name_normalized'] or normalize_name(raw)
-            try:
-                phone, website = engine.enrich_one(raw, r['city'] or '', r['state'] or '')
-            except Exception:
-                phone, website = None, None
-            now = _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-            try:
-                if phone or website:
-                    enriched += 1
-                    conn.execute("""INSERT OR REPLACE INTO contractor_contacts
-                            (contractor_name_normalized, display_name, phone, website,
-                             source, confidence, looked_up_at)
-                            VALUES (?, ?, ?, ?, 'web_enrichment', 'low', ?)""",
-                            (norm, raw, phone, website, now))
-                    conn.execute("""UPDATE contractor_profiles
-                            SET phone=?, website=?, enrichment_status='enriched',
-                                enriched_at=?, updated_at=?
-                            WHERE id=?""",
-                            (phone, website, now, now, r['id']))
-                    conn.execute("""INSERT INTO enrichment_log
-                            (contractor_profile_id, source, status, cost, created_at)
-                            VALUES (?, 'web_enrichment', 'enriched', 0.0, ?)""",
-                            (r['id'], now))
-                else:
-                    conn.execute("""UPDATE contractor_profiles
-                            SET enrichment_status='not_found',
-                                enriched_at=?, updated_at=?
-                            WHERE id=?""", (now, now, r['id']))
-                    conn.execute("""INSERT INTO enrichment_log
-                            (contractor_profile_id, source, status, cost, created_at)
-                            VALUES (?, 'web_enrichment', 'not_found', 0.0, ?)""",
-                            (r['id'], now))
-                conn.commit()
-            except Exception as e:
-                failed += 1
-                print(f"[V231 enrich-cities] {city_slug} {raw}: {e}", flush=True)
-        results.append({
-            'city_slug': city_slug,
-            'attempted': attempted,
-            'enriched': enriched,
-            'failed': failed,
-            'elapsed_seconds': round(_t.time() - city_t0, 2),
-        })
+    def _do_enrich(slug_list, _batch_size, _job_id=None):
+        """Inline worker — shared by the sync + async paths."""
+        _t0 = _t.time()
+        _engine = FreeEnrichmentEngine()
+        _conn = permitdb.get_connection()
+        _conn.row_factory = sqlite3.Row
+        _results = []
+        for city_slug in slug_list:
+            city_t0 = _t.time()
+            rows = _conn.execute("""
+                SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
+                       cp.city, cp.state
+                FROM contractor_profiles cp
+                WHERE cp.source_city_key = ?
+                  AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
+                  AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
+                  AND LENGTH(cp.contractor_name_raw) >= 5
+                  AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
+                  AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
+                  AND cp.contractor_name_raw NOT LIKE 'OWNER %'
+                  AND cp.contractor_name_raw NOT GLOB '[0-9]*'
+                  AND (cp.phone IS NULL OR cp.phone = '')
+                  AND (cp.website IS NULL OR cp.website = '')
+                ORDER BY cp.total_permits DESC
+                LIMIT ?
+            """, (city_slug, _batch_size)).fetchall()
+            attempted = enriched = failed = 0
+            for r in rows:
+                attempted += 1
+                raw = r['contractor_name_raw']
+                norm = r['contractor_name_normalized'] or normalize_name(raw)
+                try:
+                    phone, website = _engine.enrich_one(raw, r['city'] or '', r['state'] or '')
+                except Exception:
+                    phone, website = None, None
+                now = _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+                try:
+                    if phone or website:
+                        enriched += 1
+                        _conn.execute("""INSERT OR REPLACE INTO contractor_contacts
+                                (contractor_name_normalized, display_name, phone, website,
+                                 source, confidence, looked_up_at)
+                                VALUES (?, ?, ?, ?, 'web_enrichment', 'low', ?)""",
+                                (norm, raw, phone, website, now))
+                        _conn.execute("""UPDATE contractor_profiles
+                                SET phone=?, website=?, enrichment_status='enriched',
+                                    enriched_at=?, updated_at=?
+                                WHERE id=?""",
+                                (phone, website, now, now, r['id']))
+                        _conn.execute("""INSERT INTO enrichment_log
+                                (contractor_profile_id, source, status, cost, created_at)
+                                VALUES (?, 'web_enrichment', 'enriched', 0.0, ?)""",
+                                (r['id'], now))
+                    else:
+                        _conn.execute("""UPDATE contractor_profiles
+                                SET enrichment_status='not_found',
+                                    enriched_at=?, updated_at=?
+                                WHERE id=?""", (now, now, r['id']))
+                        _conn.execute("""INSERT INTO enrichment_log
+                                (contractor_profile_id, source, status, cost, created_at)
+                                VALUES (?, 'web_enrichment', 'not_found', 0.0, ?)""",
+                                (r['id'], now))
+                    _conn.commit()
+                except Exception as e:
+                    failed += 1
+                    print(f"[V234 enrich-cities] {city_slug} {raw}: {e}", flush=True)
+            _summary = {
+                'city_slug': city_slug,
+                'attempted': attempted,
+                'enriched': enriched,
+                'failed': failed,
+                'elapsed_seconds': round(_t.time() - city_t0, 2),
+            }
+            _results.append(_summary)
+            if _job_id:
+                print(f"[V234] enrich-cities job {_job_id}: {_summary}", flush=True)
+        return {
+            'cities': _results,
+            'total_elapsed_seconds': round(_t.time() - _t0, 2),
+        }
 
-    return jsonify({
-        'cities': results,
-        'total_elapsed_seconds': round(_t.time() - t0, 2),
-    })
+    if run_async:
+        import uuid as _uuid
+        job_id = _uuid.uuid4().hex[:12]
+        def _bg():
+            try:
+                final = _do_enrich(slugs, batch_size, _job_id=job_id)
+                print(f"[V234] enrich-cities job {job_id} COMPLETE: {final}", flush=True)
+            except Exception as _e:
+                import traceback as _tb
+                print(f"[V234] enrich-cities job {job_id} ERROR: {_e}", flush=True)
+                _tb.print_exc()
+        threading.Thread(target=_bg, daemon=True,
+                         name=f'enrich_cities_{job_id}').start()
+        return jsonify({
+            'status': 'started',
+            'async': True,
+            'job_id': job_id,
+            'city_slugs': slugs,
+            'batch_size': batch_size,
+            'message': 'running in background — poll enrichment_log / contractor_profiles for progress',
+        }), 202
+
+    return jsonify(_do_enrich(slugs, batch_size))
 
 
 @app.route('/api/admin/dashboard', methods=['GET'])
