@@ -916,6 +916,19 @@ def init_db():
     """)
     conn.commit()
 
+    # V229 addendum J2: stripe webhook idempotency table. Was being
+    # created inline inside stripe_webhook() on every call, which took a
+    # schema lock on every Stripe event — safe but wasteful. Defining
+    # it here at init lets the handler just INSERT/SELECT.
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+            event_id TEXT PRIMARY KEY,
+            event_type TEXT,
+            processed_at TEXT DEFAULT (datetime('now'))
+        );
+    """)
+    conn.commit()
+
     # V18: Migrations for staleness detection columns
     _run_v18_migrations(conn)
 

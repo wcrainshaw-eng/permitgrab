@@ -833,8 +833,12 @@ def _migrate_create_sources_table():
     conn.close()
     print(f"[{datetime.now()}] V170: All tables created/verified")
 
-    # V176: Run deferred startup in background thread so gunicorn can serve immediately
-    threading.Thread(target=_deferred_startup, daemon=True, name='deferred_startup').start()
+    # V229 addendum K1: daemon startup moved out of this before_request
+    # hook into a module-level spawn (see bottom of file). This hook now
+    # only runs schema migrations. Previously daemons wouldn't start at
+    # all if the first HTTP request missed the before_request chain
+    # (e.g. a healthcheck on a path that skipped it).
+    _ensure_deferred_startup_spawned()
 
 
 def _bulk_load_city_research():
@@ -9681,15 +9685,9 @@ def stripe_webhook():
     # time. Track event IDs we've already processed and no-op on repeat.
     if event_id:
         try:
+            # V229 addendum J2: table now lives in db.py init_database().
+            # Previously the CREATE TABLE ran on every webhook event.
             _wh_conn = permitdb.get_connection()
-            _wh_conn.execute("""
-                CREATE TABLE IF NOT EXISTS stripe_webhook_events (
-                    event_id TEXT PRIMARY KEY,
-                    event_type TEXT,
-                    processed_at TEXT DEFAULT (datetime('now'))
-                )
-            """)
-            _wh_conn.commit()
             already = _wh_conn.execute(
                 "SELECT 1 FROM stripe_webhook_events WHERE event_id = ?",
                 (event_id,),
@@ -13868,6 +13866,29 @@ def start_collectors():
 # V12.12: Preload existing data from disk BEFORE starting collectors
 # This ensures stale data is served immediately rather than showing 0 permits
 preload_data_from_disk()
+
+# V229 addendum K1: single, lock-guarded spawner for _deferred_startup.
+# Called from the before_request hook AND from module import. This
+# guarantees daemon threads start even if no HTTP request arrives
+# through the before_request chain (e.g. healthcheck routes registered
+# before the hook, or edge cases around app.test_client). The
+# threading.Lock makes double-spawn impossible regardless of caller.
+_DEFERRED_STARTUP_LOCK = threading.Lock()
+_DEFERRED_STARTUP_SPAWNED = False
+
+def _ensure_deferred_startup_spawned():
+    global _DEFERRED_STARTUP_SPAWNED
+    with _DEFERRED_STARTUP_LOCK:
+        if _DEFERRED_STARTUP_SPAWNED:
+            return
+        _DEFERRED_STARTUP_SPAWNED = True
+    threading.Thread(
+        target=_deferred_startup, daemon=True, name='deferred_startup'
+    ).start()
+
+# V229 addendum K1: kick daemons off at import time so they don't depend
+# on an HTTP request landing first.
+_ensure_deferred_startup_spawned()
 
 # V66: Removed module-level DB init — now deferred to first request via _deferred_startup()
 # This prevents connection pool exhaustion during gunicorn startup.
