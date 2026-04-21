@@ -1602,7 +1602,7 @@ def admin_full_collection():
 # V226: Admin tools — force-collect, city-health, dashboard, enrich
 # ===========================
 
-def _collect_city_sync(city_slug, collect_type='both'):
+def _collect_city_sync(city_slug, collect_type='both', days_back=None):
     """V226 T2 / V228 hardened: synchronous per-city collection with
     structured before/after diff. Re-fetches the DB handle after each
     collector call because collector.collect_single_city and
@@ -1634,10 +1634,40 @@ def _collect_city_sync(city_slug, collect_type='both'):
     violations_inserted = 0
     error_messages = []
 
+    # V233b: when the city is in pending-backfill state (cursor nulled,
+    # backfill_status='pending') the default 7-day window only pulls the
+    # last handful of permits. That's what left Seattle with 21 permits
+    # post-V233 even though 4K had been wiped. Auto-upgrade to a 180-day
+    # window for those cities. Caller can still override via days_back.
+    _effective_days_back = days_back
+    _is_backfill = False
+    if _effective_days_back is None:
+        try:
+            _bf_conn = permitdb.get_connection()
+            _bf_row = _bf_conn.execute(
+                "SELECT backfill_status, last_permit_date, total_permits "
+                "FROM prod_cities WHERE city_slug = ?",
+                (city_slug,)
+            ).fetchone()
+            if _bf_row:
+                _bfs = (_bf_row['backfill_status']
+                        if isinstance(_bf_row, dict) else _bf_row[0])
+                _lpd = (_bf_row['last_permit_date']
+                        if isinstance(_bf_row, dict) else _bf_row[1])
+                _tp = (_bf_row['total_permits']
+                       if isinstance(_bf_row, dict) else _bf_row[2]) or 0
+                if _bfs == 'pending' or _lpd is None or _tp < 100:
+                    _is_backfill = True
+                    _effective_days_back = 180
+        except Exception:
+            pass
+    if _effective_days_back is None:
+        _effective_days_back = 7
+
     if collect_type in ('permits', 'both'):
         try:
             from collector import collect_single_city
-            collect_single_city(city_slug, days_back=7)
+            collect_single_city(city_slug, days_back=_effective_days_back)
         except Exception as e:
             error_messages.append(f"permits: {e}")
 
@@ -1670,10 +1700,27 @@ def _collect_city_sync(city_slug, collect_type='both'):
         'error' if error_messages else 'caught_up'
     )
 
+    # V233b: after a successful backfill, clear the pending flag so the
+    # daemon falls back to its normal 7-day incremental cadence instead
+    # of re-fetching 180 days every cycle.
+    if _is_backfill and permits_inserted > 0 and not error_messages:
+        try:
+            _bf_conn = permitdb.get_connection()
+            _bf_conn.execute("""
+                UPDATE prod_cities
+                SET backfill_status='complete', health_status='healthy'
+                WHERE city_slug = ?
+            """, (city_slug,))
+            _bf_conn.commit()
+        except Exception:
+            pass
+
     return {
         'city_slug': city_slug,
         'type': collect_type,
         'status': status,
+        'days_back': _effective_days_back,
+        'backfill': _is_backfill,
         'permits_total': post_permit[0] or 0,
         'permits_inserted': permits_inserted,
         'permits_newest': post_permit[1],
@@ -1702,17 +1749,27 @@ def admin_force_collect():
         data = request.get_json() or {}
         city_slug = data.get('city_slug') or data.get('city')
         collect_type = data.get('type', 'both')
+        days_back = data.get('days_back')
     else:
         city_slug = request.args.get('city') or request.args.get('city_slug')
         collect_type = request.args.get('type', 'both')
+        days_back = request.args.get('days_back')
 
     if not city_slug:
         return jsonify({'error': 'city_slug required'}), 400
     if collect_type not in ('permits', 'violations', 'both'):
         return jsonify({'error': 'type must be permits/violations/both'}), 400
+    # V233b: accept optional days_back override. Default None lets
+    # _collect_city_sync auto-select 180 for pending-backfill cities
+    # and 7 for everything else.
+    if days_back is not None:
+        try:
+            days_back = min(max(int(days_back), 1), 730)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'days_back must be an integer'}), 400
 
     try:
-        result = _collect_city_sync(city_slug, collect_type)
+        result = _collect_city_sync(city_slug, collect_type, days_back=days_back)
         return jsonify(result)
     except Exception as e:
         import traceback
@@ -3572,9 +3629,12 @@ def admin_test_and_backfill():
 
     try:
         data = request.get_json() or {}
-        city_key = data.get('city_key')
+        # V233b: accept `city_slug` as an alias. Cowork tooling sends
+        # `city_slug` consistently across admin endpoints; this was the
+        # one holdout that still required `city_key`.
+        city_key = data.get('city_key') or data.get('city_slug')
         if not city_key:
-            return jsonify({'error': 'city_key is required'}), 400
+            return jsonify({'error': 'city_key (or city_slug) is required'}), 400
 
         days_back = data.get('days_back', 180)
 
