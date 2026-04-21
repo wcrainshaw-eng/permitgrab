@@ -1051,6 +1051,134 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V232: Houston dupe pause error (non-fatal): {e}")
 
+    # V233 P0-1: extend the V232b Seattle cursor reset — task doc calls
+    # out `backfill_status='pending'` and `health_status='pending'`
+    # which V232b didn't touch. Without these, collection schedulers
+    # that gate on health_status see Seattle as 'never_worked' and keep
+    # skipping it. Re-set all cursor fields (in case V232b was partial)
+    # and also set the two status fields the task doc specified.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v233_seattle_status'").fetchone()
+        if not m:
+            conn2.execute("""
+                UPDATE prod_cities
+                SET last_permit_date = NULL,
+                    newest_permit_date = NULL,
+                    latest_permit_date = NULL,
+                    earliest_permit_date = NULL,
+                    total_permits = 0,
+                    permits_last_30d = 0,
+                    avg_daily_permits = 0,
+                    last_collection = NULL,
+                    last_successful_collection = NULL,
+                    first_successful_collection = NULL,
+                    consecutive_no_new = 0,
+                    consecutive_failures = 0,
+                    last_error = NULL,
+                    last_failure_reason = NULL,
+                    last_run_status = NULL,
+                    days_since_new_data = NULL,
+                    data_freshness = 'no_data',
+                    backfill_status = 'pending',
+                    health_status = 'pending'
+                WHERE city_slug = 'seattle' AND state = 'WA'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v233_seattle_status', datetime('now'))")
+            conn2.commit()
+            print(f"[{datetime.now()}] V233 P0-1: Seattle backfill_status + health_status set to 'pending'")
+    except Exception as e:
+        print(f"[{datetime.now()}] V233 P0-1: Seattle status reset error (non-fatal): {e}")
+
+    # V233 P0-2: rename existing NYC permits from "New York" to "New York
+    # City". db.py's canonicalization used to rewrite every NYC variant
+    # to "New York" (the state's name), so the 35K permits ended up under
+    # `city='New York', state='NY'` while prod_cities.city='New York City'.
+    # Any query that joined on (city, state) returned 0 rows. The table
+    # flip in db.py fixes future ingests; this migration back-fills
+    # existing rows so downstream pipelines (enrichment, profiles) see
+    # NYC permits again.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v233_nyc_rename'").fetchone()
+        if not m:
+            renamed = conn2.execute("""
+                UPDATE permits
+                SET city='New York City'
+                WHERE state='NY' AND city='New York'
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v233_nyc_rename', ?)", (str(renamed),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V233 P0-2: Renamed {renamed} NYC permits 'New York' → 'New York City'")
+    except Exception as e:
+        print(f"[{datetime.now()}] V233 P0-2: NYC rename error (non-fatal): {e}")
+
+    # V233 P1-5: refresh Portland's newest_permit_date. V231 DC-4 clipped
+    # the future-dated rows in the permits table AND added a forward-
+    # guard in upsert_permits(), but prod_cities.newest_permit_date is a
+    # denormalized summary that nothing has re-derived since then — so
+    # the city page still reads "newest: 2026-04-28" (future date) on
+    # the freshness badge. Refresh it from MAX(filing_date) directly.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v233_portland_freshness'").fetchone()
+        if not m:
+            row = conn2.execute("""
+                SELECT MAX(filing_date) as max_fd
+                FROM permits
+                WHERE city='Portland' AND state='OR'
+                  AND filing_date IS NOT NULL AND filing_date != ''
+                  AND filing_date <= date('now')
+            """).fetchone()
+            max_fd = row[0] if row and row[0] else None
+            if max_fd:
+                conn2.execute("""
+                    UPDATE prod_cities
+                    SET newest_permit_date = ?
+                    WHERE city_slug = 'portland' AND state = 'OR'
+                """, (max_fd,))
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v233_portland_freshness', ?)", (str(max_fd or 'none'),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V233 P1-5: Refreshed Portland newest_permit_date to {max_fd}")
+    except Exception as e:
+        print(f"[{datetime.now()}] V233 P1-5: Portland freshness refresh error (non-fatal): {e}")
+
+    # V233 P0-3: pause 7 collectors with consecutive_failures > 10. Each
+    # has been retrying the same dead/broken upstream every cycle, eating
+    # log space and wasting threads. Pause them — they can be un-paused
+    # if/when the source is fixed. (Houston is extra-paused: also drop
+    # source_type so the collector doesn't even try.)
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v233_pause_failing'").fetchone()
+        if not m:
+            _failing_slugs = [
+                # (slug, reason)
+                ('las-vegas',       'V233: ArcGIS 400 Invalid or missing input, 84+ consecutive failures'),
+                ('houston',         'V233: data.houstontx.gov CKAN Invalid URL, 72+ failures, source confirmed dead'),
+                ('sioux-falls',     'V233: ArcGIS 400, 70+ consecutive failures'),
+                ('st-petersburg',   'V233: ArcGIS 404 Service not found, 66+ failures'),
+                ('fairfax-county',  'V233: ArcGIS 400, 52+ consecutive failures'),
+                ('greenville',      'V233: ArcGIS 400 Failed to execute query, 44+ failures'),
+                ('anchorage',       'V233: Accela "Could not find Search button", 16+ failures'),
+            ]
+            paused = 0
+            for slug, reason in _failing_slugs:
+                rc = conn2.execute("""
+                    UPDATE prod_cities
+                    SET status='paused',
+                        pause_reason = COALESCE(pause_reason, '') || ' | ' || ?
+                    WHERE city_slug = ? AND status != 'paused'
+                """, (reason, slug)).rowcount
+                paused += rc
+            # Houston also drops source_type so the daemon stops trying
+            # the dead CKAN endpoint entirely.
+            conn2.execute("""
+                UPDATE prod_cities SET source_type = NULL
+                WHERE city_slug = 'houston' AND source_type IS NOT NULL
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v233_pause_failing', ?)", (str(paused),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V233 P0-3: Paused {paused} consistently failing collectors")
+    except Exception as e:
+        print(f"[{datetime.now()}] V233 P0-3: Pause failing collectors error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
@@ -11192,8 +11320,13 @@ CITY_SEO_CONFIG = {
     "miami": {
         "name": "Miami-Dade County",
         "state": "FL",
-        "meta_title": "Miami Building Permits & Contractor Leads | PermitGrab",
-        "meta_description": "Browse active building permits in Miami-Dade County. Get real-time contractor leads with contact info, project values, and trade details. Start free.",
+        # V233 P1-2: was "Miami Building Permits …" — no state abbrev,
+        # inconsistent with every other entry. The V230 read-time
+        # normalizer doesn't rescue this one because it looks for
+        # "{name} Building" (name="Miami-Dade County") which isn't in
+        # the title either. Hardcoded fix is cleanest.
+        "meta_title": "Miami, FL Building Permits & Contractor Leads | PermitGrab",
+        "meta_description": "Browse active building permits in Miami, FL (Miami-Dade County). Get real-time contractor leads with contact info, project values, and trade details. Start free.",
         "seo_content": """
             <p>Miami's construction market is among the most active in the nation, with constant development across residential, commercial, and hospitality sectors. Miami building permits cover high-rise condo construction, luxury home development, and renovations throughout Miami-Dade County.</p>
             <p>The Miami construction industry benefits from the region's year-round building season and strong demand from domestic and international buyers. Miami construction permits reflect high demand for hurricane-resistant construction, HVAC work in the tropical climate, and pool construction.</p>
@@ -12977,6 +13110,7 @@ def sitemap_index():
     child_sitemaps = [
         ('sitemap-pages.xml', today),
         ('sitemap-cities.xml', today),
+        ('sitemap-states.xml', today),  # V233 P1-3
         ('sitemap-trades.xml', today),
         ('sitemap-blog.xml', today),
     ]
@@ -13106,6 +13240,58 @@ def sitemap_cities():
                 }
     except Exception as e:
         print(f"[sitemap_cities] V77 city URLs error: {e}")
+
+    return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
+
+
+@app.route('/sitemap-states.xml')
+def sitemap_states():
+    """V233 P1-3: dedicated state-URL sitemap. State routes (both the
+    state hub /permits/{state} and the /permits/{state}/{city} SEO URLs)
+    were already emitted inside sitemap-cities.xml, but Cowork's audit
+    showed Google wasn't surfacing them — the cities sitemap is enormous
+    and state URLs got lost in the mix. Breaking them out into a
+    dedicated sub-sitemap gives the state pattern its own crawl budget.
+    """
+    today = datetime.now().strftime('%Y-%m-%d')
+    url_map = {}
+    abbrev_to_state_slug = {v['abbrev']: k for k, v in STATE_CONFIG.items()}
+
+    # State hub pages
+    for state_slug in STATE_CONFIG.keys():
+        loc = f"{SITE_URL}/permits/{state_slug}"
+        url_map[loc] = {
+            'loc': loc,
+            'changefreq': 'daily',
+            'priority': '0.85',
+            'lastmod': today,
+        }
+
+    # /permits/{state}/{city} URLs for active cities with data
+    try:
+        conn = permitdb.get_connection()
+        active_cities = conn.execute("""
+            SELECT city_slug, state, last_collection
+            FROM prod_cities
+            WHERE status = 'active'
+              AND data_freshness != 'no_data'
+              AND total_permits > 0
+        """).fetchall()
+        for row in active_cities:
+            state_slug = abbrev_to_state_slug.get(row['state'])
+            if not state_slug:
+                continue
+            lastmod = row['last_collection'][:10] if row['last_collection'] else today
+            loc = f"{SITE_URL}/permits/{state_slug}/{row['city_slug']}"
+            if loc not in url_map:
+                url_map[loc] = {
+                    'loc': loc,
+                    'changefreq': 'daily',
+                    'priority': '0.7',
+                    'lastmod': lastmod,
+                }
+    except Exception as e:
+        print(f"[sitemap_states] state/city URL error: {e}")
 
     return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
 
