@@ -1278,7 +1278,13 @@ CITY_REGISTRY = {
         "date_format": "date",
         "limit": 2000,
         "active": True,
-        "notes": "V19: Full 30-field map â permit type/subtype/category, work description, special text, full address components, lot/block/tract, legal description, owner name, job value, use type, specific use, units, sqft, status/status date. Verified Mar 2026.",
+        # V232: the CFW_Open_Data_Development_Permits_View FeatureServer
+        # exposes Owner_Full_Name but NO contractor/applicant/licensee
+        # field. Contractor enrichment therefore is not possible from
+        # this source; Fort Worth launches with permits + violations
+        # only until CFW publishes a contractor-bearing dataset.
+        "has_contractor_field": False,
+        "notes": "V232: ArcGIS source has no contractor field (only Owner_Full_Name). V19: Full 30-field map â permit type/subtype/category, work description, special text, full address components, lot/block/tract, legal description, owner name, job value, use type, specific use, units, sqft, status/status date. Verified Mar 2026.",
     },
 
     # V50: Arlington TX - ArcGIS MapServer, 3-year permit history

@@ -963,6 +963,57 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V231 DC-4: Portland date clip error (non-fatal): {e}")
 
+    # V232: force Seattle re-collection. The field_map already maps
+    # contractorcompanyname → contractor_name (added V218), but Seattle's
+    # 4K prod permits were collected BEFORE V218, so contractor_name is
+    # NULL everywhere and downstream profile creation + enrichment have
+    # nothing to work with. Deleting just the Seattle rows triggers the
+    # scheduled_collection daemon to re-pull them with the current
+    # field_map populated.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v232_seattle_recollect'").fetchone()
+        if not m:
+            deleted = conn2.execute("""
+                DELETE FROM permits
+                WHERE (source_city_key='seattle' OR (city='Seattle' AND state='WA'))
+            """).rowcount
+            # Also clear prod_cities counters so the next collection refill
+            # reports the correct numbers rather than stale-minus-delta.
+            conn2.execute("""
+                UPDATE prod_cities
+                SET total_permits=0, newest_permit_date=NULL,
+                    last_collection=NULL, data_freshness='no_data'
+                WHERE city_slug='seattle' AND state='WA'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v232_seattle_recollect', ?)", (str(deleted),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V232: Cleared {deleted} Seattle permits to force re-collect with contractorcompanyname mapping")
+    except Exception as e:
+        print(f"[{datetime.now()}] V232: Seattle recollect migration error (non-fatal): {e}")
+
+    # V232 Fix 3: deactivate 0-permit Houston rows in non-TX states. Six
+    # legitimate-but-empty Houston entries (AK, DE, MN, MO, MS, PA) clutter
+    # admin listings and footer logic. Leaving them active gates nothing —
+    # they have zero data — so pause them until a city actually fills in.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v232_houston_dupes'").fetchone()
+        if not m:
+            paused = conn2.execute("""
+                UPDATE prod_cities
+                SET status='paused',
+                    pause_reason=COALESCE(pause_reason, '') ||
+                        ' | V232: paused, 0-permit Houston in non-TX state'
+                WHERE LOWER(city)='houston'
+                  AND state != 'TX'
+                  AND (total_permits IS NULL OR total_permits = 0)
+                  AND status='active'
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v232_houston_dupes', ?)", (str(paused),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V232: Paused {paused} zero-permit Houston rows in non-TX states")
+    except Exception as e:
+        print(f"[{datetime.now()}] V232: Houston dupe pause error (non-fatal): {e}")
+
     conn2.close()
 
     conn.close()
@@ -4372,7 +4423,12 @@ def admin_query():
 
     try:
         data = request.get_json() or {}
-        sql = data.get('sql', '').strip()
+        # V232: accept `sql` (canonical) and `query` (older name Cowork's
+        # tooling still sends). The `query` param used to return a
+        # confusing "Only SELECT queries allowed" — actually the code
+        # was reading sql='' which failed the startswith check. Now
+        # either name works.
+        sql = (data.get('sql') or data.get('query') or '').strip()
         limit = min(data.get('limit', 100), 1000)
 
         # V66: Safety check — only allow SELECT queries
