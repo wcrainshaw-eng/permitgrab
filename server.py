@@ -4296,6 +4296,452 @@ def admin_full_collection():
     })
 
 
+# ===========================
+# V226: Admin tools — force-collect, city-health, dashboard, enrich
+# ===========================
+
+def _collect_city_sync(city_slug, collect_type='both'):
+    """V226 T2: synchronous per-city collection wrapper used by both the
+    force-collect endpoint and (optionally) the daemon's auto-retry path.
+    Returns the structured result schema the V226 task doc specifies."""
+    import time as _t
+    from datetime import datetime as _dt
+    t0 = _t.time()
+    conn = permitdb.get_connection()
+
+    # Baseline: what's the newest permit/violation for this city before we run?
+    pre_permit = conn.execute(
+        "SELECT COUNT(*), MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
+        "FROM permits WHERE source_city_key = ?",
+        (city_slug,),
+    ).fetchone()
+    pre_permit_count = pre_permit[0] or 0
+
+    pre_viol = conn.execute(
+        "SELECT COUNT(*) FROM violations WHERE prod_city_id IN "
+        "(SELECT id FROM prod_cities WHERE city_slug = ?)",
+        (city_slug,),
+    ).fetchone()
+    pre_viol_count = pre_viol[0] or 0
+
+    permits_inserted = 0
+    violations_inserted = 0
+    error_messages = []
+
+    if collect_type in ('permits', 'both'):
+        try:
+            from collector import collect_single_city
+            res = collect_single_city(city_slug, days_back=7)
+            # collect_single_city returns a dict; count delta as the measurement
+            post = conn.execute(
+                "SELECT COUNT(*) FROM permits WHERE source_city_key = ?",
+                (city_slug,),
+            ).fetchone()
+            permits_inserted = (post[0] or 0) - pre_permit_count
+        except Exception as e:
+            error_messages.append(f"permits: {e}")
+
+    if collect_type in ('violations', 'both'):
+        try:
+            from violation_collector import VIOLATION_SOURCES, collect_violations_from_endpoint
+            if city_slug in VIOLATION_SOURCES:
+                cfg = VIOLATION_SOURCES[city_slug]
+                for endpoint in cfg.get('endpoints', []):
+                    try:
+                        out = collect_violations_from_endpoint(cfg, endpoint)
+                        if isinstance(out, dict):
+                            violations_inserted += out.get('inserted', 0) or 0
+                        else:
+                            violations_inserted += int(out or 0)
+                    except Exception as e:
+                        error_messages.append(f"violations({endpoint.get('name','?')}): {e}")
+            else:
+                # Not a configured violation source — not an error
+                pass
+        except Exception as e:
+            error_messages.append(f"violations: {e}")
+
+    post_permit = conn.execute(
+        "SELECT COUNT(*), MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
+        "FROM permits WHERE source_city_key = ?",
+        (city_slug,),
+    ).fetchone()
+    post_viol = conn.execute(
+        "SELECT COUNT(*), MAX(violation_date) FROM violations WHERE prod_city_id IN "
+        "(SELECT id FROM prod_cities WHERE city_slug = ?)",
+        (city_slug,),
+    ).fetchone()
+
+    status = 'success' if (permits_inserted > 0 or violations_inserted > 0) else (
+        'error' if error_messages else 'caught_up'
+    )
+
+    return {
+        'city_slug': city_slug,
+        'type': collect_type,
+        'status': status,
+        'permits_total': post_permit[0] or 0,
+        'permits_inserted': permits_inserted,
+        'permits_newest': post_permit[1],
+        'violations_total': post_viol[0] or 0,
+        'violations_inserted': violations_inserted,
+        'violations_newest': post_viol[1],
+        'elapsed_seconds': round(_t.time() - t0, 2),
+        'errors': error_messages or None,
+        'ran_at': _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+
+
+@app.route('/api/admin/force-collect', methods=['GET', 'POST'])
+def admin_force_collect():
+    """V226 T2: Structured single-city collection with before/after diff.
+
+    POST body: {"city_slug": "chicago", "type": "permits"|"violations"|"both"}
+    GET: /api/admin/force-collect?city=chicago&type=both
+    Returns inserted/total/newest deltas + elapsed + errors.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        city_slug = data.get('city_slug') or data.get('city')
+        collect_type = data.get('type', 'both')
+    else:
+        city_slug = request.args.get('city') or request.args.get('city_slug')
+        collect_type = request.args.get('type', 'both')
+
+    if not city_slug:
+        return jsonify({'error': 'city_slug required'}), 400
+    if collect_type not in ('permits', 'violations', 'both'):
+        return jsonify({'error': 'type must be permits/violations/both'}), 400
+
+    try:
+        result = _collect_city_sync(city_slug, collect_type)
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'city_slug': city_slug}), 500
+
+
+@app.route('/api/admin/city-health', methods=['GET'])
+def admin_city_health():
+    """V226 T3: One-glance health status for every active top-cities entry.
+
+    GREEN  = newest permit < 7d AND enrichment >= 40% (or no profiles)
+    YELLOW = newest permit 7-21d OR enrichment 20-40%
+    RED    = newest permit > 21d OR 0 permits OR enrichment < 20% (when profiles > 50)
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    conn = permitdb.get_connection()
+    top_slugs = [
+        'new-york-city','los-angeles','chicago','houston','phoenix',
+        'philadelphia','dallas','austin','san-antonio','san-diego',
+        'nashville','seattle','san-francisco','fort-worth','columbus',
+        'denver','memphis','new-orleans','milwaukee','san-jose',
+    ]
+    placeholders = ','.join('?' * len(top_slugs))
+    rows = conn.execute(f"""
+        SELECT pc.city_slug, pc.state, pc.status,
+               COALESCE(p.cnt, 0) as permits,
+               p.newest as newest_permit,
+               COALESCE(v.cnt, 0) as violations,
+               v.newest as newest_violation,
+               COALESCE(cp.cnt, 0) as profiles,
+               COALESCE(cp.enriched, 0) as enriched,
+               pc.last_collection
+        FROM prod_cities pc
+        LEFT JOIN (
+            SELECT source_city_key, COUNT(*) cnt,
+                   MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) newest
+            FROM permits GROUP BY source_city_key
+        ) p ON p.source_city_key = pc.city_slug
+        LEFT JOIN (
+            SELECT prod_city_id, COUNT(*) cnt, MAX(violation_date) newest
+            FROM violations GROUP BY prod_city_id
+        ) v ON v.prod_city_id = pc.id
+        LEFT JOIN (
+            SELECT source_city_key, COUNT(*) cnt,
+                   SUM(CASE WHEN (phone IS NOT NULL AND phone != '') OR (website IS NOT NULL AND website != '')
+                            THEN 1 ELSE 0 END) enriched
+            FROM contractor_profiles GROUP BY source_city_key
+        ) cp ON cp.source_city_key = pc.city_slug
+        WHERE pc.city_slug IN ({placeholders})
+        ORDER BY permits DESC
+    """, top_slugs).fetchall()
+
+    from datetime import datetime as _dt, timedelta as _td
+    today = _dt.utcnow().date()
+    summary = {'green': 0, 'yellow': 0, 'red': 0}
+    cities = []
+    for r in rows:
+        row = {k: r[k] for k in r.keys()}
+        newest = (row.get('newest_permit') or '')[:10]
+        age = None
+        if newest and len(newest) == 10:
+            try:
+                age = (today - _dt.strptime(newest, '%Y-%m-%d').date()).days
+            except Exception:
+                age = None
+        row['permit_age_days'] = age
+        pct = 0
+        if row['profiles']:
+            pct = round(100.0 * row['enriched'] / row['profiles'], 1)
+        row['enrichment_pct'] = pct
+
+        # Health scoring
+        if row['status'] != 'active':
+            health = 'PAUSED'
+        elif age is None or row['permits'] == 0 or age > 21:
+            health = 'RED'
+        elif row['profiles'] > 50 and pct < 20:
+            health = 'RED'
+        elif age > 7 or (row['profiles'] > 50 and pct < 40):
+            health = 'YELLOW'
+        else:
+            health = 'GREEN'
+        row['health'] = health
+        if health in summary:
+            summary[health.lower()] = summary.get(health.lower(), 0) + 1
+        cities.append(row)
+
+    from datetime import datetime as _dt2
+    return jsonify({
+        'generated_at': _dt2.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'total_cities_checked': len(cities),
+        'cities': cities,
+        'summary': summary,
+    })
+
+
+@app.route('/api/admin/enrich', methods=['POST'])
+def admin_enrich():
+    """V226 T5: Force-enrich N profiles for a given city using
+    FreeEnrichmentEngine (DuckDuckGo + domain guess + YellowPages fallback).
+
+    Body: {"city_slug": "chicago", "batch_size": 30}
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.get_json() or {}
+    city_slug = data.get('city_slug') or data.get('city')
+    batch_size = min(int(data.get('batch_size', 20)), 100)
+    if not city_slug:
+        return jsonify({'error': 'city_slug required'}), 400
+
+    import time as _t
+    from datetime import datetime as _dt
+    from web_enrichment import FreeEnrichmentEngine, normalize_name
+
+    t0 = _t.time()
+    conn = permitdb.get_connection()
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
+               cp.city, cp.state
+        FROM contractor_profiles cp
+        WHERE cp.source_city_key = ?
+          AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
+          AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
+          AND LENGTH(cp.contractor_name_raw) >= 5
+          AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
+          AND cp.contractor_name_raw NOT LIKE 'HOMEOWNER%'
+          AND cp.contractor_name_raw NOT LIKE 'OWNER %'
+          AND cp.contractor_name_raw NOT GLOB '[0-9]*'
+          AND (cp.phone IS NULL OR cp.phone = '')
+          AND (cp.website IS NULL OR cp.website = '')
+        ORDER BY cp.total_permits DESC
+        LIMIT ?
+    """, (city_slug, batch_size)).fetchall()
+
+    engine = FreeEnrichmentEngine()
+    attempted = 0
+    enriched = 0
+    failed = 0
+    for r in rows:
+        attempted += 1
+        raw = r['contractor_name_raw']
+        norm = r['contractor_name_normalized'] or normalize_name(raw)
+        try:
+            phone, website = engine.enrich_one(raw, r['city'] or '', r['state'] or '')
+        except Exception:
+            phone, website = None, None
+        now = _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            if phone or website:
+                enriched += 1
+                conn.execute("""INSERT OR REPLACE INTO contractor_contacts
+                        (contractor_name_normalized, display_name, phone, website,
+                         source, confidence, looked_up_at)
+                        VALUES (?, ?, ?, ?, 'web_enrichment', 'low', ?)""",
+                        (norm, raw, phone, website, now))
+                conn.execute("""UPDATE contractor_profiles
+                        SET phone = COALESCE(NULLIF(phone, ''), ?),
+                            website = COALESCE(NULLIF(website, ''), ?),
+                            enrichment_status = 'enriched',
+                            enriched_at = ?, updated_at = ?
+                        WHERE id = ?""", (phone, website, now, now, r['id']))
+                conn.execute("""INSERT INTO enrichment_log
+                        (contractor_profile_id, source, status, cost, created_at)
+                        VALUES (?, 'web_enrichment', 'enriched', 0.0, ?)""",
+                        (r['id'], now))
+            else:
+                failed += 1
+                conn.execute("""UPDATE contractor_profiles
+                        SET enrichment_status = 'not_found',
+                            enriched_at = ?, updated_at = ?
+                        WHERE id = ?""", (now, now, r['id']))
+                conn.execute("""INSERT INTO enrichment_log
+                        (contractor_profile_id, source, status, cost, created_at)
+                        VALUES (?, 'web_enrichment', 'not_found', 0.0, ?)""",
+                        (r['id'], now))
+            conn.commit()
+        except Exception as e:
+            failed += 1
+            print(f"[V226 enrich] write err {raw}: {e}", flush=True)
+
+    return jsonify({
+        'city_slug': city_slug,
+        'attempted': attempted,
+        'enriched': enriched,
+        'failed': failed,
+        'elapsed_seconds': round(_t.time() - t0, 2),
+    })
+
+
+@app.route('/api/admin/dashboard', methods=['GET'])
+def admin_dashboard():
+    """V226 T9: Combined one-stop status page — aggregates everything.
+
+    Returns overall totals, ad-ready buckets, recent collection_log,
+    recent enrichment_log, city-health matrix.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    conn = permitdb.get_connection()
+    totals = conn.execute("""
+        SELECT
+          (SELECT COUNT(*) FROM permits) as permits,
+          (SELECT COUNT(*) FROM violations) as violations,
+          (SELECT COUNT(*) FROM contractor_profiles) as profiles,
+          (SELECT COUNT(*) FROM contractor_profiles
+             WHERE (phone IS NOT NULL AND phone != '')
+                OR (website IS NOT NULL AND website != '')) as enriched,
+          (SELECT COUNT(*) FROM prod_cities WHERE status = 'active') as active_cities,
+          (SELECT COUNT(*) FROM prod_cities WHERE status = 'paused') as paused_cities
+    """).fetchone()
+    totals_dict = {k: totals[k] for k in totals.keys()}
+    if totals_dict.get('profiles', 0):
+        totals_dict['enrichment_pct'] = round(
+            100.0 * (totals_dict.get('enriched') or 0) / totals_dict['profiles'], 1
+        )
+    else:
+        totals_dict['enrichment_pct'] = 0
+
+    # recent collections (last 15)
+    recent_collections = []
+    try:
+        for r in conn.execute("""
+            SELECT city_slug, status, records_inserted, api_rows_returned,
+                   duplicate_rows_skipped, created_at
+            FROM collection_log
+            ORDER BY created_at DESC LIMIT 15
+        """).fetchall():
+            recent_collections.append({k: r[k] for k in r.keys()})
+    except Exception:
+        pass
+
+    # recent enrichments (last 15)
+    recent_enrichments = []
+    try:
+        for r in conn.execute("""
+            SELECT contractor_profile_id, source, status, created_at
+            FROM enrichment_log
+            ORDER BY created_at DESC LIMIT 15
+        """).fetchall():
+            recent_enrichments.append({k: r[k] for k in r.keys()})
+    except Exception:
+        pass
+
+    # ad-ready buckets — reuse city-health internal logic
+    top_slugs = [
+        'new-york-city','los-angeles','chicago','houston','phoenix',
+        'philadelphia','dallas','austin','san-antonio','san-diego',
+        'nashville','seattle','san-francisco','fort-worth','columbus',
+        'denver','memphis','new-orleans','milwaukee','san-jose',
+    ]
+    placeholders = ','.join('?' * len(top_slugs))
+    health_rows = conn.execute(f"""
+        SELECT pc.city_slug, pc.state, pc.status,
+               COALESCE(p.cnt, 0) as permits, p.newest as newest_permit,
+               COALESCE(v.cnt, 0) as violations,
+               COALESCE(cp.cnt, 0) as profiles,
+               COALESCE(cp.enriched, 0) as enriched
+        FROM prod_cities pc
+        LEFT JOIN (
+            SELECT source_city_key, COUNT(*) cnt,
+                   MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) newest
+            FROM permits GROUP BY source_city_key
+        ) p ON p.source_city_key = pc.city_slug
+        LEFT JOIN (
+            SELECT prod_city_id, COUNT(*) cnt FROM violations GROUP BY prod_city_id
+        ) v ON v.prod_city_id = pc.id
+        LEFT JOIN (
+            SELECT source_city_key, COUNT(*) cnt,
+                   SUM(CASE WHEN (phone IS NOT NULL AND phone != '')
+                             OR (website IS NOT NULL AND website != '')
+                            THEN 1 ELSE 0 END) enriched
+            FROM contractor_profiles GROUP BY source_city_key
+        ) cp ON cp.source_city_key = pc.city_slug
+        WHERE pc.city_slug IN ({placeholders})
+    """, top_slugs).fetchall()
+
+    from datetime import datetime as _dt
+    today = _dt.utcnow().date()
+    yes, close, no_list = [], [], []
+    for r in health_rows:
+        slug = r['city_slug']
+        if r['status'] != 'active':
+            no_list.append(slug)
+            continue
+        newest = (r['newest_permit'] or '')[:10]
+        age = None
+        if newest and len(newest) == 10:
+            try:
+                age = (today - _dt.strptime(newest, '%Y-%m-%d').date()).days
+            except Exception:
+                age = None
+        pct = 0
+        if r['profiles']:
+            pct = 100.0 * r['enriched'] / r['profiles']
+        if r['permits'] > 100 and age is not None and age < 7 and r['violations'] > 0 and pct > 40:
+            yes.append(slug)
+        elif r['permits'] > 100 and age is not None and age < 14:
+            close.append(slug)
+        else:
+            no_list.append(slug)
+
+    return jsonify({
+        'generated_at': _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'overall': totals_dict,
+        'ad_ready': {
+            'yes': yes,
+            'close': close,
+            'no': no_list,
+        },
+        'recent_collections': recent_collections,
+        'recent_enrichments': recent_enrichments,
+    })
+
+
 @app.route('/api/admin/add-source', methods=['POST'])
 def admin_add_source():
     """V12.50: Add a single source and upsert to SQLite."""
@@ -14205,6 +14651,17 @@ def city_landing_inner(city_slug):
     # population sanity filter or has no active profiles)
     top_contractors = _get_top_contractors_for_city(city_slug, limit=25)
 
+    # V226 T10: compute freshness age in days so the template can bucket
+    # the badge into fresh / aging / stale. None when we don't have a date.
+    _freshness_age_days = None
+    if newest_permit_date:
+        try:
+            _fd = newest_permit_date[:10]
+            _freshness_age_days = (datetime.now().date()
+                                   - datetime.strptime(_fd, '%Y-%m-%d').date()).days
+        except Exception:
+            _freshness_age_days = None
+
     return render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         city_name=config['name'],
@@ -14229,6 +14686,7 @@ def city_landing_inner(city_slug):
         current_year=datetime.now().year,
         current_date=datetime.now().strftime('%Y-%m-%d'),
         current_week_start=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),  # V209-3: for NEW badge
+        freshness_age_days=_freshness_age_days,  # V226 T10: fresh/aging/stale bucketing
         last_collected=last_collected,  # V17c: Freshness badge
         related_articles=related_articles,  # V17d: Cross-linked blog articles
         is_coming_soon=is_coming_soon,  # V12.11: Coming Soon badge
@@ -15677,6 +16135,49 @@ def scheduled_collection():
             print(f"[{datetime.now()}] [V209] web_enrichment cycle: {v209_result}")
         except Exception as e:
             print(f"[{datetime.now()}] [V209] web_enrichment error (non-fatal): {e}")
+
+        # V226 T8: staleness alert pass. Cities whose MAX(filing_date) is
+        # >21 days behind today haven't been updated this whole cycle
+        # series. Log a stale_warning to collection_log so the admin
+        # dashboard surfaces them without us having to ssh + sqlite each
+        # morning. Does NOT auto-retry those — most of the >21d cases
+        # have turned out to be upstream-dead sources and retrying wastes
+        # the HTTP round trip. Retries 7-21d range where the collector
+        # might actually pick up newer rows on the next try.
+        try:
+            _stale_conn = permitdb.get_connection()
+            _stale_rows = _stale_conn.execute("""
+                SELECT pc.city_slug, pc.source_type,
+                       MAX(p.filing_date) newest,
+                       CAST(julianday('now') - julianday(MAX(p.filing_date)) AS INTEGER) age_days
+                FROM prod_cities pc
+                JOIN permits p ON p.source_city_key = pc.city_slug
+                WHERE pc.status = 'active'
+                GROUP BY pc.city_slug
+                HAVING age_days > 7
+                ORDER BY age_days DESC
+                LIMIT 30
+            """).fetchall()
+            for _row in _stale_rows:
+                _slug = _row[0] if not hasattr(_row, 'keys') else _row['city_slug']
+                _age = _row[3] if not hasattr(_row, 'keys') else _row['age_days']
+                _status = 'stale_warning' if _age and _age > 21 else 'aging'
+                try:
+                    _stale_conn.execute("""
+                        INSERT INTO collection_log
+                          (city_slug, collection_type, status, error_message,
+                           duration_seconds)
+                        VALUES (?, 'staleness_check', ?, ?, 0)
+                    """, (_slug, _status,
+                          f"newest permit is {_age} days old"))
+                except Exception:
+                    pass
+            _stale_conn.commit()
+            if _stale_rows:
+                print(f"[{datetime.now()}] [V226] staleness check logged "
+                      f"{len(_stale_rows)} cities > 7d behind")
+        except Exception as e:
+            print(f"[{datetime.now()}] [V226] staleness check error: {e}")
 
         # V212-3: Resync prod_cities.newest_permit_date from actual permits each
         # cycle so the freshness badge doesn't go stale while the collector
