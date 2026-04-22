@@ -89,20 +89,26 @@ STATE_CONFIGS = {
         # first run reports mismatches.
         'name': 'California CSLB License Master',
         'format': 'aspnet_csv',
-        'download_url': 'https://www.cslb.ca.gov/onlineservices/dataportal/ContractorList',
+        # V241 P2: CSLB path is case-sensitive. Lowercase
+        # /onlineservices/dataportal/ 302s to /OnlineServices/DataPortal/
+        # Page_Not_Found.aspx, which ASP.NET serves as 500. Capitals.
+        'download_url': 'https://www.cslb.ca.gov/OnlineServices/DataPortal/ContractorList',
         'aspnet_steps': [
-            # Step 1: pick "License Master" from the dropdown.
+            # V241 P3: dropdown submits the VALUE attribute, not the
+            # display text. Values are "" / "M" / "W" / "P"; "M" =
+            # License Master. Submitting "License Master" previously
+            # produced an empty form state and the final postback
+            # returned the "pick an option" HTML page instead of a CSV.
             {
                 'eventtarget': 'ctl00$MainContent$ddlStatus',
                 'fields': {
-                    'ctl00$MainContent$ddlStatus': 'License Master',
+                    'ctl00$MainContent$ddlStatus': 'M',
                 },
             },
-            # Step 2: click the CSV download LinkButton.
             {
                 'eventtarget': 'ctl00$MainContent$lbMasterCSV',
                 'fields': {
-                    'ctl00$MainContent$ddlStatus': 'License Master',
+                    'ctl00$MainContent$ddlStatus': 'M',
                 },
             },
         ],
@@ -252,17 +258,18 @@ STATE_CONFIGS = {
 def _norm(text: str) -> str:
     """Normalize a business name for fuzzy equality.
 
-    Matches the logic in contractor_profiles.py's `normalize_name`:
-    uppercase, drop punctuation, collapse whitespace, strip common
-    business suffixes so `"MD DOORS LLC"` and `"MD Doors, LLC."` hash
-    the same.
+    V241 P0: delegates to `contractor_enrichment.normalize_contractor_name`
+    — the exact same function that populates
+    contractor_profiles.contractor_name_normalized. Earlier versions
+    used a separate uppercase + token-strip variant, so license-data
+    keys never matched profile keys and every license import returned
+    `matched: 0` despite finding thousands of candidates.
     """
-    if not text:
-        return ''
-    t = re.sub(r'[^A-Z0-9 ]', ' ', text.upper())
-    # Strip the business-word tokens (LLC, INC, CORP, CONSTRUCTION, etc).
-    tokens = [tok for tok in t.split() if tok not in BUSINESS_WORDS]
-    return ' '.join(tokens).strip()
+    # Import inside the function to avoid a circular at module-load
+    # time (contractor_enrichment imports db which imports us in
+    # some code paths).
+    from contractor_enrichment import normalize_contractor_name
+    return normalize_contractor_name(text or '')
 
 
 def _name_tokens(text: str) -> set[str]:
