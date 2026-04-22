@@ -1111,6 +1111,37 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V233 P0-2: NYC rename error (non-fatal): {e}")
 
+    # V238: Portland status cleanup. V237's OR CCB import assumed
+    # Portland's numeric contractor_name_raw values were CCB license
+    # numbers and flipped 3,521 profiles to 'not_found' when the lookup
+    # failed. Turns out those values are Portland BDS AMANDA Customer
+    # RSNs (internal FK, not published), so there's no public source to
+    # ever resolve them. Move them out of the DDG retry pool by marking
+    # as 'no_source', and flip prod_cities.has_enrichment=0 so the
+    # enrichment daemon stops wasting cycles on Portland.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v238_portland_no_source'").fetchone()
+        if not m:
+            reset = conn2.execute("""
+                UPDATE contractor_profiles
+                SET enrichment_status = 'no_source',
+                    updated_at = datetime('now')
+                WHERE source_city_key IN ('portland', 'portland-or')
+                  AND enrichment_status IN ('not_found', 'pending')
+                  AND contractor_name_raw GLOB '[0-9]*'
+            """).rowcount
+            conn2.execute("""
+                UPDATE prod_cities
+                SET has_enrichment = 0
+                WHERE city_slug IN ('portland', 'portland-or')
+                  AND state = 'OR'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v238_portland_no_source', ?)", (str(reset),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V238: Marked {reset} Portland numeric-name profiles as 'no_source'; disabled has_enrichment")
+    except Exception as e:
+        print(f"[{datetime.now()}] V238: Portland cleanup error (non-fatal): {e}")
+
     # V233 P1-5: refresh Portland's newest_permit_date. V231 DC-4 clipped
     # the future-dated rows in the permits table AND added a forward-
     # guard in upsert_permits(), but prod_cities.newest_permit_date is a
