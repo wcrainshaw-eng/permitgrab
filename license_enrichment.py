@@ -238,15 +238,43 @@ STATE_CONFIGS = {
         'match_strategy': 'name_fuzzy',
         'source_urls': {
             'applicants': 'https://www2.myfloridalicense.com/sto/file_download/extracts/constr_app.csv',
-            'certified': 'https://www2.myfloridalicense.com/sto/file_download/extracts/cilb_certified.csv',
-            'registered': 'https://www2.myfloridalicense.com/sto/file_download/extracts/cilb_registered.csv',
+            # V244d: the "cilb_certified" and "cilb_registered" URLs
+            # the V238 task doc pointed us at turned out to be
+            # continuing-education records, not licensee rosters
+            # (one row per licensee × course, 3.8M rows total, zero
+            # DBA / business-name fields). The real FL DBPR licensee
+            # file is CONSTRUCTIONLICENSE_1.csv — 47MB, 22 columns,
+            # one row per licensee with DBA populated ("GREG MINOR
+            # CONSTRUCTION", "COX CORPORATION", etc.).
+            'licensees': 'https://www2.myfloridalicense.com/sto/file_download/extracts/CONSTRUCTIONLICENSE_1.csv',
         },
-        # FL CSVs have no header row — positional columns only.
+        # V244d: applicant CSV actually has 15 columns (not 13). A
+        # sample row showed "...SARASOTA","FL","34240","68",
+        # "941.330.5058",""  — address_3 and country_code sit between
+        # what we thought was zip/phone. The pre-V244d config put
+        # 'phone' at position 11, which was actually the zip code, so
+        # _format_phone rejected nearly every entry. Fixed layout
+        # verified against the live CSV 2026-04-22.
         'applicant_columns': [
-            'occupation_number', 'occupation_description', 'first_name',
-            'second_name', 'last_name', 'suffix', 'address_1', 'address_2',
-            'city', 'state', 'zip', 'phone', 'phone_ext',
+            'occupation_number',       # 0
+            'occupation_description',  # 1
+            'first_name',              # 2
+            'middle_name',             # 3  (was 'second_name')
+            'last_name',               # 4
+            'suffix',                  # 5
+            'address_1',               # 6
+            'address_2',               # 7
+            'address_3',               # 8  (new)
+            'city',                    # 9
+            'state',                   # 10
+            'zip',                     # 11
+            'country_code',            # 12 (new)
+            'phone',                   # 13 (was at index 11)
+            'phone_ext',               # 14
         ],
+        # CONSTRUCTIONLICENSE_1.csv has 22 columns; this 21-entry list
+        # covers the fields the matcher needs (the last column is an
+        # unused trailer).
         'licensee_columns': [
             'board_number', 'occupation_code', 'licensee_name', 'dba_name',
             'class_code', 'address_1', 'address_2', 'address_3',
@@ -848,7 +876,8 @@ def _import_fl_streaming(state_code: str, config: dict) -> dict:
         BATCH_SIZE = 500
         updated_ids: set = set()
 
-        for csv_key in ('certified', 'registered'):
+        # V244d: one licensee file (CONSTRUCTIONLICENSE_1.csv), not two.
+        for csv_key in ('licensees',):
             print(f"[V244c] FL: downloading {csv_key} licensees…", flush=True)
             csv_path = _download_csv_to_tmp(urls[csv_key])
             tmp_paths.append(csv_path)
