@@ -1111,6 +1111,47 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V233 P0-2: NYC rename error (non-fatal): {e}")
 
+    # V242 P0.5 B+C: garbage profile cleanup. 2026-04-22 audit found
+    # 16K profiles where contractor_name_raw is purely numeric (permit
+    # IDs, AMANDA Customer RSNs, or DOB applicant license numbers —
+    # none of which are resolvable to a real business). Enrichment
+    # kept fabricating phones against these IDs: 43% of all phone
+    # rows in the system were garbage. Delete them, and hard-pause
+    # the three cities whose entire profile sets are numeric.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v242_garbage_profiles'").fetchone()
+        if not m:
+            # Delete all profiles from the three broken cities.
+            del1 = conn2.execute("""
+                DELETE FROM contractor_profiles
+                WHERE source_city_key IN ('fenner-ny', 'portland', 'portland-wi')
+            """).rowcount
+            # Delete numeric-only profiles in NYC (DOB applicant license
+            # IDs mis-mapped as contractor names). Keep anything with a
+            # letter in it.
+            del2 = conn2.execute("""
+                DELETE FROM contractor_profiles
+                WHERE source_city_key = 'new-york-city'
+                  AND contractor_name_raw GLOB '[0-9]*'
+                  AND contractor_name_raw NOT GLOB '*[A-Za-z]*'
+            """).rowcount
+            # Hard-pause the three broken cities so the daemon stops
+            # re-collecting them and auto-recreating garbage profiles.
+            conn2.execute("""
+                UPDATE prod_cities
+                SET status='paused', has_enrichment=0,
+                    pause_reason = COALESCE(pause_reason, '') ||
+                        ' | V242: garbage-only profiles (numeric IDs, not business names)'
+                WHERE city_slug IN ('fenner-ny', 'portland', 'portland-wi')
+                  AND status != 'paused'
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v242_garbage_profiles', ?)", (str(del1 + del2),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V242 P0.5: Deleted {del1} profiles from fenner-ny/portland/portland-wi, "
+                  f"{del2} numeric-only profiles from new-york-city")
+    except Exception as e:
+        print(f"[{datetime.now()}] V242 P0.5: Garbage cleanup error (non-fatal): {e}")
+
     # V238 (launch readiness): pause Fenner NY and Portland WI — both
     # were flagged by V231 DC-3 as junk-data cities (statewide permits
     # funneled into a tiny-population row) but retained status='active'
@@ -14206,6 +14247,18 @@ def scheduled_collection():
     last_discovery_run = None
 
     while True:
+        # V242 P0: yield to license-import. Concurrent writes against
+        # SQLite WAL stretch a 12s NY import into 51 min and block the
+        # health endpoint. Check every 30s until the import finishes.
+        try:
+            from license_enrichment import is_import_running
+            if is_import_running():
+                print(f"[{datetime.now()}] V242: collection cycle paused — license import in progress")
+                time.sleep(30)
+                continue
+        except Exception:
+            pass  # license_enrichment import failure is non-fatal
+
         # V229 C1: capture cycle start for dynamic sleep calculation below
         _v229_cycle_start = time.time()
         print(f"[{datetime.now()}] V12.50: Starting scheduled collection cycle...")
@@ -14866,6 +14919,16 @@ def start_collectors():
     def _enrichment_daemon():
         time.sleep(600)  # let collection warm up first
         while True:
+            # V242 P0: same import-pause guard the collection loop uses.
+            try:
+                from license_enrichment import is_import_running
+                if is_import_running():
+                    print(f"[{datetime.now()}] V242: enrichment daemon paused — license import in progress",
+                          flush=True)
+                    time.sleep(30)
+                    continue
+            except Exception:
+                pass
             try:
                 from web_enrichment import enrich_batch
                 result = enrich_batch(limit=200)
