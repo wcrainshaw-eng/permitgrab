@@ -627,12 +627,20 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
                 newest_date = None
                 recent_count = 0
 
+                # V238: exclude future-dated rows so prod_cities.newest_permit_date
+                # never goes into the future. Portland leaked "2026-04-28" onto
+                # its landing page freshness badge despite today being 04-22 —
+                # upstream put a scheduled-inspection date in the `date` field
+                # and the clamp only covered filing_date. Defense-in-depth:
+                # even if a clamp regresses, the MAX read filters future dates.
+                today_iso = datetime.now().strftime('%Y-%m-%d')
+
                 # Try source_city_key match first (primary strategy)
                 if city_key:
                     row = conn.execute(
                         "SELECT MAX(date) as newest, COUNT(CASE WHEN date >= ? THEN 1 END) as recent "
-                        "FROM permits WHERE source_city_key = ?",
-                        (thirty_days_ago, city_key)
+                        "FROM permits WHERE source_city_key = ? AND date <= ?",
+                        (thirty_days_ago, city_key, today_iso)
                     ).fetchone()
                     if row:
                         newest_date = row['newest'] if isinstance(row, dict) else row[0]
@@ -642,8 +650,8 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
                 if not newest_date and city_name:
                     row = conn.execute(
                         "SELECT MAX(date) as newest, COUNT(CASE WHEN date >= ? THEN 1 END) as recent "
-                        "FROM permits WHERE city = ?",
-                        (thirty_days_ago, city_name)
+                        "FROM permits WHERE city = ? AND date <= ?",
+                        (thirty_days_ago, city_name, today_iso)
                     ).fetchone()
                     if row:
                         newest_date = row['newest'] if isinstance(row, dict) else row[0]

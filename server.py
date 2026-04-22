@@ -1111,6 +1111,56 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V233 P0-2: NYC rename error (non-fatal): {e}")
 
+    # V238 (launch readiness): pause Fenner NY and Portland WI — both
+    # were flagged by V231 DC-3 as junk-data cities (statewide permits
+    # funneled into a tiny-population row) but retained status='active'
+    # because their population data was 0/missing and the DC-3 filter
+    # required population > 0. That sent the enrichment daemon off to
+    # fabricate 3,174 phone numbers for the Fenner NY "contractors"
+    # (which are actually source-keyed numeric IDs). Hard-pause both.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v238_junk_pause'").fetchone()
+        if not m:
+            paused = conn2.execute("""
+                UPDATE prod_cities
+                SET status='paused', has_enrichment=0,
+                    pause_reason = COALESCE(pause_reason, '') ||
+                        ' | V238: junk data (statewide permits in tiny city) hard-paused'
+                WHERE city_slug IN ('fenner-ny', 'portland-wi')
+                  AND status != 'paused'
+            """).rowcount
+            conn2.execute("""
+                UPDATE contractor_profiles
+                SET enrichment_status='no_source', updated_at=datetime('now')
+                WHERE source_city_key IN ('fenner-ny', 'portland-wi')
+                  AND (enrichment_status IS NULL
+                       OR enrichment_status IN ('pending','not_found'))
+            """)
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v238_junk_pause', ?)", (str(paused),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V238: Paused {paused} junk-data cities (fenner-ny, portland-wi)")
+    except Exception as e:
+        print(f"[{datetime.now()}] V238: Junk pause error (non-fatal): {e}")
+
+    # V238: one-shot reset of any lingering future-dated prod_cities
+    # newest_permit_date. V233 P1-5 already did Portland OR once but the
+    # collector re-wrote it after the next cycle (the MAX(date) read
+    # didn't filter future). With today's collector patch the regression
+    # can't recur; this migration just forces the current state clean.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v238_future_date_reset'").fetchone()
+        if not m:
+            fixed = conn2.execute("""
+                UPDATE prod_cities
+                SET newest_permit_date = NULL
+                WHERE newest_permit_date > date('now')
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v238_future_date_reset', ?)", (str(fixed),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V238: Nulled {fixed} prod_cities future-dated newest_permit_date values")
+    except Exception as e:
+        print(f"[{datetime.now()}] V238: Future date reset error (non-fatal): {e}")
+
     # V238: Portland status cleanup. V237's OR CCB import assumed
     # Portland's numeric contractor_name_raw values were CCB license
     # numbers and flipped 3,521 profiles to 'not_found' when the lookup
