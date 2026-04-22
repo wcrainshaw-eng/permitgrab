@@ -552,10 +552,46 @@ def _fetch_csv_no_header(url: str, columns: list[str]) -> list[dict]:
     return rows
 
 
-def _build_fl_applicant_phone_index(applicants: list[dict]) -> dict:
+def _iter_csv_no_header(url: str, columns: list[str]):
+    """V244: generator variant of `_fetch_csv_no_header`. Downloads the
+    whole CSV in one shot (V242's non-streaming fix still applies) but
+    yields rows one at a time so callers that just scan once never
+    materialize a 100K-dict list. The FL DBPR import pipeline used to
+    hold three such lists in memory simultaneously and blew past
+    Render's 512MB limit — see V244 P0."""
+    r = requests.get(url, timeout=(30, 300))
+    r.raise_for_status()
+    body = r.content
+    print(f"[V244] downloaded {len(body):,} bytes from {url}", flush=True)
+    try:
+        text = body.decode('utf-8')
+    except UnicodeDecodeError:
+        text = body.decode('latin-1')
+    # Release the bytes as soon as we've got the string. Peak for the
+    # body step is body + text briefly; once `body` is dropped only
+    # `text` lives on.
+    del body
+    reader = csv.reader(io.StringIO(text), skipinitialspace=True)
+    n_cols = len(columns)
+    row_count = 0
+    for raw_row in reader:
+        if not raw_row:
+            continue
+        row_vals = (raw_row + [''] * n_cols)[:n_cols]
+        yield {columns[i]: (row_vals[i] or '').strip()
+               for i in range(n_cols)}
+        row_count += 1
+    print(f"[V244] yielded {row_count:,} rows from {url}", flush=True)
+
+
+def _build_fl_applicant_phone_index(applicants) -> dict:
     """Map normalized "FIRST LAST" → best phone number from the
     applicants file. If multiple applicants share a name we keep the
-    first phone we see (DBPR doesn't publish a dedup key)."""
+    first phone we see (DBPR doesn't publish a dedup key).
+
+    V244: accepts any iterable of dicts so the caller can stream the
+    CSV instead of materializing it.
+    """
     idx = {}
     for r in applicants:
         first = r.get('first_name', '').strip()
@@ -584,125 +620,47 @@ def _normalize_city(raw: str) -> str:
     return t.lower()
 
 
-def _fetch_fl_dbpr(config: dict) -> dict:
-    """Download + parse all three FL DBPR CSVs, build a merged index
-    of licensee records keyed by the normalized name variants we'll
-    try against contractor_profiles."""
-    urls = config['source_urls']
-    print(f"[V238] FL: downloading applicants CSV…", flush=True)
-    applicants = _fetch_csv_no_header(
-        urls['applicants'], config['applicant_columns'])
-    print(f"[V238] FL: {len(applicants):,} applicants", flush=True)
+def _build_fl_profile_index(city_slugs: list[str]) -> dict:
+    """V244: Load the FL contractor_profiles that still lack a phone
+    and index them by every normalized name variant `_fl_name_variants`
+    generates. Small (<20K profiles, each with 1-3 variants) so it fits
+    comfortably in memory while the 100K+ DBPR CSVs stream past.
 
-    print(f"[V238] FL: downloading certified licensees CSV…", flush=True)
-    certified = _fetch_csv_no_header(
-        urls['certified'], config['licensee_columns'])
-    print(f"[V238] FL: downloading registered licensees CSV…", flush=True)
-    registered = _fetch_csv_no_header(
-        urls['registered'], config['licensee_columns'])
-    licensees = certified + registered
-    print(f"[V238] FL: {len(licensees):,} licensees "
-          f"(cert={len(certified):,}, reg={len(registered):,})", flush=True)
-
-    phone_idx = _build_fl_applicant_phone_index(applicants)
-
-    # Build three lookup indexes so a single contractor_profiles row
-    # can be matched on licensee_name OR dba OR applicant name.
-    by_name: dict[str, list[dict]] = {}
-    by_dba: dict[str, list[dict]] = {}
-    for lic in licensees:
-        # Attach applicant phone up front so each hit already has it.
-        ln_norm = _norm(lic.get('licensee_name', ''))
-        # For person-name licensees ("SMITH, JOHN"), also build the
-        # "FIRST LAST" variant and look up phone by that key.
-        lic['_city_slug'] = _normalize_city(lic.get('city', ''))
-        phone = None
-        if ln_norm:
-            phone = phone_idx.get(ln_norm)
-        if not phone and ',' in lic.get('licensee_name', ''):
-            parts = [p.strip() for p in lic['licensee_name'].split(',', 1)]
-            if len(parts) == 2 and parts[0] and parts[1]:
-                first = parts[1].split()[0]
-                phone = phone_idx.get(_norm(f'{first} {parts[0]}'))
-        lic['_phone'] = phone
-
-        if ln_norm:
-            by_name.setdefault(ln_norm, []).append(lic)
-        dba_norm = _norm(lic.get('dba_name', ''))
-        if dba_norm and dba_norm != ln_norm:
-            by_dba.setdefault(dba_norm, []).append(lic)
-
-    return {
-        'by_name': by_name,
-        'by_dba': by_dba,
-        'licensee_count': len(licensees),
-        'applicant_count': len(applicants),
-        'phone_index_size': len(phone_idx),
-    }
-
-
-def _enrich_fl_profiles(state_code: str, config: dict, index: dict) -> dict:
-    """Iterate FL contractor_profiles that still lack a phone and match
-    them against the DBPR index. Uses `_fl_name_variants` to try three
-    name formats before giving up.
+    Returns: {normalized_variant: {'id':..., 'city_slug':...}, ...}
+    plus a set of variant keys for O(1) lookup.
     """
-    slugs = config['city_slugs']
-    placeholders = ','.join('?' * len(slugs))
+    placeholders = ','.join('?' * len(city_slugs))
     conn = permitdb.get_connection()
     rows = conn.execute(f"""
-        SELECT id, contractor_name_raw, contractor_name_normalized,
-               source_city_key, city
+        SELECT id, contractor_name_raw, source_city_key, phone
         FROM contractor_profiles
         WHERE source_city_key IN ({placeholders})
           AND (phone IS NULL OR phone = '')
-    """, slugs).fetchall()
+    """, city_slugs).fetchall()
 
-    by_name = index['by_name']
-    by_dba = index['by_dba']
-    matched = 0
-    attempted = 0
-    now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    idx: dict[str, dict] = {}
     for row in rows:
-        attempted += 1
         pid = row['id'] if isinstance(row, dict) else row[0]
         raw = row['contractor_name_raw'] if isinstance(row, dict) else row[1]
-        profile_city_slug = row['source_city_key'] if isinstance(row, dict) else row[3]
-        variants = _fl_name_variants(raw)
+        slug = row['source_city_key'] if isinstance(row, dict) else row[2]
+        for variant in _fl_name_variants(raw):
+            if variant and variant not in idx:
+                idx[variant] = {'id': pid, 'city_slug': slug}
+    print(f"[V244] FL profile index: {len(rows):,} profiles → "
+          f"{len(idx):,} variants", flush=True)
+    return idx
 
-        hit = None
-        for key in variants:
-            candidates = by_name.get(key) or by_dba.get(key)
-            if not candidates:
-                continue
-            # Prefer a candidate whose city matches the profile's slug
-            # so "JOHN SMITH" in Miami doesn't get paired with a tampa
-            # licensee with the same name.
-            for cand in candidates:
-                if cand['_city_slug'] == profile_city_slug:
-                    hit = cand
-                    break
-            if hit is None:
-                # Fall back to the first candidate only if all we had
-                # was a single match city-agnostic — avoids cross-city
-                # false positives when multiple candidates exist.
-                if len(candidates) == 1:
-                    hit = candidates[0]
-            if hit:
-                break
 
-        if not hit:
-            continue
-
-        phone = hit.get('_phone')
-        license_number = hit.get('license_number') or ''
-        primary_status = hit.get('primary_status') or ''
-        secondary_status = hit.get('secondary_status') or ''
-        expiration = hit.get('expiration_date') or ''
-        status_parts = [s for s in (primary_status, secondary_status) if s]
-        if _is_expired(expiration):
-            status_parts.append('expired')
-        license_status = '|'.join(status_parts) if status_parts else 'unknown'
-
+def _commit_fl_batch(batch: list[tuple], state_code: str) -> int:
+    """V244: flush a batch of (profile_id, phone, license_number,
+    license_status) tuples in a single transaction. Keeps commit
+    overhead off the per-row hot path during streaming."""
+    if not batch:
+        return 0
+    conn = permitdb.get_connection()
+    now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    n = 0
+    for pid, phone, lic_num, lic_status in batch:
         try:
             conn.execute("""
                 UPDATE contractor_profiles
@@ -712,24 +670,134 @@ def _enrich_fl_profiles(state_code: str, config: dict, index: dict) -> dict:
                     enrichment_status = 'enriched',
                     enriched_at = ?, updated_at = ?
                 WHERE id = ?
-            """, (phone, license_number, license_status, now, now, pid))
+            """, (phone, lic_num, lic_status, now, now, pid))
             conn.execute("""
                 INSERT INTO enrichment_log
                     (contractor_profile_id, source, status, cost, created_at)
                 VALUES (?, ?, 'enriched', 0.0, ?)
             """, (pid, f'license:{state_code}', now))
-            conn.commit()
-            matched += 1
+            n += 1
         except Exception as e:
-            print(f"[V238] {state_code} write error for profile {pid}: {e}",
+            print(f"[V244] {state_code} write error for profile {pid}: {e}",
                   flush=True)
+    conn.commit()
+    return n
+
+
+def _import_fl_streaming(state_code: str, config: dict) -> dict:
+    """V244: streaming FL DBPR import.
+
+    Pipeline:
+      1. Load profile_idx from DB (small — 10-20K variants).
+      2. Stream applicants CSV → applicant_phone_idx (name → phone).
+         ~100K entries, bounded to the applicants with valid phones.
+      3. Stream certified + registered CSVs one row at a time:
+         - check licensee_name / dba_name against profile_idx
+         - on hit, resolve phone via applicant_phone_idx (person-name
+           licensees only — DBPR's business licensees don't have their
+           own phone in the applicant file; qualifiers do)
+         - stage (profile_id, phone, license_number, status)
+         - commit in batches of 500 to bound open-transaction size
+      4. Final flush of the last partial batch.
+
+    Peak memory: profile_idx (~3MB) + applicant_phone_idx (~15MB) +
+    currently-decoded CSV (~150MB for the one file in flight) ≈ 170MB.
+    Prior load-all-then-process pattern hit 800MB+ and OOM'd Render.
+    """
+    urls = config['source_urls']
+    slugs = config['city_slugs']
+    profile_idx = _build_fl_profile_index(slugs)
+    if not profile_idx:
+        print(f"[V244] FL: no FL profiles pending — nothing to match",
+              flush=True)
+        return {
+            'candidates': 0, 'matched': 0,
+            'licensees': 0, 'applicants': 0, 'phone_index_size': 0,
+        }
+
+    # Phase 2: build the applicant phone index by streaming the CSV.
+    print(f"[V244] FL: streaming applicants CSV for phone index…", flush=True)
+    applicant_phone_idx = _build_fl_applicant_phone_index(
+        _iter_csv_no_header(urls['applicants'], config['applicant_columns'])
+    )
+    print(f"[V244] FL: applicant phone index: {len(applicant_phone_idx):,} entries",
+          flush=True)
+
+    # Phase 3: stream both licensee CSVs, match, stage, batch-commit.
+    matched_total = 0
+    licensee_count = 0
+    batch: list[tuple] = []
+    BATCH_SIZE = 500
+    # Track which profiles we've already updated so one profile doesn't
+    # get hit twice (certified + registered entries for the same
+    # contractor).
+    updated_ids: set = set()
+
+    for csv_key in ('certified', 'registered'):
+        url = urls[csv_key]
+        print(f"[V244] FL: streaming {csv_key} licensees…", flush=True)
+        for lic in _iter_csv_no_header(url, config['licensee_columns']):
+            licensee_count += 1
+            ln_norm = _norm(lic.get('licensee_name', ''))
+            dba_norm = _norm(lic.get('dba_name', ''))
+
+            hit = profile_idx.get(ln_norm) or profile_idx.get(dba_norm)
+            if not hit:
+                continue
+            if hit['id'] in updated_ids:
+                continue
+
+            # Prefer city-matched licensees — if the licensee's city
+            # doesn't match the profile's slug and another candidate
+            # might, skip. But profile_idx only stores one profile per
+            # variant, so this is best-effort: drop cross-city hits.
+            lic_city_slug = _normalize_city(lic.get('city', ''))
+            if lic_city_slug and hit['city_slug'] and lic_city_slug != hit['city_slug']:
+                # Only drop when the city-slug actually conflicts. Many
+                # FL profile slugs don't resolve cleanly to a DBPR city
+                # name (e.g. "miami-dade-county" vs DBPR city=MIAMI),
+                # so allow the match when lic_city_slug is a substring
+                # of the profile slug or vice versa.
+                if lic_city_slug not in hit['city_slug'] and hit['city_slug'] not in lic_city_slug:
+                    continue
+
+            # Resolve phone via applicant cross-ref. Business licensees
+            # rarely have a phone this way; person-name ones do.
+            phone = applicant_phone_idx.get(ln_norm)
+            if not phone and ',' in lic.get('licensee_name', ''):
+                parts = [p.strip() for p in lic['licensee_name'].split(',', 1)]
+                if len(parts) == 2 and parts[0] and parts[1]:
+                    first = parts[1].split()[0]
+                    phone = applicant_phone_idx.get(_norm(f'{first} {parts[0]}'))
+
+            license_number = lic.get('license_number') or ''
+            primary_status = lic.get('primary_status') or ''
+            secondary_status = lic.get('secondary_status') or ''
+            expiration = lic.get('expiration_date') or ''
+            status_parts = [s for s in (primary_status, secondary_status) if s]
+            if _is_expired(expiration):
+                status_parts.append('expired')
+            license_status = '|'.join(status_parts) if status_parts else 'unknown'
+
+            batch.append((hit['id'], phone, license_number, license_status))
+            updated_ids.add(hit['id'])
+
+            if len(batch) >= BATCH_SIZE:
+                matched_total += _commit_fl_batch(batch, state_code)
+                print(f"[V244] FL: committed batch, {matched_total:,} matched "
+                      f"so far / {licensee_count:,} licensees scanned",
+                      flush=True)
+                batch = []
+
+    # Final flush.
+    if batch:
+        matched_total += _commit_fl_batch(batch, state_code)
 
     return {
-        'candidates': attempted,
-        'matched': matched,
-        'licensees': index['licensee_count'],
-        'applicants': index['applicant_count'],
-        'phone_index_size': index['phone_index_size'],
+        'candidates': len(profile_idx),
+        'matched': matched_total,
+        'licensees': licensee_count,
+        'applicants_phone_indexed': len(applicant_phone_idx),
     }
 
 
@@ -957,15 +1025,18 @@ def _import_state_inner(state_code: str) -> dict:
     t0 = time.time()
 
     if fmt == 'fl_dbpr':
-        print(f"[V238] {state_code}: fetching {config['name']}", flush=True)
-        index = _fetch_fl_dbpr(config)
+        # V244 P0: swapped from the load-all-then-process _fetch_fl_dbpr
+        # path (which held three ~50MB CSVs + two in-memory indexes
+        # simultaneously and OOM'd Render twice) to a streaming
+        # pipeline that never materializes a licensee CSV as a list.
+        print(f"[V244] {state_code}: streaming {config['name']}", flush=True)
         summary = {
             'state': state_code,
             'strategy': config.get('match_strategy', 'name_fuzzy'),
         }
-        summary['by_name'] = _enrich_fl_profiles(state_code, config, index)
+        summary['by_name'] = _import_fl_streaming(state_code, config)
         summary['elapsed_seconds'] = round(time.time() - t0, 2)
-        print(f"[V238] {state_code}: import complete — {summary}", flush=True)
+        print(f"[V244] {state_code}: import complete — {summary}", flush=True)
         return summary
 
     if fmt == 'aspnet_csv':
