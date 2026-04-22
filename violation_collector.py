@@ -477,6 +477,60 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V239b: Orlando FL — Socrata, 249K code enforcement cases, fresh through
+    # 2026-04-21. Orlando has 1,681 contractor profiles already; pairing
+    # violations with profiles lifts the page to "has all three data
+    # dimensions" once FL DBPR fills in phones.
+    'orlando': {
+        'prod_city_id': None,
+        'city': 'Orlando',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'domain': 'data.cityoforlando.net',
+                'resource_id': 'k6e8-nw6w',
+                'date_field': 'casedt',
+                'id_field': 'apno',
+                'description_field': 'case_comments',
+                'status_field': 'caseinfostatus',
+                'type_field': 'case_type',
+                # location_notes is the clean street address variant —
+                # derived_address bakes " ORLANDO FL" into the field and
+                # sorts badly downstream. casename is a description.
+                'address_fields': {'full': 'location_notes'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V239b: Mesa AZ — Socrata, 78K code enforcement cases, fresh through
+    # 2026-04-20. (V197 Phase 2 previously noted "0 violation hits" under
+    # Mesa, but that search used the old Socrata catalog domain — the live
+    # dataset is at data.mesaaz.gov/resource/hgf6-yenu.) Mesa has ~8.4K
+    # contractor profiles, so violations here unlock a lot of page value.
+    'mesa-az-accela': {
+        'prod_city_id': None,
+        'city': 'Mesa',
+        'state': 'AZ',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'domain': 'data.mesaaz.gov',
+                'resource_id': 'hgf6-yenu',
+                'date_field': 'opened_date',
+                'id_field': 'record_id',
+                'description_field': 'description',
+                'status_field': 'status',
+                'type_field': 'permit_type',
+                'address_fields': {'full': 'case_address'},
+                'zip_field': 'case_zip',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
     # V198: Charlotte NC — ArcGIS, fresh (sampled 2026-04-18)
     'charlotte-nc': {
         'prod_city_id': None,
