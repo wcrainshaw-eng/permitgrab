@@ -2146,6 +2146,74 @@ def admin_enrich_cities():
     return jsonify(_do_enrich(slugs, batch_size))
 
 
+@app.route('/api/admin/license-import', methods=['POST'])
+def admin_license_import():
+    """V237 PR#1: download a state's contractor-license open-data CSV and
+    enrich contractor_profiles.
+
+    Body: {"state": "OR", "async": true|false (default true)}
+    Response (async): 202 {"status":"started", "job_id":..., "state":...}
+    Response (sync):  200 {"state":..., "source_rows":..., "by_license":{...}, ...}
+
+    The Portland profile set has contractor_name_raw populated with raw
+    CCB license numbers rather than business names, so no fuzzy matching
+    is needed — this import does a direct license-number lookup against
+    Oregon's open-data feed and rewrites both contractor_profiles AND
+    the permits table with the real business name + phone.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.get_json() or {}
+    state = (data.get('state') or '').upper().strip()
+    if not state:
+        return jsonify({'error': 'state required'}), 400
+
+    async_param = data.get('async')
+    run_async = True if async_param is None else (
+        str(async_param).lower() in ('1', 'true', 'yes')
+    )
+
+    from license_enrichment import import_state, STATE_CONFIGS
+    if state not in STATE_CONFIGS:
+        return jsonify({
+            'error': f'unknown state {state!r}',
+            'available': sorted(STATE_CONFIGS.keys()),
+        }), 400
+
+    if run_async:
+        import uuid as _uuid
+        job_id = _uuid.uuid4().hex[:12]
+        def _bg():
+            try:
+                result = import_state(state)
+                print(f"[V237] license-import job {job_id} COMPLETE: {result}",
+                      flush=True)
+            except Exception as e:
+                import traceback as _tb
+                print(f"[V237] license-import job {job_id} ERROR: {e}",
+                      flush=True)
+                _tb.print_exc()
+        threading.Thread(target=_bg, daemon=True,
+                         name=f'license_import_{state}').start()
+        return jsonify({
+            'status': 'started',
+            'async': True,
+            'job_id': job_id,
+            'state': state,
+            'message': 'running in background — poll enrichment_log or '
+                       'contractor_profiles for progress',
+        }), 202
+
+    try:
+        result = import_state(state)
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'state': state}), 500
+
+
 @app.route('/api/admin/dashboard', methods=['GET'])
 def admin_dashboard():
     """V226 T9: Combined one-stop status page — aggregates everything.
