@@ -75,6 +75,54 @@ STATE_CONFIGS = {
                        'corvallis', 'medford'],
         'socrata_state_filter': "state='OR'",
     },
+    'CA': {
+        # V240b: California Contractors State License Board — License
+        # Master. Free public download, but delivered via an ASP.NET
+        # WebForms page that requires a multi-step postback (ViewState +
+        # __EVENTTARGET). 200K+ active/renewable licenses statewide,
+        # phone numbers included. Unlocks San Jose (1 phone → 500+?),
+        # LA, SF, San Diego, Sacramento, all other CA cities.
+        #
+        # Field_map column names are educated guesses based on CSLB's
+        # documentation. The _fetch_aspnet_csv helper prints the real
+        # header row on every run so the map can be corrected if the
+        # first run reports mismatches.
+        'name': 'California CSLB License Master',
+        'format': 'aspnet_csv',
+        'download_url': 'https://www.cslb.ca.gov/onlineservices/dataportal/ContractorList',
+        'aspnet_steps': [
+            # Step 1: pick "License Master" from the dropdown.
+            {
+                'eventtarget': 'ctl00$MainContent$ddlStatus',
+                'fields': {
+                    'ctl00$MainContent$ddlStatus': 'License Master',
+                },
+            },
+            # Step 2: click the CSV download LinkButton.
+            {
+                'eventtarget': 'ctl00$MainContent$lbMasterCSV',
+                'fields': {
+                    'ctl00$MainContent$ddlStatus': 'License Master',
+                },
+            },
+        ],
+        'match_strategy': 'name',
+        'field_map': {
+            'license_number': 'LicenseNo',
+            'business_name': 'BusinessName',
+            'phone': 'BusinessPhone',
+            'address': 'MailingAddress',
+            'city': 'City',
+            'state': 'State',
+            'zip': 'ZIPCode',
+            'license_type': 'Classifications',
+            'license_exp': 'ExpirationDate',
+        },
+        'city_slugs': ['san-jose', 'los-angeles', 'san-francisco',
+                       'san-diego', 'sacramento', 'oakland', 'fresno',
+                       'long-beach', 'anaheim', 'santa-ana',
+                       'bakersfield', 'riverside-ca', 'stockton'],
+    },
     'NY': {
         # V240: New York DOL Registered Public Work Contractors.
         # Socrata, ~13K active records, verified phone field. Covers
@@ -308,6 +356,100 @@ def _is_expired(lic_exp_date: str | None) -> bool:
         except ValueError:
             continue
     return False
+
+
+def _fetch_aspnet_csv(config: dict) -> list[dict]:
+    """V240b: download a CSV from an ASP.NET WebForms page that requires
+    a multi-step postback sequence (ViewState + __EVENTTARGET).
+
+    Used for CA CSLB's dataportal/ContractorList — the actual download
+    link is a LinkButton that posts back to the same URL, so we have to
+    round-trip ViewState through each step, then capture the CSV body
+    from the final response.
+
+    `config` must supply:
+      - 'download_url': the ASP.NET page URL
+      - 'aspnet_steps': list of form postbacks to execute in order.
+        Each step is a dict with either:
+          * 'fields': {name: value, ...}        — extra form fields merged in
+          * 'eventtarget': '<asp-control-id>'   — __EVENTTARGET value
+    """
+    from bs4 import BeautifulSoup
+
+    url = config['download_url']
+    steps = config.get('aspnet_steps', [])
+
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': ('Mozilla/5.0 (X11; Linux x86_64) '
+                       'AppleWebKit/537.36 (KHTML, like Gecko) '
+                       'Chrome/120 Safari/537.36'),
+    })
+
+    def _viewstate_payload(html: str) -> dict:
+        """Extract the three ViewState fields that every ASP.NET
+        postback needs. Returns empty dict if the page doesn't have
+        them (unusual — would indicate a redirect or error page)."""
+        soup = BeautifulSoup(html, 'html.parser')
+        payload = {}
+        for name in ('__VIEWSTATE', '__VIEWSTATEGENERATOR',
+                     '__EVENTVALIDATION', '__VIEWSTATEENCRYPTED'):
+            tag = soup.find('input', {'name': name})
+            if tag and tag.get('value') is not None:
+                payload[name] = tag['value']
+        return payload
+
+    # Step 0: GET the page to seed cookies + ViewState.
+    resp = session.get(url, timeout=CSV_DOWNLOAD_TIMEOUT)
+    resp.raise_for_status()
+    state = _viewstate_payload(resp.text)
+
+    last_resp = resp
+    for i, step in enumerate(steps):
+        form = dict(state)
+        form.setdefault('__EVENTTARGET', step.get('eventtarget', ''))
+        form.setdefault('__EVENTARGUMENT', '')
+        for k, v in (step.get('fields') or {}).items():
+            form[k] = v
+        if 'eventtarget' in step:
+            form['__EVENTTARGET'] = step['eventtarget']
+        print(f"[V240b] aspnet step {i+1}/{len(steps)}: "
+              f"EVENTTARGET={form.get('__EVENTTARGET','')!r}", flush=True)
+        resp = session.post(url, data=form,
+                            timeout=CSV_DOWNLOAD_TIMEOUT,
+                            allow_redirects=True)
+        resp.raise_for_status()
+        last_resp = resp
+        # If the server handed back a CSV (by Content-Type or -Disposition)
+        # we're done — the next step is irrelevant.
+        ct = resp.headers.get('Content-Type', '').lower()
+        cd = resp.headers.get('Content-Disposition', '').lower()
+        if 'csv' in ct or 'attachment' in cd or '.csv' in cd:
+            print(f"[V240b] received CSV after step {i+1} "
+                  f"({len(resp.content):,} bytes)", flush=True)
+            break
+        # Otherwise parse the new ViewState for the next postback.
+        state = _viewstate_payload(resp.text)
+
+    body = last_resp.content
+    try:
+        text = body.decode('utf-8')
+    except UnicodeDecodeError:
+        text = body.decode('latin-1')
+
+    # Diagnostic: print the header line so Cowork can cross-check
+    # field_map against the actual CSV columns without waiting for a
+    # match-rate analysis.
+    first_line = text.split('\n', 1)[0] if text else ''
+    print(f"[V240b] CSV header: {first_line[:400]}", flush=True)
+
+    reader = csv.DictReader(io.StringIO(text))
+    rows = []
+    for row in reader:
+        if not row:
+            continue
+        rows.append({k: (v or '').strip() for k, v in row.items() if k})
+    return rows
 
 
 def _fetch_csv_with_header(url: str) -> list[dict]:
@@ -765,6 +907,31 @@ def import_state(state_code: str) -> dict:
         summary['by_name'] = _enrich_fl_profiles(state_code, config, index)
         summary['elapsed_seconds'] = round(time.time() - t0, 2)
         print(f"[V238] {state_code}: import complete — {summary}", flush=True)
+        return summary
+
+    if fmt == 'aspnet_csv':
+        # V240b: CA CSLB pattern — the "download" is actually an ASP.NET
+        # postback sequence that eventually returns a CSV body. After
+        # the fetch, reuse the same status-filter + name-match path the
+        # csv_dict format uses.
+        print(f"[V240b] {state_code}: starting ASP.NET download for "
+              f"{config['name']}", flush=True)
+        raw = _fetch_aspnet_csv(config)
+        status_filter = config.get('status_filter')
+        if status_filter:
+            fld = status_filter['field']
+            target = status_filter['value'].upper()
+            raw = [r for r in raw if r.get(fld, '').upper() == target]
+        print(f"[V240b] {state_code}: {len(raw):,} rows post-filter "
+              f"in {time.time()-t0:.1f}s", flush=True)
+        summary = {
+            'state': state_code,
+            'source_rows': len(raw),
+            'strategy': config.get('match_strategy', 'name'),
+        }
+        summary['by_name'] = _enrich_by_name(state_code, config, {}, raw)
+        summary['elapsed_seconds'] = round(time.time() - t0, 2)
+        print(f"[V240b] {state_code}: import complete — {summary}", flush=True)
         return summary
 
     if fmt == 'csv_dict':
