@@ -12100,6 +12100,68 @@ def _get_top_contractors_for_city(city_slug, limit=25):
         conn.close()
 
 
+def _get_market_insights(prod_city_id=None, city_name=None, city_state=None):
+    """V236 PR#5: compute a data-driven blurb for the city page —
+    permits filed in the last 30 days, top-3 trade categories, and
+    average project value. Rendered as a paragraph on each city
+    landing page so pages aren't all identical template boilerplate
+    (Google Ads Quality Score + SEO anti-doorway-page).
+
+    Returns None if we can't compute (falls back to static prose).
+    """
+    if not prod_city_id and not city_name:
+        return None
+    _conn = permitdb.get_connection()
+    try:
+        if prod_city_id:
+            count_row = _conn.execute("""
+                SELECT COUNT(*) as cnt, COALESCE(AVG(CASE WHEN estimated_cost > 0
+                                                        THEN estimated_cost END), 0) as avg_cost
+                FROM permits
+                WHERE prod_city_id = ?
+                  AND filing_date >= date('now', '-30 days')
+            """, (prod_city_id,)).fetchone()
+            trade_rows = _conn.execute("""
+                SELECT COALESCE(NULLIF(trade_category,''), 'General Construction') as trade,
+                       COUNT(*) as cnt
+                FROM permits
+                WHERE prod_city_id = ?
+                  AND filing_date >= date('now', '-30 days')
+                GROUP BY trade_category
+                ORDER BY cnt DESC
+                LIMIT 3
+            """, (prod_city_id,)).fetchall()
+        else:
+            count_row = _conn.execute("""
+                SELECT COUNT(*) as cnt, COALESCE(AVG(CASE WHEN estimated_cost > 0
+                                                        THEN estimated_cost END), 0) as avg_cost
+                FROM permits
+                WHERE city = ? AND state = ?
+                  AND filing_date >= date('now', '-30 days')
+            """, (city_name, city_state or '')).fetchone()
+            trade_rows = _conn.execute("""
+                SELECT COALESCE(NULLIF(trade_category,''), 'General Construction') as trade,
+                       COUNT(*) as cnt
+                FROM permits
+                WHERE city = ? AND state = ?
+                  AND filing_date >= date('now', '-30 days')
+                GROUP BY trade_category
+                ORDER BY cnt DESC
+                LIMIT 3
+            """, (city_name, city_state or '')).fetchall()
+    except Exception:
+        return None
+    if not count_row or not count_row['cnt']:
+        return None
+    trades = [(r['trade'], r['cnt']) for r in trade_rows]
+    avg_cost = count_row['avg_cost']
+    return {
+        'permits_30d': count_row['cnt'],
+        'top_trades': trades,
+        'avg_project_value': int(avg_cost) if avg_cost else None,
+    }
+
+
 def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
     # V157: Slug aliases for cities where URL slug differs from DB slug.
@@ -12309,8 +12371,12 @@ def city_landing_inner(city_slug):
         robots_directive = "noindex, follow"
         is_coming_soon = True
     else:
-        # V12.5: noindex for empty city pages to avoid thin content in Google
-        robots_directive = "noindex, follow" if permit_count == 0 else "index, follow"
+        # V12.5 → V236 PR#6: noindex thin pages. Pre-V236 only gated at
+        # 0 permits, but Google de-indexes programmatic pages with ≤20
+        # records worth of content. Lifting the bar to 20 keeps our
+        # index clean and concentrates crawl budget on pages that have
+        # enough data to rank for "<city> building permits" queries.
+        robots_directive = "noindex, follow" if permit_count < 20 else "index, follow"
         # V12.11: Coming Soon flag for empty cities
         is_coming_soon = permit_count == 0
 
@@ -12492,6 +12558,13 @@ def city_landing_inner(city_slug):
         except Exception:
             _freshness_age_days = None
 
+    # V236 PR#5: per-city market insights for the data-driven paragraph.
+    market_insights = _get_market_insights(
+        prod_city_id=_prod_city_id,
+        city_name=filter_name,
+        city_state=filter_state,
+    )
+
     return render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         city_name=config['name'],
@@ -12543,6 +12616,7 @@ def city_landing_inner(city_slug):
         is_active=not is_coming_soon,
         violations=[],
         violations_count=0,
+        market_insights=market_insights,  # V236 PR#5
     )
 
 
@@ -12731,8 +12805,8 @@ def state_city_landing(state_slug, city_slug):
     meta_title = _SEO_TITLES.get(_key, f"{display_name}, {state_name} Building Permits | PermitGrab")
     meta_description = _SEO_METAS.get(_key, f"Browse recent building permits in {display_name}, {state_name}. Track new construction, renovations, and remodeling permits updated daily. Built for contractors and builders.")
 
-    # Robots directive
-    robots_directive = "index, follow" if permit_count > 0 and is_active else "noindex, follow"
+    # Robots directive — V236 PR#6: thin-page suppression at <20 permits.
+    robots_directive = "index, follow" if permit_count >= 20 and is_active else "noindex, follow"
 
     # Canonical URL — use the canonical state slug so /permits/new-york/..
     # and /permits/new-york-state/.. both point at the same canonical.
@@ -12794,6 +12868,12 @@ def state_city_landing(state_slug, city_slug):
     # 500ing before the V229 hotfix). Aliases and zero-defaults are fine
     # for the stats we don't compute here; the primary route can fill in
     # richer values.
+    # V236 PR#5: data-driven insights paragraph.
+    market_insights = _get_market_insights(
+        prod_city_id=prod_city_id,
+        city_name=city_name,
+        city_state=city_state,
+    )
     return render_template('city_landing_v77.html',
         city_name=display_name,
         city_slug=city_slug,
@@ -12845,6 +12925,7 @@ def state_city_landing(state_slug, city_slug):
         top_neighborhoods=[],
         city_blog_url=None,
         top_trades=[],
+        market_insights=market_insights,  # V236 PR#5
     )
 
 

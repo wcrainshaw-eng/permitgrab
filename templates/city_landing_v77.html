@@ -714,6 +714,20 @@ body {
   </div>
 </section>
 
+{# V236 PR#5: data-driven insights paragraph — unique per-city prose so
+   Google Ads Quality Score and SEO see real content instead of template
+   boilerplate. Suppressed silently when we don't have 30-day data
+   (thin pages / new cities) so the hero flows straight into the CTA. #}
+{% if market_insights is defined and market_insights and market_insights.permits_30d > 0 %}
+<section style="background: var(--gray-50); border-bottom: 1px solid var(--gray-200); padding: 18px 32px;">
+  <div style="max-width: 1200px; margin: 0 auto; font-size: 15px; line-height: 1.55; color: var(--gray-700);">
+    <strong>{{ city_name }}</strong> had <strong>{{ market_insights.permits_30d }}</strong> new building permits filed in the last 30 days{% if market_insights.top_trades %}, led by
+    {% for t in market_insights.top_trades %}{{ t[1] }} {{ t[0]|lower }}{% if not loop.last %}{% if loop.revindex0 == 1 %} and {% else %}, {% endif %}{% endif %}{% endfor %}
+    {%- endif -%}{% if market_insights.avg_project_value %}. The average project value is ${{ "{:,.0f}".format(market_insights.avg_project_value) }}{% endif %}.
+  </div>
+</section>
+{% endif %}
+
 <!-- V211-1: Inline email capture — writes to /api/subscribe which already
      backs the User digest system (Postgres) — no new table needed -->
 <section class="email-capture" id="email-capture">
