@@ -75,6 +75,40 @@ STATE_CONFIGS = {
                        'corvallis', 'medford'],
         'socrata_state_filter': "state='OR'",
     },
+    'WA': {
+        # V239: Washington L&I Contractor License Data — General. Socrata
+        # SODA endpoint. 74K active licensees statewide, 3,368 in Seattle.
+        # Seattle's contractor_profiles are sparse (~30) because the
+        # upstream Seattle permits feed publishes contractor names on
+        # only ~108 of ~190K records — so this import is mostly about
+        # populating phones on the 30 profiles we do have. Running the
+        # import statewide (not just Seattle) also primes a cache for
+        # any WA city we add later.
+        'name': 'Washington L&I Contractor License',
+        'format': 'socrata',
+        'socrata_url': 'https://data.wa.gov/resource/m8qx-ubtq.json',
+        'match_strategy': 'name',
+        'field_map': {
+            # NOTE: Cowork's V239 doc referenced businesscity/businessstate
+            # but the live dataset uses 'city'/'state'/'zip'. Verified
+            # via the Socrata column inspect 2026-04-22.
+            'license_number': 'contractorlicensenumber',
+            'business_name': 'businessname',
+            'phone': 'phonenumber',
+            'address': 'address1',
+            'city': 'city',
+            'state': 'state',
+            'zip': 'zip',
+            'license_type': 'contractorlicensetypecodedesc',
+            'license_exp': 'licenseexpirationdate',
+        },
+        # Pre-filter to active licenses only — expired/suspended numbers
+        # aren't useful contractor leads. No city filter at the Socrata
+        # layer because `_enrich_by_name` is already city-scoped against
+        # contractor_profiles.source_city_key.
+        'socrata_state_filter': "contractorlicensestatus='ACTIVE'",
+        'city_slugs': ['seattle', 'seattle-wa'],
+    },
     'FL': {
         # V238: Florida DBPR publishes three separate headerless CSVs.
         # The applicant file carries phones; the licensee files carry
