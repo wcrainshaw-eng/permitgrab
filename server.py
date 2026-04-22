@@ -2227,6 +2227,15 @@ def admin_enrich_cities():
     return jsonify(_do_enrich(slugs, batch_size))
 
 
+# V241 P4: global serialization lock for license-import. Each state's
+# CSV is 13K-500K rows; loading several concurrently OOM'd the Render
+# worker (auto-restart 2026-04-22 after 5-state parallel trigger).
+# Only one import may run at a time; a second request returns 409 with
+# the state of the in-flight job.
+_LICENSE_IMPORT_LOCK = threading.Lock()
+_LICENSE_IMPORT_IN_FLIGHT = {'state': None, 'job_id': None, 'started_at': None}
+
+
 @app.route('/api/admin/license-import', methods=['POST'])
 def admin_license_import():
     """V237 PR#1: download a state's contractor-license open-data CSV and
@@ -2235,12 +2244,11 @@ def admin_license_import():
     Body: {"state": "OR", "async": true|false (default true)}
     Response (async): 202 {"status":"started", "job_id":..., "state":...}
     Response (sync):  200 {"state":..., "source_rows":..., "by_license":{...}, ...}
+    Response (busy):  409 {"error":"import in progress", "state":..., "job_id":...}
 
-    The Portland profile set has contractor_name_raw populated with raw
-    CCB license numbers rather than business names, so no fuzzy matching
-    is needed — this import does a direct license-number lookup against
-    Oregon's open-data feed and rewrites both contractor_profiles AND
-    the permits table with the real business name + phone.
+    V241 P4: a threading.Lock gates every invocation (sync and async).
+    Concurrent imports OOM'd Render's worker — the serialization keeps
+    at most one state's CSV in memory at a time.
     """
     valid, error = check_admin_key()
     if not valid:
@@ -2262,9 +2270,26 @@ def admin_license_import():
             'available': sorted(STATE_CONFIGS.keys()),
         }), 400
 
+    # V241 P4: non-blocking try-acquire so a busy request rejects
+    # immediately rather than hanging the caller for the entire
+    # download.
+    if not _LICENSE_IMPORT_LOCK.acquire(blocking=False):
+        return jsonify({
+            'error': 'license-import already in progress',
+            'in_flight': dict(_LICENSE_IMPORT_IN_FLIGHT),
+            'requested_state': state,
+            'hint': 'wait for the current job to finish; check logs for '
+                    'COMPLETE: {state: ...} before retrying',
+        }), 409
+
     if run_async:
         import uuid as _uuid
+        from datetime import datetime as _dt
         job_id = _uuid.uuid4().hex[:12]
+        _LICENSE_IMPORT_IN_FLIGHT['state'] = state
+        _LICENSE_IMPORT_IN_FLIGHT['job_id'] = job_id
+        _LICENSE_IMPORT_IN_FLIGHT['started_at'] = _dt.utcnow().isoformat()
+
         def _bg():
             try:
                 result = import_state(state)
@@ -2275,6 +2300,12 @@ def admin_license_import():
                 print(f"[V237] license-import job {job_id} ERROR: {e}",
                       flush=True)
                 _tb.print_exc()
+            finally:
+                _LICENSE_IMPORT_IN_FLIGHT['state'] = None
+                _LICENSE_IMPORT_IN_FLIGHT['job_id'] = None
+                _LICENSE_IMPORT_IN_FLIGHT['started_at'] = None
+                _LICENSE_IMPORT_LOCK.release()
+
         threading.Thread(target=_bg, daemon=True,
                          name=f'license_import_{state}').start()
         return jsonify({
@@ -2286,6 +2317,7 @@ def admin_license_import():
                        'contractor_profiles for progress',
         }), 202
 
+    # Sync path — lock already held; release after the import completes.
     try:
         result = import_state(state)
         return jsonify(result)
@@ -2293,6 +2325,8 @@ def admin_license_import():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e), 'state': state}), 500
+    finally:
+        _LICENSE_IMPORT_LOCK.release()
 
 
 @app.route('/api/admin/dashboard', methods=['GET'])
