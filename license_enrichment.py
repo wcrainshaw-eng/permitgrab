@@ -552,57 +552,140 @@ def _fetch_csv_no_header(url: str, columns: list[str]) -> list[dict]:
     return rows
 
 
-def _iter_csv_no_header(url: str, columns: list[str]):
-    """V244: generator variant of `_fetch_csv_no_header`. Downloads the
-    whole CSV in one shot (V242's non-streaming fix still applies) but
-    yields rows one at a time so callers that just scan once never
-    materialize a 100K-dict list. The FL DBPR import pipeline used to
-    hold three such lists in memory simultaneously and blew past
-    Render's 512MB limit — see V244 P0."""
+def _download_csv_to_tmp(url: str) -> str:
+    """V244c: download a CSV to a /tmp file so the bytes never live
+    permanently in the Python heap. V244's in-memory streaming
+    approach still OOM'd Render's 512MB worker because
+    `requests.get().content` + `body.decode()` + `io.StringIO(text)`
+    held ~200MB per CSV in flight. Writing to disk drops the peak to
+    the size of `response.content` (which we delete immediately after
+    writing) plus any Python allocator residual.
+
+    Returns the tempfile path. Caller is responsible for unlinking
+    the file when done.
+    """
+    import os as _os
+    import tempfile as _tempfile
     r = requests.get(url, timeout=(30, 300))
     r.raise_for_status()
     body = r.content
-    print(f"[V244] downloaded {len(body):,} bytes from {url}", flush=True)
+    fd, path = _tempfile.mkstemp(prefix='fl_dbpr_', suffix='.csv')
     try:
-        text = body.decode('utf-8')
-    except UnicodeDecodeError:
-        text = body.decode('latin-1')
-    # Release the bytes as soon as we've got the string. Peak for the
-    # body step is body + text briefly; once `body` is dropped only
-    # `text` lives on.
+        with _os.fdopen(fd, 'wb') as fp:
+            fp.write(body)
+    except Exception:
+        try:
+            _os.unlink(path)
+        except Exception:
+            pass
+        raise
+    size = len(body)
     del body
-    reader = csv.reader(io.StringIO(text), skipinitialspace=True)
+    import gc as _gc
+    _gc.collect()
+    print(f"[V244c] wrote {size:,} bytes from {url} to {path}", flush=True)
+    return path
+
+
+def _iter_csv_no_header_from_file(path: str, columns: list[str]):
+    """V244c: stream-parse a CSV file from disk with the same
+    positional-column schema the DBPR files use. Never materializes
+    the full response body — reads the file line-by-line."""
     n_cols = len(columns)
     row_count = 0
-    for raw_row in reader:
-        if not raw_row:
-            continue
-        row_vals = (raw_row + [''] * n_cols)[:n_cols]
-        yield {columns[i]: (row_vals[i] or '').strip()
-               for i in range(n_cols)}
-        row_count += 1
-    print(f"[V244] yielded {row_count:,} rows from {url}", flush=True)
+    # latin-1 never errors (it's a single-byte encoding), so we skip
+    # the utf-8-first-then-fallback dance here. Every FL DBPR row the
+    # collector has seen decodes cleanly via latin-1.
+    with open(path, encoding='latin-1', newline='') as fp:
+        for raw_row in csv.reader(fp, skipinitialspace=True):
+            if not raw_row:
+                continue
+            row_vals = (raw_row + [''] * n_cols)[:n_cols]
+            yield {columns[i]: (row_vals[i] or '').strip()
+                   for i in range(n_cols)}
+            row_count += 1
+    print(f"[V244c] iterated {row_count:,} rows from {path}", flush=True)
 
 
-def _build_fl_applicant_phone_index(applicants) -> dict:
-    """Map normalized "FIRST LAST" → best phone number from the
-    applicants file. If multiple applicants share a name we keep the
-    first phone we see (DBPR doesn't publish a dedup key).
+def _iter_csv_no_header(url: str, columns: list[str]):
+    """V244 compatibility shim. Downloads to /tmp and streams from
+    disk — the in-memory variant from V244 still OOM'd on FL DBPR
+    even after the dict-list-removal refactor."""
+    import os as _os
+    path = _download_csv_to_tmp(url)
+    try:
+        yield from _iter_csv_no_header_from_file(path, columns)
+    finally:
+        try:
+            _os.unlink(path)
+        except Exception:
+            pass
 
-    V244: accepts any iterable of dicts so the caller can stream the
-    CSV instead of materializing it.
+
+def _build_fl_applicant_phone_sqlite(applicants_csv_path: str,
+                                     applicant_columns: list[str]) -> str:
+    """V244c: write applicant phones to a /tmp SQLite DB instead of an
+    in-memory dict. Prior versions kept ~100K name→phone entries in a
+    Python dict — with per-entry overhead that was pushing 30-50MB on
+    its own and contributing to the 512MB OOM.
+
+    SQLite on disk has near-zero resident memory (OS page cache aside)
+    and a single indexed lookup per licensee row is fast enough to not
+    dominate runtime.
+
+    Returns the SQLite DB path. Caller owns cleanup.
     """
-    idx = {}
-    for r in applicants:
-        first = r.get('first_name', '').strip()
-        last = r.get('last_name', '').strip()
-        phone = _format_phone(r.get('phone', ''))
+    import os as _os
+    import sqlite3 as _sq
+    import tempfile as _tempfile
+
+    fd, db_path = _tempfile.mkstemp(prefix='fl_dbpr_phone_', suffix='.db')
+    _os.close(fd)
+    conn = _sq.connect(db_path)
+    conn.execute('PRAGMA journal_mode = OFF')
+    conn.execute('PRAGMA synchronous = OFF')
+    conn.execute('''
+        CREATE TABLE applicant_phones (
+            name_norm TEXT PRIMARY KEY,
+            phone TEXT NOT NULL
+        )
+    ''')
+
+    inserted = 0
+    skipped = 0
+    batch: list[tuple] = []
+    BATCH = 2000
+    for row in _iter_csv_no_header_from_file(applicants_csv_path, applicant_columns):
+        first = row.get('first_name', '').strip()
+        last = row.get('last_name', '').strip()
+        phone = _format_phone(row.get('phone', ''))
         if not first or not last or not phone:
+            skipped += 1
             continue
         key = _norm(f'{first} {last}')
-        if key and key not in idx:
-            idx[key] = phone
-    return idx
+        if not key:
+            skipped += 1
+            continue
+        batch.append((key, phone))
+        if len(batch) >= BATCH:
+            conn.executemany(
+                'INSERT OR IGNORE INTO applicant_phones(name_norm, phone) VALUES (?, ?)',
+                batch,
+            )
+            inserted += conn.total_changes  # approximate
+            batch.clear()
+    if batch:
+        conn.executemany(
+            'INSERT OR IGNORE INTO applicant_phones(name_norm, phone) VALUES (?, ?)',
+            batch,
+        )
+    conn.commit()
+    row = conn.execute('SELECT COUNT(*) FROM applicant_phones').fetchone()
+    total = row[0] if row else 0
+    conn.close()
+    print(f"[V244c] applicant phone SQLite: {total:,} rows at {db_path} "
+          f"(skipped {skipped:,})", flush=True)
+    return db_path
 
 
 def _normalize_city(raw: str) -> str:
@@ -685,120 +768,169 @@ def _commit_fl_batch(batch: list[tuple], state_code: str) -> int:
 
 
 def _import_fl_streaming(state_code: str, config: dict) -> dict:
-    """V244: streaming FL DBPR import.
+    """V244c: disk-backed FL DBPR import.
 
-    Pipeline:
-      1. Load profile_idx from DB (small — 10-20K variants).
-      2. Stream applicants CSV → applicant_phone_idx (name → phone).
-         ~100K entries, bounded to the applicants with valid phones.
-      3. Stream certified + registered CSVs one row at a time:
-         - check licensee_name / dba_name against profile_idx
-         - on hit, resolve phone via applicant_phone_idx (person-name
-           licensees only — DBPR's business licensees don't have their
-           own phone in the applicant file; qualifiers do)
-         - stage (profile_id, phone, license_number, status)
-         - commit in batches of 500 to bound open-transaction size
-      4. Final flush of the last partial batch.
+    V244's in-memory streaming STILL OOM'd Render's 512MB worker.
+    Peak was ~200MB per CSV because `requests.get().content` +
+    `.decode()` + `io.StringIO(text)` kept multiple copies of the
+    body in Python heap. Plus a ~100K-entry applicant phone dict
+    with Python's per-entry overhead was another 50MB. Combined with
+    daemon/Flask/Python runtime (~120MB baseline), peak exceeded 512MB.
 
-    Peak memory: profile_idx (~3MB) + applicant_phone_idx (~15MB) +
-    currently-decoded CSV (~150MB for the one file in flight) ≈ 170MB.
-    Prior load-all-then-process pattern hit 800MB+ and OOM'd Render.
+    New pipeline (V244c):
+      1. Load profile_idx from DB (small — 10-20K string→int dict).
+      2. Download each CSV to a /tmp file via non-streaming `.content`,
+         then immediately `del body` and `gc.collect()` so the bytes
+         don't linger in the Python heap.
+      3. Build the applicant phone index as a /tmp SQLite DB rather
+         than a Python dict — near-zero resident memory, indexed
+         lookups are fast enough.
+      4. Stream each licensee CSV from disk, match against
+         profile_idx (in-memory), resolve phone via SQLite lookup,
+         stage updates in 500-row batches, commit per batch.
+      5. Clean up all /tmp files in `finally`.
+
+    Peak memory: profile_idx (~5MB) + one CSV's `body` in flight
+    during download (~50MB, released right after write) + SQLite
+    DB handle + Python runtime overhead ≈ 60-80MB. Well under 512MB
+    even with Flask + daemon co-resident.
     """
+    import os as _os
+    import sqlite3 as _sq
+    import gc as _gc
+
     urls = config['source_urls']
     slugs = config['city_slugs']
     profile_idx = _build_fl_profile_index(slugs)
     if not profile_idx:
-        print(f"[V244] FL: no FL profiles pending — nothing to match",
+        print(f"[V244c] FL: no FL profiles pending — nothing to match",
               flush=True)
         return {
             'candidates': 0, 'matched': 0,
-            'licensees': 0, 'applicants': 0, 'phone_index_size': 0,
+            'licensees': 0, 'applicants_phone_indexed': 0,
         }
 
-    # Phase 2: build the applicant phone index by streaming the CSV.
-    print(f"[V244] FL: streaming applicants CSV for phone index…", flush=True)
-    applicant_phone_idx = _build_fl_applicant_phone_index(
-        _iter_csv_no_header(urls['applicants'], config['applicant_columns'])
-    )
-    print(f"[V244] FL: applicant phone index: {len(applicant_phone_idx):,} entries",
-          flush=True)
+    tmp_paths: list[str] = []
+    phone_db_path: str | None = None
+    phone_conn = None
+    try:
+        # Phase 2a: download applicants + build phone SQLite.
+        print(f"[V244c] FL: downloading applicants CSV…", flush=True)
+        applicants_path = _download_csv_to_tmp(urls['applicants'])
+        tmp_paths.append(applicants_path)
+        phone_db_path = _build_fl_applicant_phone_sqlite(
+            applicants_path, config['applicant_columns']
+        )
+        # Applicants CSV no longer needed — its data is now in SQLite.
+        try:
+            _os.unlink(applicants_path)
+            tmp_paths.remove(applicants_path)
+        except Exception:
+            pass
+        _gc.collect()
 
-    # Phase 3: stream both licensee CSVs, match, stage, batch-commit.
-    matched_total = 0
-    licensee_count = 0
-    batch: list[tuple] = []
-    BATCH_SIZE = 500
-    # Track which profiles we've already updated so one profile doesn't
-    # get hit twice (certified + registered entries for the same
-    # contractor).
-    updated_ids: set = set()
+        phone_conn = _sq.connect(phone_db_path)
+        phone_conn.row_factory = None  # tuple rows, one column
 
-    for csv_key in ('certified', 'registered'):
-        url = urls[csv_key]
-        print(f"[V244] FL: streaming {csv_key} licensees…", flush=True)
-        for lic in _iter_csv_no_header(url, config['licensee_columns']):
-            licensee_count += 1
-            ln_norm = _norm(lic.get('licensee_name', ''))
-            dba_norm = _norm(lic.get('dba_name', ''))
+        def _lookup_phone(name_norm: str) -> str | None:
+            if not name_norm:
+                return None
+            row = phone_conn.execute(
+                'SELECT phone FROM applicant_phones WHERE name_norm = ?',
+                (name_norm,),
+            ).fetchone()
+            return row[0] if row else None
 
-            hit = profile_idx.get(ln_norm) or profile_idx.get(dba_norm)
-            if not hit:
-                continue
-            if hit['id'] in updated_ids:
-                continue
+        # Phase 2b+2c: stream each licensee CSV, match + commit.
+        matched_total = 0
+        licensee_count = 0
+        batch: list[tuple] = []
+        BATCH_SIZE = 500
+        updated_ids: set = set()
 
-            # Prefer city-matched licensees — if the licensee's city
-            # doesn't match the profile's slug and another candidate
-            # might, skip. But profile_idx only stores one profile per
-            # variant, so this is best-effort: drop cross-city hits.
-            lic_city_slug = _normalize_city(lic.get('city', ''))
-            if lic_city_slug and hit['city_slug'] and lic_city_slug != hit['city_slug']:
-                # Only drop when the city-slug actually conflicts. Many
-                # FL profile slugs don't resolve cleanly to a DBPR city
-                # name (e.g. "miami-dade-county" vs DBPR city=MIAMI),
-                # so allow the match when lic_city_slug is a substring
-                # of the profile slug or vice versa.
-                if lic_city_slug not in hit['city_slug'] and hit['city_slug'] not in lic_city_slug:
-                    continue
+        for csv_key in ('certified', 'registered'):
+            print(f"[V244c] FL: downloading {csv_key} licensees…", flush=True)
+            csv_path = _download_csv_to_tmp(urls[csv_key])
+            tmp_paths.append(csv_path)
+            try:
+                for lic in _iter_csv_no_header_from_file(
+                        csv_path, config['licensee_columns']):
+                    licensee_count += 1
+                    ln_norm = _norm(lic.get('licensee_name', ''))
+                    dba_norm = _norm(lic.get('dba_name', ''))
 
-            # Resolve phone via applicant cross-ref. Business licensees
-            # rarely have a phone this way; person-name ones do.
-            phone = applicant_phone_idx.get(ln_norm)
-            if not phone and ',' in lic.get('licensee_name', ''):
-                parts = [p.strip() for p in lic['licensee_name'].split(',', 1)]
-                if len(parts) == 2 and parts[0] and parts[1]:
-                    first = parts[1].split()[0]
-                    phone = applicant_phone_idx.get(_norm(f'{first} {parts[0]}'))
+                    hit = profile_idx.get(ln_norm) or profile_idx.get(dba_norm)
+                    if not hit:
+                        continue
+                    if hit['id'] in updated_ids:
+                        continue
 
-            license_number = lic.get('license_number') or ''
-            primary_status = lic.get('primary_status') or ''
-            secondary_status = lic.get('secondary_status') or ''
-            expiration = lic.get('expiration_date') or ''
-            status_parts = [s for s in (primary_status, secondary_status) if s]
-            if _is_expired(expiration):
-                status_parts.append('expired')
-            license_status = '|'.join(status_parts) if status_parts else 'unknown'
+                    lic_city_slug = _normalize_city(lic.get('city', ''))
+                    if lic_city_slug and hit['city_slug'] and lic_city_slug != hit['city_slug']:
+                        # Allow substring-contains either direction
+                        # (e.g. "miami-dade-county" vs DBPR city="MIAMI").
+                        if lic_city_slug not in hit['city_slug'] and hit['city_slug'] not in lic_city_slug:
+                            continue
 
-            batch.append((hit['id'], phone, license_number, license_status))
-            updated_ids.add(hit['id'])
+                    phone = _lookup_phone(ln_norm)
+                    if not phone and ',' in lic.get('licensee_name', ''):
+                        parts = [p.strip() for p in lic['licensee_name'].split(',', 1)]
+                        if len(parts) == 2 and parts[0] and parts[1]:
+                            first = parts[1].split()[0]
+                            phone = _lookup_phone(_norm(f'{first} {parts[0]}'))
 
-            if len(batch) >= BATCH_SIZE:
-                matched_total += _commit_fl_batch(batch, state_code)
-                print(f"[V244] FL: committed batch, {matched_total:,} matched "
-                      f"so far / {licensee_count:,} licensees scanned",
-                      flush=True)
-                batch = []
+                    license_number = lic.get('license_number') or ''
+                    primary_status = lic.get('primary_status') or ''
+                    secondary_status = lic.get('secondary_status') or ''
+                    expiration = lic.get('expiration_date') or ''
+                    status_parts = [s for s in (primary_status, secondary_status) if s]
+                    if _is_expired(expiration):
+                        status_parts.append('expired')
+                    license_status = '|'.join(status_parts) if status_parts else 'unknown'
 
-    # Final flush.
-    if batch:
-        matched_total += _commit_fl_batch(batch, state_code)
+                    batch.append((hit['id'], phone, license_number, license_status))
+                    updated_ids.add(hit['id'])
 
-    return {
-        'candidates': len(profile_idx),
-        'matched': matched_total,
-        'licensees': licensee_count,
-        'applicants_phone_indexed': len(applicant_phone_idx),
-    }
+                    if len(batch) >= BATCH_SIZE:
+                        matched_total += _commit_fl_batch(batch, state_code)
+                        print(f"[V244c] FL: committed batch, "
+                              f"{matched_total:,} matched / "
+                              f"{licensee_count:,} licensees scanned",
+                              flush=True)
+                        batch = []
+            finally:
+                try:
+                    _os.unlink(csv_path)
+                    tmp_paths.remove(csv_path)
+                except Exception:
+                    pass
+                _gc.collect()
+
+        if batch:
+            matched_total += _commit_fl_batch(batch, state_code)
+
+        row = phone_conn.execute(
+            'SELECT COUNT(*) FROM applicant_phones'
+        ).fetchone()
+        phone_indexed = row[0] if row else 0
+
+        return {
+            'candidates': len(profile_idx),
+            'matched': matched_total,
+            'licensees': licensee_count,
+            'applicants_phone_indexed': phone_indexed,
+        }
+    finally:
+        if phone_conn is not None:
+            try:
+                phone_conn.close()
+            except Exception:
+                pass
+        for p in (tmp_paths + ([phone_db_path] if phone_db_path else [])):
+            try:
+                _os.unlink(p)
+            except Exception:
+                pass
 
 
 def _fetch_socrata(url: str, where: str | None = None) -> list[dict]:
