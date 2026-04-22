@@ -477,6 +477,43 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V243: Phoenix AZ — ArcGIS MapServer TABLE (non-spatial). 25K+
+    # code enforcement cases, 4K+ from 2026, actively maintained. Data
+    # covers wider Phoenix metro (Scottsdale, Glendale, Mesa appear in
+    # the same table) so address_city_filter drops non-Phoenix rows
+    # before insert. The table has no date column — year comes from
+    # the CSM_CASENO prefix (PEF2026-xxxxx) and incremental_where pins
+    # a single year per fetch so we don't haul the whole 25K backlog
+    # on every cycle.
+    'phoenix-az': {
+        'prod_city_id': None,
+        'city': 'Phoenix',
+        'state': 'AZ',
+        'endpoints': [
+            {
+                'name': 'NSD Property Maintenance',
+                'platform': 'arcgis',
+                'arcgis_url': 'https://maps.phoenix.gov/pub/rest/services/Public/NSD_Property_Maintenance/MapServer/0',
+                'mapserver_table': True,
+                'date_field': None,
+                'date_from_id_pattern': r'PEF(\d{4})-\d+',
+                'incremental_where': "CSM_CASENO LIKE 'PEF{YEAR}%'",
+                'orderby': 'ESRI_OID ASC',
+                'id_field': 'CSM_CASENO',
+                'description_field': 'NOTES',
+                'status_field': 'CSM_STATUS',
+                'type_field': None,
+                'fixed_violation_type': 'Property Maintenance',
+                'address_fields': {'full': 'CSM_ADDRESS'},
+                'address_parse': 'phoenix_full',
+                'address_city_filter': 'PHOENIX',
+                'resource_id': 'phoenix-nsd-violations',
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V242 P2: Miami-Dade County FL — ArcGIS FeatureServer. 183K records,
     # refreshed daily; covers unincorporated Miami-Dade. Pairs with the
     # ~4K Miami-Dade contractor profiles (phone-enriched via FL DBPR
@@ -731,7 +768,47 @@ def _parse_date(date_str):
 
 def normalize_violation(record, city_config, endpoint):
     """Map source fields to normalized schema."""
+    # V243: address_parse='phoenix_full' signals that the address field
+    # is "STREET CITY ZIP" all in one string — parse it out and apply
+    # the city_filter so non-Phoenix records (Scottsdale / Glendale /
+    # Mesa) get dropped before insert.
     address = _build_address(record, endpoint['address_fields'])
+    parsed_zip = ''
+    parse_mode = endpoint.get('address_parse')
+    if parse_mode == 'phoenix_full' and address:
+        import re as _re
+        # Greedy street + single-word city + trailing ZIP. Phoenix's
+        # table packs everything into one field as
+        # "STREET STATE_CITY ZIP" — the city is always one token so
+        # `[A-Z]+` (no whitespace) is a tighter match than a lazy run.
+        m = _re.search(
+            r'^(.+?)\s+([A-Z][A-Z]+)\s+(\d{5}(?:-\d{4})?)$',
+            address.strip(),
+        )
+        # Try greedy-street first (single-word city) so "41ST AVE"
+        # stays with the street instead of getting eaten as the city.
+        m2 = _re.search(
+            r'^(.+)\s+([A-Z][A-Z]+)\s+(\d{5}(?:-\d{4})?)$',
+            address.strip(),
+        )
+        m = m2 or m
+        if m:
+            street, city_token, zip_code = m.group(1), m.group(2).strip(), m.group(3)
+            parsed_zip = zip_code
+            required_city = (endpoint.get('address_city_filter') or '').upper()
+            if required_city and city_token.upper() != required_city:
+                # Signal the caller to drop this record.
+                return {
+                    'prod_city_id': city_config['prod_city_id'],
+                    'city': city_config['city'],
+                    'state': city_config['state'],
+                    'source_violation_id': None,
+                    'violation_date': None,
+                    'violation_type': '', 'violation_description': '',
+                    'status': '', 'address': '', 'zip': '',
+                    'latitude': None, 'longitude': None, 'raw_data': '',
+                }
+            address = street
     vid = record.get(endpoint['id_field'], '')
     # V213: Carto endpoints don't set 'resource_id' (they use 'carto_table'
     # + 'carto_base'). Fall back through a sane prefix ladder so the
@@ -745,17 +822,43 @@ def normalize_violation(record, city_config, endpoint):
     )
     source_id = f"{id_prefix}_{vid}" if vid else None
 
+    # V243: Phoenix NSD doesn't expose a date column. Extract the year
+    # from the case-number prefix (PEF2026-13612) and anchor to Jan 1
+    # of that year so the row isn't dropped as dateless.
+    date_val = None
+    date_pattern = endpoint.get('date_from_id_pattern')
+    if date_pattern:
+        import re as _re
+        if vid:
+            m = _re.match(date_pattern, str(vid))
+            if m:
+                try:
+                    year = int(m.group(1))
+                    date_val = f"{year:04d}-01-01"
+                except (ValueError, IndexError):
+                    pass
+    elif endpoint.get('date_field'):
+        date_val = _parse_date(record.get(endpoint['date_field']))
+
+    vtype = endpoint.get('fixed_violation_type') or str(
+        record.get(endpoint.get('type_field', ''), '') or '')[:200]
+    zip_val = ''
+    if endpoint.get('zip_field'):
+        zip_val = str(record.get(endpoint['zip_field'], '') or '')
+    elif parsed_zip:
+        zip_val = parsed_zip
+
     return {
         'prod_city_id': city_config['prod_city_id'],
         'city': city_config['city'],
         'state': city_config['state'],
         'source_violation_id': source_id,
-        'violation_date': _parse_date(record.get(endpoint['date_field'])),
-        'violation_type': str(record.get(endpoint.get('type_field', ''), '') or '')[:200],
+        'violation_date': date_val,
+        'violation_type': vtype,
         'violation_description': str(record.get(endpoint.get('description_field', ''), '') or '')[:500],
         'status': str(record.get(endpoint.get('status_field', ''), '') or '')[:100],
         'address': address,
-        'zip': str(record.get(endpoint['zip_field'], '') or '') if endpoint.get('zip_field') else '',
+        'zip': zip_val,
         'latitude': record.get(endpoint['lat_field']) if endpoint.get('lat_field') else None,
         'longitude': record.get(endpoint['lng_field']) if endpoint.get('lng_field') else None,
         'raw_data': json.dumps(record, default=str),
@@ -772,8 +875,18 @@ def collect_violations_from_endpoint(city_config, endpoint):
         base_url = endpoint['arcgis_url'].rstrip('/') + '/query'
     else:
         base_url = f"https://{endpoint['domain']}/resource/{endpoint['resource_id']}.json"
-    date_field = endpoint['date_field']
+    date_field = endpoint.get('date_field')
     prod_city_id = city_config['prod_city_id']
+    # V243: ArcGIS MapServer TABLE endpoints (non-spatial, no geometry)
+    # require returnGeometry=false on every query or the server responds
+    # 400 "Failed to execute query.". Phoenix NSD Property Maintenance
+    # is the first such source we support.
+    is_mapserver_table = bool(endpoint.get('mapserver_table'))
+    # V243: some sources have no date column at all (Phoenix's case
+    # number embeds the year). In that case we use a hardcoded
+    # incremental_where template instead of the date filter logic, and
+    # sort on a stable non-date column.
+    incremental_where = endpoint.get('incremental_where')
 
     # V170: Dynamic prod_city_id lookup for cities with None
     if prod_city_id is None:
@@ -823,7 +936,7 @@ def collect_violations_from_endpoint(city_config, endpoint):
     # esriFieldTypeDate where clauses. Raw epoch ms is rejected by hosted
     # FeatureServer/MapServer with "Invalid query parameters".
     arcgis_ts_literal = None
-    if is_arcgis:
+    if is_arcgis and date_field:
         try:
             last_dt = datetime.strptime(last_date[:10], '%Y-%m-%d')
         except ValueError:
@@ -838,14 +951,28 @@ def collect_violations_from_endpoint(city_config, endpoint):
                    f"ORDER BY {date_field} DESC LIMIT {batch_size} OFFSET {offset}")
             params = {'q': sql, 'format': 'json'}
         elif is_arcgis:
+            # V243: dateless MapServer tables use an incremental_where
+            # template (Phoenix filters by the year prefix in the case
+            # number) and sort on a stable column the config declares.
+            if incremental_where:
+                year = datetime.now().year
+                where_clause = incremental_where.replace('{YEAR}', str(year))
+                order_by = endpoint.get('orderby', 'ESRI_OID ASC')
+            else:
+                where_clause = f"{date_field} >= timestamp '{arcgis_ts_literal}'"
+                order_by = f"{date_field} DESC"
             params = {
-                'where': f"{date_field} >= timestamp '{arcgis_ts_literal}'",
+                'where': where_clause,
                 'outFields': '*',
-                'orderByFields': f"{date_field} DESC",
+                'orderByFields': order_by,
                 'resultOffset': offset,
                 'resultRecordCount': batch_size,
                 'f': 'json',
             }
+            if is_mapserver_table:
+                # Non-spatial tables return 400 unless geometry is
+                # explicitly suppressed.
+                params['returnGeometry'] = 'false'
         else:
             params = {
                 '$limit': batch_size,
