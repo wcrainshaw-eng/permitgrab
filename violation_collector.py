@@ -477,6 +477,87 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V244b: Cape Coral FL — ArcGIS MapServer TABLE (non-spatial). 635K
+    # code enforcement cases, updated actively. Same return-geometry
+    # requirement as Phoenix since it's a Table type. Paired with the
+    # 1,751 Cape Coral profiles + FL DBPR phones (pending V244 import
+    # completion) to complete the three-dimension ad-ready set.
+    'cape-coral': {
+        'prod_city_id': None,
+        'city': 'Cape Coral',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'platform': 'arcgis',
+                'arcgis_url': 'https://capeims.capecoral.gov/arcgis/rest/services/OpenData/OpenData/MapServer/5',
+                'mapserver_table': True,
+                'date_field': 'opened',
+                'id_field': 'CaseNumber',
+                'description_field': 'case_description',
+                'status_field': 'Status',
+                'type_field': 'CaseType',
+                'address_fields': {'full': 'Main_Site_addr'},
+                'zip_field': 'Main_Site_Zip',
+                'lat_field': None,
+                'lng_field': None,
+                'resource_id': 'cape-coral-code-enforcement',
+            },
+        ],
+    },
+    # V244b: Cleveland OH — FeatureServer, 30K Building Complaint
+    # Violation Notices (Accela-sourced, exported to ArcGIS hub).
+    # Fresh date range. Pairs with Cleveland's 1,068 profiles —
+    # phone enrichment remains the gap (OH OCILB has no public phone
+    # feed) but at least the violations leg lights up.
+    'cleveland-oh': {
+        'prod_city_id': None,
+        'city': 'Cleveland',
+        'state': 'OH',
+        'endpoints': [
+            {
+                'name': 'Building Complaint Violation Notices',
+                'platform': 'arcgis',
+                'arcgis_url': 'https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Complaint_Violation_Notices/FeatureServer/0',
+                'date_field': 'FILE_DATE',
+                'id_field': 'VIOLATION_NUMBER',
+                'description_field': 'VIOLATION_APP_STATUS',
+                'status_field': 'VIOLATION_APP_STATUS',
+                'type_field': 'SOURCE',
+                'address_fields': {'full': 'PRIMARY_ADDRESS'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+                'resource_id': 'cleveland-complaint-violation-notices',
+            },
+        ],
+    },
+    # V244b: Fort Lauderdale FL — CodeCaseTracker MapServer layer. 66K
+    # code cases, spatial Feature Layer with geometry (so no
+    # mapserver_table flag needed). Pairs with FL DBPR phones (V244
+    # streaming import) to put Fort Lauderdale into ad-ready territory.
+    'fort-lauderdale': {
+        'prod_city_id': None,
+        'city': 'Fort Lauderdale',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'Code Cases',
+                'platform': 'arcgis',
+                'arcgis_url': 'https://gis.fortlauderdale.gov/arcgis/rest/services/CodeCaseTracker/CodeCase/MapServer/0',
+                'date_field': 'INITDATE',
+                'id_field': 'CASENUM',
+                'description_field': 'CASETYPE',
+                'status_field': 'CASESTATUS',
+                'type_field': 'CASETYPE',
+                'address_fields': {'full': 'SITEADDRESS'},
+                'zip_field': 'PARCELZIP',
+                'lat_field': None,
+                'lng_field': None,
+                'resource_id': 'fort-lauderdale-code-cases',
+            },
+        ],
+    },
     # V243: Phoenix AZ — ArcGIS MapServer TABLE (non-spatial). 25K+
     # code enforcement cases, 4K+ from 2026, actively maintained. Data
     # covers wider Phoenix metro (Scottsdale, Glendale, Mesa appear in
