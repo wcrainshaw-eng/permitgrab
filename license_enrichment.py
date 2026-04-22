@@ -75,6 +75,57 @@ STATE_CONFIGS = {
                        'corvallis', 'medford'],
         'socrata_state_filter': "state='OR'",
     },
+    'NY': {
+        # V240: New York DOL Registered Public Work Contractors.
+        # Socrata, ~13K active records, verified phone field. Covers
+        # Buffalo (151 phones in the source), NYC boroughs, and the
+        # rest of NY state. Same match_strategy as WA — business name.
+        'name': 'NY DOL Public Work Contractors',
+        'format': 'socrata',
+        'socrata_url': 'https://data.ny.gov/resource/i4jv-zkey.json',
+        'match_strategy': 'name',
+        'field_map': {
+            'license_number': 'certificate_number',
+            'business_name': 'business_name',
+            'phone': 'phone',
+            'address': 'address',
+            'city': 'city',
+            'state': 'state',
+            'zip': 'zip_code',
+            'license_type': 'business_type',
+            'license_exp': 'expiration_date',
+        },
+        'socrata_state_filter': "status='Active'",
+        'city_slugs': ['new-york-city', 'buffalo-ny', 'rochester-ny',
+                       'yonkers', 'syracuse', 'albany'],
+    },
+    'MN': {
+        # V240: Minnesota DLI Contractor Registration. Direct CSV
+        # download — not Socrata. 20K total, 19K carry phones, 1,061
+        # Minneapolis rows available. Compare with Minneapolis's 6
+        # existing phones: this is one import away from 500+.
+        'name': 'Minnesota DLI Contractor Registration',
+        'format': 'csv_dict',
+        'source_url': 'https://secure.doli.state.mn.us/ccld/data/MNDLILicRegCertExport_Contractor_Registrations.csv',
+        'match_strategy': 'name',
+        'field_map': {
+            'license_number': 'Lic_Number',
+            'business_name': 'Name',
+            'phone': 'Phone_No',
+            'address': 'Addr1',
+            'city': 'City',
+            'state': 'St',
+            'zip': 'Zip',
+            'license_type': 'License_Subtype',
+            'license_exp': 'Exp_Date',
+        },
+        # Only registrations in the 'Issued' status count. The file
+        # also contains 'Expired', 'Revoked', 'Cancelled' rows that
+        # would pollute the match index.
+        'status_filter': {'field': 'Status', 'value': 'Issued'},
+        'city_slugs': ['minneapolis', 'saint-paul', 'duluth',
+                       'rochester-mn', 'bloomington-mn'],
+    },
     'WA': {
         # V239: Washington L&I Contractor License Data — General. Socrata
         # SODA endpoint. 74K active licensees statewide, 3,368 in Seattle.
@@ -257,6 +308,34 @@ def _is_expired(lic_exp_date: str | None) -> bool:
         except ValueError:
             continue
     return False
+
+
+def _fetch_csv_with_header(url: str) -> list[dict]:
+    """Download a CSV that already has a header row. Returns list of
+    dicts keyed by the column names the file declares.
+
+    V240: MN DLI CSV pattern — unlike FL DBPR (headerless positional
+    columns), state portals that ship Content-Disposition CSV downloads
+    usually include a standard header. csv.DictReader handles the rest.
+
+    Decoding: tries UTF-8 first but falls back to latin-1 for state
+    portals that export from Windows systems (MN DLI was hitting a
+    0xa0 non-breaking-space byte in UTF-8 mode).
+    """
+    r = requests.get(url, timeout=CSV_DOWNLOAD_TIMEOUT)
+    r.raise_for_status()
+    body = r.content
+    try:
+        text = body.decode('utf-8')
+    except UnicodeDecodeError:
+        text = body.decode('latin-1')
+    reader = csv.DictReader(io.StringIO(text))
+    rows = []
+    for row in reader:
+        if not row:
+            continue
+        rows.append({k: (v or '').strip() for k, v in row.items() if k})
+    return rows
 
 
 def _fetch_csv_no_header(url: str, columns: list[str]) -> list[dict]:
@@ -686,6 +765,31 @@ def import_state(state_code: str) -> dict:
         summary['by_name'] = _enrich_fl_profiles(state_code, config, index)
         summary['elapsed_seconds'] = round(time.time() - t0, 2)
         print(f"[V238] {state_code}: import complete — {summary}", flush=True)
+        return summary
+
+    if fmt == 'csv_dict':
+        # V240: simple CSV-with-header download (e.g. MN DLI). Stream,
+        # parse via DictReader, optionally post-filter by a status
+        # column, then reuse the name-match path.
+        print(f"[V240] {state_code}: fetching {config['name']}", flush=True)
+        raw = _fetch_csv_with_header(config['source_url'])
+        status_filter = config.get('status_filter')
+        if status_filter:
+            fld = status_filter['field']
+            target = status_filter['value'].upper()
+            raw = [r for r in raw if r.get(fld, '').upper() == target]
+        print(f"[V240] {state_code}: {len(raw):,} rows post-filter "
+              f"in {time.time()-t0:.1f}s", flush=True)
+        # Empty license_idx — the name-match path doesn't need it, but
+        # _enrich_by_name still expects the arg to be a dict.
+        summary = {
+            'state': state_code,
+            'source_rows': len(raw),
+            'strategy': config.get('match_strategy', 'name'),
+        }
+        summary['by_name'] = _enrich_by_name(state_code, config, {}, raw)
+        summary['elapsed_seconds'] = round(time.time() - t0, 2)
+        print(f"[V240] {state_code}: import complete — {summary}", flush=True)
         return summary
 
     # Default: Socrata (Oregon CCB and future JSON-endpoint states).
