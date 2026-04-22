@@ -1111,6 +1111,32 @@ def _migrate_create_sources_table():
     except Exception as e:
         print(f"[{datetime.now()}] V233 P0-2: NYC rename error (non-fatal): {e}")
 
+    # V242b P2: pause the mesa-az-accela duplicate city key. V242's
+    # audit showed 99.8% overlap (8,427 / 8,441) with the canonical
+    # 'mesa' slug — same contractors collected under two keys, doubling
+    # the enrichment workload for no benefit. Pause the dup and delete
+    # its profiles so the daemon's per-city fairness quota stops
+    # spending cycles on a redundant slot.
+    try:
+        m = conn2.execute("SELECT value FROM system_state WHERE key='migration_v242b_mesa_dup'").fetchone()
+        if not m:
+            conn2.execute("""
+                UPDATE prod_cities
+                SET status='paused', has_enrichment=0,
+                    pause_reason = COALESCE(pause_reason, '') ||
+                        ' | V242b: duplicate of mesa — collected under two keys'
+                WHERE city_slug = 'mesa-az-accela' AND status != 'paused'
+            """)
+            deleted = conn2.execute("""
+                DELETE FROM contractor_profiles
+                WHERE source_city_key = 'mesa-az-accela'
+            """).rowcount
+            conn2.execute("INSERT OR IGNORE INTO system_state (key, value) VALUES ('migration_v242b_mesa_dup', ?)", (str(deleted),))
+            conn2.commit()
+            print(f"[{datetime.now()}] V242b: Paused mesa-az-accela duplicate and deleted {deleted} duplicated profiles")
+    except Exception as e:
+        print(f"[{datetime.now()}] V242b: mesa-az-accela dedup error (non-fatal): {e}")
+
     # V242 P0.5 B+C: garbage profile cleanup. 2026-04-22 audit found
     # 16K profiles where contractor_name_raw is purely numeric (permit
     # IDs, AMANDA Customer RSNs, or DOB applicant license numbers —

@@ -27,16 +27,23 @@ CITY_REGISTRY = {
     # SOCRATA PLATFORM CITIES (SODA API)
     # =========================================================================
 
-    "new_york": {
+        "new_york": {
         "name": "New York City",
         "state": "NY",
         "slug": "new-york",
         "lat": 40.713,
         "lon": -74.006,
         "platform": "socrata",
-        "endpoint": "https://data.cityofnewyork.us/resource/dq6g-a4sc.json",
-        "dataset_id": "dq6g-a4sc",
-        "description": "DOB NOW: All Approved Permits â Approved Permits (data.cityofnewyork.us)",
+        # V242b P0: switched from dq6g-a4sc to rbx6-tga4. The old
+        # "DOB NOW: All Approved Permits" dataset had NO contractor
+        # fields at all — verified via live Socrata inspection — so
+        # every NYC permit landed with contractor_name=NULL and no
+        # profiles got created. rbx6-tga4 is "DOB NOW: Build –
+        # Approved Permits", 926K records, 99.5% populated with
+        # applicant_business_name and refreshed daily.
+        "endpoint": "https://data.cityofnewyork.us/resource/rbx6-tga4.json",
+        "dataset_id": "rbx6-tga4",
+        "description": "DOB NOW: Build – Approved Permits (data.cityofnewyork.us)",
         "field_map": {
             "permit_number": "job_filing_number",
             "permit_type": "work_type",
@@ -45,31 +52,40 @@ CITY_REGISTRY = {
             "house_number": "house_no",
             "street_name": "street_name",
             "address": "street_name",
-            "zip": "zip",
+            # V242b: rbx6-tga4 uses zip_code (not zip) and
+            # latitude/longitude (not gis_latitude/gis_longitude).
+            "zip": "zip_code",
             "block": "block",
             "lot": "lot",
             "community_board": "community_board",
             "filing_date": "approved_date",
             "issue_date": "issued_date",
             "expiration_date": "expired_date",
+            # V242b: the key fix — contractor_name now populates from
+            # applicant_business_name ("DM80 SOLUTIONS LLC",
+            # "ARSENAL SCAFFOLD INC", etc.). Kept contact_name for
+            # templates that still read it.
+            "contractor_name": "applicant_business_name",
+            "contact_name": "applicant_business_name",
             "contact_first_name": "applicant_first_name",
             "contact_last_name": "applicant_last_name",
-            "contact_name": "applicant_business_name",
             "contact_license": "applicant_license",
             "owner_name": "owner_business_name",
-            "owner_first_name": "owner_first_name",
-            "owner_last_name": "owner_last_name",
+            # V242b: rbx6-tga4 has owner_name (not owner_first_name /
+            # owner_last_name — those don't exist in this dataset).
             "description": "job_description",
             "estimated_cost": "estimated_job_costs",
-            "latitude": "gis_latitude",
-            "longitude": "gis_longitude",
+            "latitude": "latitude",
+            "longitude": "longitude",
             "council_district": "council_district",
             "census_tract": "census_tract",
+            "permit_status": "permit_status",
+            "filing_representative_business_name": "filing_representative_business_name",
         },
-        "date_field": "approved_date",
+        "date_field": "issued_date",
         "limit": 2000,
         "active": True,
-        "notes": "V15: Switched to dq6g-a4sc (Approved Permits) - has proper calendar_date fields. ~1K+ permits/14 days.",
+        "notes": "V242b: Switched to rbx6-tga4 (DOB NOW: Build – Approved Permits). 926K records, 99.5% carry applicant_business_name → real contractor profiles.",
     },
 
     "chicago": {
@@ -1417,7 +1433,7 @@ CITY_REGISTRY = {
             "permit_number": "PERMIT_NUMBER",
             "permit_type": "PERMIT_TYPE",
             "permit_status": "PERMIT_STATUS",
-            "contractor": "CONTRACTOR",
+            "contractor_name": "CONTRACTOR",
             "category": "CATEGORY_NAME",
             "work_type": "WORK_TYPE",
             "zoning": "ZONING",
@@ -5364,7 +5380,7 @@ CITY_REGISTRY = {
             "issued_date": "permitissued",
             "status": "casestatus",
             "estimated_cost": "jobvaluation",
-            "contractor": "contractorsname",
+            "contractor_name": "contractorsname",
             "parcel": "parcel",
         },
         "date_field": "permitissued",
@@ -7476,7 +7492,7 @@ CITY_REGISTRY = {
             "issued_date": "PERMITISSUEDATE",
             "status": "APPLICATIONSTATUS",
             "estimated_cost": "CONSTRUCTIONVALUE",
-            "contractor": "CONTRACTOR",
+            "contractor_name": "CONTRACTOR",
             "owner_name": "OWNER",
         },
         "date_field": "APPLICATIONYEAR",
@@ -7502,7 +7518,7 @@ CITY_REGISTRY = {
             "issued_date": "ISSUDATE",
             "status": "BPSTATUS",
             "estimated_cost": "ESTVALUE",
-            "contractor": "CONTRNAME",
+            "contractor_name": "CONTRNAME",
             "parcel": "FOLIO",
         },
         "date_field": "ISSUDATE",
@@ -7642,7 +7658,7 @@ CITY_REGISTRY = {
             "description": "PERMITDESC",
             "owner_name": "OWNERNAME",
             "estimated_cost": "ESTCOST",
-            "contractor": "CONTRACTOR",
+            "contractor_name": "CONTRACTOR",
             "contractor_phone": "CONTRACTPH",
         },
         "date_field": "SUBMITDT",
@@ -8598,7 +8614,7 @@ CITY_REGISTRY = {
             "permit_type": "Record_Type",
             "description": "Permit_For",
             "status": "Record_Status",
-            "contractor": "Contractor_Name",
+            "contractor_name": "Contractor_Name",
             "filing_date": "Permit_License_Issued_Date",
             "_date_format": "string_mdy",
         },
@@ -9989,7 +10005,7 @@ CITY_REGISTRY = {
             "issued_date": "issueddate",
             "status": "status",
             "description": "description",
-            "contractor": "contractor",
+            "contractor_name": "contractor",
         },
         "date_field": "issueddate",
         "limit": 2000,
@@ -37839,7 +37855,7 @@ BULK_SOURCES = {
             "description": "projectdescription",
             "estimated_cost": "projectvalue",
             "owner": "ownername",
-            "contractor": "contractorname",
+            "contractor_name": "contractorname",
             "zip": "zip",
         },
         "date_field": "issueddate",
