@@ -2028,8 +2028,21 @@ def normalize_permit(raw_record, city_key):
 
     fmap = config.get("field_map", {}) or {}
 
+    # V242 P0.75: 8 city configs use the short key "contractor" in
+    # their field_map (hialeah, worcester, louisville, anaheim,
+    # st-petersburg, fort-lauderdale, chattanooga, east-baton-rouge).
+    # The collector only ever calls get_field("contractor_name"), so
+    # without an alias all 8 cities silently drop ~30K permits' worth
+    # of contractor data. Map the short key to the canonical one at
+    # lookup time — no config edits needed, no regression risk.
+    _FIELD_ALIASES = {
+        "contractor_name": "contractor",
+    }
+
     def get_field(field_name):
         raw_key = fmap.get(field_name, "")
+        if not raw_key and field_name in _FIELD_ALIASES:
+            raw_key = fmap.get(_FIELD_ALIASES[field_name], "")
         if not raw_key:
             return ""
         # V136: Try exact match first, then case-insensitive

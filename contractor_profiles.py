@@ -83,16 +83,28 @@ def city_passes_public_filter(population, total_permits) -> bool:
 def _is_real_contractor(normalized: str) -> bool:
     """Return False for empty/placeholder/owner-type names.
 
-    License-number-only entries (e.g. '623618') are KEPT — the UI
-    renders them as 'License #<raw>' rather than hiding the row,
-    so users know a licensed contractor pulled the permit even if
-    the company name wasn't captured.
+    V242 P0.5 Part D: also rejects pure-numeric and short alphanumeric
+    code values. Pre-V242 kept these so the UI could render them as
+    "License #<raw>", but the 2026-04-22 audit found 16,356 such rows
+    across Portland (AMANDA Customer RSNs — not license numbers),
+    Fenner NY (NYC DOB IDs mis-bucketed), and NYC (DOB applicant
+    license IDs, not businesses). Every enrichment cycle on those was
+    fabricating random phone numbers against unresolvable IDs — 43%
+    of all phones in the system were garbage. Reject upstream so no
+    new garbage profiles get created.
     """
     if not normalized:
         return False
     if normalized in SKIP_NAMES:
         return False
     if len(normalized) < 3:
+        return False
+    # Pure-numeric (any length): "016662", "4656746"
+    if normalized.isdigit():
+        return False
+    # Short alphanumeric code: "C558633", "R273248"
+    import re as _re
+    if _re.match(r'^[A-Z]\d{5,}$', normalized.upper()):
         return False
     return True
 

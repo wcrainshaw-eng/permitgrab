@@ -477,6 +477,32 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V242 P2: Miami-Dade County FL — ArcGIS FeatureServer. 183K records,
+    # refreshed daily; covers unincorporated Miami-Dade. Pairs with the
+    # ~4K Miami-Dade contractor profiles (phone-enriched via FL DBPR
+    # import) to make Miami-Dade ad-ready.
+    'miami-dade-county': {
+        'prod_city_id': None,
+        'city': 'Miami-Dade County',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Violations',
+                'platform': 'arcgis',
+                'resource_id': 'miami-dade-ccviol',
+                'arcgis_url': 'https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/CCVIOL_gdb/FeatureServer/0',
+                'date_field': 'CASE_DATE',
+                'id_field': 'CASE_NUM',
+                'description_field': 'PROBLEM_DESC',
+                'status_field': 'STAT_DESC',
+                'type_field': 'PROBLEM_DESC',
+                'address_fields': {'full': 'ADDRESS'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V239b: Orlando FL — Socrata, 249K code enforcement cases, fresh through
     # 2026-04-21. Orlando has 1,681 contractor profiles already; pairing
     # violations with profiles lifts the page to "has all three data

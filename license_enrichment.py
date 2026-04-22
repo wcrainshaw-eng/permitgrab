@@ -27,12 +27,25 @@ from __future__ import annotations
 import csv
 import io
 import re
+import threading
 import time
 from datetime import datetime
 
 import requests
 
 import db as permitdb
+
+
+# V242 P0: module-level Event the collection + enrichment daemons check
+# at the top of every cycle. license-import sets it for the duration
+# of a download + write pass; daemons see set() and skip their cycle
+# so WAL contention doesn't stretch a 12s import into 51 minutes.
+IMPORT_IN_PROGRESS = threading.Event()
+
+
+def is_import_running() -> bool:
+    """Thin wrapper daemons can call without a direct Event reference."""
+    return IMPORT_IN_PROGRESS.is_set()
 
 
 SOCRATA_PAGE_LIMIT = 50000  # hard cap per fetch page; Socrata allows up to 50K
@@ -491,24 +504,48 @@ def _fetch_csv_no_header(url: str, columns: list[str]) -> list[dict]:
     """Download a headerless CSV and return rows as dicts keyed by the
     positional column names. Trims whitespace on every value.
 
-    Streams the response so a 50MB download doesn't hold the whole
-    response body in memory before parsing — iter_lines + csv.reader.
+    V242 P1: was `stream=True` + `iter_lines`, which hung indefinitely
+    mid-body on FL DBPR's certified licensees CSV. requests' `timeout`
+    only covers the initial connect under stream mode, so a server
+    that stalls mid-body never triggers a timeout. Switched to a
+    non-streaming download with a (connect=30s, read=300s) tuple that
+    bounds the whole response body, plus a 3-attempt retry with
+    exponential backoff. Per-attempt byte count is logged so a future
+    stall is diagnosable from Render output alone.
     """
-    r = requests.get(url, timeout=CSV_DOWNLOAD_TIMEOUT, stream=True)
-    r.raise_for_status()
-    r.encoding = r.encoding or 'latin-1'
-    rows = []
-    # csv.reader expects an iterable of strings. iter_lines yields bytes
-    # unless decode_unicode=True. We do that + forward to csv.reader.
-    reader = csv.reader(
-        r.iter_lines(decode_unicode=True),
-        skipinitialspace=True,
-    )
+    last_err = None
+    body = None
+    for attempt in range(1, 4):
+        t0 = time.time()
+        try:
+            r = requests.get(url, timeout=(30, 300))
+            r.raise_for_status()
+            body = r.content
+            print(f"[V242] CSV attempt {attempt} OK: {len(body):,} bytes "
+                  f"in {time.time()-t0:.1f}s ({url})", flush=True)
+            break
+        except Exception as e:
+            last_err = e
+            wait = 30 * attempt  # 30s, 60s, 90s
+            print(f"[V242] CSV attempt {attempt} FAILED after "
+                  f"{time.time()-t0:.1f}s: {e}; "
+                  f"{'retrying in ' + str(wait) + 's' if attempt < 3 else 'giving up'} "
+                  f"({url})", flush=True)
+            if attempt < 3:
+                time.sleep(wait)
+    if body is None:
+        raise last_err if last_err else RuntimeError("CSV download failed")
+
+    try:
+        text = body.decode('utf-8')
+    except UnicodeDecodeError:
+        text = body.decode('latin-1')
+    reader = csv.reader(io.StringIO(text), skipinitialspace=True)
     n_cols = len(columns)
+    rows = []
     for raw_row in reader:
         if not raw_row:
             continue
-        # Pad or trim to the expected column count.
         row_vals = (raw_row + [''] * n_cols)[:n_cols]
         rows.append({columns[i]: (row_vals[i] or '').strip()
                      for i in range(n_cols)})
@@ -890,11 +927,26 @@ def import_state(state_code: str) -> dict:
     Dispatches on `config['format']`:
       - 'socrata'  → single JSON endpoint (Oregon CCB).
       - 'fl_dbpr'  → three headerless CSVs cross-referenced (FL DBPR).
+      - 'csv_dict' → CSV with header (MN DLI).
+      - 'aspnet_csv' → ASP.NET postback CSV (CA CSLB).
 
     Returns a dict with per-strategy counters. Raises ValueError on
     unknown state_code. Caller is responsible for spawning this in a
     background thread if the run might exceed Render's 30s HTTP timeout.
+
+    V242 P0: sets the module-level IMPORT_IN_PROGRESS Event for the
+    whole run so the collection + enrichment daemons skip their cycles
+    and SQLite WAL contention doesn't stretch a 12s import into 51
+    minutes (observed on NY, V241).
     """
+    IMPORT_IN_PROGRESS.set()
+    try:
+        return _import_state_inner(state_code)
+    finally:
+        IMPORT_IN_PROGRESS.clear()
+
+
+def _import_state_inner(state_code: str) -> dict:
     state_code = state_code.upper()
     if state_code not in STATE_CONFIGS:
         raise ValueError(f'Unknown state {state_code!r} — '
