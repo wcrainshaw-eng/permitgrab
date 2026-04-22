@@ -232,27 +232,46 @@ def _select_pending(conn, limit, per_city_cap=25):
     cache miss). Filter out known junk names (NOT GIVEN, OWNER, utility
     placeholders, numeric IDs, etc).
 
-    V234 P1: per-city fairness. The pre-V234 version ordered globally by
-    total_permits DESC, which meant cities with one massive profile
-    (Mesa at 16,859 profiles) monopolized every daemon cycle and cities
-    like Portland/Columbus/Philly — with thousands of profiles of their
-    own — almost never got their turn. The window-function cap rotates
-    top-N profiles per source_city_key so every city with pending work
-    gets a share of each cycle.
+    V234 P1 (fairness v1): per-city PARTITION + per_city_cap so no single
+    city monopolizes a cycle.
+
+    V235 P0 (fairness v2): two additional changes.
+    1. Dropped the `cp.is_active = 1` filter. contractor_profiles sets
+       is_active=1 only when last_permit_date is within 90 days — but
+       enrichment value (phone/website) doesn't depend on recency. With
+       the filter in place, Portland / Cook County / any city whose
+       contractors filed their last permit >90d ago were ENTIRELY
+       excluded from the candidate pool. Ordering below prefers active
+       contractors first so the incentive stays correct.
+    2. Randomized tie-break within each city_rank tier. The prior
+       `ORDER BY city_rank ASC, total_permits DESC` put NYC's (rank=1
+       top contractor, 500 permits) before Portland's (rank=1, 20
+       permits) so NYC rank-1 filled the slot tree before Portland
+       rank-1 got considered. RANDOM() gives every city's rank-1 an
+       equal shot at the 200-row LIMIT.
+
+    V235 P3.2: not_found retry after 7-day cooldown. Previously once a
+    contractor hit last_error='no results' they were excluded forever;
+    now re-checked if the attempt is >7 days old — DDG results change.
     """
     rows = conn.execute("""
         WITH candidates AS (
             SELECT cp.id, cp.contractor_name_raw, cp.contractor_name_normalized,
                    cp.city, cp.state, cp.source_city_key, cp.total_permits,
+                   cp.is_active,
                    ROW_NUMBER() OVER (
                        PARTITION BY cp.source_city_key
-                       ORDER BY cp.total_permits DESC, cp.id ASC
+                       ORDER BY cp.is_active DESC,
+                                cp.total_permits DESC, cp.id ASC
                    ) AS city_rank
             FROM contractor_profiles cp
             LEFT JOIN contractor_contacts cc
                    ON cc.contractor_name_normalized = cp.contractor_name_normalized
-            WHERE cp.is_active = 1
-              AND (cp.enrichment_status IS NULL OR cp.enrichment_status = 'pending')
+            WHERE (cp.enrichment_status IS NULL
+                   OR cp.enrichment_status = 'pending'
+                   OR (cp.enrichment_status = 'not_found'
+                       AND (cp.enriched_at IS NULL
+                            OR cp.enriched_at < datetime('now', '-7 days'))))
               AND cp.contractor_name_raw IS NOT NULL AND cp.contractor_name_raw != ''
               AND LENGTH(cp.contractor_name_raw) >= 5
               AND cp.contractor_name_raw NOT LIKE 'NOT GIVEN%'
@@ -264,13 +283,15 @@ def _select_pending(conn, limit, per_city_cap=25):
               AND cp.contractor_name_raw NOT GLOB '[0-9]*'
               AND (cc.id IS NULL
                    OR (cc.phone IS NULL AND cc.website IS NULL
-                       AND (cc.last_error IS NULL OR cc.last_error != 'no results')))
+                       AND (cc.last_error IS NULL
+                            OR cc.last_error != 'no results'
+                            OR cc.looked_up_at < datetime('now', '-7 days'))))
         )
         SELECT id, contractor_name_raw, contractor_name_normalized,
                city, state, source_city_key
         FROM candidates
         WHERE city_rank <= ?
-        ORDER BY city_rank ASC, total_permits DESC, id ASC
+        ORDER BY city_rank ASC, RANDOM()
         LIMIT ?
     """, (per_city_cap, limit)).fetchall()
     return rows
@@ -286,6 +307,19 @@ def enrich_batch(limit=PER_CYCLE_DEFAULT, min_delay=MIN_DELAY_SEC):
     if not rows:
         print(f"[{datetime.now()}] [V210] web_enrichment: no pending profiles")
         return {'enriched': 0, 'not_found': 0, 'errors': 0, 'seen': 0}
+
+    # V235: per-city breakdown. The enrichment daemon is meant to
+    # distribute work across every city with pending profiles; logging
+    # the per-city count makes regressions obvious (e.g. pre-V235, a
+    # single Mesa-dominated cycle would print "mesa: 200" and nothing
+    # else, which was the signal the fairness fix was needed).
+    _by_city = {}
+    for r in rows:
+        key = r['source_city_key'] if isinstance(r, dict) else r[5]
+        _by_city[key] = _by_city.get(key, 0) + 1
+    print(f"[{datetime.now()}] [V235] enrich_batch selected "
+          f"{len(rows)} profiles across {len(_by_city)} cities: "
+          f"{dict(sorted(_by_city.items(), key=lambda kv: -kv[1])[:10])}")
 
     engine = FreeEnrichmentEngine()
     now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
