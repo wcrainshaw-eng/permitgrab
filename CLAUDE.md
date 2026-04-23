@@ -39,6 +39,18 @@ A city is "ad-ready" when it has ALL THREE:
 - **Fresno** (fresno.gov): WAF 403 blocks programmatic probes.
 - **Oakland** (data.oaklandca.gov): catalog API returned Chicago's ydr8-5enu dataset (mirroring Socrata globally, not city-specific data) — no local permits available.
 - **Dallas** (www.dallasopendata.com e7gq-4sah): HAS `contractor` field with name+address+phone inline (e.g. "RELIANT HEATING A/C ... (817) 616-0620"). BUT newest permit is 2020-08-29 (zero permits starting with 2025/2026). Socrata metadata says "daily automated updates, updated 2024-01-10" but data is frozen. Probed 2026-04-24. Dead.
+- **Charlotte NC** (data.charlottenc.gov): ArcGIS Hub DCAT feed contains no building/construction permit datasets — only transportation, stormwater, emergency services. Dead.
+- **Indianapolis IN** (data.indy.gov): Open-data catalog has 47 datasets (boundaries, addresses, transportation) — no permits. Dead.
+- **San Diego CA**: seshat.datasd.org blocks programmatic requests with 403; maps.sandiego.gov ArcGIS root ECONNREFUSED. Double-confirmed dead via two paths.
+- **Kansas City MO** (data.kcmo.org): ntw8-aacc Permits-CPD Dataset has `contractorcompanyname` with real businesses ("Permit Service Inc.", "Garrison Plumbing") but newest is 2025-05-09 (~11 months stale). Companion 6h9j-mu65 ("CPD Permits Status Change") freezes at 2024-10-10 and has no contractor field. Dead.
+- **Atlanta GA** (opendata.atlantaga.gov): DCAT feed ECONNREFUSED, search API returns TLS cert-name-invalid, ArcGIS hub returns empty JS-rendered pages. No accessible API path found 2026-04-24.
+- **Detroit MI** (data.detroitmi.gov): Not indexed at api.us.socrata.com federated catalog (404) — host isn't a Socrata portal.
+- **Las Vegas NV** (opendata.lasvegasnevada.gov): ECONNREFUSED on search path.
+- **Nashville TN** (data.nashville.gov): Socrata catalog API returns 404; portal browse page requires JS rendering — can't enumerate datasets via WebFetch.
+
+### V258 already-configured — activation pending
+- **Philadelphia** (phl.carto.com/permits, platform=carto): 11,875 permits (newest 2026-04-22 FRESH), 1,253 real-business profiles ("Hormigon LLC", "Ricco Construction Corp"), 11 phones, 7,270 violations (newest 2026-04-22 FRESH). Only gap: phone count. DDG enrichment fired job `da6d8fd1613e` 2026-04-24. PA has no bulk state license DB → DDG-only.
+- **Pittsburgh** (data.wprdc.org CKAN, dataset f4d1177a-f597-4c32-8cbf-7885f56253f6): 2,045 permits (newest 2026-04-10), 2,002 have `contractor_name` with real businesses ("Phillips Heating & Air Conditioning, Inc.", "Johnson Controls Fire Protection LP"), but contractor_profiles=0 because profile-build step never ran for this slug. TODO: `POST /api/admin/refresh-profiles?city=pittsburgh` after current enrichment jobs drain the sqlite write lock — then fire enrichment on the newly-created profiles.
 
 **New Orleans — partial.** PR #150 switched `new_orleans_la` endpoint from `nbcf-m6c2` (metadata-only) to `rcm3-fn58` (has `contractors` field). 3,489 historical profiles exist. Sample of recent profiles (2026-04-24) shows mixed individual licensee names ("Christopher Jake Laborde", "Joan Brooks") and real businesses ("LGD Lawn, LLC", "Legacy Construction and Design LLC") — roughly 40-50% business-suffixed. DDG hit rate on first 5 profiles of async enrichment was 0/5 not_found. Louisiana has no bulk state license DB (paid-only). Not a structural dead-end but conversion will be slow; plan for 20-40 phones after a full enrichment pass, not 50+.
 
