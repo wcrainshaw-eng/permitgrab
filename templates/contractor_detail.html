@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ contractor.display_name }} — {{ contractor.city }} Permit History | PermitGrab</title>
+<meta name="description" content="{{ contractor.display_name }} has pulled {{ contractor.total_permits }} permits in {{ contractor.city }}. See permit history, project values, and contact info on PermitGrab.">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta name="robots" content="noindex, follow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --accent: #f97316;
+  --accent-dark: #ea580c;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --shadow: 0 1px 3px rgba(0,0,0,.1);
+  --radius-lg: 12px;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+       background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+.breadcrumbs { background: var(--gray-100); padding: 12px 32px; font-size: 13px; }
+.breadcrumbs a { color: var(--gray-500); text-decoration: none; }
+.breadcrumbs a:hover { color: var(--primary); }
+.hero { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+        color: white; padding: 32px; }
+.hero-inner { max-width: 1200px; margin: 0 auto; }
+.hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+.hero .sub { font-size: 15px; color: rgba(255,255,255,.75); }
+.summary-cards { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
+.summary-card { background: rgba(255,255,255,.08); border-radius: 8px; padding: 14px 20px; min-width: 140px; }
+.summary-card-value { font-size: 24px; font-weight: 800; color: var(--accent); }
+.summary-card-label { font-size: 12px; color: rgba(255,255,255,.65); text-transform: uppercase; letter-spacing: 0.4px; }
+.section { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+.section h2 { font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px; }
+
+.contact-card { background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow);
+                border: 1px solid var(--gray-200); padding: 20px 24px; margin-bottom: 16px; }
+.contact-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.contact-row .label { font-size: 12px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.4px; min-width: 70px; }
+.contact-row .value { font-size: 16px; color: var(--gray-900); font-weight: 600; }
+
+.gate-reveal-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: var(--primary);
+  color: white !important;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 14px;
+}
+.gate-reveal-big:hover { background: var(--primary-dark); }
+
+.velocity-badge { display: inline-block; font-size: 12px; font-weight: 700;
+                  padding: 3px 10px; border-radius: 12px; letter-spacing: 0.2px; }
+.velocity-badge.red    { background: #fee2e2; color: #991b1b; }
+.velocity-badge.orange { background: #ffedd5; color: #9a3412; }
+.velocity-badge.blue   { background: #dbeafe; color: #1e40af; }
+.velocity-badge.new    { background: #fef9c3; color: #854d0e; }
+.recency-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+               margin-right: 8px; vertical-align: middle; }
+.recency-dot.green  { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.15); }
+.recency-dot.yellow { background: #eab308; }
+.recency-dot.gray   { background: #d1d5db; }
+
+.permit-table { width: 100%; border-collapse: collapse; background: white;
+                border-radius: var(--radius-lg); overflow: hidden;
+                box-shadow: var(--shadow); border: 1px solid var(--gray-200); font-size: 14px; }
+.permit-table th { background: var(--gray-50); text-align: left; padding: 12px 16px;
+                   font-weight: 600; color: var(--gray-600); border-bottom: 1px solid var(--gray-200); }
+.permit-table td { padding: 12px 16px; border-bottom: 1px solid var(--gray-100); color: var(--gray-700); }
+.permit-table tr:last-child td { border-bottom: none; }
+
+.gate-cta { display: flex; flex-direction: column; align-items: center; gap: 12px;
+            padding: 28px; margin: 20px 0; background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+            color: white; border-radius: var(--radius-lg); text-align: center; }
+.gate-cta h3 { font-size: 20px; color: white; margin: 0; }
+.gate-cta p { color: rgba(255,255,255,.8); margin: 0; font-size: 14px; }
+.gate-cta .cta-btn { display: inline-block; padding: 14px 32px; background: var(--accent);
+                     color: white !important; border-radius: 8px; font-weight: 700; text-decoration: none; }
+.gate-cta .cta-btn:hover { background: var(--accent-dark); }
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<div class="breadcrumbs">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    <a href="/">Home</a> <span style="color: var(--gray-400); margin: 0 6px;">/</span>
+    <a href="/permits/{{ contractor.source_city_key }}">{{ contractor.city }} Permits</a>
+    <span style="color: var(--gray-400); margin: 0 6px;">/</span>
+    <span style="color: var(--gray-700);">{{ contractor.display_name }}</span>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="hero-inner">
+    <h1>
+      <span class="recency-dot {{ contractor.recency }}"></span>
+      {{ contractor.display_name }}
+      {% if contractor.is_new %}
+        <span class="velocity-badge new" style="margin-left: 8px;">NEW</span>
+      {% elif contractor.velocity_color == 'red' %}
+        <span class="velocity-badge red" style="margin-left: 8px;">🔥 {{ contractor.permits_30d }} permits/30d</span>
+      {% elif contractor.velocity_color %}
+        <span class="velocity-badge {{ contractor.velocity_color }}" style="margin-left: 8px;">{{ contractor.permits_30d }} permits/30d</span>
+      {% endif %}
+    </h1>
+    <div class="sub">
+      {{ contractor.primary_trade or 'General' }} contractor in {{ contractor.city }}{% if contractor.state %}, {{ contractor.state }}{% endif %}
+      {% if contractor.first_permit_date %} · First seen {{ contractor.first_permit_date[:10] }}{% endif %}
+    </div>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="summary-card-value">{{ "{:,}".format(contractor.total_permits) }}</div>
+        <div class="summary-card-label">Total Permits</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value">{{ contractor.permits_90d }}</div>
+        <div class="summary-card-label">Last 90 Days</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value">{{ contractor.permits_30d }}</div>
+        <div class="summary-card-label">Last 30 Days</div>
+      </div>
+      {% if contractor.avg_project_value and contractor.avg_project_value > 0 %}
+      <div class="summary-card">
+        <div class="summary-card-value">${{ "{:,.0f}".format(contractor.avg_project_value) }}</div>
+        <div class="summary-card-label">Avg Project Value</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Contact</h2>
+  <div class="contact-card">
+    {% if is_pro %}
+      <div class="contact-row" style="margin-bottom: 10px;">
+        <span class="label">Phone</span>
+        {% if contractor.phone %}
+          <a class="value" href="tel:{{ contractor.phone }}">{{ contractor.phone }}</a>
+        {% else %}
+          <span class="value" style="color: var(--gray-400); font-weight: 400;">Not verified yet</span>
+        {% endif %}
+      </div>
+      {% if contractor.website %}
+      <div class="contact-row" style="margin-bottom: 10px;">
+        <span class="label">Website</span>
+        <a class="value" href="{{ contractor.website }}" rel="nofollow noopener" target="_blank">{{ contractor.website }}</a>
+      </div>
+      {% endif %}
+      {% if contractor.license_number %}
+      <div class="contact-row">
+        <span class="label">License</span>
+        <span class="value">{{ contractor.license_number }}</span>
+      </div>
+      {% endif %}
+    {% else %}
+      <div class="contact-row" style="justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <div class="label">Phone & Website</div>
+          <div class="value" style="filter: blur(4px); user-select: none; pointer-events: none;">(555) 123-4567</div>
+        </div>
+        <a class="gate-reveal-big" href="/signup?next=/contractor/{{ contractor.id }}">🔒 Subscribe to reveal contact</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if permits %}
+<section class="section">
+  <h2>Permit History ({{ permits|length }})</h2>
+  <table class="permit-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Address</th>
+        <th>Description</th>
+        <th style="text-align: right;">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in permits[:50] %}
+      <tr>
+        <td>{{ (p.filing_date or p.issued_date or p.date or '')[:10] }}</td>
+        <td>{{ p.permit_type or '-' }}</td>
+        <td>{{ p.address or '-' }}</td>
+        <td>{{ (p.description or '')[:80] }}{% if p.description and p.description|length > 80 %}…{% endif %}</td>
+        <td style="text-align: right;">{% if p.estimated_cost and p.estimated_cost > 0 %}${{ "{:,.0f}".format(p.estimated_cost) }}{% else %}-{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if violations %}
+<section class="section">
+  <h2>Code Violations at These Addresses ({{ violations|length }})</h2>
+  <table class="permit-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Address</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in violations %}
+      <tr>
+        <td>{{ (v.violation_date or '')[:10] }}</td>
+        <td>{{ v.violation_type or '-' }}</td>
+        <td>{{ v.address or '-' }}</td>
+        <td>{{ v.status or '-' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if other_cities %}
+<section class="section">
+  <h2>Also active in</h2>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    {% for c in other_cities %}
+    <a href="/permits/{{ c.source_city_key }}"
+       style="padding: 6px 14px; background: white; border: 1px solid var(--gray-200); border-radius: 999px; font-size: 13px; color: var(--gray-700); text-decoration: none;">
+      {{ c.source_city_key }} ({{ c.n }})
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if not is_pro %}
+<section class="section">
+  <div class="gate-cta">
+    <h3>Unlock full contact info for every contractor</h3>
+    <p>Phone numbers, websites, license status, and CSV export — for all {{ contractor.city }} contractors.</p>
+    <a href="/signup?next=/contractor/{{ contractor.id }}" class="cta-btn">Subscribe — $149/mo</a>
+  </div>
+</section>
+{% endif %}
+
+{% include 'partials/footer.html' ignore missing %}
+</body>
+</html>
