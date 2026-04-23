@@ -26,6 +26,9 @@ A city is "ad-ready" when it has ALL THREE:
 - **Oklahoma City** (data.okc.gov): Blocked by Incapsula WAF — can't probe programmatically.
 - **Hialeah violations:** No public ArcGIS/Socrata feed. Miami-Dade county violations return 0 Hialeah addresses (CCVIOL_gdb is unincorporated-only).
 
+### Known dead ends for phone enrichment (don't re-invest effort)
+- **Cape Coral contractor_name_raw is dominated by homeowner names** ("OWNER BUILDER", "PEDRO CHAVEZ", "WADE WILLIAMSON"), not business names. Only 44 profiles have phones out of 1,751, and those matched DBPR by coincidence (licensed individuals who share a homeowner's name). Conclusion: Cape Coral permit data has no real contractor names — DBPR can't lift phones meaningfully. Compare Miami-Dade contractor_name_raw which is real businesses ("STRADA SERVICES INC", "ARNOLD J ELECTRIC INC"). Cape Coral is structurally a poor fit for the $149/mo lead product regardless of enrichment investment.
+
 **You are autonomous. Don't stop to ask permission. Fix things, test things, deploy things. If something breaks, debug and fix it. Write clean PRs with descriptive titles.**
 
 ---
