@@ -21,6 +21,7 @@ A city is "ad-ready" when it has ALL THREE:
 
 ### Known dead ends for new-city onboarding (don't re-research)
 - **Washington DC** (maps2.dcgis.dc.gov FeatureServer 18): PERMIT_APPLICANT field is individual names (e.g. "KENNETH BEECHNER"), not business names. 14,187 total permits, only 50% have any applicant, and those aren't contractors. Owner field also individuals. No separate contractor field.
+- **Boston** (data.boston.gov CKAN, resource 6ddcd912-32a0-43df-9908-63574f8c7e77): 722k permits, daily updates, rich fields (address/zip/declared_valuation/status/worktype). But `applicant` is individual licensee names ("Iliya Iliev", "paul roper", "HomeWorks Energy" occasional business) same pattern as DC. Municipal permit-pull convention: licensed individual files, business name not captured at the permit record. Would need a MA state licensing DB join (license_enrichment.py pattern) to map individual → business — deferred.
 - **Louisville Active Permits** (services1.arcgis.com/79kfd2K6fskCAkyg/): CONTRACTOR field exists and is populated with real business names ("PAYNE ELECTRIC COMPANY INC"), but dataset frozen at 2019-02. Hub metadata says modified 2024-08 but actual records stop 2019.
 - **Baltimore Permits** (egisdata.baltimorecity.gov FS/3): No contractor field at all. Fields are OBJECTID, CaseNumber, Description, Address, BLOCKLOT, ExistingUse, ProposedUse, Cost. Owner/applicant not exposed.
 - **Oklahoma City** (data.okc.gov): Blocked by Incapsula WAF — can't probe programmatically.
