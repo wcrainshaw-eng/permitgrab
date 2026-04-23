@@ -192,6 +192,52 @@ async function contractorDetail(browser) {
   await page.close();
 }
 
+async function v252Surface(browser) {
+  // V252 F6 leaderboard
+  const lb = await newPage(browser);
+  let resp = await lb.goto(`${BASE_URL}/leaderboard/chicago-il`, { waitUntil: 'networkidle2', timeout: 20000 });
+  if (resp.status() === 200) pass('V252.F6 /leaderboard/chicago-il returns 200');
+  else fail('V252.F6 leaderboard 200', `${resp.status()}`);
+  const lbInfo = await lb.evaluate(() => ({
+    rows: document.querySelectorAll('.lb-table tbody tr').length,
+    h1: !!document.querySelector('h1'),
+    // Anon must see zero tel: links on leaderboard too
+    tel: document.querySelectorAll('.lb-table a[href^="tel:"]').length,
+  }));
+  if (lbInfo.rows > 10) pass(`V252.F6 leaderboard renders ${lbInfo.rows} rows`);
+  else fail('V252.F6 leaderboard rows', `only ${lbInfo.rows}`);
+  if (lbInfo.tel === 0) pass('V252.F6 leaderboard anon sees no tel: links');
+  else fail('V252.F6 leaderboard phone leak', `${lbInfo.tel} tel: links to anon`);
+  await lb.close();
+
+  // V251 F22 shareable report
+  const rep = await newPage(browser);
+  resp = await rep.goto(`${BASE_URL}/report/chicago-il`, { waitUntil: 'networkidle2', timeout: 20000 });
+  if (resp.status() === 200) pass('V251.F22 /report/chicago-il returns 200');
+  else fail('V251.F22 report 200', `${resp.status()}`);
+  const repInfo = await rep.evaluate(() => ({
+    kpis: document.querySelectorAll('.kpi').length,
+    cta: !!document.querySelector('.cta-footer a.btn'),
+  }));
+  if (repInfo.kpis >= 4) pass(`V251.F22 report shows ${repInfo.kpis} KPI tiles`);
+  else fail('V251.F22 report KPIs', `${repInfo.kpis}`);
+  if (repInfo.cta) pass('V251.F22 report has bottom CTA');
+  else fail('V251.F22 report CTA', 'no cta-footer');
+  await rep.close();
+
+  // V252 F7 trade-first URL redirects
+  const tr = await newPage(browser);
+  resp = await tr.goto(`${BASE_URL}/solar/chicago-il`, { waitUntil: 'networkidle2', timeout: 20000 });
+  const finalUrl = resp.url();
+  if (resp.status() === 200 && finalUrl.includes('/permits/chicago-il/')) {
+    pass(`V252.F7 /solar/chicago-il → ${finalUrl.split(BASE_URL).pop()}`);
+  } else {
+    fail('V252.F7 trade URL redirect', `ended at ${finalUrl} status ${resp.status()}`);
+  }
+  await tr.close();
+}
+
+
 async function seoBasics(browser) {
   for (const slug of CITIES) {
     const page = await newPage(browser);
@@ -256,6 +302,8 @@ async function mobileSignup(browser) {
     await velocityRecency(browser);
     console.log('\n--- F6: Contractor Detail ---');
     await contractorDetail(browser);
+    console.log('\n--- V251 F22 / V252 F6 F7 Surface ---');
+    await v252Surface(browser);
     console.log('\n--- SEO basics on all ad-ready cities ---');
     await seoBasics(browser);
     console.log('\n--- Signup flow ---');
