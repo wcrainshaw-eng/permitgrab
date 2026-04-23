@@ -9386,6 +9386,70 @@ def api_unsave_contractor(profile_id):
     return jsonify({'removed': True})
 
 
+def build_weekly_market_report(city_slug):
+    """V251 F16: generate a weekly market report payload for a city.
+
+    Returns {'subject': str, 'html': str, 'text': str, 'stats': {...}}
+    so the existing digest daemon can hand it to SendGrid.
+    Returns None if the city has no data or isn't active.
+    """
+    conn = permitdb.get_connection()
+    pc = conn.execute(
+        "SELECT id, city, state FROM prod_cities WHERE city_slug=? AND status='active'",
+        (city_slug,),
+    ).fetchone()
+    if not pc:
+        return None
+    pid = pc['id']
+    stats = conn.execute("""
+        SELECT
+          (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-7 days')) as permits_this_week,
+          (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-14 days') AND COALESCE(filing_date,issued_date,date) < date('now','-7 days')) as permits_prev_week,
+          (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND first_permit_date >= date('now','-7 days')) as new_contractors,
+          (SELECT trade_category FROM permits WHERE prod_city_id=? AND trade_category IS NOT NULL AND trade_category != '' AND COALESCE(filing_date,issued_date,date) >= date('now','-7 days') GROUP BY trade_category ORDER BY COUNT(*) DESC LIMIT 1) as top_trade,
+          (SELECT zip FROM permits WHERE prod_city_id=? AND zip IS NOT NULL AND zip != '' AND COALESCE(filing_date,issued_date,date) >= date('now','-7 days') GROUP BY zip ORDER BY COUNT(*) DESC LIMIT 1) as top_zip
+    """, (pid, pid, city_slug, pid, pid)).fetchone()
+    if not stats or (stats['permits_this_week'] or 0) == 0:
+        return None
+    tw = stats['permits_this_week'] or 0
+    pw = stats['permits_prev_week'] or 0
+    pct = ((tw - pw) / pw * 100) if pw else None
+    trend = f"up {pct:.0f}% from last week" if pct and pct > 0 else (f"down {abs(pct):.0f}% from last week" if pct and pct < 0 else "flat vs. last week")
+    subject = f"{pc['city']} permit activity this week — {tw} filings"
+    lines = [
+        f"{pc['city']}, {pc['state']} permit activity",
+        f"{tw} permits this week ({trend}).",
+    ]
+    if stats['top_trade']: lines.append(f"Top trade: {stats['top_trade']}.")
+    if stats['top_zip']:   lines.append(f"Fastest-growing zip: {stats['top_zip']}.")
+    if stats['new_contractors']: lines.append(f"{stats['new_contractors']} new contractors pulled their first permit this week.")
+    lines.append(f"Full report: {SITE_URL}/permits/{city_slug}")
+    text = '\n'.join(lines)
+    html = (
+        f'<h2 style="font-family:sans-serif;">{pc["city"]} permit activity</h2>'
+        f'<p><strong>{tw}</strong> permits this week ({trend}).</p>'
+        + (f'<p>Top trade: <strong>{stats["top_trade"]}</strong></p>' if stats['top_trade'] else '')
+        + (f'<p>Fastest-growing zip: <strong>{stats["top_zip"]}</strong></p>' if stats['top_zip'] else '')
+        + (f'<p>{stats["new_contractors"]} new contractors this week.</p>' if stats['new_contractors'] else '')
+        + f'<p><a href="{SITE_URL}/permits/{city_slug}">View the full {pc["city"]} dashboard →</a></p>'
+    )
+    return {'subject': subject, 'html': html, 'text': text, 'stats': dict(stats)}
+
+
+@app.route('/api/digest/preview/<city_slug>')
+def api_digest_preview(city_slug):
+    """V251 F16: Pro-gated preview of the weekly market report email for a city."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    if not is_pro(user):
+        return jsonify({'error': 'Pro feature', 'upgrade_url': '/pricing'}), 402
+    report = build_weekly_market_report(city_slug)
+    if not report:
+        return jsonify({'error': 'No activity this week or city not active'}), 404
+    return jsonify(report)
+
+
 @app.route('/report/<city_slug>')
 def city_report(city_slug):
     """V251 F22: Shareable city report — print-friendly single-page summary
