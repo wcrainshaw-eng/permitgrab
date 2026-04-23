@@ -8315,44 +8315,53 @@ def update_user_by_email(email, updates):
 
 
 def get_user_plan(user):
-    """
-    Returns 'pro', 'free', or 'anonymous'.
-    Centralizes all plan checking logic to avoid inconsistencies.
-    Recognizes Pro status from:
-    - user.plan == 'pro'
-    - user.plan == 'professional' (Stripe)
-    - user.plan == 'enterprise'
-    - user.stripe_subscription_status == 'active'
+    """Returns one of: 'enterprise', 'pro', 'free', 'anonymous'.
+
+    V252 F1: split 'pro' into 'pro' vs 'enterprise' so Enterprise-only
+    features (property owners, webhooks, market reports) can gate
+    separately. Existing 'professional' Stripe label maps to 'pro'.
     """
     if not user:
         return 'anonymous'
 
-    plan = (user.get('plan') or '').lower()
+    plan = (user.get('plan') if hasattr(user, 'get') else getattr(user, 'plan', '')) or ''
+    plan = plan.lower()
 
-    # Check admin-set or Stripe-set plans
-    if plan in ('pro', 'professional', 'enterprise'):
+    if plan == 'enterprise':
+        return 'enterprise'
+    if plan in ('pro', 'professional'):
         return 'pro'
 
-    # Check Stripe subscription status
-    if user.get('stripe_subscription_status') == 'active':
+    # Stripe subscription status — safe accessor
+    sub_status = (user.get('stripe_subscription_status')
+                  if hasattr(user, 'get')
+                  else getattr(user, 'stripe_subscription_status', None))
+    if sub_status == 'active':
         return 'pro'
 
     return 'free'
 
 
 def is_pro(user):
-    """Returns True if user has Pro access."""
-    return get_user_plan(user) == 'pro'
+    """Returns True if user has Pro-or-above access. Enterprise counts as Pro."""
+    return get_user_plan(user) in ('pro', 'enterprise')
+
+
+def is_enterprise(user):
+    """V252 F1: Enterprise-tier gate for webhook / owner-append / PDF reports."""
+    return get_user_plan(user) == 'enterprise'
 
 
 # V69: COMPLETELY STATIC nav context — NO database access whatsoever
 @app.context_processor
 def inject_nav_context():
-    """V69: Return static empty data. NO DB calls until server is stable."""
+    """V69: Return static empty data. NO DB calls until server is stable.
+    V252 F1: adds is_enterprise to the context so templates can gate on it."""
     return {
         'user': None,
         'user_plan': 'anonymous',
         'is_pro': False,
+        'is_enterprise': False,
         'nav_cities': []
     }
 
