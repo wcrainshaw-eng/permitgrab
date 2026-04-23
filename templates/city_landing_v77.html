@@ -691,6 +691,53 @@ body {
 .new-week-toggle:hover { background: var(--primary); color: white !important; }
 .new-week-toggle.active { background: var(--primary); color: white; }
 
+/* V251 F14: permit-type bar chart */
+.permit-type-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.permit-type-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 200px) 1fr;
+    gap: 16px;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--gray-50);
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.12s;
+}
+.permit-type-row:hover { background: #eff6ff; }
+.permit-type-label { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.permit-type-bar-wrap {
+    position: relative;
+    height: 26px;
+    background: var(--gray-200);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.permit-type-bar {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 6px;
+}
+.permit-type-meta {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--gray-900);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+    .permit-type-row { grid-template-columns: 1fr; gap: 6px; }
+}
+
 /* V251 F13: zip heatmap grid */
 .zip-heatmap {
     display: grid;
@@ -1245,21 +1292,33 @@ body {
 </section>
 {% endif %}
 
-<!-- PERMIT TYPES BREAKDOWN -->
+<!-- V251 F14: PERMIT TYPES BREAKDOWN — now with a horizontal CSS bar chart
+     alongside the card grid. No JS dependency. Bar width = share of this
+     city's permits. Useful for roofers/electricians/solar cos to see which
+     trades dominate a market at a glance. -->
 {% if permit_types %}
+{% set _pt_sorted = permit_types.items() | list | sort(attribute=1, reverse=True) %}
+{% set _pt_total = permit_types.values() | list | sum %}
 <section class="section" style="background: white; max-width: none; padding-left: 32px; padding-right: 32px;">
   <div style="max-width: 1200px; margin: 0 auto;">
     <div class="section-header">
       <h2>Permit Types in {{ city_name }}</h2>
-      <p>Breakdown of building permits by category</p>
+      <p>Breakdown of {{ "{:,}".format(_pt_total) }} building permits by category</p>
     </div>
 
-    <div class="types-grid">
-      {% for ptype, count in permit_types.items() %}
-      <div class="type-card">
-        <h4>{{ ptype }}</h4>
-        <div class="count">{{ "{:,}".format(count) }}</div>
-      </div>
+    <div class="permit-type-chart">
+      {% for ptype, count in _pt_sorted[:10] %}
+      {% set _pct = (count / _pt_total * 100) if _pt_total else 0 %}
+      <a href="/permits/{{ city_slug }}?trade={{ ptype | urlencode }}" class="permit-type-row">
+        <div class="permit-type-label">{{ ptype }}</div>
+        <div class="permit-type-bar-wrap">
+          <div class="permit-type-bar" style="width: {{ '%.1f' % _pct }}%;"></div>
+          <div class="permit-type-meta">
+            <span class="permit-type-count">{{ "{:,}".format(count) }}</span>
+            <span class="permit-type-pct">{{ '%.1f' % _pct }}%</span>
+          </div>
+        </div>
+      </a>
       {% endfor %}
     </div>
   </div>
