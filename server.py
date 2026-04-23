@@ -12352,31 +12352,67 @@ def _get_top_contractors_for_city(city_slug, limit=25):
         ):
             return []
         rows = conn.execute("""
-            SELECT contractor_name_raw, contractor_name_normalized,
-                   total_permits, permits_90d, primary_trade,
+            SELECT id, contractor_name_raw, contractor_name_normalized,
+                   total_permits, permits_90d, permits_30d, primary_trade,
                    avg_project_value, phone, website, enrichment_status,
-                   permit_frequency
+                   permit_frequency, first_permit_date, last_permit_date
             FROM contractor_profiles
             WHERE source_city_key = ? AND is_active = 1
             ORDER BY total_permits DESC, permits_90d DESC
             LIMIT ?
         """, (city_slug, limit)).fetchall()
         out = []
+        # V251 F5: compute velocity + recency bucket in Python so the template
+        # stays dumb. velocity: red ≥10/mo, orange 5–9, blue 1–4, '' otherwise.
+        # recency: green ≤7 days, yellow ≤30 days, gray older/unknown. "new"
+        # flag = first_permit_date within last 7 days (highest-intent lead).
+        from datetime import date, datetime as _dt
+        today = date.today()
         for r in rows:
             norm = r['contractor_name_normalized']
             raw = r['contractor_name_raw']
             is_license = is_license_number(norm)
+            p30 = r['permits_30d'] or 0
+            if p30 >= 10:
+                velocity_color = 'red'
+            elif p30 >= 5:
+                velocity_color = 'orange'
+            elif p30 >= 1:
+                velocity_color = 'blue'
+            else:
+                velocity_color = ''
+            def _days_since(s):
+                if not s: return None
+                try:
+                    return (today - _dt.strptime(s[:10], '%Y-%m-%d').date()).days
+                except Exception:
+                    return None
+            last_age = _days_since(r['last_permit_date'])
+            first_age = _days_since(r['first_permit_date'])
+            if last_age is not None and last_age <= 7:
+                recency = 'green'
+            elif last_age is not None and last_age <= 30:
+                recency = 'yellow'
+            else:
+                recency = 'gray'
+            is_new = first_age is not None and first_age <= 7
             out.append({
+                'id': r['id'],
                 'display_name': f"License #{raw}" if is_license else raw,
                 'is_license_number': is_license,
                 'total_permits': r['total_permits'],
                 'permits_90d': r['permits_90d'],
+                'permits_30d': p30,
                 'primary_trade': r['primary_trade'],
                 'avg_project_value': r['avg_project_value'],
                 'phone': r['phone'],
                 'website': r['website'],
                 'enriched': r['enrichment_status'] == 'enriched',
                 'permit_frequency': r['permit_frequency'],
+                'velocity_color': velocity_color,
+                'recency': recency,
+                'is_new': is_new,
+                'last_permit_date': r['last_permit_date'],
             })
         return out
     finally:

@@ -644,6 +644,34 @@ body {
     letter-spacing: 0.2px;
 }
 .gate-cta .cta-btn:hover { background: var(--accent-dark); }
+
+/* V251 F5: Velocity badges + recency dots on contractor rows */
+.velocity-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+    letter-spacing: 0.2px;
+    vertical-align: middle;
+}
+.velocity-badge.red    { background: #fee2e2; color: #991b1b; }
+.velocity-badge.orange { background: #ffedd5; color: #9a3412; }
+.velocity-badge.blue   { background: #dbeafe; color: #1e40af; }
+.velocity-badge.new    { background: #fef9c3; color: #854d0e; }
+.recency-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+.recency-dot.green  { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.15); }
+.recency-dot.yellow { background: #eab308; }
+.recency-dot.gray   { background: #d1d5db; }
 .leader-rank {
     display: inline-block;
     width: 20px;
@@ -1015,6 +1043,9 @@ body {
         {% set row_gate = (not is_pro) and (loop.index > 5) %}
         <tr>
           <td>
+            {# V251 F5: recency dot fires first so it aligns with the name #}
+            <span class="recency-dot {{ c.recency or 'gray' }}"
+                  title="{% if c.recency == 'green' %}Pulled a permit in the last 7 days{% elif c.recency == 'yellow' %}Active in the last 30 days{% else %}No permit activity in 30+ days{% endif %}"></span>
             <span class="leader-rank">{{ loop.index }}.</span>
             {% if c.is_license_number %}
               <span class="contractor-license">{{ c.display_name }}</span>
@@ -1022,6 +1053,16 @@ body {
               <span class="contractor-name">{{ c.display_name }}</span>
             {% endif %}
             {% if c.phone %}<span class="contractor-enriched-icon" title="Verified phone number available">📞</span>{% endif %}
+            {# V251 F5: velocity badge — highest-signal first #}
+            {% if c.is_new %}
+              <span class="velocity-badge new" title="First permit in the last 7 days">NEW</span>
+            {% elif c.velocity_color == 'red' %}
+              <span class="velocity-badge red">🔥 {{ c.permits_30d }} permits/30d</span>
+            {% elif c.velocity_color == 'orange' %}
+              <span class="velocity-badge orange">{{ c.permits_30d }} permits/30d</span>
+            {% elif c.velocity_color == 'blue' %}
+              <span class="velocity-badge blue">{{ c.permits_30d }} permits/30d</span>
+            {% endif %}
             {% if c.permit_frequency == 'high' %}<span class="contractor-freq high">Active</span>{% endif %}
           </td>
           <td{% if row_gate %} class="gate-blur"{% endif %}>{{ "{:,}".format(c.total_permits) }}<span style="color: var(--gray-500);"> ({{ c.permits_90d }})</span></td>
