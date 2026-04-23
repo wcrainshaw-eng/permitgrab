@@ -3011,6 +3011,11 @@ def upsert_permits(permits, source_city_key=None):
     V19: Also deduplicates by address+city+state+filing_date to prevent
     duplicate rows for the same physical permit with different permit numbers.
 
+    V255: if source_city_key isn't the canonical city_slug in prod_cities
+    (collector call sites pass source_id like 'chicago' or 'new_york'),
+    remap it to the canonical slug so historical + fresh permits share
+    the same key and per-slug queries stop reporting false staleness.
+
     Args:
         permits: list of permit dicts (same format as the old JSON)
         source_city_key: which city config collected these (for tracking)
@@ -3018,6 +3023,27 @@ def upsert_permits(permits, source_city_key=None):
     Returns:
         (new_count, updated_count)
     """
+    # V255: canonical-slug remap — pick the active city_slug from
+    # prod_cities that maps to this source_id / alt-slug. Silently fall
+    # back to the original value if no unique canonical exists. One
+    # tiny query per upsert batch, acceptable overhead.
+    if source_city_key:
+        try:
+            _c = get_connection()
+            _row = _c.execute(
+                "SELECT city_slug FROM prod_cities "
+                "WHERE status='active' AND (city_slug=? OR source_id=? "
+                "       OR source_id=REPLACE(?, '-', '_')) "
+                "ORDER BY (city_slug=?) DESC LIMIT 1",
+                (source_city_key, source_city_key, source_city_key, source_city_key),
+            ).fetchone()
+            if _row:
+                canon = _row['city_slug'] if hasattr(_row, 'keys') else _row[0]
+                if canon and canon != source_city_key:
+                    source_city_key = canon
+        except Exception:
+            pass
+
     # V19: Apply neighborhood-to-city mapping (e.g., "Vista Park, FL" -> "Orlando, FL")
     for p in permits:
         city = p.get('city', '').strip() if p.get('city') else ''

@@ -393,6 +393,18 @@ def _migrate_create_sources_table():
         CREATE INDEX IF NOT EXISTS idx_permits_prod_city_address
             ON permits(prod_city_id, address);
 
+        -- V255 P0#3: composite indexes covering the city-page + trade-
+        -- filter query pattern. Render logs showed /permits/<city>?trade=X
+        -- taking 22-99s on big cities for bot crawls — full scan on
+        -- 25k-row city tables. These let SQLite hit the filter clause
+        -- AND the filing_date sort in one index seek.
+        CREATE INDEX IF NOT EXISTS idx_permits_prod_city_trade_date
+            ON permits(prod_city_id, trade_category, filing_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_permits_prod_city_date
+            ON permits(prod_city_id, filing_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_permits_prod_city_zip
+            ON permits(prod_city_id, zip);
+
         -- V252 F1.5: property owner append (Enterprise feature). Schema in
         -- place so the per-city import ETL can write here as soon as each
         -- county's assessor API is wired up (Cook County 5pge-nu6u,
@@ -7162,6 +7174,50 @@ with app.app_context():
     except Exception as e:
         db.session.rollback()
         print(f"[Database] Tables created, migration warning: {e}")
+
+    # V255 P0#2: consolidate source_city_key to canonical city_slug.
+    # Historical permits accumulated under source_id-style keys (chicago,
+    # new_york, san_jose) because the collector passes source_id as
+    # source_city_key at upsert time. That fragments per-slug freshness
+    # queries and makes ad-ready cities look 3-5 weeks stale when
+    # filtered by canonical slug. This runs once on boot; idempotent
+    # (UPDATE only touches rows still on the legacy key).
+    try:
+        import sqlite3 as _sqlite3  # type: ignore
+        _conn = permitdb.get_connection()
+        _updated_total = 0
+        # Fetch all active prod_cities + their source_id, generate the
+        # full remap set dynamically so this works for any city, not
+        # just the 3 hand-picked ones.
+        _rows = _conn.execute(
+            "SELECT city_slug, source_id FROM prod_cities "
+            "WHERE status='active' AND source_id IS NOT NULL AND source_id != ''"
+        ).fetchall()
+        for _r in _rows:
+            _canon = _r['city_slug'] if hasattr(_r, 'keys') else _r[0]
+            _sid = _r['source_id'] if hasattr(_r, 'keys') else _r[1]
+            if not _canon or not _sid or _canon == _sid:
+                continue
+            # Variants to remap: the raw source_id, the hyphen-swap
+            # variant, and a lowercase form. Narrow by prod_city_id so
+            # we never cross-contaminate.
+            try:
+                _cur = _conn.execute(
+                    "UPDATE permits SET source_city_key = ? "
+                    "WHERE prod_city_id = (SELECT id FROM prod_cities WHERE city_slug=?) "
+                    "  AND source_city_key IN (?, ?, ?)",
+                    (_canon, _canon, _sid, _sid.replace('_', '-'), _sid.lower()),
+                )
+                _updated_total += _cur.rowcount or 0
+            except Exception:
+                pass
+        _conn.commit()
+        if _updated_total:
+            print(f"[V255 P0#2] Consolidated source_city_key on {_updated_total} permit rows")
+        else:
+            print("[V255 P0#2] source_city_key already canonical")
+    except Exception as e:
+        print(f"[V255 P0#2] source_city_key consolidation skipped: {e}")
 
 
 # Rate limiter setup

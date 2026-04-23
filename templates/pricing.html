@@ -447,77 +447,56 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <section class="pricing-section">
   <div class="pricing-inner">
-    <!-- Billing Toggle -->
-    <div class="billing-toggle">
-      <button type="button" class="toggle-btn active" id="monthly-btn" onclick="setBilling('monthly')">Monthly</button>
-      <button type="button" class="toggle-btn" id="annual-btn" onclick="setBilling('annual')">Annual <span class="save-badge">Save 13%</span></button>
-    </div>
+    {# V255 P0#1: billing toggle removed — annual Stripe prices don't
+       exist yet. Show monthly pricing only until annual is wired up. #}
 
     <div class="pricing-grid">
 
-      <!-- V209-4 / V211-2: STARTER TIER -->
-      <div class="pricing-card">
-        <div class="plan-name">Starter</div>
-        <div class="plan-price">$99<span>/month</span></div>
-        <div class="plan-desc">Solo contractors, 1 city + 1 trade</div>
+      {# V255 P0#1: Starter $99 tier deleted per spec — exactly two
+         tiers: Pro $149 (left, most popular) + Enterprise $349 (right).
+         Stripe price IDs: STRIPE_PRICE_PRO / STRIPE_PRICE_ENTERPRISE. #}
 
-        <ul class="features-list">
-          <li><span class="check">&#10003;</span> 1 city, 1 trade</li>
-          <li><span class="check">&#10003;</span> Daily permit alerts</li>
-          <li><span class="check">&#10003;</span> Contractor profiles + enriched contacts</li>
-          <li><span class="check">&#10003;</span> Trade-filtered views</li>
-          <li><span class="check">&#10003;</span> Email: weekly digest</li>
-          <li><span class="check">&#10003;</span> CSV export for your city</li>
-        </ul>
-
-        <button type="button" onclick="startCheckout('starter')" class="btn btn-outline">Start Free Trial</button>
-        <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free</p>
-      </div>
-
-      <!-- V209-4 / V211-2: PRO TIER (most popular) -->
+      <!-- V255 P0#1: PRO TIER — most popular, left card -->
       <div class="pricing-card featured">
         <div class="popular-badge">⭐ Most Popular</div>
         <div class="plan-name">Pro</div>
-        <div class="plan-price" id="pro-price">$149<span>/month</span></div>
-        <div class="plan-desc" id="pro-desc">Active contractors covering 3 cities</div>
+        <div class="plan-price">$149<span>/month</span></div>
+        <div class="plan-desc">Solo contractors & small teams</div>
 
         <ul class="features-list">
-          <li><span class="check">&#10003;</span> 3 cities, all trades</li>
-          <li><span class="check">&#10003;</span> Daily permit <strong>+ violation</strong> alerts</li>
-          <li><span class="check">&#10003;</span> Full contractor phones + websites</li>
-          <li><span class="check">&#10003;</span> Trade-filtered views</li>
-          <li><span class="check">&#10003;</span> Contractor leaderboard + intel</li>
-          <li><span class="check">&#10003;</span> Email: daily digest</li>
-          <li><span class="check">&#10003;</span> CSV export + saved searches</li>
-          <li><span class="check">&#10003;</span> Priority support</li>
+          <li><span class="check">&#10003;</span> <strong>Unlimited phone + website reveals</strong></li>
+          <li><span class="check">&#10003;</span> CSV export for 1 city</li>
+          <li><span class="check">&#10003;</span> Trade, zip, date, and value filters</li>
+          <li><span class="check">&#10003;</span> 3 saved searches with email alerts</li>
+          <li><span class="check">&#10003;</span> Contractor detail pages + permit history</li>
+          <li><span class="check">&#10003;</span> Lead scoring (Hot / Warm / Cold)</li>
+          <li><span class="check">&#10003;</span> Violation cross-reference flags</li>
         </ul>
 
-        <button type="button" onclick="startCheckout('pro')" class="btn btn-primary">Start Free Trial</button>
+        <a href="/signup?plan=pro&next=/pricing?plan=pro" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
         <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free, no credit card required</p>
       </div>
 
-      <!-- V209-4 / V211-2: ENTERPRISE TIER -->
-      <!-- V253 P2: Enterprise tier refreshed — $349/mo with V252 features
-           (REST API, webhooks, competitor tracker, property owner data,
-           monthly reports, unlimited cities) -->
+      <!-- V255 P0#1: ENTERPRISE TIER — right card, $349/mo -->
       <div class="pricing-card">
         <div class="plan-name">Enterprise</div>
         <div class="plan-price">$349<span>/month</span></div>
-        <div class="plan-desc">Multi-city + API + advanced intel</div>
+        <div class="plan-desc">Multi-city teams + API + advanced intel</div>
 
         <ul class="features-list">
-          <li><span class="check">&#10003;</span> Everything in Pro</li>
+          <li><span class="check">&#10003;</span> <strong>Everything in Pro</strong></li>
           <li><span class="check">&#10003;</span> <strong>Unlimited cities</strong></li>
           <li><span class="check">&#10003;</span> <strong>REST API access</strong> (/api/v1/)</li>
-          <li><span class="check">&#10003;</span> <strong>Zapier webhooks</strong> for new permits</li>
-          <li><span class="check">&#10003;</span> Competitor tracker (up to 10 companies)</li>
-          <li><span class="check">&#10003;</span> Property owner contact append</li>
-          <li><span class="check">&#10003;</span> Monthly PDF market reports</li>
-          <li><span class="check">&#10003;</span> Priority support + onboarding call</li>
+          <li><span class="check">&#10003;</span> Competitor tracker (watchlist 10 companies)</li>
+          <li><span class="check">&#10003;</span> Multi-city intel dashboard (/intel)</li>
+          <li><span class="check">&#10003;</span> Shareable reports (/report/)</li>
+          <li><span class="check">&#10003;</span> Webhook integration (Zapier / CRM)</li>
+          <li><span class="check">&#10003;</span> Monthly market report PDF</li>
+          <li><span class="check">&#10003;</span> Priority support</li>
         </ul>
 
-        <button type="button" onclick="startCheckout('enterprise')" class="btn btn-outline">Contact Us</button>
-        <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">Talk to a human about your markets</p>
+        <a href="/signup?plan=enterprise&next=/pricing?plan=enterprise" class="btn btn-outline" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
+        <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free, no credit card required</p>
       </div>
 
     </div>
@@ -654,50 +633,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 {% include 'partials/footer.html' %}
 
 <script>
-// Billing period state
-let billingPeriod = 'monthly';
-
-function setBilling(period) {
-  billingPeriod = period;
-
-  // Update toggle buttons
-  document.getElementById('monthly-btn').classList.toggle('active', period === 'monthly');
-  document.getElementById('annual-btn').classList.toggle('active', period === 'annual');
-
-  // Update pricing display
-  const priceEl = document.getElementById('pro-price');
-  const savingsEl = document.getElementById('annual-savings');
-  const descEl = document.getElementById('pro-desc');
-
-  if (period === 'annual') {
-    priceEl.innerHTML = '$129<span>/month</span>';
-    descEl.textContent = 'Billed annually ($1,548/year)';
-    savingsEl.classList.add('show');
-  } else {
-    priceEl.innerHTML = '$149<span>/month</span>';
-    descEl.textContent = 'Full access to win more jobs';
-    savingsEl.classList.remove('show');
-  }
-}
-
-async function startStripeCheckout() {
-  try {
-    const resp = await fetch('/api/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ billing_period: billingPeriod })
-    });
-    const data = await resp.json();
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert('Unable to start checkout. Please try again.');
-    }
-  } catch (err) {
-    console.error('Checkout error:', err);
-    alert('Unable to start checkout. Please try again.');
-  }
-}
+// V255 P0#1: billing-toggle JS removed along with the DOM toggle —
+// annual Stripe prices don't exist yet. All CTAs are monthly /signup
+// links now; checkout kicks in post-registration via the stored plan
+// query param.
 </script>
 
 </body>
