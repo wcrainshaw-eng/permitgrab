@@ -168,7 +168,10 @@ async function contractorDetail(browser) {
   }
   pass(`F6.1 contractor link found (${href})`);
 
-  const resp = await page.goto(`${BASE_URL}${href}`, { waitUntil: 'networkidle2', timeout: 20000 });
+  // Contractor detail page hits a heavier JOIN (permits×violations by
+  // address) on big cities — bump the timeout so Render's occasional
+  // ~10-15s first-request cold start doesn't flip the test red.
+  const resp = await page.goto(`${BASE_URL}${href}`, { waitUntil: 'networkidle2', timeout: 45000 });
   if (resp.status() === 200) pass(`F6.2 detail page 200 (${href})`);
   else fail('F6.2 detail page 200', `${resp.status()}`);
 
