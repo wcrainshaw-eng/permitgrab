@@ -1711,7 +1711,19 @@ def normalize_permit_bulk(raw_record, virtual_config, source_key):
         raw_key = fmap.get(field_name, "")
         if not raw_key:
             return ""
-        return str(raw_record.get(raw_key, "")).strip()
+        val = raw_record.get(raw_key)
+        # V258: When source key exists with Python None value (common
+        # for CKAN nullable fields like Pittsburgh's contractor_name on
+        # newly-issued permits), str(None) = "None" was landing as a
+        # literal string — 2,002 Pittsburgh permits had contractor_name
+        # = "None" and got rejected by SKIP_NAMES at profile-build time.
+        # Treat None and the literal "None"/"null" strings as empty.
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.lower() in ("none", "null"):
+            return ""
+        return s
 
     # Build address — V12.55c: handle Socrata location objects
     raw_addr = raw_record.get(fmap.get("address", ""), "")
