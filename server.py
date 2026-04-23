@@ -11599,6 +11599,14 @@ def create_checkout_session():
                 'billing_period': billing_period,
             },
             allow_promotion_codes=True,
+            # V253 P2 #6: 14-day free trial on all paid plans. Pricing
+            # page already advertises "14 days free, no credit card
+            # required" — actually honor it via Stripe trial_period_days
+            # so Pro/Enterprise users aren't charged until day 14.
+            # Matches the existing V251 F17 nav pill that says NEW.
+            subscription_data={
+                'trial_period_days': 14,
+            },
         )
         return jsonify({'url': checkout_session.url})
     except stripe.error.StripeError as e:
