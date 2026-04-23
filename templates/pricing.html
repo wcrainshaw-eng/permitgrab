@@ -501,19 +501,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
     </div>
 
-    {# V251 F20: bulk phone-reveal credits (stub). Lower entry point for
-       users who won't commit monthly. Stripe product not wired yet —
-       clicking goes to /contact waitlist so we gauge demand before
-       building Stripe products + credit-consumption logic. #}
-    <div style="max-width: 1200px; margin: 48px auto 0; padding: 28px 32px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
-        <div>
-          <h3 style="font-size: 18px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px;">Not ready for monthly? Buy reveal credits.</h3>
-          <p style="font-size: 14px; color: var(--gray-500);">One-time top-ups: <strong>50 phones for $49</strong> · <strong>200 phones for $99</strong> — no subscription, credits never expire.</p>
-        </div>
-        <a href="/contact?interest=bulk-credits" class="btn btn-outline" style="white-space: nowrap;">Join the waitlist →</a>
-      </div>
-    </div>
+    {# V255: V251 F20 bulk-credits waitlist card removed. The $49/$99
+       price points read as a $99 tier per Wes's "no sub-$149 tier"
+       directive and created confusion on the pricing grid. Credits
+       feature parked until we have Stripe products + consumption logic. #}
 
     <!-- V211-2: unified checkout JS — calls /api/create-checkout-session,
          falls back to mailto when Stripe env vars aren't set yet. -->
