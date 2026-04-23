@@ -341,6 +341,25 @@ h1 {
     </form>
   </div>
 
+  <!-- V251 F17: Competitor Watch (Pro only) — surfaces the existing
+       /api/competitors backend so users can actually add/remove names.
+       Shows "Pro feature" call-out for non-Pro. -->
+  <div class="card">
+    <h2>Competitor Watch <span style="font-size: 10px; background: #f97316; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle;">PRO</span></h2>
+    <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 12px;">
+      Track up to 5 competitor business names. Permits they pull in your markets will surface in your digest.
+    </p>
+    {% if is_pro %}
+    <div id="competitors-list" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;"></div>
+    <form id="competitor-form" onsubmit="return addCompetitor(event)" style="display: flex; gap: 8px;">
+      <input id="competitor-name" type="text" placeholder="e.g. ACME ROOFING LLC" required style="flex: 1; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 14px;">
+      <button class="btn btn-primary" type="submit">Add</button>
+    </form>
+    {% else %}
+    <p style="font-size: 14px;"><a href="/pricing" style="color: var(--primary); font-weight: 600;">Subscribe for $149/mo</a> to watch competitors.</p>
+    {% endif %}
+  </div>
+
   <!-- Security Section -->
   <div class="card">
     <h2>Security</h2>
@@ -372,6 +391,42 @@ function showToast(message, isError = false) {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+// V251 F17: competitor watch — hits the existing /api/competitors CRUD.
+async function loadCompetitors() {
+  const list = document.getElementById('competitors-list');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/competitors');
+    if (!r.ok) return;
+    const d = await r.json();
+    const names = d.competitors || [];
+    list.innerHTML = names.length ? names.map(n => (
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--gray-50);border-radius:6px;">' +
+        '<span>' + escapeHtml(n) + '</span>' +
+        '<button class="btn" style="padding:4px 10px;font-size:12px;" onclick="removeCompetitor(' + JSON.stringify(n).replace(/"/g, '&quot;') + ')">Remove</button>' +
+      '</div>'
+    )).join('') : '<p style="color: var(--gray-500); font-size: 13px;">No competitors tracked yet.</p>';
+  } catch (e) { /* swallow */ }
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function addCompetitor(ev) {
+  ev.preventDefault();
+  const inp = document.getElementById('competitor-name');
+  const name = inp.value.trim();
+  if (!name) return false;
+  const r = await fetch('/api/competitors', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name}) });
+  const d = await r.json();
+  if (r.ok) { inp.value = ''; showToast('Added'); loadCompetitors(); }
+  else showToast(d.error || 'Failed', true);
+  return false;
+}
+async function removeCompetitor(name) {
+  const r = await fetch('/api/competitors', { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name}) });
+  if (r.ok) { showToast('Removed'); loadCompetitors(); }
+  else { const d = await r.json(); showToast(d.error || 'Failed', true); }
+}
+if (document.getElementById('competitors-list')) loadCompetitors();
 
 // Profile form
 document.getElementById('profile-form').addEventListener('submit', async (e) => {
