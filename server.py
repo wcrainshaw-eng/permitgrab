@@ -9501,6 +9501,36 @@ def city_report(city_slug):
     )
 
 
+# V252 F7: vertical landing pages — /<trade>/<city> SEO route that targets
+# "<trade> leads <city>" keywords. Whitelisted to our supported trades so
+# this doesn't collide with /pricing, /blog, /account, etc.
+V252_TRADE_URL_MAP = {
+    'solar': 'solar',
+    'roofing': 'roofing',
+    'hvac': 'hvac',
+    'electrical': 'electrical',
+    'plumbing': 'plumbing',
+    'demolition': 'demolition',
+    'general-construction': 'general-construction',
+    'pool': 'pool',
+    'fence': 'fence',
+    'interior-renovation': 'interior-renovation',
+}
+
+
+@app.route('/<trade>/<city_slug>')
+def trade_city_landing(trade, city_slug):
+    if trade.lower() not in V252_TRADE_URL_MAP:
+        # Not a known trade — let Flask's normal 404 handler deal with it.
+        abort(404)
+    trade_slug = V252_TRADE_URL_MAP[trade.lower()]
+    # Reuse the existing /permits/<city>/<trade> renderer. 301 so Google
+    # collapses the ranking signal into the canonical URL (which also
+    # exists) rather than splitting across two paths. city_trade_landing
+    # handles missing-city + missing-trade gracefully.
+    return redirect(f"/permits/{city_slug}/{trade_slug}", code=301)
+
+
 @app.route('/leaderboard/<city_slug>')
 def leaderboard(city_slug):
     """V252 F6: Public contractor-volume leaderboard for a city.
