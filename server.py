@@ -4974,6 +4974,110 @@ def _require_pro_api():
     return None, None
 
 
+# ==========================================================================
+# V254 Phase 1: 10 free phone reveals — the conversion lever.
+# ==========================================================================
+def _resolve_phone_for_profile(profile_id):
+    """Look up phone (and site) for a contractor_profile by id."""
+    try:
+        row = permitdb.get_connection().execute(
+            "SELECT phone, website, contractor_name_raw FROM contractor_profiles WHERE id = ?",
+            (int(profile_id),),
+        ).fetchone()
+        return dict(row) if row and hasattr(row, 'keys') else (dict(zip(['phone', 'website', 'contractor_name_raw'], row)) if row else None)
+    except Exception:
+        return None
+
+
+@app.route('/api/reveal-status')
+def api_reveal_status():
+    """V254 Phase 1: return remaining free reveals + Pro status for the
+    current session. Public — anon gets zero credits, is_pro=false,
+    signup prompt. UI uses this to render the right CTA everywhere.
+    """
+    if 'user_email' not in session:
+        return jsonify({'authenticated': False, 'is_pro': False,
+                        'credits_remaining': 0, 'signup_url': '/signup'})
+    u = find_user_by_email(session['user_email'])
+    if not u:
+        return jsonify({'authenticated': False, 'is_pro': False,
+                        'credits_remaining': 0, 'signup_url': '/signup'})
+    pro = is_pro({'plan': u.plan,
+                  'stripe_subscription_status': getattr(u, 'stripe_subscription_status', None)})
+    try:
+        already = json.loads(u.revealed_profile_ids or '[]')
+    except Exception:
+        already = []
+    return jsonify({
+        'authenticated': True,
+        'is_pro': bool(pro),
+        'credits_remaining': 0 if pro else int(u.reveal_credits or 0),
+        'revealed_count': len(already),
+    })
+
+
+@app.route('/api/reveal-phone', methods=['POST'])
+def api_reveal_phone():
+    """V254 Phase 1: spend a free-tier credit to reveal a contractor phone.
+
+    Pro/Enterprise: phone returned without decrementing.
+    Free with credits > 0: decrement and return phone; track revealed id
+    so a second reveal of the same contractor is idempotent (no charge).
+    Free with credits == 0: 402 with upgrade_url.
+    Anon: 401 with signup_url.
+    """
+    if 'user_email' not in session:
+        return jsonify({'error': 'Sign up for 10 free reveals',
+                        'signup_url': '/signup'}), 401
+    data = request.get_json() or {}
+    try:
+        profile_id = int(data.get('profile_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'profile_id required'}), 400
+    profile = _resolve_phone_for_profile(profile_id)
+    if not profile:
+        return jsonify({'error': 'Contractor not found'}), 404
+
+    u = find_user_by_email(session['user_email'])
+    if not u:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    pro = is_pro({'plan': u.plan,
+                  'stripe_subscription_status': getattr(u, 'stripe_subscription_status', None)})
+    if pro:
+        return jsonify({'phone': profile.get('phone'),
+                        'website': profile.get('website'),
+                        'credits_remaining': None, 'is_pro': True})
+
+    # Free tier — check idempotency + credits
+    try:
+        already = json.loads(u.revealed_profile_ids or '[]')
+    except Exception:
+        already = []
+    if profile_id in already:
+        return jsonify({'phone': profile.get('phone'),
+                        'website': profile.get('website'),
+                        'credits_remaining': int(u.reveal_credits or 0),
+                        'is_pro': False, 'already_revealed': True})
+
+    credits = int(u.reveal_credits or 0)
+    if credits <= 0:
+        return jsonify({
+            'error': "You've used all your free reveals. Subscribe for unlimited access.",
+            'upgrade_url': '/pricing',
+            'credits_remaining': 0,
+        }), 402
+
+    already.append(profile_id)
+    u.reveal_credits = credits - 1
+    u.revealed_profile_ids = json.dumps(already[-500:])  # cap list length
+    db.session.commit()
+    return jsonify({'phone': profile.get('phone'),
+                    'website': profile.get('website'),
+                    'credits_remaining': u.reveal_credits,
+                    'is_pro': False})
+
+
 @app.route('/api/v1/contractors')
 def api_v1_contractors():
     """GET /api/v1/contractors?city=<slug>[&trade=][&limit=]
@@ -6922,6 +7026,12 @@ class User(db.Model):
     # V251 F4: per-user filter defaults for daily digest.
     digest_zip_filter = db.Column(db.String(16), nullable=True)
     digest_trade_filter = db.Column(db.String(64), nullable=True)
+    # V254 Phase 1: 10 free phone-reveal credits per signup. Decrements on
+    # each unique /api/reveal-phone call. Pro/Enterprise bypass entirely.
+    reveal_credits = db.Column(db.Integer, default=10)
+    # V254 Phase 1: JSON list of already-revealed profile_ids — so a
+    # repeat reveal of the same contractor doesn't burn a fresh credit.
+    revealed_profile_ids = db.Column(db.Text, default='[]')
 
     # V12.53: Email system fields
     email_verified = db.Column(db.Boolean, default=False)
@@ -7023,6 +7133,10 @@ with app.app_context():
         # V251 F4: per-user filter defaults for the daily digest.
         ("digest_zip_filter", "VARCHAR(16)"),
         ("digest_trade_filter", "VARCHAR(64)"),
+        # V254 Phase 1: free-tier phone-reveal credits. Default 10 matches
+        # the free-trial promise on the signup / pricing page.
+        ("reveal_credits", "INTEGER DEFAULT 10"),
+        ("revealed_profile_ids", "TEXT DEFAULT '[]'"),
         ("email_verified", "BOOLEAN DEFAULT FALSE"),
         ("email_verified_at", "TIMESTAMP"),
         ("email_verification_token", "VARCHAR(64)"),
