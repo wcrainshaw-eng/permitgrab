@@ -384,6 +384,14 @@ def _migrate_create_sources_table():
         CREATE INDEX IF NOT EXISTS idx_violations_prod_city_id ON violations(prod_city_id);
         CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
         CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
+        -- V251 F11 perf: covers the contractor-violation cross-ref JOIN on
+        -- each city page. Without these, Chicago's 19k violations × 25k
+        -- permits join ran 20+ seconds per page render and intermittently
+        -- tipped Render's gateway into 502s.
+        CREATE INDEX IF NOT EXISTS idx_violations_prod_city_address
+            ON violations(prod_city_id, address);
+        CREATE INDEX IF NOT EXISTS idx_permits_prod_city_address
+            ON permits(prod_city_id, address);
     ''')
 
     # V163: Drop dead tables
@@ -13312,12 +13320,14 @@ def city_landing_inner(city_slug):
     # V251 F13: zip heatmap — top 10 zip codes by permit volume with
     # contractor counts and 90-day permit counts for trend signal.
     # Skipped silently when the city's permit feed doesn't populate zip
-    # (Chicago, Orlando, Phoenix data sources don't). Template renders a
-    # grid with color intensity proportional to max_permits_in_zip.
+    # (Chicago, Orlando, Phoenix data sources don't). Uses a fresh
+    # connection since the page-scoped `conn` can have a stale cursor
+    # by the time we reach here — same pattern as F2 dropdowns.
     zip_heatmap = []
     if _prod_city_id:
         try:
-            zip_heatmap = [dict(r) for r in conn.execute("""
+            _hconn = permitdb.get_connection()
+            zip_heatmap = [dict(r) for r in _hconn.execute("""
                 SELECT zip,
                        COUNT(*) as permits_total,
                        COUNT(CASE WHEN COALESCE(filing_date, issued_date, date)
