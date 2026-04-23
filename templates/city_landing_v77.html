@@ -593,6 +593,57 @@ body {
 .trade-tabs button:hover:not(.active) {
     background: #e5e7eb;
 }
+
+/* V251 F1: Gated preview — first 5 rows are real, rest are obscured. */
+.gate-blur {
+    filter: blur(5px);
+    user-select: none;
+    pointer-events: none;
+    color: var(--gray-700);
+}
+.gate-reveal-btn {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--primary);
+    color: white !important;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    letter-spacing: 0.3px;
+}
+.gate-reveal-btn:hover { background: var(--primary-dark); }
+.gate-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 32px;
+    margin: 16px 0;
+    background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+    color: white;
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+.gate-cta h3 {
+    font-size: 22px;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+}
+.gate-cta p { color: rgba(255,255,255,.8); margin: 0; font-size: 14px; }
+.gate-cta .cta-btn {
+    display: inline-block;
+    padding: 14px 32px;
+    background: var(--accent);
+    color: white !important;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    letter-spacing: 0.2px;
+}
+.gate-cta .cta-btn:hover { background: var(--accent-dark); }
 .leader-rank {
     display: inline-block;
     width: 20px;
@@ -933,9 +984,12 @@ body {
       </thead>
       <tbody>
         {% for c in top_contractors %}
+        {# V251 F1: gated preview. Pro users see everything. Anonymous/free
+           users see full names for top 5, blurred for rest, and phones are
+           always gated to a "Reveal" CTA that drops them into /signup. #}
+        {% set row_gate = (not is_pro) and (loop.index > 5) %}
         <tr>
           <td>
-            {# V209-3: rank number + enriched icon (visible even before mobile column shows) #}
             <span class="leader-rank">{{ loop.index }}.</span>
             {% if c.is_license_number %}
               <span class="contractor-license">{{ c.display_name }}</span>
@@ -945,9 +999,9 @@ body {
             {% if c.phone %}<span class="contractor-enriched-icon" title="Verified phone number available">📞</span>{% endif %}
             {% if c.permit_frequency == 'high' %}<span class="contractor-freq high">Active</span>{% endif %}
           </td>
-          <td>{{ "{:,}".format(c.total_permits) }}<span style="color: var(--gray-500);"> ({{ c.permits_90d }})</span></td>
-          <td class="hide-mobile">{{ c.primary_trade or '-' }}</td>
-          <td class="hide-mobile">
+          <td{% if row_gate %} class="gate-blur"{% endif %}>{{ "{:,}".format(c.total_permits) }}<span style="color: var(--gray-500);"> ({{ c.permits_90d }})</span></td>
+          <td class="hide-mobile{% if row_gate %} gate-blur{% endif %}">{{ c.primary_trade or '-' }}</td>
+          <td class="hide-mobile{% if row_gate %} gate-blur{% endif %}">
             {% if c.avg_project_value and c.avg_project_value > 0 %}
               ${{ "{:,.0f}".format(c.avg_project_value) }}
             {% else %}
@@ -955,16 +1009,32 @@ body {
             {% endif %}
           </td>
           <td class="contractor-contact">
-            {% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% endif %}
-            {% if c.phone and c.website %} · {% endif %}
-            {% if c.website %}<a href="{{ c.website }}" rel="nofollow noopener" target="_blank">Website</a>{% endif %}
-            {% if not c.phone and not c.website %}<span style="color: var(--gray-400); font-size: 12px;" title="Contact details being verified — refreshes daily">Verifying…</span>{% endif %}
+            {% if is_pro %}
+              {% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% endif %}
+              {% if c.phone and c.website %} · {% endif %}
+              {% if c.website %}<a href="{{ c.website }}" rel="nofollow noopener" target="_blank">Website</a>{% endif %}
+              {% if not c.phone and not c.website %}<span style="color: var(--gray-400); font-size: 12px;" title="Contact details being verified — refreshes daily">Verifying…</span>{% endif %}
+            {% else %}
+              {% if c.phone or c.website %}
+                <a href="/signup?next=/permits/{{ city_slug }}" class="gate-reveal-btn" title="Subscribe to reveal">🔒 Reveal</a>
+              {% else %}
+                <span style="color: var(--gray-400); font-size: 12px;">Verifying…</span>
+              {% endif %}
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if not is_pro and top_contractors|length > 5 %}
+  {# V251 F1: below-table conversion CTA. Shown to anon + free tiers only. #}
+  <div class="gate-cta">
+    <h3>Viewing {{ [top_contractors|length, 5] | min }} of {{ unique_contractors or top_contractors|length }} contractors in {{ city_name }}</h3>
+    <p>Subscribe to unlock full contractor names, phone numbers, and websites for every row — plus CSV export and weekly alerts.</p>
+    <a href="/signup?next=/permits/{{ city_slug }}" class="cta-btn">Unlock full access — $149/mo</a>
+  </div>
+  {% endif %}
 </section>
 {% endif %}
 
