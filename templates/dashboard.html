@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PermitGrab — Building Permit Data for Contractors | Track Permits Nationwide</title>
-<meta name="description" content="Track building permits across 900+ US cities. Find new construction, renovation, and remodeling permits daily. Built for contractors, builders, and remodelers looking for job leads.">
+<meta name="description" content="Track building permits across {{ city_count }}+ US cities. Find new construction, renovation, and remodeling permits daily. Built for contractors, builders, and remodelers looking for job leads.">
 <link rel="canonical" href="https://permitgrab.com/">
 <meta property="og:title" content="PermitGrab — Building Permit Data for Contractors">
-<meta property="og:description" content="Track building permits across 900+ US cities. Find new construction, renovation, and remodeling permits daily. Built for contractors.">
+<meta property="og:description" content="Track building permits across {{ city_count }}+ US cities. Find new construction, renovation, and remodeling permits daily. Built for contractors.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://permitgrab.com/">
 <meta property="og:image" content="https://permitgrab.com/static/og-image.png">
@@ -1506,16 +1506,16 @@ footer a:hover { color: white; }
       PermitGrab tracks freshly-issued building permits from official city portals in {{ state_count }} states. Browse permits filtered by trade, project value, and neighborhood on any of our active city pages:
     </p>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 40px; font-size: 14px;">
-      <a href="/permits/new-york" style="color: #2563eb; text-decoration: none;">New York City Building Permits</a>
+      <a href="/permits/new-york-city" style="color: #2563eb; text-decoration: none;">New York City Building Permits</a>
       <a href="/permits/los-angeles" style="color: #2563eb; text-decoration: none;">Los Angeles Building Permits</a>
-      <a href="/permits/chicago" style="color: #2563eb; text-decoration: none;">Chicago Building Permits</a>
-      <a href="/permits/houston" style="color: #2563eb; text-decoration: none;">Houston Building Permits</a>
-      <a href="/permits/phoenix" style="color: #2563eb; text-decoration: none;">Phoenix Building Permits</a>
+      <a href="/permits/chicago-il" style="color: #2563eb; text-decoration: none;">Chicago Building Permits</a>
+      <a href="/permits/houston-tx" style="color: #2563eb; text-decoration: none;">Houston Building Permits</a>
+      <a href="/permits/phoenix-az" style="color: #2563eb; text-decoration: none;">Phoenix Building Permits</a>
       <a href="/permits/philadelphia" style="color: #2563eb; text-decoration: none;">Philadelphia Building Permits</a>
-      <a href="/permits/san-antonio" style="color: #2563eb; text-decoration: none;">San Antonio Building Permits</a>
+      <a href="/permits/san-antonio-tx" style="color: #2563eb; text-decoration: none;">San Antonio Building Permits</a>
       <a href="/permits/san-diego" style="color: #2563eb; text-decoration: none;">San Diego Building Permits</a>
-      <a href="/permits/dallas" style="color: #2563eb; text-decoration: none;">Dallas Building Permits</a>
-      <a href="/permits/austin" style="color: #2563eb; text-decoration: none;">Austin Building Permits</a>
+      <a href="/permits/dallas-tx" style="color: #2563eb; text-decoration: none;">Dallas Building Permits</a>
+      <a href="/permits/austin-tx" style="color: #2563eb; text-decoration: none;">Austin Building Permits</a>
       <a href="/permits/fort-worth" style="color: #2563eb; text-decoration: none;">Fort Worth Building Permits</a>
       <a href="/permits/san-francisco" style="color: #2563eb; text-decoration: none;">San Francisco Building Permits</a>
     </div>
@@ -1525,11 +1525,11 @@ footer a:hover { color: white; }
     </h2>
     <p style="font-size: 15px; color: #4b5563; margin-bottom: 20px;">
       Open building code violations are some of the strongest contractor leads you can buy. The owner has a deadline, a fine, and a written reason to hire someone tomorrow. PermitGrab indexes official city violation feeds alongside permit data so you see both in one place. Cities with violation coverage include
-      <a href="/permits/new-york" style="color: #2563eb;">New York</a>,
-      <a href="/permits/chicago" style="color: #2563eb;">Chicago</a>,
+      <a href="/permits/new-york-city" style="color: #2563eb;">New York</a>,
+      <a href="/permits/chicago-il" style="color: #2563eb;">Chicago</a>,
       <a href="/permits/philadelphia" style="color: #2563eb;">Philadelphia</a>,
-      <a href="/permits/houston" style="color: #2563eb;">Houston</a>,
-      <a href="/permits/austin" style="color: #2563eb;">Austin</a>,
+      <a href="/permits/houston-tx" style="color: #2563eb;">Houston</a>,
+      <a href="/permits/austin-tx" style="color: #2563eb;">Austin</a>,
       <a href="/permits/san-francisco" style="color: #2563eb;">San Francisco</a>,
       <a href="/permits/seattle" style="color: #2563eb;">Seattle</a>,
       <a href="/permits/nashville" style="color: #2563eb;">Nashville</a>,
@@ -1992,34 +1992,38 @@ function populateFilters() {
   const trades = [...new Set(allPermits.map(p => p.trade_category))].filter(t => t).sort();
   const statuses = [...new Set(allPermits.map(p => p.status))].filter(s => s).sort();
 
+  // V247: filter bar is hidden on homepage (is_homepage=True) — null-check
+  // every element before touching it so populateFilters() doesn't throw.
   const citySelect = document.getElementById('filter-city');
   const alertCity = document.getElementById('alert-city');
   // V13: Populate from server-side list of ALL cities
   sortedCities.forEach(city => {
     const label = city.state ? `${city.state} - ${city.name}` : city.name;
-    citySelect.add(new Option(label, city.name));
+    if (citySelect) citySelect.add(new Option(label, city.name));
     if (alertCity) alertCity.add(new Option(label, city.name));
   });
 
   const tradeSelect = document.getElementById('filter-trade');
   const alertTrade = document.getElementById('alert-trade');
   trades.forEach(t => {
-    tradeSelect.add(new Option(t, t));
+    if (tradeSelect) tradeSelect.add(new Option(t, t));
     if (alertTrade) alertTrade.add(new Option(t, t));
   });
 
   // V9 Fix 5: Apply user's default filter preferences from onboarding
-  if (defaultCity && cityStateMap.has(defaultCity)) {
+  if (citySelect && defaultCity && cityStateMap.has(defaultCity)) {
     citySelect.value = defaultCity;
   }
-  if (defaultTrade && trades.includes(defaultTrade)) {
+  if (tradeSelect && defaultTrade && trades.includes(defaultTrade)) {
     tradeSelect.value = defaultTrade;
   }
 
   const statusSelect = document.getElementById('filter-status');
-  statuses.forEach(s => {
-    statusSelect.add(new Option(s, s));
-  });
+  if (statusSelect) {
+    statuses.forEach(s => {
+      statusSelect.add(new Option(s, s));
+    });
+  }
 
   // V8: Populate search suggestions (addresses and owner names)
   const suggestions = new Set();
@@ -2958,6 +2962,8 @@ function updateAuthUI() {
 }
 
 function updateAlertWidget() {
+  // V247: alert sidebar widget isn't rendered on the marketing homepage,
+  // so every DOM handle may be null. Guard and early-return.
   const signupForm = document.getElementById('alerts-signup-form');
   const statusDiv = document.getElementById('alerts-status');
   const headerText = document.getElementById('alerts-header-text');
@@ -2965,25 +2971,27 @@ function updateAlertWidget() {
   const inactiveStatus = document.getElementById('alerts-inactive-status');
   const cityName = document.getElementById('alerts-city-name');
 
+  if (!signupForm && !statusDiv && !headerText) return;
+
   if (currentUser) {
     // Logged in - show status instead of form
-    signupForm.style.display = 'none';
-    statusDiv.style.display = 'block';
-    headerText.textContent = 'Your Alerts';
+    if (signupForm) signupForm.style.display = 'none';
+    if (statusDiv) statusDiv.style.display = 'block';
+    if (headerText) headerText.textContent = 'Your Alerts';
 
     if (currentUser.daily_alerts) {
-      activeStatus.style.display = 'block';
-      inactiveStatus.style.display = 'none';
-      cityName.textContent = currentUser.city || 'All Cities';
+      if (activeStatus) activeStatus.style.display = 'block';
+      if (inactiveStatus) inactiveStatus.style.display = 'none';
+      if (cityName) cityName.textContent = currentUser.city || 'All Cities';
     } else {
-      activeStatus.style.display = 'none';
-      inactiveStatus.style.display = 'block';
+      if (activeStatus) activeStatus.style.display = 'none';
+      if (inactiveStatus) inactiveStatus.style.display = 'block';
     }
   } else {
     // Logged out - show signup form
-    signupForm.style.display = 'block';
-    statusDiv.style.display = 'none';
-    headerText.textContent = 'Get Permit Alerts';
+    if (signupForm) signupForm.style.display = 'block';
+    if (statusDiv) statusDiv.style.display = 'none';
+    if (headerText) headerText.textContent = 'Get Permit Alerts';
   }
 }
 
@@ -3180,8 +3188,13 @@ function loadMoreViolations() {
 }
 
 async function loadMarketLeaders() {
+  // V247: sidebar widget and filter-city element are both hidden on the
+  // marketing homepage. Bail early if either is missing so the page doesn't
+  // fail with "Cannot read 'value' of null".
   const container = document.getElementById('market-leaders');
-  const city = document.getElementById('filter-city').value;
+  if (!container) return;
+  const filterCity = document.getElementById('filter-city');
+  const city = filterCity ? filterCity.value : '';
 
   try {
     const resp = await fetch(`/api/contractors/top?city=${encodeURIComponent(city)}&limit=5`);
@@ -3197,6 +3210,7 @@ async function loadMarketLeaders() {
 
 function renderMarketLeaders(contractors, cityLabel) {
   const container = document.getElementById('market-leaders');
+  if (!container) return;
 
   if (!contractors || contractors.length === 0) {
     container.innerHTML = '<div style="color: var(--gray-400); font-size: 13px; text-align: center; padding: 12px;">No contractors found</div>';

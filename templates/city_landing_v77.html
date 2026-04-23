@@ -241,11 +241,15 @@ body {
 }
 
 /* PERMITS TABLE */
+/* V247: removed `overflow: hidden` on the outer container — it was clipping
+ * the table on some viewports and combined with the box-shadow it rendered
+ * as empty white space. Keep the shadow/border on the wrap instead so the
+ * table always shows 25 rows of real permit data. */
 .permits-table-container {
   background: white;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  border: 1px solid var(--gray-200);
 }
 .permits-table-header {
   padding: 16px 24px;
@@ -270,11 +274,28 @@ body {
 }
 .permits-table-wrap {
   overflow-x: auto;
+  /* V247: ensure the wrap never collapses — anchors height to the table
+   * rows so the container is always visible even if something weird
+   * happens to the parent layout. */
+  display: block;
+  min-height: 100px;
 }
 .permits-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  /* V247: belt-and-suspenders visibility so nothing upstream can collapse it */
+  display: table !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: white;
+}
+.permits-table tbody tr {
+  display: table-row;
+}
+.permits-table tbody td {
+  color: var(--gray-700);
+  background: white;
 }
 .permits-table th {
   background: var(--gray-50);

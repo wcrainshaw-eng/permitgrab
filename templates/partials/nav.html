@@ -177,10 +177,16 @@
           <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
           {% endfor %}
           {% else %}
-          <a href="/permits/new-york">New York City</a>
+          {# V247: fallback slugs verified against prod_cities on 2026-04-22.
+             Old fallback used bare city names ("new-york", "chicago") which
+             don't exist as active slugs and sent customers to dead pages. #}
+          <a href="/permits/chicago-il">Chicago</a>
+          <a href="/permits/new-york-city">New York City</a>
+          <a href="/permits/phoenix-az">Phoenix</a>
+          <a href="/permits/miami-dade-county">Miami-Dade</a>
+          <a href="/permits/san-jose">San Jose</a>
           <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/chicago">Chicago</a>
-          <a href="/permits/austin">Austin</a>
+          <a href="/permits/austin-tx">Austin</a>
           <a href="/permits/seattle">Seattle</a>
           <a href="/permits/san-francisco">San Francisco</a>
           {% endif %}
