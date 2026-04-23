@@ -148,6 +148,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </div>
 </section>
 
+<section class="section" style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 0; padding-bottom: 0;">
+  {# V251 F15: Save-contractor button. Pro-gated server-side (API returns
+     402 for non-Pro). UI uses that to either show the save form or the
+     upgrade CTA. Starts inert so anon doesn't think they can bookmark. #}
+  {% if session.get('user_email') and is_pro %}
+  <button id="save-btn" onclick="toggleSave()"
+          style="padding: 10px 18px; background: white; border: 1.5px solid var(--primary); border-radius: 8px; color: var(--primary); font-weight: 700; cursor: pointer;">
+    ⭐ Save contractor
+  </button>
+  {% endif %}
+</section>
+
 <section class="section">
   <h2>Contact</h2>
   <div class="contact-card">
@@ -266,5 +278,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 {% endif %}
 
 {% include 'partials/footer.html' ignore missing %}
+
+<script>
+// V251 F15: Save-contractor toggle using /api/saved-contractors.
+async function toggleSave() {
+  const notes = prompt('Notes for this contractor (optional):', '') || '';
+  const r = await fetch('/api/saved-contractors', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ profile_id: {{ contractor.id }}, notes })
+  });
+  const btn = document.getElementById('save-btn');
+  if (r.ok) {
+    if (btn) { btn.textContent = '✅ Saved — view in /saved-contractors'; btn.style.background = '#16a34a'; btn.style.color = 'white'; btn.style.borderColor = '#16a34a'; }
+  } else {
+    const d = await r.json().catch(() => ({}));
+    if (btn) btn.textContent = '⚠️ ' + (d.error || 'Failed');
+  }
+}
+</script>
 </body>
 </html>
