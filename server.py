@@ -9590,18 +9590,22 @@ def contractor_detail(contractor_id):
     ).fetchone()
     _profile_pc_id = _profile_pc[0] if _profile_pc else None
     if _profile_pc_id:
+        # Exact-case match — permit data arrives pre-upper from Chicago and
+        # most large cities. Avoids the UPPER() full-scan on 25k+ permits
+        # which was timing out the detail page on big-city contractors.
+        # Both raw + normalized are tried so DB-normalized entries still hit.
         permits = conn.execute("""
             SELECT filing_date, issued_date, date, permit_type, address,
                    description, estimated_cost, trade_category, status,
                    zip, source_city_key
             FROM permits
             WHERE prod_city_id = ?
-              AND (UPPER(contractor_name) = UPPER(?)
-                   OR UPPER(contractor_name) = UPPER(?)
-                   OR UPPER(contact_name) = UPPER(?))
+              AND (contractor_name = ? OR contractor_name = ?
+                   OR contact_name = ? OR contact_name = ?)
             ORDER BY COALESCE(filing_date, issued_date, date) DESC
             LIMIT 200
-        """, (_profile_pc_id, raw, prof['contractor_name_normalized'], raw)).fetchall()
+        """, (_profile_pc_id, raw, (prof['contractor_name_normalized'] or ''),
+              raw, (prof['contractor_name_normalized'] or ''))).fetchall()
     else:
         permits = conn.execute("""
             SELECT filing_date, issued_date, date, permit_type, address,
