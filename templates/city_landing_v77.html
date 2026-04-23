@@ -1309,6 +1309,57 @@ body {
 </section>
 {% endif %}
 
+<!-- V252 F3: STALLED PROJECTS — permits 6-12mo old still marked active/open.
+     High-intent handover leads: the homeowner probably fired their contractor
+     or ran out of money. Whoever reaches them first usually wins the work. -->
+{% if stalled_permits %}
+<section class="section">
+  <div class="section-header">
+    <h2>Stalled Projects in {{ city_name }}</h2>
+    <p>Permits filed 6–12 months ago that are still marked active/open — prime handover opportunities for contractors willing to step in.</p>
+  </div>
+  <div class="permits-table-container">
+    <div class="permits-table-wrap">
+      <table class="permits-table">
+        <thead>
+          <tr>
+            <th>Filed</th>
+            <th>Address</th>
+            <th>Type</th>
+            <th style="text-align: right;">Value</th>
+            <th>Original Contractor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in stalled_permits %}
+          <tr>
+            <td>{{ (p.permit_date or '')[:10] }}</td>
+            <td>{{ p.address or '—' }}</td>
+            <td>{{ p.permit_type or '—' }}</td>
+            <td style="text-align: right; font-variant-numeric: tabular-nums;">
+              {% if p.estimated_cost and p.estimated_cost > 0 %}${{ "{:,.0f}".format(p.estimated_cost) }}{% else %}—{% endif %}
+            </td>
+            <td>
+              {% if session.get('user_email') and is_pro %}
+                {{ p.contractor_name or '—' }}
+              {% else %}
+                <a href="/signup?next=/permits/{{ city_slug }}" class="gate-reveal-btn">🔒 Reveal</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if not (session.get('user_email') and is_pro) %}
+  <p style="margin-top: 12px; font-size: 13px; color: var(--gray-500); text-align: center;">
+    Subscribe to see the original contractor on each stalled project and contact the property owner directly.
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
 <!-- V251 F13: ZIP HEATMAP — top 10 zips by permit volume, click to filter.
      Hidden when the city's data source doesn't populate zip (Chicago,
      Orlando, Phoenix permit feeds omit zip, so the grid stays empty). -->

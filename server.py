@@ -13617,6 +13617,27 @@ def city_landing_inner(city_slug):
         city_slug, limit=25, new_this_week_only=_new_week_only
     )
 
+    # V252 F3: stalled permits — permits 6-12 months old that are still
+    # active / open / issued. Homeowner likely fired their contractor or
+    # ran out of money; these are the HOTTEST handover leads for
+    # contractors willing to take over. Limit 10 shown on the page.
+    stalled_permits = []
+    if _prod_city_id:
+        try:
+            _sconn = permitdb.get_connection()
+            stalled_permits = [dict(r) for r in _sconn.execute("""
+                SELECT address, contractor_name, permit_type, estimated_cost,
+                       COALESCE(filing_date, issued_date, date) as permit_date
+                FROM permits
+                WHERE prod_city_id = ?
+                  AND COALESCE(filing_date, issued_date, date) BETWEEN date('now', '-12 months') AND date('now', '-6 months')
+                  AND LOWER(COALESCE(status, '')) IN ('active', 'open', 'issued')
+                ORDER BY (estimated_cost IS NULL), estimated_cost DESC
+                LIMIT 10
+            """, (_prod_city_id,)).fetchall()]
+        except Exception as e:
+            print(f"[V252 F3] stalled permits query failed for {city_slug}: {e}", flush=True)
+
     # V251 F13: zip heatmap — top 10 zip codes by permit volume with
     # contractor counts and 90-day permit counts for trend signal.
     # Skipped silently when the city's permit feed doesn't populate zip
@@ -13749,6 +13770,7 @@ def city_landing_inner(city_slug):
         filtered_permit_count=filtered_permit_count,
         new_week_only=_new_week_only,  # V251 F12
         zip_heatmap=zip_heatmap,  # V251 F13
+        stalled_permits=stalled_permits,  # V252 F3
     )
 
 
