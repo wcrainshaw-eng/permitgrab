@@ -9477,6 +9477,86 @@ def build_weekly_market_report(city_slug):
     return {'subject': subject, 'html': html, 'text': text, 'stats': dict(stats)}
 
 
+def send_weekly_digests(dry_run=False):
+    """V253 P2 #9: send this week's market report to every Pro subscriber
+    for each city they're watching via digest_cities.
+
+    Uses build_weekly_market_report (V251 F16 generator) + the existing
+    email_alerts.send_email SMTP wrapper. Returns per-user send counts
+    so the admin cron can log delivery.
+
+    dry_run=True: compose messages but don't actually send. Useful for
+    previewing the whole batch before flipping it on.
+    """
+    try:
+        from email_alerts import send_email
+    except ImportError as e:
+        return {'error': f'email_alerts not importable: {e}'}
+
+    conn = permitdb.get_connection()
+    sent = []
+    skipped = []
+
+    # Pull every user who has digest_active + at least one digest city.
+    # Match digest_cities values (city NAMES like "Chicago") back to
+    # city_slugs via prod_cities.
+    try:
+        users = db.session.execute(
+            db.text("SELECT email, digest_cities, digest_active, plan "
+                    "FROM users WHERE digest_active = TRUE "
+                    "AND digest_cities IS NOT NULL AND digest_cities != '[]'")
+        ).fetchall()
+    except Exception as e:
+        return {'error': f'user query failed: {e}'}
+
+    for u in users:
+        email, digest_cities_json, digest_active, plan = u
+        if (plan or '').lower() not in ('pro', 'professional', 'enterprise'):
+            skipped.append({'email': email, 'reason': 'not_pro'})
+            continue
+        try:
+            city_names = json.loads(digest_cities_json or '[]')
+        except Exception:
+            city_names = []
+        if not city_names:
+            continue
+        # Resolve city names → slugs (best-effort)
+        placeholders = ','.join(['?'] * len(city_names))
+        slug_rows = conn.execute(
+            f"SELECT city_slug FROM prod_cities WHERE city IN ({placeholders}) AND status='active'",
+            city_names,
+        ).fetchall()
+        slugs = [r[0] for r in slug_rows]
+        for slug in slugs:
+            report = build_weekly_market_report(slug)
+            if not report:
+                skipped.append({'email': email, 'slug': slug, 'reason': 'no_activity'})
+                continue
+            if dry_run:
+                sent.append({'email': email, 'slug': slug, 'subject': report['subject'], 'dry_run': True})
+                continue
+            try:
+                send_email(email, report['subject'], report['html'], report['text'])
+                sent.append({'email': email, 'slug': slug, 'subject': report['subject']})
+            except Exception as e:
+                skipped.append({'email': email, 'slug': slug, 'reason': f'smtp_error: {e}'})
+    return {'sent': len(sent), 'skipped': len(skipped), 'details': {'sent': sent, 'skipped': skipped}}
+
+
+@app.route('/api/admin/send-weekly-digests', methods=['POST'])
+def admin_send_weekly_digests():
+    """Admin cron endpoint — call weekly (Mon 9am ET) to blast the
+    V251 F16 weekly market report to every Pro subscriber per their
+    digest_cities. Supports ?dry_run=1 for preview.
+    """
+    key = request.args.get('key') or request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY')
+    if not expected or key != expected:
+        return jsonify({'error': 'Admin key required'}), 401
+    dry_run = request.args.get('dry_run') == '1'
+    return jsonify(send_weekly_digests(dry_run=dry_run))
+
+
 @app.route('/api/digest/preview/<city_slug>')
 def api_digest_preview(city_slug):
     """V251 F16: Pro-gated preview of the weekly market report email for a city."""
