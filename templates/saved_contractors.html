@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saved Contractors — PermitGrab</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --primary:#2563eb; --gray-50:#f9fafb; --gray-200:#e5e7eb; --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.6; }
+.container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+h1 { font-size: 28px; font-weight: 800; color: var(--gray-900); margin-bottom: 20px; }
+.empty { padding: 48px 24px; text-align: center; color: var(--gray-500); background: white; border-radius: 12px; border: 1px solid var(--gray-200); }
+.card { background: white; border: 1px solid var(--gray-200); border-radius: 12px; padding: 18px 22px; margin-bottom: 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.card h2 { font-size: 18px; font-weight: 700; color: var(--gray-900); }
+.card .meta { font-size: 13px; color: var(--gray-500); margin-top: 4px; }
+.card .notes { font-size: 14px; color: var(--gray-700); margin-top: 10px; padding: 10px 12px; background: var(--gray-50); border-radius: 6px; white-space: pre-wrap; }
+.card .actions { display: flex; gap: 8px; }
+.btn { padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid var(--gray-200); background: white; color: var(--gray-700); text-decoration: none; }
+.btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+.btn-danger { color: #dc2626; border-color: #fecaca; }
+.phone-pill { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<div class="container">
+  <h1>Your Saved Contractors</h1>
+  <div id="list"></div>
+</div>
+
+{% include 'partials/footer.html' %}
+
+<script>
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+async function load() {
+  const wrap = document.getElementById('list');
+  wrap.innerHTML = '<div style="padding:24px;text-align:center;color:#6b7280;">Loading…</div>';
+  const r = await fetch('/api/saved-contractors');
+  if (!r.ok) { wrap.innerHTML = '<div class="empty">Unable to load your saved contractors. <a href="/login">Log in</a>.</div>'; return; }
+  const d = await r.json();
+  if (!d.saved || !d.saved.length) {
+    wrap.innerHTML = '<div class="empty"><h2 style="color:#111;margin-bottom:8px;">No saved contractors yet</h2><p>Browse a city page and click the ⭐ on any contractor to save them here with notes.</p></div>';
+    return;
+  }
+  wrap.innerHTML = d.saved.map(item => {
+    const p = item.profile || {};
+    const name = p.contractor_name_raw || '(removed)';
+    const phone = p.phone ? '<span class="phone-pill">' + escapeHtml(p.phone) + '</span>' : '';
+    const trade = p.primary_trade ? ' · ' + escapeHtml(p.primary_trade) : '';
+    const city = p.source_city_key ? '<a href="/permits/' + encodeURIComponent(p.source_city_key) + '">' + escapeHtml(p.source_city_key) + '</a>' : '';
+    return '<div class="card">' +
+      '<div class="card-head">' +
+        '<div>' +
+          '<h2>' + (p.id ? '<a href="/contractor/' + p.id + '" style="color:inherit;text-decoration:none;">' + escapeHtml(name) + '</a>' : escapeHtml(name)) + '</h2>' +
+          '<div class="meta">' + city + trade + (p.total_permits ? ' · ' + p.total_permits.toLocaleString() + ' permits' : '') + '</div>' +
+        '</div>' +
+        '<div class="actions">' + phone +
+          '<button class="btn btn-danger" onclick="unsave(' + item.profile_id + ')">Remove</button>' +
+        '</div>' +
+      '</div>' +
+      (item.notes ? '<div class="notes">' + escapeHtml(item.notes) + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function unsave(id) {
+  if (!confirm('Remove this contractor from your saved list?')) return;
+  const r = await fetch('/api/saved-contractors/' + id, { method: 'DELETE' });
+  if (r.ok) load();
+}
+
+load();
+</script>
+</body>
+</html>

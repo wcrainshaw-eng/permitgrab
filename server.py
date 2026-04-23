@@ -8534,6 +8534,27 @@ def get_user_saved_leads(user_email):
     return [l for l in all_leads if l.get('user_email') == user_email]
 
 
+# V251 F15: saved contractors (bookmark a contractor with notes). File-backed
+# JSON matching the saved_leads pattern so we don't need a schema migration.
+SAVED_CONTRACTORS_FILE = os.path.join(DATA_DIR, 'saved_contractors.json')
+
+
+def _load_saved_contractors():
+    if os.path.exists(SAVED_CONTRACTORS_FILE):
+        try:
+            with open(SAVED_CONTRACTORS_FILE) as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def _save_saved_contractors(items):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(SAVED_CONTRACTORS_FILE, 'w') as f:
+        json.dump(items, f, indent=2)
+
+
 # ===========================
 # API ROUTES
 # ===========================
@@ -9290,6 +9311,91 @@ def delete_saved_lead(permit_id):
     save_saved_leads(all_leads)
 
     return jsonify({'message': 'Lead removed'})
+
+
+# ==========================================================================
+# V251 F15: /api/saved-contractors — Pro bookmarks + notes on contractors
+# ==========================================================================
+@app.route('/api/saved-contractors', methods=['GET'])
+def api_get_saved_contractors():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    if not is_pro(user):
+        return jsonify({'error': 'Pro feature', 'upgrade_url': '/pricing'}), 402
+    items = [i for i in _load_saved_contractors() if i.get('user_email') == user['email']]
+    # Enrich with profile data so the UI can render business name / phone / trade
+    conn = permitdb.get_connection()
+    ids = [int(i['profile_id']) for i in items if str(i.get('profile_id', '')).isdigit()]
+    profiles = {}
+    if ids:
+        ph = ','.join(['?'] * len(ids))
+        rows = conn.execute(f"""
+            SELECT id, contractor_name_raw, source_city_key, primary_trade,
+                   phone, website, total_permits, permits_90d, last_permit_date
+            FROM contractor_profiles WHERE id IN ({ph})
+        """, ids).fetchall()
+        profiles = {r['id']: dict(r) for r in rows}
+    out = [{**i, 'profile': profiles.get(int(i.get('profile_id', 0)))} for i in items]
+    return jsonify({'count': len(out), 'saved': out})
+
+
+@app.route('/api/saved-contractors', methods=['POST'])
+def api_save_contractor():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    if not is_pro(user):
+        return jsonify({'error': 'Pro feature', 'upgrade_url': '/pricing'}), 402
+    data = request.get_json() or {}
+    try:
+        profile_id = int(data.get('profile_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'profile_id required'}), 400
+    notes = (data.get('notes') or '').strip()[:500]
+    all_items = _load_saved_contractors()
+    existing = next(
+        (i for i in all_items if i.get('user_email') == user['email']
+         and int(i.get('profile_id', 0)) == profile_id),
+        None,
+    )
+    if existing:
+        existing['notes'] = notes
+        existing['updated_at'] = datetime.utcnow().isoformat()
+    else:
+        all_items.append({
+            'user_email': user['email'],
+            'profile_id': profile_id,
+            'notes': notes,
+            'saved_at': datetime.utcnow().isoformat(),
+        })
+    _save_saved_contractors(all_items)
+    return jsonify({'saved': True, 'profile_id': profile_id})
+
+
+@app.route('/api/saved-contractors/<int:profile_id>', methods=['DELETE'])
+def api_unsave_contractor(profile_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    all_items = _load_saved_contractors()
+    keep = [i for i in all_items
+            if not (i.get('user_email') == user['email']
+                    and int(i.get('profile_id', 0)) == profile_id)]
+    _save_saved_contractors(keep)
+    return jsonify({'removed': True})
+
+
+@app.route('/saved-contractors')
+def saved_contractors_page():
+    """V251 F15: Pro-only saved-contractors list page."""
+    user = get_current_user()
+    if not user:
+        return redirect('/login?redirect=/saved-contractors')
+    if not is_pro(user):
+        return redirect('/pricing?next=/saved-contractors')
+    footer_cities = get_cities_with_data()
+    return render_template('saved_contractors.html', user=user, footer_cities=footer_cities)
 
 
 @app.route('/api/saved-leads/export')
