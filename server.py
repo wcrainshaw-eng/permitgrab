@@ -12780,7 +12780,17 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
                 'lead_score': _score,  # V251 F21
                 'score_tier': score_tier,  # V251 F21
             })
-        return out
+        # Prefer real business names on the city page — NYC in particular
+        # returns a lot of DOB license-number-only rows in the top-volume
+        # band (e.g. "License #626264") which look like garbage next to a
+        # proper business name. Keep them only when we don't have enough
+        # real names to fill a table of 10 — otherwise sort them to the
+        # back and cap the table. Don't drop the underlying data so
+        # contractor-profile detail links still resolve.
+        real_name_rows = [r for r in out if not r.get('is_license_number')]
+        if len(real_name_rows) >= 10:
+            return real_name_rows
+        return real_name_rows + [r for r in out if r.get('is_license_number')]
     finally:
         conn.close()
 
