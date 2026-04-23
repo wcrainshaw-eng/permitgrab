@@ -9571,6 +9571,56 @@ def _save_webhooks(items):
         json.dump(items, f, indent=2)
 
 
+def scan_and_fire_webhooks(window_minutes=60):
+    """V252 F5 hookup: query recently-collected permits and dispatch them
+    through every matching active webhook. Designed to be called on a
+    short external cron (every 15min) rather than inline with the
+    collector daemon, so a slow webhook URL can't block permit ingestion.
+    Returns dict with scanned/fired counts for the admin endpoint to
+    report.
+    """
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute(f"""
+            SELECT source_city_key, permit_number, permit_type, address, zip,
+                   description, estimated_cost, trade_category,
+                   contractor_name, contact_name,
+                   COALESCE(filing_date, issued_date, date) as permit_date,
+                   collected_at
+            FROM permits
+            WHERE collected_at >= datetime('now', '-{int(window_minutes)} minutes')
+              AND source_city_key IS NOT NULL
+            ORDER BY collected_at DESC
+            LIMIT 1000
+        """).fetchall()
+        new_permits = [dict(r) for r in rows]
+        fired = fire_webhooks_for_new_permits(new_permits)
+        return {'scanned': len(new_permits), 'fired': fired, 'window_minutes': window_minutes}
+    except Exception as e:
+        print(f"[V252 F5] scan_and_fire_webhooks error: {e}", flush=True)
+        return {'error': str(e)}
+
+
+@app.route('/api/admin/fire-webhooks', methods=['POST'])
+def admin_fire_webhooks():
+    """Admin cron hook — run the webhook scan-and-fire pass.
+
+    Call every 15m from an external scheduler; returns the count of
+    webhooks fired so the cron job can log it. Window defaults to 60m
+    so a cron hiccup doesn't lose a whole batch.
+    """
+    key = request.args.get('key') or request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY')
+    if not expected or key != expected:
+        return jsonify({'error': 'Admin key required'}), 401
+    try:
+        window = int(request.args.get('minutes') or 60)
+    except (TypeError, ValueError):
+        window = 60
+    result = scan_and_fire_webhooks(window_minutes=window)
+    return jsonify(result)
+
+
 def fire_webhooks_for_new_permits(new_permits):
     """V252 F5: dispatch new-permit batch to all matching active webhooks.
 
