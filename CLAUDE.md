@@ -11,11 +11,20 @@ A city is "ad-ready" when it has ALL THREE:
 2. **Phones** (>50 profiles with phone numbers)
 3. **Violations** (>0 code enforcement violation records)
 
-**Current state (2026-04-22):**
-- Confirmed YES: Chicago (3,494 phones), Phoenix (1,079), San Antonio (3,828), San Jose (95 phones, 3,428 violations)
-- NYC: 466 phones (was 4,362 — check if data issue)
-- 6+ FL cities BLOCKED on FL DBPR import (column position bug, V244d fix pending)
+**Current state (2026-04-23, post-V250 merges):**
+- **Ad-ready (6):** Chicago (3,494 phones), NYC (466), Phoenix (1,079), San Jose (95), Miami-Dade (245), **Orlando** (57 — new this cycle, FL DBPR 2nd-import lift)
+- **Near-miss — phones gap:** Cape Coral (44, need 6), Fort Lauderdale (22), Columbus (12), Buffalo (15)
+- **Near-miss — violation gap:** Hialeah (88 phones, 0 violations — confirmed dead-end below), San Antonio (3,828 phones, no violations — dead-end)
+- **FL DBPR 2nd import landed:** Miami-Dade 181→245, Hialeah 64→88, Orlando 39→57, Cape Coral 24→44, Fort Lauderdale 17→22
+- **Visual UAT green** (61/0, V248 Puppeteer) post-V247/V248/V249/V250-P0/P1D deploys
 - ~98 cities actively collecting permits
+
+### Known dead ends for new-city onboarding (don't re-research)
+- **Washington DC** (maps2.dcgis.dc.gov FeatureServer 18): PERMIT_APPLICANT field is individual names (e.g. "KENNETH BEECHNER"), not business names. 14,187 total permits, only 50% have any applicant, and those aren't contractors. Owner field also individuals. No separate contractor field.
+- **Louisville Active Permits** (services1.arcgis.com/79kfd2K6fskCAkyg/): CONTRACTOR field exists and is populated with real business names ("PAYNE ELECTRIC COMPANY INC"), but dataset frozen at 2019-02. Hub metadata says modified 2024-08 but actual records stop 2019.
+- **Baltimore Permits** (egisdata.baltimorecity.gov FS/3): No contractor field at all. Fields are OBJECTID, CaseNumber, Description, Address, BLOCKLOT, ExistingUse, ProposedUse, Cost. Owner/applicant not exposed.
+- **Oklahoma City** (data.okc.gov): Blocked by Incapsula WAF — can't probe programmatically.
+- **Hialeah violations:** No public ArcGIS/Socrata feed. Miami-Dade county violations return 0 Hialeah addresses (CCVIOL_gdb is unincorporated-only).
 
 **You are autonomous. Don't stop to ask permission. Fix things, test things, deploy things. If something breaks, debug and fix it. Write clean PRs with descriptive titles.**
 
