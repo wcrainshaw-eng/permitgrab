@@ -9386,6 +9386,85 @@ def api_unsave_contractor(profile_id):
     return jsonify({'removed': True})
 
 
+@app.route('/intel')
+def intel_dashboard():
+    """V251 F19: Pro-only multi-city intel dashboard.
+
+    Grid of ad-ready cities + the user's digest_cities with per-city KPIs
+    (permits 7d, new contractors, phone coverage, violations) so a
+    franchise / regional buyer can scan their whole footprint.
+    """
+    user = get_current_user()
+    if not user:
+        return redirect('/login?redirect=/intel')
+    if not is_pro(user):
+        return redirect('/pricing?next=/intel')
+    conn = permitdb.get_connection()
+
+    # Seed with the confirmed ad-ready set + any cities the user has in their digest
+    ad_ready = ['chicago-il', 'new-york-city', 'phoenix-az', 'miami-dade-county',
+                'orlando-fl', 'san-jose', 'san-antonio-tx']
+    # user.to_dict() already parses digest_cities into a list; handle both.
+    dc = user.get('digest_cities') or []
+    if isinstance(dc, str):
+        try:
+            digest_cities = json.loads(dc or '[]')
+        except Exception:
+            digest_cities = []
+    else:
+        digest_cities = dc
+    # Resolve digest city names → slugs (best-effort join on prod_cities.city)
+    slugs = list(ad_ready)
+    if digest_cities:
+        ph = ','.join(['?'] * len(digest_cities))
+        rows = conn.execute(
+            f"SELECT city_slug FROM prod_cities WHERE city IN ({ph}) AND status='active'",
+            digest_cities,
+        ).fetchall()
+        for r in rows:
+            s = r['city_slug'] if not isinstance(r, tuple) else r[0]
+            if s not in slugs:
+                slugs.append(s)
+
+    cities = []
+    for slug in slugs:
+        row = conn.execute("""
+            SELECT pc.id, pc.city, pc.state, pc.city_slug, pc.newest_permit_date
+            FROM prod_cities pc WHERE pc.city_slug = ?
+        """, (slug,)).fetchone()
+        if not row:
+            continue
+        pid = row['id']
+        stats = conn.execute("""
+            SELECT
+              (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-7 days')) as permits_7d,
+              (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-30 days')) as permits_30d,
+              (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND is_active=1) as profiles,
+              (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND phone IS NOT NULL AND phone != '') as phones,
+              (SELECT COUNT(*) FROM violations WHERE prod_city_id=?) as violations,
+              (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND first_permit_date >= date('now','-7 days')) as new_contractors_7d
+        """, (pid, pid, slug, slug, pid, slug)).fetchone()
+        cities.append({
+            'slug': row['city_slug'],
+            'name': row['city'],
+            'state': row['state'],
+            'newest': row['newest_permit_date'],
+            'permits_7d': stats['permits_7d'] or 0,
+            'permits_30d': stats['permits_30d'] or 0,
+            'profiles': stats['profiles'] or 0,
+            'phones': stats['phones'] or 0,
+            'violations': stats['violations'] or 0,
+            'new_contractors_7d': stats['new_contractors_7d'] or 0,
+        })
+    footer_cities = get_cities_with_data()
+    return render_template(
+        'intel_dashboard.html',
+        cities=cities,
+        user=user,
+        footer_cities=footer_cities,
+    )
+
+
 @app.route('/saved-contractors')
 def saved_contractors_page():
     """V251 F15: Pro-only saved-contractors list page."""
