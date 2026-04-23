@@ -1031,6 +1031,8 @@ body {
     <a href="/permits/{{ city_slug }}" style="padding: 8px 12px; color: var(--gray-600); font-size: 13px; text-decoration: underline;">Clear filters</a>
     {% endif %}
     <a id="csv-link" href="/api/permits/{{ city_slug }}/export.csv" download style="padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; color: #374151; text-decoration: none;">📥 CSV</a>
+    {# V251 F23: Shareable report link — F22 /report/<slug> page #}
+    <a href="/report/{{ city_slug }}" style="padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; color: #374151; text-decoration: none;" title="Printable {{ city_name }} activity summary">📊 Report</a>
     <button onclick="saveCurrentSearch()" id="btn-save-search" style="display: none; padding: 8px 16px; background: #16a34a; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">💾 Save Search</button>
   </div>
   {% if filters_active %}
