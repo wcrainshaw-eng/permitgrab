@@ -341,6 +341,13 @@ CITY_REGISTRY = {
             "council_district": "councildist",
             "zoning": "zoning",
             "contact_name": "applicant",
+            # V258: NOLA's rcm3-fn58 exposes a "contractors" field
+            # (sibling to applicant) with real business names like
+            # "Storm Guard Roofing and Construction NOLA LLC",
+            # "Audubon Management Group LLC". Map to contractor_name
+            # so contractor_profiles.py picks it up — previously the
+            # config only passed applicant (often individuals) through.
+            "contractor_name": "contractors",
         },
         "date_field": "issuedate",
         "limit": 2000,
@@ -38578,15 +38585,42 @@ BULK_SOURCES = {
         "active": True,
     },
     "new_orleans_la": {
+        # V258: switched to rcm3-fn58 — the only NOLA Socrata permit
+        # dataset that exposes a "contractors" field with real business
+        # names. nbcf-m6c2 (the previous endpoint) has address + type +
+        # dates only — no contractor column — which is why NOLA was stuck
+        # at 11 phones despite 3,489 profiles in contractor_profiles.
+        # Historical profiles came from rcm3-fn58 via the legacy
+        # "new_orleans" config; restoring that data source here so
+        # future collections continue populating contractor_name.
         "city": "New Orleans",
         "state": "LA",
         "slug": "new-orleans",
         "lat": 29.951,
         "lon": -90.072,
         "platform": "socrata",
-        "endpoint": "https://data.nola.gov/resource/nbcf-m6c2.json",
+        "endpoint": "https://data.nola.gov/resource/rcm3-fn58.json",
+        "dataset_id": "rcm3-fn58",
+        "description": "Permits (data.nola.gov) — rcm3-fn58, has contractors field",
+        "field_map": {
+            "permit_number": "numstring",
+            "permit_type": "type",
+            "address": "address",
+            "owner_name": "owner",
+            "description": "description",
+            "filing_date": "filingdate",
+            "issue_date": "issuedate",
+            "status": "currentstatus",
+            "land_use": "landuse",
+            "estimated_cost": "constrval",
+            "contact_name": "applicant",
+            "contractor_name": "contractors",
+            "parcel": "pin",
+            "zoning": "zoning",
+            "building_area": "bldgarea",
+        },
         "date_field": "issuedate",
-        "description": "Building Permits 2018-present (data.nola.gov)",
+        "limit": 2000,
         "active": True,
     },
     "janesville_wi": {
