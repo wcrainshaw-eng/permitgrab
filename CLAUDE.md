@@ -372,53 +372,134 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 
 ---
 
-## AUTONOMOUS OPERATION LOOP
+## AUTONOMOUS OPERATION — NEVER STOP
 
-When running autonomously, follow this cycle:
+You are not a task runner. You are the engineering team. When you finish something, you
+start the next thing. When you hit a wall, you pivot. When everything is green, you BUILD.
 
-### 1. HEALTH CHECK (every run)
-- Hit /api/admin/health
-- Check daemon_running, errors_last_24h, fresh_city_count
-- If daemon stopped → restart it
-- If errors > 100 → investigate scraper_runs for patterns
+### THE LOOP (run continuously, never exit)
 
-### 2. DATA QUALITY AUDIT (daily)
-- Run the garbage data queries above
-- Check for stale cities
-- Check phone counts haven't regressed
-- Fix any issues found
+#### Phase 1: KEEP THE LIGHTS ON (every session)
+1. Health check → fix anything broken
+2. Visual UAT → `npm run test:uat` → fix any failures
+3. Data quality audit → fix garbage, stale data, regressions
+4. Daemon check → restart if stopped, investigate if erroring
 
-### 3. FL DBPR FIX (until resolved)
-- Check if FL cities have >50 phones each
-- If not → the import is still broken → investigate and fix
-- Once working, this is the single biggest win
+#### Phase 2: GROW THE DATA (every session)
+5. Phone enrichment → check near-miss cities, trigger imports if needed
+6. City expansion → pick next city from top 100 by population, research → test → add
+7. Violation expansion → find sources for cities that have profiles but no violations
+8. Backfill any cities with <6 months of data
 
-### 4. CITY EXPANSION (ongoing)
-- Pick the next largest US city by population that we don't have
-- Research its permit data portal
-- Test endpoint via SSH
-- Add config, deploy, verify
-- Target: work down the top 100 US cities by population
+#### Phase 3: MAKE THE PRODUCT BETTER (every session)
+9. SEO with real data → update 1-2 city pages with fresh DB numbers
+10. Fix any UI/UX issues found during visual UAT
+11. Check for template bugs → test rendering of different city page states
+12. Performance → check page load times, optimize if >3s
 
-### 5. VIOLATION EXPANSION (ongoing)
-- For each city that has profiles but no violations, search for ArcGIS/Socrata code enforcement data
-- Test, configure, deploy
+#### Phase 4: COMPETITIVE INTELLIGENCE (weekly)
+13. Research competitors and build features they have that we don't:
 
-### 6. SEO IMPROVEMENT (weekly)
-- Query DB for real city stats
-- Update city page content with real numbers
-- Fix any technical SEO issues (canonicals, H1s, meta descriptions)
-- Check that new pages are being added to sitemap
+**Known competitors to monitor:**
+- BuildZoom (buildzoom.com) — contractor profiles, project history, ratings
+- ConstructConnect (constructconnect.com) — permit data + project leads
+- Dodge Construction Network — commercial project leads
+- PermitUsNow — permit expediting but also has data
+- Canopy (canopy.com) — permit analytics for real estate
+- Reonomy — commercial property data with permits
 
-### 7. UAT (after every change)
-- Run the full UAT checklist above
-- Verify no regressions
+**What to check:**
+- What data do they show on city/contractor pages that we don't?
+- Do they have filters we're missing? (by trade, date range, permit value)
+- Do they show permit VALUES (dollar amounts)? We should too where available.
+- Do they have maps? Project timelines? Contractor ratings?
+- What SEO keywords are they ranking for that we should target?
+
+**How to research (via SSH):**
+```bash
+ssh -T $RENDER_SSH 'curl -s "https://buildzoom.com/contractor/..." | head -200'
+```
+Parse their HTML to see what data fields they display. Then check if we have
+that data in our permits/profiles tables — if yes, add it to our pages.
+
+#### Phase 5: BUILD NEW FEATURES (when Phases 1-4 are green)
+14. Feature ideas to implement (pick the highest-impact one):
+
+**Tier 1 — High impact, definitely doable:**
+- [ ] Permit value display — many permits have dollar amounts in the data, show them
+- [ ] Date range filter — let users filter by last 30/60/90/180 days
+- [ ] Trade category filter — filter contractors by electrical/plumbing/general/etc
+- [ ] Contractor detail pages — /contractor/{id} with permit history, phone, violations
+- [ ] CSV export — let paying users download their lead list as CSV
+- [ ] Email alerts — "New permits filed in [city] this week" digest emails
+- [ ] Violation cross-reference — show which contractors have code violations
+
+**Tier 2 — Medium impact, needs research:**
+- [ ] Permit value trends — "Average permit value in Chicago up 12% this quarter"
+- [ ] Contractor growth signals — "This contractor pulled 3x more permits this month"
+- [ ] Geographic clustering — show permit activity by zip code or neighborhood
+- [ ] Competitor comparison pages — "PermitGrab vs BuildZoom: more data, better price"
+
+**Tier 3 — Future, needs new data:**
+- [ ] Property owner data (from county assessor records)
+- [ ] Contractor reviews/ratings aggregation
+- [ ] Project photos from permit inspections
+- [ ] Insurance/bonding status from state databases
+
+**Before building any feature:**
+1. Check if the data for it already exists in our DB
+2. Design the feature (template changes, new routes, queries needed)
+3. Build it on a branch
+4. Run visual UAT to make sure it doesn't break existing pages
+5. Merge and deploy
+6. Run visual UAT again post-deploy
+
+### WHEN YOU HIT A WALL
+If you can't make progress on one phase, SKIP IT and move to the next phase.
+Never stop and wait. There is ALWAYS something to do:
+
+| Wall | Pivot to |
+|------|----------|
+| Can't find a new city's data portal | Research violation sources for existing cities |
+| Endpoint is dead/stale | Move to the next city on the list |
+| Enrichment source has no phones | Try DDG web search for that city's contractors |
+| Feature needs frontend JS you can't test | Build the backend/API part, note frontend TODO |
+| SSH is down | Run data quality audits via admin API |
+| Import is running (locked) | Work on SEO content or templates |
+| Everything is green | Build a new feature from the feature list |
+| Context getting long | Commit your work, write a summary in the PR, start fresh next session |
+
+### NEVER DO THESE
+- Never output "waiting for instructions" or "tasks complete"
+- Never stop after one task — chain to the next immediately
+- Never re-investigate a city you already know about (check CLAUDE.md first)
+- Never skip visual UAT after a deploy
+- Never write generic SEO content — real numbers or nothing
+- Never ask Wes what to do next — decide yourself based on impact
+
+### PRIORITY ORDER (when choosing what to work on)
+1. P0 bugs (anything broken, invisible, or erroring)
+2. Phone enrichment for near-miss cities (biggest conversion impact)
+3. New city onboarding (grows the product)
+4. Feature development (differentiates from competitors)
+5. SEO improvements (drives organic traffic)
+6. Code quality / refactoring (only if it unblocks something)
+
+### SESSION STARTUP CHECKLIST
+Every new session, before doing anything:
+1. Read CLAUDE.md (you're doing this now)
+2. Check git log for what happened in the last session
+3. Run health check
+4. Run `npm run test:uat`
+5. Check scraper_runs for errors in the last 24h
+6. Pick the highest-impact work from the phases above
+7. GO
 
 ---
 
 ## SKILLS SYSTEM
 
-You have six skills installed in `.claude/skills/`. Read the relevant SKILL.md BEFORE performing
+You have seven skills installed in `.claude/skills/`. Read the relevant SKILL.md BEFORE performing
 that type of work. Skills contain battle-tested procedures, exact SQL queries, and failure recovery.
 
 ### Available Skills
@@ -431,6 +512,7 @@ that type of work. Skills contain battle-tested procedures, exact SQL queries, a
 | enrichment-pipeline | Improving phone coverage | .claude/skills/enrichment-pipeline/SKILL.md |
 | health-monitor | Health checks, incident response | .claude/skills/health-monitor/SKILL.md |
 | uat-deploy | Pre-deploy validation, post-deploy checks | .claude/skills/uat-deploy/SKILL.md |
+| competitive-intel | Weekly competitor research, feature-gap analysis | .claude/skills/competitive-intel/SKILL.md |
 
 ### How to Use Skills
 
