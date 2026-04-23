@@ -12534,6 +12534,41 @@ def _get_top_contractors_for_city(city_slug, limit=25):
             ORDER BY total_permits DESC, permits_90d DESC
             LIMIT ?
         """, (city_slug, limit)).fetchall()
+
+        # V251 F11: per-contractor violation count — "has a code violation at
+        # any address where this contractor pulled a permit." Single aggregate
+        # query (not per-row) joined through permits by address; keyed back to
+        # the contractor's raw name so the loop below can just dict-lookup.
+        # Limited to prod_city scope so Chicago doesn't scan national data.
+        violations_by_name = {}
+        try:
+            pc_id_row = conn.execute(
+                "SELECT id FROM prod_cities WHERE city_slug = ?", (city_slug,)
+            ).fetchone()
+            pc_id = pc_id_row[0] if pc_id_row else None
+            if pc_id and rows:
+                # Gather the contractors we're rendering so the violations
+                # query doesn't explode into an "every contractor in city"
+                # scan on cities with thousands of profiles.
+                rendered_names = tuple(set(
+                    n for r in rows for n in (r['contractor_name_raw'],) if n
+                ))
+                if rendered_names:
+                    ph = ','.join(['?'] * len(rendered_names))
+                    viol_rows = conn.execute(f"""
+                        SELECT p.contractor_name, COUNT(DISTINCT v.id) as n
+                        FROM violations v
+                        JOIN permits p ON UPPER(p.address) = UPPER(v.address)
+                                      AND p.prod_city_id = ?
+                        WHERE v.prod_city_id = ?
+                          AND p.contractor_name IN ({ph})
+                        GROUP BY p.contractor_name
+                    """, (pc_id, pc_id) + rendered_names).fetchall()
+                    for v in viol_rows:
+                        violations_by_name[v[0]] = v[1]
+        except Exception as e:
+            print(f"[V251 F11] violation cross-ref failed for {city_slug}: {e}", flush=True)
+
         out = []
         # V251 F5: compute velocity + recency bucket in Python so the template
         # stays dumb. velocity: red ≥10/mo, orange 5–9, blue 1–4, '' otherwise.
@@ -12586,6 +12621,7 @@ def _get_top_contractors_for_city(city_slug, limit=25):
                 'recency': recency,
                 'is_new': is_new,
                 'last_permit_date': r['last_permit_date'],
+                'violations_count': violations_by_name.get(raw, 0),  # V251 F11
             })
         return out
     finally:
