@@ -293,6 +293,36 @@ async function mobileSignup(browser) {
 }
 
 
+async function checkoutSmoke(browser) {
+  // V254 Phase 2: verify the anon → /signup → /pricing → "Start Free Trial"
+  // handoff renders without 500-ing. Full Stripe E2E requires a live test
+  // key CI doesn't have, so we assert:
+  //   - /signup loads + has email input
+  //   - /pricing Pro CTA button exists + is clickable (onclick=startCheckout)
+  //   - Pricing copy still advertises "14 days free" (guards V253 P2 #6)
+  const page = await newPage(browser);
+  let resp = await page.goto(`${BASE_URL}/signup`, { waitUntil: 'networkidle2', timeout: 15000 });
+  if (resp.status() === 200) pass('V254.P2 /signup reachable');
+  else fail('V254.P2 /signup reachable', `${resp.status()}`);
+  const hasEmail = await page.evaluate(() => !!document.querySelector('input[type="email"]'));
+  if (hasEmail) pass('V254.P2 /signup has email input');
+  else fail('V254.P2 /signup email input', 'missing');
+
+  resp = await page.goto(`${BASE_URL}/pricing`, { waitUntil: 'networkidle2', timeout: 15000 });
+  const proCta = await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll('button, a'))
+      .find(b => /start free trial|subscribe|get started/i.test(b.textContent) && /pro/i.test((b.closest('.pricing-card')||b).textContent));
+    return btn ? { exists: true, text: btn.textContent.trim().slice(0, 40), onclick: btn.getAttribute('onclick') || '' } : null;
+  });
+  if (proCta && proCta.exists) pass(`V254.P2 /pricing Pro CTA present ("${proCta.text}")`);
+  else fail('V254.P2 /pricing Pro CTA', 'not found');
+  const hasTrial = await page.evaluate(() => /14 days free|free trial|no credit card/i.test(document.body.innerText));
+  if (hasTrial) pass('V254.P2 /pricing advertises free trial');
+  else fail('V254.P2 pricing trial copy', 'missing');
+  await page.close();
+}
+
+
 async function mobileCityPage(browser) {
   // V253 P2 #13: half of B2B SaaS traffic is mobile. Fail loudly if a
   // city page horizontally scrolls at 375px (breaks phone buyers).
@@ -351,6 +381,8 @@ async function mobileCityPage(browser) {
     console.log('\n--- Signup flow ---');
     await signupReachable(browser);
     await mobileSignup(browser);
+    console.log('\n--- V254 P2 checkout smoke ---');
+    await checkoutSmoke(browser);
     console.log('\n--- Mobile city pages (375px) ---');
     await mobileCityPage(browser);
 

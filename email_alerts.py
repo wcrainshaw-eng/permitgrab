@@ -101,7 +101,34 @@ SITE_URL = os.environ.get('SITE_URL', 'https://permitgrab.com')
 # =============================================================================
 
 def send_email(to_email, subject, html_body, text_body=None):
-    """Send an email via SendGrid SMTP."""
+    """Send an email.
+
+    V254 P4: prefers Resend (REST API, 100/day free tier) when
+    RESEND_API_KEY is set; falls back to SendGrid SMTP. No migration
+    needed — setting one env var swaps senders.
+    """
+    # V254 P4: Resend path
+    resend_key = os.environ.get('RESEND_API_KEY')
+    if resend_key:
+        try:
+            import resend as _resend  # pip install resend
+            _resend.api_key = resend_key
+            payload = {
+                'from': FROM_EMAIL,
+                'to': [to_email],
+                'subject': subject,
+                'html': html_body,
+            }
+            if text_body:
+                payload['text'] = text_body
+            _resend.Emails.send(payload)
+            print(f"  ✓ Sent via Resend to {to_email}: {subject}")
+            return True
+        except ImportError:
+            print("  [Resend] 'resend' package not installed — falling back to SMTP")
+        except Exception as e:
+            print(f"  ✗ Resend failed, falling back to SMTP: {e}")
+
     if not SMTP_PASS:
         # V64: Make dry-run mode more alarming so it's noticed in logs
         print(f"  [CRITICAL] SMTP_PASS not set! Email to {to_email} NOT sent (dry-run mode)")
