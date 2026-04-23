@@ -47,6 +47,31 @@ Verify: returns valid JSON, has recent dates, has contractor names.
 
 ## POST-DEPLOY CHECKS (run after every deploy to main)
 
+### Visual UAT (CRITICAL — run after every deploy)
+
+The SQL and HTTP checks below are NOT sufficient. You MUST also run the browser-based tests:
+
+```bash
+npm run test:uat
+```
+
+This tests what a CUSTOMER sees:
+- Data tables are actually VISIBLE (not just in the DOM)
+- No JavaScript errors on any page
+- No large white space gaps (from broken JS components)
+- Navigation links go to correct slugs (not 404)
+- H1 tags exist on city pages
+- Pricing page has working checkout buttons
+
+**If ANY visual test fails, it is a P0.** A page returning HTTP 200 with an invisible data table is WORSE than a 404 — at least a 404 tells the customer something is wrong.
+
+Previous bugs this would have caught (V247):
+- P0 #1: Data table invisible on all city pages (DOM had data, CSS/JS hid it)
+- P0 #2: 3 JS errors creating 1800px white space on homepage
+- P0 #3: Nav links pointing to wrong slugs (/permits/new-york instead of /permits/new-york-city)
+
+Override with a non-prod target: `BASE_URL=https://pr-87-permitgrab.onrender.com npm run test:uat`
+
 ### 1. Service Health (P0 — blocks everything)
 ```bash
 # Must return 200 with daemon_running:true

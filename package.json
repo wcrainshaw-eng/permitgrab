@@ -1,0 +1,28 @@
+{
+  "name": "permitgrab",
+  "version": "1.0.0",
+  "description": "Building permit data aggregation and alerts for contractors.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:uat": "node tests/visual-uat.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wcrainshaw-eng/permitgrab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wcrainshaw-eng/permitgrab/issues"
+  },
+  "homepage": "https://github.com/wcrainshaw-eng/permitgrab#readme",
+  "dependencies": {
+    "puppeteer": "^24.42.0"
+  }
+}
