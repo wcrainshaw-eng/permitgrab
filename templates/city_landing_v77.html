@@ -898,6 +898,16 @@ body {
       <option value="180"{% if filter_days == 180 %} selected{% endif %}>Last 180 days</option>
       <option value="365"{% if filter_days == 365 %} selected{% endif %}>Last year</option>
     </select>
+    {# V251 F8: min-value dropdown — brackets chosen to bucket residential (10k),
+       small-commercial (50k), mid-commercial (100k), high-value (500k/1M). #}
+    <select id="f-min-value" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+      <option value="0"{% if not filter_min_value %} selected{% endif %}>Any Value</option>
+      <option value="10000"{% if filter_min_value == 10000 %} selected{% endif %}>$10k+</option>
+      <option value="50000"{% if filter_min_value == 50000 %} selected{% endif %}>$50k+</option>
+      <option value="100000"{% if filter_min_value == 100000 %} selected{% endif %}>$100k+</option>
+      <option value="500000"{% if filter_min_value == 500000 %} selected{% endif %}>$500k+</option>
+      <option value="1000000"{% if filter_min_value == 1000000 %} selected{% endif %}>$1M+</option>
+    </select>
     <input id="f-q" placeholder="Search address, description..." style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; flex: 1; min-width: 150px;" />
     <button onclick="applyFilters()" style="padding: 8px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500;">Filter</button>
     {% if filters_active %}
@@ -912,6 +922,7 @@ body {
     {% if filter_trade %} for <strong>{{ filter_trade }}</strong>{% endif %}
     {% if filter_zip %} in zip <strong>{{ filter_zip }}</strong>{% endif %}
     {% if filter_days %} from the last <strong>{{ filter_days }} days</strong>{% endif %}
+    {% if filter_min_value %} worth <strong>${{ "{:,}".format(filter_min_value) }}+</strong>{% endif %}
   </div>
   {% endif %}
 </section>
@@ -966,7 +977,8 @@ body {
             <th>Date</th>
             <th>Address</th>
             <th>Type</th>
-            <th>Description</th>
+            <th class="hide-mobile">Description</th>
+            <th style="text-align: right;">Value</th>
             <th>Contractor/Applicant</th>
           </tr>
         </thead>
@@ -974,6 +986,13 @@ body {
           {% for permit in recent_permits[:25] %}
           {# V209-3: NEW badge for permits filed in the last 7 days #}
           {% set is_new = permit.filing_date and permit.filing_date >= current_week_start %}
+          {# V251 F8: estimated_cost may be a number, None (→ '—' via V223
+             cleanup), or a blank string. Try a float conversion; anything
+             that fails or is ≤0 renders a dash. #}
+          {% set _val = 0 %}
+          {% if permit.estimated_cost is number %}
+            {% set _val = permit.estimated_cost %}
+          {% endif %}
           <tr data-trade="{{ permit.trade_category or '' }}">
             <td>
               {{ permit.filing_date or 'N/A' }}
@@ -987,7 +1006,10 @@ body {
               <span style="color: var(--gray-400);">-</span>
               {% endif %}
             </td>
-            <td class="description" title="{{ permit.description or '' }}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}...{% endif %}</td>
+            <td class="description hide-mobile" title="{{ permit.description or '' }}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}...{% endif %}</td>
+            <td class="permit-value" style="text-align: right; font-variant-numeric: tabular-nums;{% if _val >= 100000 %} color: #166534; font-weight: 600;{% endif %}">
+              {% if _val > 0 %}${{ "{:,.0f}".format(_val) }}{% else %}<span style="color: var(--gray-400);">—</span>{% endif %}
+            </td>
             <td>{{ permit.contractor_name or permit.contact_name or '-' }}</td>
           </tr>
           {% endfor %}
@@ -1353,10 +1375,12 @@ function applyFilters() {
   const trade = (document.getElementById('f-trade') || {}).value || '';
   const zip = (document.getElementById('f-zip') || {}).value || '';
   const days = (document.getElementById('f-days') || {}).value || '0';
+  const minValue = (document.getElementById('f-min-value') || {}).value || '0';
   const q = (document.getElementById('f-q') || {}).value || '';
   if (trade) params.set('trade', trade);
   if (zip) params.set('zip', zip);
   if (days && days !== '0') params.set('days', days);
+  if (minValue && minValue !== '0') params.set('min_value', minValue);
   if (q) params.set('q', q);
   const qs = params.toString();
   // Update CSV link to inherit the same filters

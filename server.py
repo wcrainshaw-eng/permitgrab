@@ -4857,6 +4857,19 @@ def export_csv(city_slug):
     pid = prod_city['id']
     trade_filter = request.args.get('trade', '')
     tier_filter = request.args.get('tier', '')
+    zip_filter = (request.args.get('zip') or '').strip()[:5]
+    try:
+        days_filter = int(request.args.get('days') or 0)
+    except (TypeError, ValueError):
+        days_filter = 0
+    if days_filter not in (0, 7, 30, 90, 180, 365):
+        days_filter = 0
+    try:
+        min_value_filter = int(request.args.get('min_value') or 0)
+    except (TypeError, ValueError):
+        min_value_filter = 0
+    if min_value_filter not in (0, 10000, 50000, 100000, 500000, 1000000):
+        min_value_filter = 0
     limit = min(int(request.args.get('limit', 10000)), 10000)
 
     query = "SELECT * FROM permits WHERE prod_city_id = ?"
@@ -4864,6 +4877,13 @@ def export_csv(city_slug):
     if trade_filter:
         query += " AND trade_category = ?"
         params.append(trade_filter)
+    if zip_filter:
+        query += " AND zip = ?"
+        params.append(zip_filter)
+    if days_filter:
+        query += f" AND COALESCE(filing_date, issued_date, date) >= date('now', '-{days_filter} days')"
+    if min_value_filter:
+        query += f" AND estimated_cost >= {min_value_filter}"
     query += " ORDER BY filing_date DESC LIMIT ?"
     params.append(limit)
 
@@ -12654,9 +12674,9 @@ def city_landing_inner(city_slug):
     city_slug = db_slug  # legacy var name used below for internal queries
 
     # V251 F2: URL-param filters for the permits table (zip / trade / days).
-    # Pulled once up-front so both the stats query and the permits query can
-    # share the same clause. Sanitized: days is an allowed whitelist, zip is
-    # trimmed to 5 digits, trade is passed through (matches DB exactly).
+    # V251 F8: added min_value to the same filter machinery so "$100k+" is
+    # reachable in one query param. Whitelisted to prevent arbitrary ORDER
+    # injection when the value is concatenated into SQL below.
     _filter_zip = (request.args.get('zip') or '').strip()[:5]
     _filter_trade = (request.args.get('trade') or '').strip()
     try:
@@ -12665,7 +12685,13 @@ def city_landing_inner(city_slug):
         _filter_days = 0
     if _filter_days not in (0, 7, 30, 90, 180, 365):
         _filter_days = 0
-    _filters_active = bool(_filter_zip or _filter_trade or _filter_days)
+    try:
+        _filter_min_value = int(request.args.get('min_value') or 0)
+    except (TypeError, ValueError):
+        _filter_min_value = 0
+    if _filter_min_value not in (0, 10000, 50000, 100000, 500000, 1000000):
+        _filter_min_value = 0
+    _filters_active = bool(_filter_zip or _filter_trade or _filter_days or _filter_min_value)
     filtered_permit_count = None  # V251 F2: set below in prod-id branch
 
     # V15: Check prod_cities status for this city
@@ -12804,6 +12830,9 @@ def city_landing_inner(city_slug):
             _filter_params.append(_filter_trade)
         if _filter_days:
             _filter_sql += f" AND COALESCE(filing_date, issued_date, date) >= date('now', '-{_filter_days} days')"
+        if _filter_min_value:
+            # Whitelisted int above — safe to inline.
+            _filter_sql += f" AND estimated_cost >= {_filter_min_value}"
         stats_row = conn.execute("""
             SELECT COUNT(*) as permit_count,
                    COALESCE(SUM(estimated_cost), 0) as total_value,
@@ -13170,6 +13199,7 @@ def city_landing_inner(city_slug):
         filter_zip=_filter_zip,
         filter_trade=_filter_trade,
         filter_days=_filter_days,
+        filter_min_value=_filter_min_value,  # V251 F8
         filters_active=_filters_active,
         filtered_permit_count=filtered_permit_count,
     )
