@@ -908,7 +908,7 @@ body {
   </div>
   {% if filters_active %}
   <div style="max-width: 1200px; margin: 8px auto 0; font-size: 13px; color: var(--gray-600);">
-    Showing <strong>{{ "{:,}".format(permit_count) }}</strong> permits
+    Showing <strong>{{ "{:,}".format(filtered_permit_count or 0) }}</strong> permits
     {% if filter_trade %} for <strong>{{ filter_trade }}</strong>{% endif %}
     {% if filter_zip %} in zip <strong>{{ filter_zip }}</strong>{% endif %}
     {% if filter_days %} from the last <strong>{{ filter_days }} days</strong>{% endif %}
