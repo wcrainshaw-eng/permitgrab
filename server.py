@@ -12502,7 +12502,7 @@ def state_or_city_landing(state_slug):
     return city_landing_inner(state_slug)
 
 
-def _get_top_contractors_for_city(city_slug, limit=25):
+def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False):
     """V182 PR2: Top active contractors for a city's landing page.
 
     Returns [] if:
@@ -12512,6 +12512,10 @@ def _get_top_contractors_for_city(city_slug, limit=25):
     License-number-only entries render as "License #<raw>" per Wes's
     direction (tells the user a licensed contractor pulled the permit
     even when the company name wasn't captured).
+
+    V251 F12: when new_this_week_only is True, restricts to contractors
+    whose first_permit_date is within the last 7 days — highest-intent
+    leads (ramping-up contractors hiring subs, buying tools).
     """
     from contractor_profiles import is_license_number, city_passes_public_filter
     conn = permitdb.get_connection()
@@ -12524,13 +12528,16 @@ def _get_top_contractors_for_city(city_slug, limit=25):
             pc_row['population'] or 0, pc_row['total_permits'] or 0
         ):
             return []
-        rows = conn.execute("""
+        _where_extra = ""
+        if new_this_week_only:
+            _where_extra = " AND first_permit_date >= date('now', '-7 days')"
+        rows = conn.execute(f"""
             SELECT id, contractor_name_raw, contractor_name_normalized,
                    total_permits, permits_90d, permits_30d, primary_trade,
                    avg_project_value, phone, website, enrichment_status,
                    permit_frequency, first_permit_date, last_permit_date
             FROM contractor_profiles
-            WHERE source_city_key = ? AND is_active = 1
+            WHERE source_city_key = ? AND is_active = 1{_where_extra}
             ORDER BY total_permits DESC, permits_90d DESC
             LIMIT ?
         """, (city_slug, limit)).fetchall()
@@ -13130,8 +13137,13 @@ def city_landing_inner(city_slug):
     ]
 
     # V182 PR2: top contractors for this city (empty if city fails
-    # population sanity filter or has no active profiles)
-    top_contractors = _get_top_contractors_for_city(city_slug, limit=25)
+    # population sanity filter or has no active profiles).
+    # V251 F12: ?new_week=1 → only contractors whose first permit ever
+    # was within the last 7 days. Highest-intent leads.
+    _new_week_only = request.args.get('new_week') == '1'
+    top_contractors = _get_top_contractors_for_city(
+        city_slug, limit=25, new_this_week_only=_new_week_only
+    )
 
     # V226 T10: compute freshness age in days so the template can bucket
     # the badge into fresh / aging / stale. None when we don't have a date.
@@ -13238,6 +13250,7 @@ def city_landing_inner(city_slug):
         filter_min_value=_filter_min_value,  # V251 F8
         filters_active=_filters_active,
         filtered_permit_count=filtered_permit_count,
+        new_week_only=_new_week_only,  # V251 F12
     )
 
 
