@@ -672,6 +672,21 @@ body {
 .recency-dot.green  { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.15); }
 .recency-dot.yellow { background: #eab308; }
 .recency-dot.gray   { background: #d1d5db; }
+
+/* V251 F11: violation flag pill */
+.violation-flag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+    letter-spacing: 0.2px;
+    vertical-align: middle;
+    background: #fff1f2;
+    color: #9f1239;
+    border: 1px solid #fecdd3;
+}
 .leader-rank {
     display: inline-block;
     width: 20px;
@@ -1082,6 +1097,13 @@ body {
               <span class="contractor-name">{{ c.display_name }}</span>
             {% endif %}
             {% if c.phone %}<span class="contractor-enriched-icon" title="Verified phone number available">📞</span>{% endif %}
+            {# V251 F11: violation cross-reference flag. Hidden when zero.
+               Hook for property-owner outreach — "your contractor has N open
+               code violations." Aggregated server-side in one JOIN so the
+               page still renders fast on 25-row tables. #}
+            {% if c.violations_count and c.violations_count > 0 %}
+              <span class="violation-flag" title="{{ c.violations_count }} code violation{% if c.violations_count != 1 %}s{% endif %} on file at this contractor's job sites">⚠️ {{ c.violations_count }}</span>
+            {% endif %}
             {# V251 F5: velocity badge — highest-signal first #}
             {% if c.is_new %}
               <span class="velocity-badge new" title="First permit in the last 7 days">NEW</span>
