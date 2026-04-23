@@ -4908,6 +4908,130 @@ def export_csv(city_slug):
     )
 
 
+# ==========================================================================
+# V251 F18: Public v1 API (Pro-gated). Same data the web UI shows, just
+# JSON. Session-authenticated for now (API-key header is a v2 concern).
+# ==========================================================================
+
+def _require_pro_api():
+    """Returns (None, None) when the request is Pro; otherwise a
+    (response, status) tuple the caller should `return`.
+
+    Matches the F3 CSV-export gate: anon→402, free→402 with upgrade_url.
+    Response is JSON only — no redirects on API endpoints.
+    """
+    if 'user_email' not in session:
+        return jsonify({
+            'error': 'Authentication required',
+            'signup_url': '/signup',
+        }), 401
+    _user = find_user_by_email(session['user_email'])
+    if not _user or not is_pro(_user):
+        return jsonify({
+            'error': 'Pro subscription required for API access',
+            'upgrade_url': '/pricing',
+        }), 402
+    return None, None
+
+
+@app.route('/api/v1/contractors')
+def api_v1_contractors():
+    """GET /api/v1/contractors?city=<slug>[&trade=][&limit=]
+
+    Returns the same top-contractors payload the web UI renders, but
+    unredacted (Pro-only). Useful for CRM ingestion.
+    """
+    err, status = _require_pro_api()
+    if err:
+        return err, status
+    city_slug = (request.args.get('city') or '').strip()
+    trade = (request.args.get('trade') or '').strip()
+    try:
+        limit = min(max(int(request.args.get('limit') or 25), 1), 500)
+    except (TypeError, ValueError):
+        limit = 25
+    if not city_slug:
+        return jsonify({'error': 'city query param required'}), 400
+    contractors = _get_top_contractors_for_city(city_slug, limit=limit)
+    if trade:
+        contractors = [c for c in contractors if (c.get('primary_trade') or '') == trade]
+    return jsonify({
+        'city_slug': city_slug,
+        'count': len(contractors),
+        'contractors': contractors,
+    })
+
+
+@app.route('/api/v1/permits')
+def api_v1_permits():
+    """GET /api/v1/permits?city=<slug>[&trade=][&zip=][&days=][&min_value=][&limit=]
+
+    Recent permits for the city, honoring the same filter params as the
+    web UI. Pro-gated.
+    """
+    err, status = _require_pro_api()
+    if err:
+        return err, status
+    city_slug = (request.args.get('city') or '').strip()
+    if not city_slug:
+        return jsonify({'error': 'city query param required'}), 400
+    conn = permitdb.get_connection()
+    pc_row = conn.execute(
+        "SELECT id FROM prod_cities WHERE city_slug = ?", (city_slug,)
+    ).fetchone()
+    if not pc_row:
+        return jsonify({'error': f'city not found: {city_slug}'}), 404
+    pid = pc_row[0] if not isinstance(pc_row, dict) else pc_row['id']
+
+    trade = (request.args.get('trade') or '').strip()
+    zip_f = (request.args.get('zip') or '').strip()[:5]
+    try:
+        days = int(request.args.get('days') or 0)
+    except (TypeError, ValueError):
+        days = 0
+    if days not in (0, 7, 30, 90, 180, 365):
+        days = 0
+    try:
+        min_value = int(request.args.get('min_value') or 0)
+    except (TypeError, ValueError):
+        min_value = 0
+    if min_value not in (0, 10000, 50000, 100000, 500000, 1000000):
+        min_value = 0
+    try:
+        limit = min(max(int(request.args.get('limit') or 100), 1), 1000)
+    except (TypeError, ValueError):
+        limit = 100
+
+    clause = ""
+    params = [pid]
+    if trade:
+        clause += " AND trade_category = ?"
+        params.append(trade)
+    if zip_f:
+        clause += " AND zip = ?"
+        params.append(zip_f)
+    if days:
+        clause += f" AND COALESCE(filing_date, issued_date, date) >= date('now', '-{days} days')"
+    if min_value:
+        clause += f" AND estimated_cost >= {min_value}"
+    rows = conn.execute(f"""
+        SELECT permit_number, filing_date, issued_date, date, permit_type,
+               address, zip, description, estimated_cost, trade_category,
+               contractor_name, contact_name, owner_name, status
+        FROM permits
+        WHERE prod_city_id = ?{clause}
+        ORDER BY COALESCE(filing_date, issued_date, date) DESC
+        LIMIT ?
+    """, params + [limit]).fetchall()
+    return jsonify({
+        'city_slug': city_slug,
+        'filters': {'trade': trade or None, 'zip': zip_f or None,
+                    'days': days or None, 'min_value': min_value or None},
+        'count': len(rows),
+        'permits': [dict(r) for r in rows],
+    })
+
+
 @app.route('/api/admin/digest/status', methods=['GET'])
 def admin_digest_status():
     """V158: Get digest daemon status and recent history."""
