@@ -1112,7 +1112,11 @@ body {
           {% endif %}
           <tr data-trade="{{ permit.trade_category or '' }}">
             <td>
-              {{ permit.filing_date or 'N/A' }}
+              {# Strip time component — some sources (DC, Miami-Dade) deliver
+                 ISO timestamps like "2026-02-20T00:00:00.000" that leak into
+                 the table verbatim. Truncate to 10 chars so every date renders
+                 as YYYY-MM-DD regardless of source format. #}
+              {{ (permit.filing_date[:10] if permit.filing_date else 'N/A') }}
               {% if is_new %}<span class="badge-new">NEW</span>{% endif %}
             </td>
             <td class="address">{{ permit.address or 'Address not listed' }}</td>
@@ -1194,7 +1198,10 @@ body {
         {# V251 F1: gated preview. Pro users see everything. Anonymous/free
            users see full names for top 5, blurred for rest, and phones are
            always gated to a "Reveal" CTA that drops them into /signup. #}
-        {% set row_gate = (not is_pro) and (loop.index > 5) %}
+        {# Hardened gate: require a real session AND is_pro, matches the
+           contractor-contact cell gate below. #}
+        {% set _is_paying = session.get('user_email') and is_pro %}
+        {% set row_gate = (not _is_paying) and (loop.index > 5) %}
         <tr>
           <td>
             {# V251 F5: recency dot fires first so it aligns with the name #}
@@ -1207,7 +1214,12 @@ body {
                visually obscured for free/anon. License-number rows get
                no link (they're placeholder names). #}
             {% if c.is_license_number %}
-              <span class="contractor-license">{{ c.display_name }}</span>
+              {# License-number-only rows — the upstream permit feed didn't
+                 give us a business name, just a DOB/state license ID. Show
+                 a generic "Licensed contractor" label so the UI doesn't
+                 look like a junk list; keep the ID in a tooltip so paying
+                 users can still look it up. #}
+              <span class="contractor-license" title="Licensed contractor — DB ID {{ c.display_name }}">Licensed contractor</span>
             {% elif c.id %}
               <a href="/contractor/{{ c.id }}" class="contractor-name" style="text-decoration: none; color: inherit;">{{ c.display_name }}</a>
             {% else %}
@@ -1251,7 +1263,14 @@ body {
             {% endif %}
           </td>
           <td class="contractor-contact">
-            {% if is_pro %}
+            {# V251 phone-leak fix: the `is_pro` context variable was being
+               shadowed in some render paths (module-level is_pro function
+               vs context-processor dict), which let phone numbers render
+               unredacted to anonymous visitors on production. Gate on both
+               a real session cookie AND the is_pro context var so the
+               worst case is "slightly slower to reveal for Pro users"
+               instead of "free phone numbers to the internet". #}
+            {% if session.get('user_email') and is_pro %}
               {% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% endif %}
               {% if c.phone and c.website %} · {% endif %}
               {% if c.website %}<a href="{{ c.website }}" rel="nofollow noopener" target="_blank">Website</a>{% endif %}
@@ -1277,7 +1296,7 @@ body {
     </div>
     {% endif %}
   </div>
-  {% if not is_pro and top_contractors and top_contractors|length > 5 %}
+  {% if not _is_paying and top_contractors and top_contractors|length > 5 %}
   {# V251 F1: below-table conversion CTA. Shown to anon + free tiers only. #}
   <div class="gate-cta">
     <h3>Viewing {{ [top_contractors|length, 5] | min }} of {{ unique_contractors or top_contractors|length }} contractors in {{ city_name }}</h3>
