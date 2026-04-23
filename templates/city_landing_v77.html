@@ -836,31 +836,50 @@ body {
 </section>
 {% endif %}
 
-<!-- V177: FILTER BAR -->
+<!-- V251 F2: FILTER BAR (was V177). Trade + zip dropdowns are server-rendered
+     from available_trades / available_zips (top 20 zips + top 15 trades by
+     permit volume for this city). The days dropdown maps to
+     COALESCE(filing_date, issued_date, date) >= date('now', '-N days') server-side.
+     All three use GET query params so the URL is shareable + bookmarkable. -->
 {% if permit_count > 0 %}
 <section style="background: white; max-width: none; padding: 16px 32px;">
   <div style="max-width: 1200px; margin: 0 auto; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
     <select id="f-trade" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
       <option value="">All Trades</option>
-      <option value="HVAC">HVAC</option>
-      <option value="Electrical">Electrical</option>
-      <option value="Plumbing">Plumbing</option>
-      <option value="Roofing">Roofing</option>
-      <option value="Solar">Solar</option>
-      <option value="Demolition">Demolition</option>
-      <option value="General Construction">General</option>
+      {% for t in available_trades %}
+      <option value="{{ t }}"{% if filter_trade == t %} selected{% endif %}>{{ t }}</option>
+      {% endfor %}
     </select>
-    <select id="f-tier" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
-      <option value="">All Values</option>
-      <option value="small">&lt; $50K</option>
-      <option value="mid">$50K - $500K</option>
-      <option value="large">&gt; $500K</option>
+    <select id="f-zip" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+      <option value="">All Zips</option>
+      {% for z in available_zips %}
+      <option value="{{ z }}"{% if filter_zip == z %} selected{% endif %}>{{ z }}</option>
+      {% endfor %}
+    </select>
+    <select id="f-days" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+      <option value="0"{% if not filter_days %} selected{% endif %}>All Dates</option>
+      <option value="7"{% if filter_days == 7 %} selected{% endif %}>Last 7 days</option>
+      <option value="30"{% if filter_days == 30 %} selected{% endif %}>Last 30 days</option>
+      <option value="90"{% if filter_days == 90 %} selected{% endif %}>Last 90 days</option>
+      <option value="180"{% if filter_days == 180 %} selected{% endif %}>Last 180 days</option>
+      <option value="365"{% if filter_days == 365 %} selected{% endif %}>Last year</option>
     </select>
     <input id="f-q" placeholder="Search address, description..." style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; flex: 1; min-width: 150px;" />
     <button onclick="applyFilters()" style="padding: 8px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500;">Filter</button>
+    {% if filters_active %}
+    <a href="/permits/{{ city_slug }}" style="padding: 8px 12px; color: var(--gray-600); font-size: 13px; text-decoration: underline;">Clear filters</a>
+    {% endif %}
     <a id="csv-link" href="/api/permits/{{ city_slug }}/export.csv" download style="padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; color: #374151; text-decoration: none;">📥 CSV</a>
     <button onclick="saveCurrentSearch()" id="btn-save-search" style="display: none; padding: 8px 16px; background: #16a34a; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">💾 Save Search</button>
   </div>
+  {% if filters_active %}
+  <div style="max-width: 1200px; margin: 8px auto 0; font-size: 13px; color: var(--gray-600);">
+    Showing <strong>{{ "{:,}".format(permit_count) }}</strong> permits
+    {% if filter_trade %} for <strong>{{ filter_trade }}</strong>{% endif %}
+    {% if filter_zip %} in zip <strong>{{ filter_zip }}</strong>{% endif %}
+    {% if filter_days %} from the last <strong>{{ filter_days }} days</strong>{% endif %}
+  </div>
+  {% endif %}
 </section>
 {% endif %}
 
@@ -1269,32 +1288,33 @@ function v211Subscribe(ev) {
     });
 })();
 
-// V177: Filter functionality
+// V251 F2: Filter functionality (was V177). Pushes trade/zip/days/q to the
+// URL so the server-side SQL filter kicks in. Server pre-selects the
+// dropdowns, so we only need to keep `q` pre-fill for the text input.
 function applyFilters() {
   const params = new URLSearchParams();
-  const trade = document.getElementById('f-trade').value;
-  const tier = document.getElementById('f-tier').value;
-  const q = document.getElementById('f-q').value;
+  const trade = (document.getElementById('f-trade') || {}).value || '';
+  const zip = (document.getElementById('f-zip') || {}).value || '';
+  const days = (document.getElementById('f-days') || {}).value || '0';
+  const q = (document.getElementById('f-q') || {}).value || '';
   if (trade) params.set('trade', trade);
-  if (tier) params.set('tier', tier);
+  if (zip) params.set('zip', zip);
+  if (days && days !== '0') params.set('days', days);
   if (q) params.set('q', q);
   const qs = params.toString();
-  history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
-  // Update CSV link
+  // Update CSV link to inherit the same filters
   const csvLink = document.getElementById('csv-link');
   if (csvLink) csvLink.href = `/api/permits/{{ city_slug }}/export.csv${qs ? '?' + qs : ''}`;
-  // Show save button when filters active
   const saveBtn = document.getElementById('btn-save-search');
   if (saveBtn) saveBtn.style.display = qs ? 'inline-flex' : 'none';
-  // Reload page with filters (server-side filtering via query params)
+  // Reload page with filters — server renders the filtered stats+rows
   window.location.search = qs;
 }
-// Pre-fill filters from URL on load
+// Pre-fill `q` from URL (trade/zip/days are server-rendered selected)
 (function() {
   const p = new URLSearchParams(window.location.search);
-  if (p.get('trade')) document.getElementById('f-trade').value = p.get('trade');
-  if (p.get('tier')) document.getElementById('f-tier').value = p.get('tier');
-  if (p.get('q')) document.getElementById('f-q').value = p.get('q');
+  const q = document.getElementById('f-q');
+  if (p.get('q') && q) q.value = p.get('q');
   if (p.toString()) {
     const btn = document.getElementById('btn-save-search');
     if (btn) btn.style.display = 'inline-flex';
