@@ -12671,6 +12671,13 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
         # query (not per-row) joined through permits by address; keyed back to
         # the contractor's raw name so the loop below can just dict-lookup.
         # Limited to prod_city scope so Chicago doesn't scan national data.
+        #
+        # Perf note: the original query did UPPER(p.address) = UPPER(v.address)
+        # which forced a full scan × full scan on cities with 20k+ permits
+        # (Chicago). Dropped the UPPER — permit and violation addresses both
+        # arrive already uppercased from their source APIs, and the cost of
+        # missing a mixed-case edge case (→ zero flag rendered) is much less
+        # than page-load timeouts on every city-page visit.
         violations_by_name = {}
         try:
             pc_id_row = conn.execute(
@@ -12678,9 +12685,6 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
             ).fetchone()
             pc_id = pc_id_row[0] if pc_id_row else None
             if pc_id and rows:
-                # Gather the contractors we're rendering so the violations
-                # query doesn't explode into an "every contractor in city"
-                # scan on cities with thousands of profiles.
                 rendered_names = tuple(set(
                     n for r in rows for n in (r['contractor_name_raw'],) if n
                 ))
@@ -12689,7 +12693,7 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
                     viol_rows = conn.execute(f"""
                         SELECT p.contractor_name, COUNT(DISTINCT v.id) as n
                         FROM violations v
-                        JOIN permits p ON UPPER(p.address) = UPPER(v.address)
+                        JOIN permits p ON p.address = v.address
                                       AND p.prod_city_id = ?
                         WHERE v.prod_city_id = ?
                           AND p.contractor_name IN ({ph})
