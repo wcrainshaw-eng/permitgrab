@@ -8898,7 +8898,18 @@ def alerts_redirect():
 
 @app.route('/api/admin/health')
 def admin_daemon_health():
-    """V146: Daemon health check — no auth required (for Render health checks)."""
+    """V146: Daemon health check — no auth required (for Render health checks).
+
+    V256: self-heal — if the daemon has stopped AND no collection has
+    happened in the last 15 minutes, kick off start_collectors() in a
+    background thread before returning the status. Eliminates the
+    "every deploy needs a manual POST /api/admin/start-collectors" toil
+    that's burned hours this week. Safe because:
+      - start_collectors is thread-safe (_collector_started flag)
+      - health probe is called every minute by Render's TCP check, so
+        self-heal fires on the first probe after a failed deploy
+      - bound check (15 min) avoids hot-loop during the 120s startup
+    """
     try:
         conn = permitdb.get_connection()
         # Last collection
@@ -8909,20 +8920,49 @@ def admin_daemon_health():
         errors_24h = conn.execute("SELECT COUNT(*) FROM scraper_runs WHERE run_started_at > datetime('now', '-24 hours') AND status = 'error'").fetchone()[0]
         # Fresh cities
         fresh = conn.execute("SELECT COUNT(DISTINCT city) FROM permits WHERE date >= date('now', '-7 days') AND date <= date('now')").fetchone()[0]
+        # V256 self-heal trigger: minutes since last collection (if we can parse it)
+        stale_minutes = None
+        if last_coll_at:
+            try:
+                from datetime import datetime as _dt
+                delta = _dt.utcnow() - _dt.strptime(last_coll_at[:19], '%Y-%m-%d %H:%M:%S')
+                stale_minutes = int(delta.total_seconds() / 60)
+            except Exception:
+                pass
         conn.close()
 
         daemon_running = _collector_started
         is_healthy = daemon_running and colls_24h > 0
+        self_healed = False
+
+        # V256: self-heal if daemon is down + no recent activity. Run in a
+        # background thread so this endpoint stays snappy for Render's probe.
+        if not daemon_running and (stale_minutes is None or stale_minutes > 15):
+            try:
+                import threading as _th
+                def _selfheal():
+                    try:
+                        print(f"[V256] Self-heal: daemon not running, stale_minutes={stale_minutes} — starting collectors", flush=True)
+                        start_collectors()
+                    except Exception as e:
+                        print(f"[V256] Self-heal failed: {e}", flush=True)
+                _th.Thread(target=_selfheal, daemon=True, name='v256_selfheal').start()
+                self_healed = True
+            except Exception:
+                pass
 
         status_code = 200 if is_healthy else 503
-        return jsonify({
+        payload = {
             'status': 'healthy' if is_healthy else 'unhealthy',
             'daemon_running': daemon_running,
             'last_collection_at': last_coll_at,
             'collections_last_24h': colls_24h,
             'errors_last_24h': errors_24h,
             'fresh_city_count': fresh,
-        }), status_code
+        }
+        if self_healed:
+            payload['self_heal_triggered'] = True
+        return jsonify(payload), status_code
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)[:100]}), 503
 
