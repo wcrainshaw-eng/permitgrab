@@ -416,6 +416,42 @@ When running autonomously, follow this cycle:
 
 ---
 
+## SKILLS SYSTEM
+
+You have six skills installed in `.claude/skills/`. Read the relevant SKILL.md BEFORE performing
+that type of work. Skills contain battle-tested procedures, exact SQL queries, and failure recovery.
+
+### Available Skills
+
+| Skill | When to Use | Location |
+|-------|-------------|----------|
+| city-onboarding | Adding ANY new city | .claude/skills/city-onboarding/SKILL.md |
+| data-quality-audit | Daily quality checks, before deploys | .claude/skills/data-quality-audit/SKILL.md |
+| seo-real-data | Writing/updating city page content | .claude/skills/seo-real-data/SKILL.md |
+| enrichment-pipeline | Improving phone coverage | .claude/skills/enrichment-pipeline/SKILL.md |
+| health-monitor | Health checks, incident response | .claude/skills/health-monitor/SKILL.md |
+| uat-deploy | Pre-deploy validation, post-deploy checks | .claude/skills/uat-deploy/SKILL.md |
+
+### How to Use Skills
+
+1. Before starting a task, identify which skill applies
+2. Read the SKILL.md file to get the exact procedure
+3. Follow the procedure step by step — don't skip steps
+4. Use the output format specified in the skill for reporting
+
+### Autonomous Loop with Skills
+
+Each cycle of the autonomous loop should use skills:
+
+1. **HEALTH CHECK** → Read `health-monitor/SKILL.md`, follow the health check sequence
+2. **DATA QUALITY** → Read `data-quality-audit/SKILL.md`, run the full audit
+3. **ENRICHMENT** → Read `enrichment-pipeline/SKILL.md`, check phone coverage, trigger imports
+4. **CITY EXPANSION** → Read `city-onboarding/SKILL.md`, onboard the next city
+5. **SEO** → Read `seo-real-data/SKILL.md`, update city pages with real numbers
+6. **UAT** → Read `uat-deploy/SKILL.md`, run the full checklist after any change
+
+---
+
 ## RENDER DEPLOYMENT
 
 - **Service**: permitgrab (web service)
