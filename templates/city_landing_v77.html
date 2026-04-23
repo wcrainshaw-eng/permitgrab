@@ -673,6 +673,24 @@ body {
 .recency-dot.yellow { background: #eab308; }
 .recency-dot.gray   { background: #d1d5db; }
 
+/* V251 F12: new-this-week toggle */
+.new-week-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: white;
+    border: 1.5px solid var(--primary);
+    border-radius: 999px;
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.new-week-toggle:hover { background: var(--primary); color: white !important; }
+.new-week-toggle.active { background: var(--primary); color: white; }
+
 /* V251 F11: violation flag pill */
 .violation-flag {
     display: inline-block;
@@ -1048,18 +1066,33 @@ body {
 </section>
 
 <!-- V182 PR2 + V204-3: TOP CONTRACTORS -->
-{% if top_contractors %}
+{% if top_contractors or new_week_only %}
 {% set contractors_enriched = top_contractors | selectattr('phone') | list | length %}
 <section class="contractors-section">
-  <div class="section-header">
-    <h2>Top Contractors in {{ city_name }}</h2>
-    <p>Most active contractors by permit volume — last 90 days of activity shown in parentheses.
-    {% if contractors_enriched > 0 %}
-      <strong>{{ contractors_enriched }} of {{ top_contractors|length }}</strong> have verified phone numbers below.
-    {% else %}
-      Contact info is being verified — check back soon or <a href="/pricing">subscribe to unlock full contacts</a>.
-    {% endif %}
-    </p>
+  <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+    <div>
+      <h2>{% if new_week_only %}New This Week — {% endif %}Top Contractors in {{ city_name }}</h2>
+      <p>
+        {% if new_week_only %}
+          Contractors who pulled their <strong>first permit ever</strong> in {{ city_name }} within the last 7 days. Highest-intent leads — they're ramping up.
+        {% else %}
+          Most active contractors by permit volume — last 90 days of activity shown in parentheses.
+          {% if contractors_enriched > 0 %}
+            <strong>{{ contractors_enriched }} of {{ top_contractors|length }}</strong> have verified phone numbers below.
+          {% else %}
+            Contact info is being verified — check back soon or <a href="/pricing">subscribe to unlock full contacts</a>.
+          {% endif %}
+        {% endif %}
+      </p>
+    </div>
+    {# V251 F12: New-this-week toggle. One-click filter for highest-intent
+       leads (first permit within 7 days). Preserves other filter params via
+       JS so the user doesn't lose their zip/trade/days selection. #}
+    <a href="{% if new_week_only %}/permits/{{ city_slug }}{% else %}/permits/{{ city_slug }}?new_week=1{% endif %}"
+       class="new-week-toggle{% if new_week_only %} active{% endif %}"
+       title="{% if new_week_only %}Show all top contractors{% else %}Show only contractors new to the city in the last 7 days{% endif %}">
+      {% if new_week_only %}✕ Show all{% else %}🆕 New this week{% endif %}
+    </a>
   </div>
   <div class="permits-table-wrap">
     <table class="contractors-table">
@@ -1143,8 +1176,16 @@ body {
         {% endfor %}
       </tbody>
     </table>
+    {% if new_week_only and not top_contractors %}
+    {# V251 F12: graceful empty state when the 7-day filter yields no new
+       contractors — common in smaller cities on slow weeks. #}
+    <div style="padding: 32px 24px; text-align: center; color: var(--gray-500); font-size: 14px;">
+      No contractors in {{ city_name }} pulled their first permit in the last 7 days.
+      <a href="/permits/{{ city_slug }}" style="color: var(--primary); text-decoration: underline; margin-left: 4px;">Show all top contractors &rarr;</a>
+    </div>
+    {% endif %}
   </div>
-  {% if not is_pro and top_contractors|length > 5 %}
+  {% if not is_pro and top_contractors and top_contractors|length > 5 %}
   {# V251 F1: below-table conversion CTA. Shown to anon + free tiers only. #}
   <div class="gate-cta">
     <h3>Viewing {{ [top_contractors|length, 5] | min }} of {{ unique_contractors or top_contractors|length }} contractors in {{ city_name }}</h3>
