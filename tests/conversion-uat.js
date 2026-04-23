@@ -225,15 +225,29 @@ async function v252Surface(browser) {
   else fail('V251.F22 report CTA', 'no cta-footer');
   await rep.close();
 
-  // V252 F7 trade-first URL redirects
+  // V252 F7 + V253 P1 #5: trade-first URL now renders directly (no 301).
+  // Check both that it returns 200 AND that the canonical points to the
+  // trade-first URL (not /permits/.../<trade>) so SEO ranking stays on
+  // /solar/chicago-il. If the 301 comes back we lose ranking signal.
   const tr = await newPage(browser);
   resp = await tr.goto(`${BASE_URL}/solar/chicago-il`, { waitUntil: 'networkidle2', timeout: 20000 });
   const finalUrl = resp.url();
-  if (resp.status() === 200 && finalUrl.includes('/permits/chicago-il/')) {
-    pass(`V252.F7 /solar/chicago-il → ${finalUrl.split(BASE_URL).pop()}`);
+  const trInfo = await tr.evaluate(() => ({
+    canonical: (document.querySelector('link[rel="canonical"]') || {}).href || '',
+    hasSolar: /solar/i.test(document.body.innerText.slice(0, 5000)),
+  }));
+  if (resp.status() === 200 && finalUrl.endsWith('/solar/chicago-il')) {
+    pass(`V252.F7 /solar/chicago-il renders directly (no 301)`);
   } else {
-    fail('V252.F7 trade URL redirect', `ended at ${finalUrl} status ${resp.status()}`);
+    fail('V252.F7 trade URL direct render', `ended at ${finalUrl} status ${resp.status()}`);
   }
+  if (trInfo.canonical.endsWith('/solar/chicago-il')) {
+    pass('V253 P1#5 /solar/chicago-il canonical self-refers');
+  } else {
+    fail('V253 P1#5 trade canonical', `canonical=${trInfo.canonical}`);
+  }
+  if (trInfo.hasSolar) pass('V252.F7 page content mentions solar');
+  else fail('V252.F7 trade content', 'no solar mention in first 5k chars');
   await tr.close();
 }
 
