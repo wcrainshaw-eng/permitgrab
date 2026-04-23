@@ -11,11 +11,19 @@ A city is "ad-ready" when it has ALL THREE:
 2. **Phones** (>50 profiles with phone numbers)
 3. **Violations** (>0 code enforcement violation records)
 
-**Current state (2026-04-22):**
-- Confirmed YES: Chicago (3,494 phones), Phoenix (1,079), San Antonio (3,828), San Jose (95 phones, 3,428 violations)
-- NYC: 466 phones (was 4,362 — check if data issue)
-- 6+ FL cities BLOCKED on FL DBPR import (column position bug, V244d fix pending)
-- ~98 cities actively collecting permits
+**Current state (2026-04-22, post-V244d):**
+- **Confirmed ad-ready (profiles ≥100, phones ≥50, violations >0):**
+  - Chicago (8,352 / 3,494 / 19,857)
+  - NYC (3,728 / 466 / 51,244)
+  - Phoenix (1,944 / 1,079 / V243 violations)
+  - San Jose (1,180 / 95 / 3,428)
+  - Miami-Dade (4,160 / 180 / 188K) — NEW, V244d landed phones
+- **Ad-ready minus violations** (no public API exists): San Antonio
+- **Near-miss** (need ~10-40 more phones): Orlando-fl (39), Cape Coral (24), Fort Lauderdale (17)
+- **Ad-ready minus violations** (needs code-enforcement source): Hialeah (64 phones, 0 violations — Hialeah has NO public ArcGIS code enforcement feed; Miami-Dade CCVIOL_gdb is county-unincorporated only)
+- NYC 466 phones is the REAL number — pre-V242 showed 4,362 which was inflated by DDG-fabricated phones on numeric-name fake profiles that V242 P0.5 rightly deleted. Not a regression.
+- FL DBPR import WORKING: 35 → 328 phones across 6 FL cities (V244d column-layout fix landed)
+- ~98 cities actively collecting permits, 96 fresh (last 7d)
 
 **You are autonomous. Don't stop to ask permission. Fix things, test things, deploy things. If something breaks, debug and fix it. Write clean PRs with descriptive titles.**
 
@@ -337,23 +345,29 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 
 ## KNOWN BUGS & CURRENT BLOCKERS
 
-### P0: FL DBPR Column Position Mismatch (V244d)
-- Import runs but matches 0 records. applicants_phone_indexed=2 out of ~100K.
-- Root cause: STATE_CONFIGS['FL'] applicant_columns (13 fields) and licensee_columns (20 fields) don't match actual CSV layout from myfloridalicense.com
-- Fix: SSH in, `head -3` each CSV, count actual columns, update the column lists
-- Impact: Unlocks 6+ FL cities for phone enrichment
+### ~~P0: FL DBPR Column Position Mismatch~~ (RESOLVED V244d)
+- V244d (PR #83, deployed 2026-04-22) fixed two config bugs: applicants CSV has 15 columns (phone at idx 13, not 11), and the real licensee file is `CONSTRUCTIONLICENSE_1.csv` (not `cilb_certified.csv` / `cilb_registered.csv` which are continuing-education records).
+- Post-fix live-verified: 81,540 phones indexed (was 2), FL phone total 35 → 328 across 6 cities, Miami-Dade crossed ad-ready threshold.
+
+### ~~P2: NYC Phone Count Dropped~~ (RESOLVED — not a bug)
+- The 4,362 figure pre-dated V242's garbage cleanup. Those rows were attached to 2,338 numeric-only NYC profiles (DOB applicant license IDs stored as contractor names) with DDG-fabricated phones. V242 P0.5 rightly deleted them. Current 466 phones are on 3,728 genuine business-name profiles — real coverage 12.5%, not a regression.
 
 ### P1: Tampa/Memphis Accela Scraper
 - Both have permits but 0 profiles because contractor_name is NULL
-- Root cause: accela_portal_collector.py scrapes HTML search grid, but the grid has NO contractor column
-- Fix: Need new scraper feature to follow each permit detail link and parse contractor info from detail page
+- Root cause: accela_portal_collector.py scrapes HTML search grid, but the grid has NO contractor column (V244b probe confirmed: Tampa CodeEnforcement folder on `arcgis.tampagov.net` is empty; Accela ACA portals only expose Record # / Type / Address / Date / Status columns)
+- Fix: Need new scraper feature to follow each permit detail link and parse contractor info from detail page — architectural, not a config edit
 - Impact: Tampa alone is 1,778 permits
 
-### P2: NYC Phone Count Dropped
-- NYC had 4,362 phones, now showing 466. Investigate whether data was lost or re-imported.
+### P1: Hialeah Has No Public Violation Feed
+- Hialeah is at 64 phones + has profiles but **0 violations** — only needs violations to flip ad-ready.
+- Probed 2026-04-22: no Hialeah-owned ArcGIS services, ArcGIS Online search returns 0 results for "hialeah violation" (Hialeah Gardens is a different city). Miami-Dade County's Code Compliance feeds are county-wide without a city column to filter Hialeah.
+- Options: (a) skip — fewer cities but clean data, (b) investigate Miami-Dade's `Energov` CodeCasePublicView to see if it includes Hialeah records with a city/municipality field.
 
 ### P3: SEO — Not Indexed
 - 2/3,115 pages indexed. Need to fix technical SEO issues and wait for Googlebot.
+
+### Speculative: FL DBPR match-rate gap (Miami 180 / Orlando 39)
+- Same matcher, different profile volumes (4,160 vs 1,681). Raw hit rate similar (~4.3% vs 2.3%). Worth sampling a few Orlando profile names vs DBPR licensee/DBA names to see if there's a normalization mismatch.
 
 ---
 
