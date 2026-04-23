@@ -1279,7 +1279,16 @@ body {
               {% if not c.phone and not c.website %}<span style="color: var(--gray-400); font-size: 12px;" title="Contact details being verified — refreshes daily">Verifying…</span>{% endif %}
             {% else %}
               {% if c.phone or c.website %}
-                <a href="/signup?next=/permits/{{ city_slug }}" class="gate-reveal-btn" title="Subscribe to reveal">🔒 Reveal</a>
+                {# V254 Phase 1: anon → signup CTA; logged-in free → AJAX
+                   reveal that spends a free-tier credit. JS at the bottom
+                   of the page checks session state on load and flips the
+                   button's handler accordingly (<a> stays SEO-safe with
+                   /signup href as the non-JS fallback). #}
+                <a href="/signup?next=/permits/{{ city_slug }}"
+                   class="gate-reveal-btn"
+                   data-profile-id="{{ c.id or '' }}"
+                   onclick="return v254Reveal(event, this);"
+                   title="Reveal phone">🔒 Reveal</a>
               {% else %}
                 <span style="color: var(--gray-400); font-size: 12px;">Verifying…</span>
               {% endif %}
@@ -1564,6 +1573,65 @@ body {
 <script>
 // V211-1: Email capture form — POSTs to /api/subscribe (existing endpoint
 // that backs User digest subscriptions). Shows inline status message.
+// V254 Phase 1: free-tier phone-reveal handler. Intercepts clicks on
+// .gate-reveal-btn and, for logged-in free users, AJAXes the reveal
+// and swaps the pill with the real phone number. For anon (or if the
+// session check returns authenticated:false), falls through to the
+// anchor's default /signup?next=... navigation.
+let _v254RevealState = null;
+async function _v254GetRevealState() {
+  if (_v254RevealState !== null) return _v254RevealState;
+  try {
+    const r = await fetch('/api/reveal-status', { credentials: 'same-origin' });
+    _v254RevealState = r.ok ? await r.json() : { authenticated: false };
+  } catch (e) { _v254RevealState = { authenticated: false }; }
+  return _v254RevealState;
+}
+async function v254Reveal(ev, el) {
+  const profileId = el && el.dataset && el.dataset.profileId;
+  if (!profileId) return true; // fall through — let the href handle it
+  const state = await _v254GetRevealState();
+  if (!state.authenticated) return true; // anon → /signup via href
+  if (state.is_pro) return true; // Pro should never see this pill; fallback
+  ev.preventDefault();
+  const original = el.innerHTML;
+  el.innerHTML = '…';
+  try {
+    const r = await fetch('/api/reveal-phone', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: parseInt(profileId, 10) }),
+    });
+    const d = await r.json();
+    if (r.ok && d.phone) {
+      // Replace pill with phone + optional website. Update global credit
+      // state so subsequent pills on the same page know the new balance.
+      const pieces = ['<a href="tel:' + d.phone + '" style="color:#111;font-weight:600;">' + d.phone + '</a>'];
+      if (d.website) pieces.push('<a href="' + d.website + '" rel="nofollow noopener" target="_blank">Website</a>');
+      el.outerHTML = pieces.join(' &middot; ');
+      _v254RevealState = Object.assign({}, state, { credits_remaining: d.credits_remaining });
+      _v254UpdateNavCounter();
+    } else if (r.status === 402) {
+      el.outerHTML = '<a href="/pricing" class="gate-reveal-btn" style="background:#dc2626;">⚠ Out of reveals · Upgrade</a>';
+    } else {
+      el.innerHTML = original;
+    }
+  } catch (e) {
+    el.innerHTML = original;
+  }
+  return false;
+}
+function _v254UpdateNavCounter() {
+  const n = document.getElementById('v254-nav-credits');
+  if (n && _v254RevealState && _v254RevealState.authenticated && !_v254RevealState.is_pro) {
+    n.textContent = (_v254RevealState.credits_remaining || 0) + ' reveals left';
+    n.style.display = 'inline-block';
+  }
+}
+// On page load, warm the state cache + paint nav counter if present.
+(function(){ _v254GetRevealState().then(_v254UpdateNavCounter); })();
+
 function v211Subscribe(ev) {
     ev.preventDefault();
     var emailEl = document.getElementById('v211-sub-email');

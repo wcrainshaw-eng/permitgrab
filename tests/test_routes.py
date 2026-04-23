@@ -62,14 +62,17 @@ def test_contractor_detail_404_for_missing_id(client):
 def test_city_page_anon_has_no_tel_links(client):
     """V251 P0 phone-leak guard. Anon must never see tel: links in
     the contractors table on a city page — if this fails the phone
-    gate is broken and paying customers have nothing to unlock."""
+    gate is broken and paying customers have nothing to unlock.
+
+    Scans only inside the actual <table class="contractors-table">...
+    </table> block (not the CSS declaration), since V254 Phase 1
+    introduces a tel: link inside a <script> template literal lower on
+    the page which isn't server-side-rendered output to the user."""
     r = client.get('/permits/chicago-il')
     assert r.status_code == 200
     body = r.get_data(as_text=True)
-    # Check only within the Top Contractors section, not elsewhere on the
-    # page. Heuristic: look for tel: links between the 'contractors-table'
-    # open and the next '</table>'.
-    start = body.find('contractors-table')
+    start_tag = '<table class="contractors-table">'
+    start = body.find(start_tag)
     if start == -1:
         # No contractors table rendered — nothing to assert.
         return
