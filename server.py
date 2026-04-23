@@ -4830,7 +4830,22 @@ def api_violations_stats(city_slug):
 
 @app.route('/api/permits/<city_slug>/export.csv')
 def export_csv(city_slug):
-    """V170 B3: Export permits for a city as CSV."""
+    """V170 B3: Export permits for a city as CSV.
+
+    V251 F3: gated to paid subscribers. Anonymous → redirect to signup with
+    a return URL pointing at the same city page (matches the F1 gated-preview
+    CTA pattern). Logged-in free-tier → 402 JSON with upgrade message. Pro
+    users (including admin) → CSV as before.
+    """
+    if 'user_email' not in session:
+        return redirect(f'/signup?next=/permits/{city_slug}&message=subscribe_to_export')
+    _user = find_user_by_email(session['user_email'])
+    if not _user or not is_pro(_user):
+        return jsonify({
+            'error': 'CSV export is a Pro feature. Subscribe for $149/mo to download contractor lead lists.',
+            'upgrade_url': f'/pricing?next=/permits/{city_slug}',
+        }), 402
+
     import csv, io
     conn = permitdb.get_connection()
     prod_city = conn.execute(
