@@ -9821,15 +9821,23 @@ def api_delete_webhook(webhook_id):
 
 @app.route('/<trade>/<city_slug>')
 def trade_city_landing(trade, city_slug):
+    """V252 F7 + V253: standalone trade-first URL.
+
+    Originally 301'd to /permits/<city>/<trade>, which meant Google saw
+    one canonical and /<trade>/<city> got zero ranking juice — defeating
+    the SEO play. Now renders the same template directly and passes a
+    self-canonical so the trade-first URL can rank for "solar leads
+    chicago" / "roofing contractor phoenix" / etc. on its own.
+    """
     if trade.lower() not in V252_TRADE_URL_MAP:
-        # Not a known trade — let Flask's normal 404 handler deal with it.
         abort(404)
     trade_slug = V252_TRADE_URL_MAP[trade.lower()]
-    # Reuse the existing /permits/<city>/<trade> renderer. 301 so Google
-    # collapses the ranking signal into the canonical URL (which also
-    # exists) rather than splitting across two paths. city_trade_landing
-    # handles missing-city + missing-trade gracefully.
-    return redirect(f"/permits/{city_slug}/{trade_slug}", code=301)
+    # Render through city_trade_landing (the existing /permits/<city>/<trade>
+    # route handler) but override canonical_url via Flask request context.
+    # Simplest: call the view function with a g-scoped canonical override
+    # and have the template pick it up.
+    g.canonical_url_override = f"{SITE_URL}/{trade.lower()}/{city_slug}"
+    return city_trade_landing(city_slug, trade_slug)
 
 
 @app.route('/leaderboard/<city_slug>')
@@ -14706,6 +14714,9 @@ def city_trade_landing(city_slug, trade_slug):
         city_blog_url=city_blog_url,
         trade_fallback=trade_fallback,
         trade_insights=trade_insights,  # V227 T9: per-page prose data insights
+        # V253: canonical override honored by the template so the V252 F7
+        # trade-first URL (/solar/chicago-il) renders with its own canonical.
+        canonical_url=getattr(g, 'canonical_url_override', None),
     )
 
 
