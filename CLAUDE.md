@@ -31,13 +31,16 @@ A city is "ad-ready" when it has ALL THREE:
 - **Cape Coral contractor_name_raw is dominated by homeowner names** ("OWNER BUILDER", "PEDRO CHAVEZ", "WADE WILLIAMSON"), not business names. Only 44 profiles have phones out of 1,751, and those matched DBPR by coincidence (licensed individuals who share a homeowner's name). Conclusion: Cape Coral permit data has no real contractor names — DBPR can't lift phones meaningfully. Compare Miami-Dade contractor_name_raw which is real businesses ("STRADA SERVICES INC", "ARNOLD J ELECTRIC INC"). Cape Coral is structurally a poor fit for the $149/mo lead product regardless of enrichment investment.
 
 ### V258 structural dead ends — permits collect, but no contractor field in the source API
-- **Los Angeles** (data.lacity.org/resource/pi9x-tg5x): 30,164 permits, only 32 profiles. Socrata dataset has address/type/value/zone/parcel/zip/dates but NO contractor, applicant, owner, or license field. Would need a separate LA DBS dataset — the building-permits endpoint is metadata-only.
+- **Los Angeles** (data.lacity.org): CURRENT pi9x-tg5x has no contractor field. Probed 3 alternates 2026-04-24 — hbkd-qubn (Electrical Permits), xnhu-aczu (LA BUILD PERMITS), 6q2s-9pnn (Building Permits Feb'15-Present) — all have `contractors_business_name` BUT all datasets frozen at 2023-05-19. LA city data portal stopped publishing permits ~May 2023 across all 30 permit datasets. Dead.
 - **San Francisco** (data.sfgov.org i98e-djp9): 11,254 permits, 0 profiles. Only `application_submission_method` is remotely contractor-shaped. Building Inspection Commission dataset doesn't expose applicant identity.
 - **Seattle** (data.seattle.gov ht3q-kdvx): 1,159 permits, 30 profiles. Zero contractor-like fields in the Socrata response.
 - **Denver** (denvergov.org opendata): 3,409 permits, 505 profiles (some extraction working, source unclear), 0 violations, 0 phones. CO has no state licensing DB, DDG-only path.
 - **Sacramento** (data.cityofsacramento.org): CKAN portal returns 404 for package_search — no public data portal detected 2026-04-24.
 - **Fresno** (fresno.gov): WAF 403 blocks programmatic probes.
 - **Oakland** (data.oaklandca.gov): catalog API returned Chicago's ydr8-5enu dataset (mirroring Socrata globally, not city-specific data) — no local permits available.
+- **Dallas** (www.dallasopendata.com e7gq-4sah): HAS `contractor` field with name+address+phone inline (e.g. "RELIANT HEATING A/C ... (817) 616-0620"). BUT newest permit is 2020-08-29 (zero permits starting with 2025/2026). Socrata metadata says "daily automated updates, updated 2024-01-10" but data is frozen. Probed 2026-04-24. Dead.
+
+**New Orleans — NOT DEAD (ad-ready candidate).** PR #150 switched `new_orleans_la` endpoint from `nbcf-m6c2` (metadata-only) to `rcm3-fn58` (has `contractors` field with real business names — e.g. historical 3,489 profiles came from rcm3-fn58 via legacy `new_orleans` config). Collection + DDG enrichment should now populate phones. Re-check phone coverage after next full cycle.
 
 **Takeaway:** All 6 California cities in V258 Tier 1-3 except the already-live ones lack a usable contractor-field permit API. CSLB name-matching is wired but there are no names to match. California's municipal permit data is fundamentally a metadata-only story across major cities.
 
