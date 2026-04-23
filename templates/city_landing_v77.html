@@ -691,6 +691,28 @@ body {
 .new-week-toggle:hover { background: var(--primary); color: white !important; }
 .new-week-toggle.active { background: var(--primary); color: white; }
 
+/* V251 F13: zip heatmap grid */
+.zip-heatmap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+.zip-cell {
+    display: block;
+    padding: 16px 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: transform 0.12s;
+}
+.zip-cell:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.zip-cell .zip-label { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+.zip-cell .zip-total { font-size: 22px; font-weight: 800; line-height: 1.1; margin-top: 2px; }
+.zip-cell .zip-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+@media (max-width: 768px) {
+    .zip-heatmap { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+    .zip-cell { padding: 12px 10px; }
+}
+
 /* V251 F11: violation flag pill */
 .violation-flag {
     display: inline-block;
@@ -1193,6 +1215,33 @@ body {
     <a href="/signup?next=/permits/{{ city_slug }}" class="cta-btn">Unlock full access — $149/mo</a>
   </div>
   {% endif %}
+</section>
+{% endif %}
+
+<!-- V251 F13: ZIP HEATMAP — top 10 zips by permit volume, click to filter.
+     Hidden when the city's data source doesn't populate zip (Chicago,
+     Orlando, Phoenix permit feeds omit zip, so the grid stays empty). -->
+{% if zip_heatmap %}
+{% set _max_z = zip_heatmap | map(attribute='permits_total') | max %}
+<section class="section">
+  <div class="section-header">
+    <h2>Permit Activity by Zip Code</h2>
+    <p>Top 10 zips in {{ city_name }} by permit volume. Click a cell to filter the tables above.</p>
+  </div>
+  <div class="zip-heatmap">
+    {% for z in zip_heatmap %}
+    {# 0..1 intensity from permits_total vs max for this city. Clamp to 0.12
+       minimum so the least-active cell still reads as an active cell. #}
+    {% set _intensity = (z.permits_total / _max_z) if _max_z else 0 %}
+    {% set _alpha = 0.12 + (_intensity * 0.78) %}
+    <a class="zip-cell" href="/permits/{{ city_slug }}?zip={{ z.zip }}"
+       style="background: rgba(37, 99, 235, {{ '%.2f' % _alpha }}); color: {% if _intensity > 0.55 %}white{% else %}var(--gray-900){% endif %};">
+      <div class="zip-label">{{ z.zip }}</div>
+      <div class="zip-total">{{ "{:,}".format(z.permits_total) }}</div>
+      <div class="zip-sub">{{ z.permits_90d }}/90d &middot; {{ z.contractors }} contractors</div>
+    </a>
+    {% endfor %}
+  </div>
 </section>
 {% endif %}
 

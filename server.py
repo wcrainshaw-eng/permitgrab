@@ -13145,6 +13145,29 @@ def city_landing_inner(city_slug):
         city_slug, limit=25, new_this_week_only=_new_week_only
     )
 
+    # V251 F13: zip heatmap — top 10 zip codes by permit volume with
+    # contractor counts and 90-day permit counts for trend signal.
+    # Skipped silently when the city's permit feed doesn't populate zip
+    # (Chicago, Orlando, Phoenix data sources don't). Template renders a
+    # grid with color intensity proportional to max_permits_in_zip.
+    zip_heatmap = []
+    if _prod_city_id:
+        try:
+            zip_heatmap = [dict(r) for r in conn.execute("""
+                SELECT zip,
+                       COUNT(*) as permits_total,
+                       COUNT(CASE WHEN COALESCE(filing_date, issued_date, date)
+                                  >= date('now', '-90 days') THEN 1 END) as permits_90d,
+                       COUNT(DISTINCT contractor_name) as contractors
+                FROM permits
+                WHERE prod_city_id = ? AND zip IS NOT NULL AND zip != ''
+                GROUP BY zip
+                ORDER BY permits_total DESC
+                LIMIT 10
+            """, (_prod_city_id,)).fetchall()]
+        except Exception as e:
+            print(f"[V251 F13] zip heatmap query failed for {city_slug}: {e}", flush=True)
+
     # V226 T10: compute freshness age in days so the template can bucket
     # the badge into fresh / aging / stale. None when we don't have a date.
     _freshness_age_days = None
@@ -13251,6 +13274,7 @@ def city_landing_inner(city_slug):
         filters_active=_filters_active,
         filtered_permit_count=filtered_permit_count,
         new_week_only=_new_week_only,  # V251 F12
+        zip_heatmap=zip_heatmap,  # V251 F13
     )
 
 
