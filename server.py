@@ -9518,6 +9518,119 @@ V252_TRADE_URL_MAP = {
 }
 
 
+# V252 F5: Zapier webhooks — Enterprise tier. File-backed JSON so no
+# schema migration; fine for <100 webhook definitions across subscribers.
+WEBHOOKS_FILE = os.path.join(DATA_DIR, 'webhooks.json')
+
+
+def _load_webhooks():
+    if os.path.exists(WEBHOOKS_FILE):
+        try:
+            with open(WEBHOOKS_FILE) as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def _save_webhooks(items):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(WEBHOOKS_FILE, 'w') as f:
+        json.dump(items, f, indent=2)
+
+
+def fire_webhooks_for_new_permits(new_permits):
+    """V252 F5: dispatch new-permit batch to all matching active webhooks.
+
+    Called by the collector after a successful insert batch (wiring is
+    a follow-up — ship the mechanism here). Filters per-webhook on
+    city_slug, optional trade_filter, optional min_value.
+    """
+    if not new_permits:
+        return 0
+    import requests as _req
+    items = _load_webhooks()
+    fired = 0
+    for wh in items:
+        if not wh.get('active', True):
+            continue
+        city = wh.get('city_slug')
+        trade = (wh.get('trade_filter') or '').strip() or None
+        min_v = int(wh.get('min_value') or 0)
+        matching = [
+            p for p in new_permits
+            if p.get('source_city_key') == city
+            and (not trade or (p.get('trade_category') == trade))
+            and (int(p.get('estimated_cost') or 0) >= min_v)
+        ]
+        if not matching:
+            continue
+        try:
+            _req.post(wh['url'], json={'permits': matching, 'webhook_id': wh.get('id')}, timeout=10)
+            fired += 1
+        except Exception as e:
+            print(f"[V252 F5] webhook {wh.get('id')} POST failed: {e}", flush=True)
+    return fired
+
+
+@app.route('/api/webhooks', methods=['GET'])
+def api_list_webhooks():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    if not is_enterprise(user):
+        return jsonify({'error': 'Enterprise feature', 'upgrade_url': '/pricing'}), 402
+    items = [w for w in _load_webhooks() if w.get('user_email') == user['email']]
+    return jsonify({'webhooks': items, 'count': len(items)})
+
+
+@app.route('/api/webhooks', methods=['POST'])
+def api_create_webhook():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    if not is_enterprise(user):
+        return jsonify({'error': 'Enterprise feature', 'upgrade_url': '/pricing'}), 402
+    data = request.get_json() or {}
+    url = (data.get('url') or '').strip()
+    city_slug = (data.get('city_slug') or '').strip()
+    if not url.startswith(('http://', 'https://')):
+        return jsonify({'error': 'Valid http(s) url required'}), 400
+    if not city_slug:
+        return jsonify({'error': 'city_slug required'}), 400
+    import secrets as _sec
+    wh = {
+        'id': _sec.token_hex(8),
+        'user_email': user['email'],
+        'url': url,
+        'city_slug': city_slug,
+        'trade_filter': (data.get('trade_filter') or '').strip() or None,
+        'min_value': int(data.get('min_value') or 0),
+        'active': True,
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    items = _load_webhooks()
+    # cap at 10 webhooks per user
+    user_items = [w for w in items if w.get('user_email') == user['email']]
+    if len(user_items) >= 10:
+        return jsonify({'error': 'Max 10 webhooks per account'}), 400
+    items.append(wh)
+    _save_webhooks(items)
+    return jsonify({'webhook': wh}), 201
+
+
+@app.route('/api/webhooks/<webhook_id>', methods=['DELETE'])
+def api_delete_webhook(webhook_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    items = _load_webhooks()
+    keep = [w for w in items
+            if not (w.get('id') == webhook_id and w.get('user_email') == user['email'])]
+    _save_webhooks(keep)
+    return jsonify({'removed': True})
+
+
 @app.route('/<trade>/<city_slug>')
 def trade_city_landing(trade, city_slug):
     if trade.lower() not in V252_TRADE_URL_MAP:
