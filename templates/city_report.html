@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ city.city }} Permit Activity Report — PermitGrab</title>
+<meta name="description" content="Quarterly permit activity report for {{ city.city }}, {{ city.state }} — {{ stats.permits_90d }} permits in the last 90 days across {{ stats.profiles }} contractors.">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:title" content="{{ city.city }} Permit Activity Report">
+<meta property="og:description" content="{{ stats.permits_90d }} permits, {{ stats.profiles }} contractors, {{ stats.violations }} violations in {{ city.city }}.">
+<meta property="og:image" content="https://permitgrab.com/og-image.png">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --primary:#2563eb; --accent:#f97316; --green:#16a34a; --gray-50:#f9fafb; --gray-200:#e5e7eb; --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.55; }
+.sheet { max-width: 900px; margin: 24px auto; background: white; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.05); overflow: hidden; }
+.sheet-head { background: linear-gradient(135deg, #111827 0%, #1e3a5f 100%); color: white; padding: 40px 48px; }
+.sheet-head .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.6); margin-bottom: 8px; }
+.sheet-head h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+.sheet-head .sub { font-size: 15px; color: rgba(255,255,255,.75); margin-top: 6px; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 32px 48px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200); }
+.kpi { text-align: left; }
+.kpi .v { font-size: 28px; font-weight: 800; color: var(--gray-900); font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.section { padding: 32px 48px; border-bottom: 1px solid var(--gray-200); }
+.section h2 { font-size: 20px; font-weight: 700; color: var(--gray-900); margin-bottom: 16px; }
+.trade-list { display: flex; flex-direction: column; gap: 8px; }
+.trade-row { display: grid; grid-template-columns: 200px 1fr 60px; gap: 12px; align-items: center; padding: 8px 0; }
+.trade-row .name { font-weight: 600; color: var(--gray-900); font-size: 14px; }
+.trade-row .bar { height: 18px; background: var(--gray-200); border-radius: 4px; overflow: hidden; }
+.trade-row .bar .fill { height: 100%; background: var(--primary); }
+.trade-row .count { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.contractor-list { display: flex; flex-direction: column; gap: 10px; }
+.contractor-row { display: grid; grid-template-columns: 24px 1fr 90px 110px; gap: 12px; align-items: center; padding: 10px 14px; background: var(--gray-50); border-radius: 8px; }
+.contractor-row .rank { font-size: 13px; font-weight: 700; color: var(--gray-500); }
+.contractor-row .name { font-weight: 600; color: var(--gray-900); font-size: 14px; }
+.contractor-row .meta { font-size: 12px; color: var(--gray-500); }
+.contractor-row .count { text-align: right; font-size: 13px; font-weight: 600; }
+.phone-gate { display: inline-block; padding: 4px 10px; background: var(--primary); color: white; border-radius: 999px; font-size: 11px; font-weight: 600; text-decoration: none; }
+.cta-footer { padding: 32px 48px; background: linear-gradient(135deg, #111827 0%, #1e3a5f 100%); color: white; text-align: center; }
+.cta-footer .brand { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 10px; }
+.cta-footer .hook { font-size: 18px; font-weight: 600; }
+.cta-footer a.btn { display: inline-block; margin-top: 16px; padding: 12px 32px; background: var(--accent); color: white !important; text-decoration: none; border-radius: 8px; font-weight: 700; }
+.share-bar { padding: 12px 48px; background: white; display: flex; gap: 10px; justify-content: flex-end; }
+.share-bar button, .share-bar a { font-size: 12px; color: var(--gray-500); background: none; border: 1px solid var(--gray-200); padding: 6px 12px; border-radius: 6px; cursor: pointer; text-decoration: none; }
+@media print {
+  body { background: white; }
+  .sheet { box-shadow: none; margin: 0; max-width: 100%; border-radius: 0; }
+  .share-bar { display: none; }
+  .cta-footer a.btn { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="share-bar">
+    <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='✓ Link copied'">🔗 Copy link</button>
+    <button onclick="window.print()">🖨 Print / PDF</button>
+  </div>
+
+  <div class="sheet-head">
+    <div class="label">Permit Activity Report · {{ current_date }}</div>
+    <h1>{{ city.city }}{% if city.state %}, {{ city.state }}{% endif %}</h1>
+    <div class="sub">{{ stats.permits_90d }} permits filed in the last 90 days · data updated {{ city.newest_permit_date[:10] if city.newest_permit_date else '—' }}</div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v">{{ "{:,}".format(stats.permits_90d) }}</div><div class="l">Permits · 90 Days</div></div>
+    <div class="kpi"><div class="v">{{ "{:,}".format(stats.permits_7d) }}</div><div class="l">Permits · This Week</div></div>
+    <div class="kpi"><div class="v">{{ "{:,}".format(stats.profiles) }}</div><div class="l">Active Contractors</div></div>
+    <div class="kpi"><div class="v">{{ "{:,}".format(stats.violations) }}</div><div class="l">Code Violations</div></div>
+  </div>
+
+  {% if top_trades %}
+  {% set trade_max = top_trades[0].n %}
+  <section class="section">
+    <h2>Top Trades by Permit Volume</h2>
+    <div class="trade-list">
+      {% for t in top_trades %}
+      <div class="trade-row">
+        <div class="name">{{ t.trade_category }}</div>
+        <div class="bar"><div class="fill" style="width: {{ (100.0 * t.n / trade_max) | round(0) }}%;"></div></div>
+        <div class="count">{{ "{:,}".format(t.n) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if top_contractors %}
+  <section class="section">
+    <h2>Most Active Contractors</h2>
+    <div class="contractor-list">
+      {% for c in top_contractors[:10] %}
+      <div class="contractor-row">
+        <div class="rank">{{ loop.index }}</div>
+        <div>
+          <div class="name">{% if c.is_license_number %}Licensed contractor{% else %}{{ c.display_name }}{% endif %}</div>
+          <div class="meta">{{ c.primary_trade or 'General' }}{% if c.permits_30d %} · {{ c.permits_30d }} permits/30d{% endif %}</div>
+        </div>
+        <div class="count">{{ "{:,}".format(c.total_permits) }}<br><span style="font-weight:400;color:var(--gray-500);font-size:11px;">permits</span></div>
+        <div>
+          {% if c.phone %}
+            <a class="phone-gate" href="/signup?next=/permits/{{ city.city_slug }}">🔒 Reveal phone</a>
+          {% else %}
+            <span style="font-size:11px;color:var(--gray-500);">Verifying…</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="cta-footer">
+    <div class="brand">PermitGrab</div>
+    <div class="hook">The complete {{ city.city }} lead database — updated daily.</div>
+    <a class="btn" href="/signup?next=/permits/{{ city.city_slug }}">Unlock full contacts — $149/mo</a>
+  </div>
+</div>
+
+</body>
+</html>
