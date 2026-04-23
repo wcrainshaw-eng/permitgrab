@@ -326,6 +326,42 @@ async function checkoutSmoke(browser) {
 }
 
 
+async function v256TableVisibleAllAdReady(browser) {
+  // V256 regression guard: a UAT report claimed the contractor data
+  // table was "completely invisible" on city pages. Direct curl + this
+  // check both show 25 contractor rows + 0 console errors on Chicago.
+  // Extending to ALL 6 ad-ready cities so we catch the real thing if
+  // it ever happens on one we weren't sampling.
+  const AD_READY = ['chicago-il', 'new-york-city', 'phoenix-az',
+                    'miami-dade-county', 'orlando-fl', 'san-jose'];
+  for (const slug of AD_READY) {
+    const page = await newPage(browser);
+    await gotoCity(page, slug);
+    const probe = await page.evaluate(() => ({
+      contractorRows: document.querySelectorAll('.contractors-table tbody tr').length,
+      revealPills: document.querySelectorAll('.gate-reveal-btn').length,
+      topContractorsH2: !!Array.from(document.querySelectorAll('h2'))
+        .find(h => /top contractors/i.test(h.textContent)),
+      bodyHeight: document.body.scrollHeight,
+    }));
+    // A healthy city page renders 10-25 contractor rows + a "Top
+    // Contractors" heading + ≥5000px body. If any drop to zero we've
+    // regressed.
+    if (probe.contractorRows >= 10) pass(`V256 ${slug} contractors table has ${probe.contractorRows} rows`);
+    else fail(`V256 ${slug} contractors table`, `only ${probe.contractorRows} rows`);
+    if (probe.topContractorsH2) pass(`V256 ${slug} "Top Contractors" heading present`);
+    else fail(`V256 ${slug} heading`, 'missing');
+    if (probe.revealPills >= 5) pass(`V256 ${slug} ${probe.revealPills} reveal pills rendered`);
+    else fail(`V256 ${slug} reveal pills`, `only ${probe.revealPills}`);
+    if (probe.bodyHeight >= 5000) pass(`V256 ${slug} body ${probe.bodyHeight}px`);
+    else fail(`V256 ${slug} body height`, `only ${probe.bodyHeight}px — page probably cut off`);
+    if (page._consoleErrs.length === 0) pass(`V256 ${slug} zero console errors`);
+    else fail(`V256 ${slug} console errors`, page._consoleErrs.slice(0, 2).join('; '));
+    await page.close();
+  }
+}
+
+
 async function mobileCityPage(browser) {
   // V253 P2 #13: half of B2B SaaS traffic is mobile. Fail loudly if a
   // city page horizontally scrolls at 375px (breaks phone buyers).
@@ -379,6 +415,8 @@ async function mobileCityPage(browser) {
     await contractorDetail(browser);
     console.log('\n--- V251 F22 / V252 F6 F7 Surface ---');
     await v252Surface(browser);
+    console.log('\n--- V256 table-visible guard on all 6 ad-ready cities ---');
+    await v256TableVisibleAllAdReady(browser);
     console.log('\n--- SEO basics on all ad-ready cities ---');
     await seoBasics(browser);
     console.log('\n--- Signup flow ---');
