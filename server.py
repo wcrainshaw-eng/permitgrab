@@ -12611,6 +12611,30 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
             else:
                 recency = 'gray'
             is_new = first_age is not None and first_age <= 7
+            # V251 F21: composite lead score (0-5) from signals we already
+            # compute. Buyers scan for "Hot Lead" pills to prioritize who to
+            # call first. Weights chosen so the floor is "a legit contractor"
+            # and the ceiling is "actively pulling permits AND reachable".
+            #   recency: green +2, yellow +1
+            #   velocity: p30 ≥10 +2, ≥5 +1
+            #   phone: +1
+            # Ties broken in favor of phone presence (since sellable leads need
+            # phones). NEW contractors (first permit within 7d) get a +1 bump
+            # since they're the highest-intent prospects in the pipeline.
+            _score = 0
+            if recency == 'green': _score += 2
+            elif recency == 'yellow': _score += 1
+            if p30 >= 10: _score += 2
+            elif p30 >= 5: _score += 1
+            if r['phone']: _score += 1
+            if is_new: _score += 1
+            _score = min(_score, 5)
+            if _score >= 4:
+                score_tier = 'hot'
+            elif _score >= 2:
+                score_tier = 'warm'
+            else:
+                score_tier = 'cold'
             out.append({
                 'id': r['id'],
                 'display_name': f"License #{raw}" if is_license else raw,
@@ -12629,6 +12653,8 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
                 'is_new': is_new,
                 'last_permit_date': r['last_permit_date'],
                 'violations_count': violations_by_name.get(raw, 0),  # V251 F11
+                'lead_score': _score,  # V251 F21
+                'score_tier': score_tier,  # V251 F21
             })
         return out
     finally:
