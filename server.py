@@ -9386,6 +9386,48 @@ def api_unsave_contractor(profile_id):
     return jsonify({'removed': True})
 
 
+@app.route('/report/<city_slug>')
+def city_report(city_slug):
+    """V251 F22: Shareable city report — print-friendly single-page summary
+    Pro users can send to their sales team. Publicly viewable (phones
+    still gated). Designed to screenshot/PDF well — fixed max-width,
+    branded footer, no nav dropdowns interfering with print.
+    """
+    conn = permitdb.get_connection()
+    pc = conn.execute(
+        "SELECT id, city, state, city_slug, newest_permit_date FROM prod_cities WHERE city_slug=?",
+        (city_slug,),
+    ).fetchone()
+    if not pc:
+        return render_template('404.html'), 404
+    pid = pc['id']
+    stats = conn.execute("""
+        SELECT
+          (SELECT COUNT(*) FROM permits WHERE prod_city_id=?) as total_permits,
+          (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-90 days')) as permits_90d,
+          (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-7 days')) as permits_7d,
+          (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND is_active=1) as profiles,
+          (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND phone IS NOT NULL AND phone != '') as phones,
+          (SELECT COUNT(*) FROM violations WHERE prod_city_id=?) as violations,
+          (SELECT COALESCE(SUM(estimated_cost),0) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-90 days')) as value_90d
+    """, (pid, pid, pid, city_slug, city_slug, pid, pid)).fetchone()
+    top_trades = conn.execute("""
+        SELECT trade_category, COUNT(*) as n FROM permits
+        WHERE prod_city_id=? AND trade_category IS NOT NULL AND trade_category != ''
+        GROUP BY trade_category ORDER BY n DESC LIMIT 5
+    """, (pid,)).fetchall()
+    top_contractors = _get_top_contractors_for_city(city_slug, limit=10)
+    return render_template(
+        'city_report.html',
+        city=dict(pc),
+        stats=dict(stats),
+        top_trades=[dict(r) for r in top_trades],
+        top_contractors=top_contractors,
+        current_date=datetime.now().strftime('%B %d, %Y'),
+        canonical_url=f"{SITE_URL}/report/{city_slug}",
+    )
+
+
 @app.route('/intel')
 def intel_dashboard():
     """V251 F19: Pro-only multi-city intel dashboard.
