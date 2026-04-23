@@ -210,16 +210,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <th>Address</th>
         <th>Description</th>
         <th style="text-align: right;">Value</th>
+        {% if is_enterprise %}<th>Property Owner</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for p in permits[:50] %}
+      {% set po = property_owner_lookup.get((p.address or '')|upper) if property_owner_lookup else none %}
       <tr>
         <td>{{ (p.filing_date or p.issued_date or p.date or '')[:10] }}</td>
         <td>{{ p.permit_type or '-' }}</td>
         <td>{{ p.address or '-' }}</td>
         <td>{{ (p.description or '')[:80] }}{% if p.description and p.description|length > 80 %}…{% endif %}</td>
         <td style="text-align: right;">{% if p.estimated_cost and p.estimated_cost > 0 %}${{ "{:,.0f}".format(p.estimated_cost) }}{% else %}-{% endif %}</td>
+        {% if is_enterprise %}
+        <td>
+          {% if po %}<strong>{{ po.owner_name or '—' }}</strong>{% if po.owner_mailing_address %}<br><span style="color: var(--gray-500); font-size: 12px;">{{ po.owner_mailing_address }}</span>{% endif %}{% else %}<span style="color: var(--gray-400);">—</span>{% endif %}
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

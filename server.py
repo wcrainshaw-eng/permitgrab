@@ -392,6 +392,28 @@ def _migrate_create_sources_table():
             ON violations(prod_city_id, address);
         CREATE INDEX IF NOT EXISTS idx_permits_prod_city_address
             ON permits(prod_city_id, address);
+
+        -- V252 F1.5: property owner append (Enterprise feature). Schema in
+        -- place so the per-city import ETL can write here as soon as each
+        -- county's assessor API is wired up (Cook County 5pge-nu6u,
+        -- Maricopa parcel search, NYC PLUTO 64uk-42ks, etc.). Stays empty
+        -- until import endpoints are implemented per-county.
+        CREATE TABLE IF NOT EXISTS property_owners (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            address TEXT NOT NULL,
+            city TEXT,
+            state TEXT,
+            zip TEXT,
+            owner_name TEXT,
+            owner_mailing_address TEXT,
+            parcel_id TEXT,
+            source TEXT,
+            last_updated TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_property_owners_address
+            ON property_owners(address);
+        CREATE INDEX IF NOT EXISTS idx_property_owners_parcel
+            ON property_owners(parcel_id);
     ''')
 
     # V163: Drop dead tables
@@ -9573,6 +9595,50 @@ def fire_webhooks_for_new_permits(new_permits):
     return fired
 
 
+def lookup_property_owner(address):
+    """V252 F1.5: property-owner lookup for Enterprise tier.
+
+    Returns {owner_name, owner_mailing_address, parcel_id, source} or None.
+    Data must be populated by a per-county import ETL into property_owners
+    table — this function is the read side. Returns None silently while
+    the table is empty so callers don't crash pre-import.
+    """
+    if not address:
+        return None
+    try:
+        row = permitdb.get_connection().execute(
+            "SELECT owner_name, owner_mailing_address, parcel_id, source "
+            "FROM property_owners WHERE UPPER(address) = UPPER(?) LIMIT 1",
+            (address,)
+        ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    return dict(row) if hasattr(row, 'keys') else {
+        'owner_name': row[0], 'owner_mailing_address': row[1],
+        'parcel_id': row[2], 'source': row[3],
+    }
+
+
+@app.route('/api/reports/<city_slug>/monthly')
+def api_monthly_report(city_slug):
+    """V252 F4: monthly market report for a city. Enterprise-only.
+
+    For MVP this returns the same HTML the shareable /report/<slug> page
+    (F22) serves, which is print-friendly and PDF-able via the browser's
+    print-to-PDF — sidestepping a ReportLab/WeasyPrint dependency.
+    Redirect to the print-ready page so the user's browser handles the
+    rendering; the Enterprise gate lives here.
+    """
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Login required'}), 401
+    if not is_enterprise(user):
+        return jsonify({'error': 'Enterprise feature', 'upgrade_url': '/pricing'}), 402
+    return redirect(f'/report/{city_slug}?print=1')
+
+
 def compute_competitor_alert_batches(window_days=1):
     """V252 F2: for every user watching competitors, return the new permits
     those competitors pulled in the last `window_days` days.
@@ -10326,6 +10392,24 @@ def contractor_detail(contractor_id):
         GROUP BY source_city_key ORDER BY n DESC LIMIT 5
     """, (raw, prof['source_city_key'])).fetchall()
 
+    # V252 F1.5: Property-owner append — enterprise tier only.
+    # Gracefully empty list until per-county ETL writes rows.
+    property_owner_lookup = {}
+    if permits:
+        addrs = list({p['address'] for p in permits if p['address']})[:50]
+        if addrs:
+            placeholders = ','.join(['?'] * len(addrs))
+            try:
+                po_rows = conn.execute(f"""
+                    SELECT address, owner_name, owner_mailing_address, parcel_id, source
+                    FROM property_owners WHERE UPPER(address) IN ({placeholders})
+                """, [a.upper() for a in addrs]).fetchall()
+                property_owner_lookup = {
+                    (r['address'] or '').upper(): dict(r) for r in po_rows
+                }
+            except Exception:
+                pass
+
     # Violations at addresses this contractor worked. Join on normalized address.
     violations = []
     if permits:
@@ -10371,6 +10455,7 @@ def contractor_detail(contractor_id):
         permits=[dict(p) for p in permits],
         other_cities=[dict(c) for c in other_cities],
         violations=[dict(v) for v in violations],
+        property_owner_lookup=property_owner_lookup,  # V252 F1.5
         canonical_url=f"{SITE_URL}/contractor/{contractor_id}",
     )
 
