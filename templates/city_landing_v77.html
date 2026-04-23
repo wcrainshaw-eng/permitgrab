@@ -800,10 +800,16 @@ body {
 </section>
 {% endif %}
 
-<!-- V211-1: Inline email capture — writes to /api/subscribe which already
-     backs the User digest system (Postgres) — no new table needed -->
+<!-- V251 F4 (was V211-1): Inline email capture — writes to /api/subscribe.
+     Copy now reflects active filters so the visitor subscribes to exactly
+     what they're viewing ("Get Electrical permit alerts for Chicago in 60614").
+     For non-filtered visits it falls back to the generic city digest. -->
 <section class="email-capture" id="email-capture">
-  <h3 style="margin: 0 0 8px 0;">&#128276; Get Daily {{ city_name }} Permit Alerts</h3>
+  <h3 style="margin: 0 0 8px 0;">&#128276; Get
+    {%- if filter_trade %} {{ filter_trade }}{% endif %}
+    Daily {{ city_name }} Permit Alerts
+    {%- if filter_zip %} in {{ filter_zip }}{% endif -%}
+  </h3>
   <p style="margin: 0 0 14px 0; color: #1e3a8a;">New permits, violations, and contractor activity delivered to your inbox. Free &mdash; no credit card.</p>
   <form id="subscribe-form" onsubmit="v211Subscribe(event)" style="max-width: 520px; margin: 0 auto;">
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -1241,7 +1247,10 @@ function v211Subscribe(ev) {
         body: JSON.stringify({
             email: email,
             city: '{{ city_name | e }}',
-            trade: ''
+            // V251 F4: forward the filter context so the subscriber's alerts
+            // mirror what they were viewing. Empty string → no filter.
+            trade: '{{ filter_trade | e }}',
+            zip: '{{ filter_zip | e }}'
         })
     }).then(function(r) { return r.json().then(function(body) { return {status: r.status, body: body}; }); })
       .then(function(res) {

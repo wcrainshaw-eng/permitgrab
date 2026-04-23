@@ -6735,6 +6735,9 @@ class User(db.Model):
     watched_competitors = db.Column(db.Text, default='[]')
     # V12.26: Weekly digest city subscriptions - JSON list of city names
     digest_cities = db.Column(db.Text, default='[]')
+    # V251 F4: per-user filter defaults for daily digest.
+    digest_zip_filter = db.Column(db.String(16), nullable=True)
+    digest_trade_filter = db.Column(db.String(64), nullable=True)
 
     # V12.53: Email system fields
     email_verified = db.Column(db.Boolean, default=False)
@@ -6833,6 +6836,9 @@ with app.app_context():
     migration_columns = [
         ("watched_competitors", "TEXT DEFAULT '[]'"),
         ("digest_cities", "TEXT DEFAULT '[]'"),
+        # V251 F4: per-user filter defaults for the daily digest.
+        ("digest_zip_filter", "VARCHAR(16)"),
+        ("digest_trade_filter", "VARCHAR(64)"),
         ("email_verified", "BOOLEAN DEFAULT FALSE"),
         ("email_verified_at", "TIMESTAMP"),
         ("email_verification_token", "VARCHAR(64)"),
@@ -8835,6 +8841,12 @@ def api_subscribe():
 
     city = data.get('city', '').strip().title()  # V12.64: Normalize to titlecase
     trade = data.get('trade', '')
+    # V251 F4: capture active-filter context so the digest narrows to what
+    # the subscriber was actually viewing. Stored per-user (last wins), which
+    # is a compromise — multi-city subscribers with different filters per
+    # city need a proper user_city_subscriptions table. Fine for MVP.
+    zip_filter = (data.get('zip') or '').strip()[:16]
+    trade_filter = (data.get('trade') or '').strip()[:64]
 
     # Check if user already exists
     existing = find_user_by_email(email)
@@ -8847,11 +8859,15 @@ def api_subscribe():
         existing.digest_active = True
         if trade:
             existing.trade = trade
+        # V251 F4: persist filters (clearing if empty, so the user can unset
+        # by resubscribing without filters).
+        existing.digest_zip_filter = zip_filter or None
+        existing.digest_trade_filter = trade_filter or None
         db.session.commit()
 
         return jsonify({
             'message': f'Updated digest settings for {email}',
-            'subscriber': {'email': email, 'city': city, 'trade': trade},
+            'subscriber': {'email': email, 'city': city, 'trade': trade, 'zip': zip_filter},
         }), 200
 
     # Create new lightweight user for digest subscription
@@ -8865,6 +8881,8 @@ def api_subscribe():
             digest_active=True,
             digest_cities=json.dumps([city]) if city else '[]',
             trade=trade,
+            digest_zip_filter=zip_filter or None,
+            digest_trade_filter=trade_filter or None,
             unsubscribe_token=secrets.token_urlsafe(32),
         )
         db.session.add(new_user)
@@ -8882,7 +8900,7 @@ def api_subscribe():
 
     return jsonify({
         'message': f'Successfully subscribed {email}',
-        'subscriber': {'email': email, 'city': city, 'trade': trade},
+        'subscriber': {'email': email, 'city': city, 'trade': trade, 'zip': zip_filter},
     }), 201
 
 
