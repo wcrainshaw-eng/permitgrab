@@ -12557,8 +12557,16 @@ def city_landing_inner(city_slug):
                    COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
             FROM permits WHERE prod_city_id = ?
         """, (_prod_city_id,)).fetchone()
+        # V247 P1: was ORDER BY estimated_cost DESC, which meant the "Recent
+        # Permits" table showed the 50 most-expensive historical permits, not
+        # the 50 most recent. On Chicago this surfaced a batch of Oct 2025
+        # high-value self-cert filings and made the page look 6 months stale
+        # even after fresh collections. Sort by filing_date so "Recent" is
+        # actually recent; tiebreak by estimated_cost for stable ordering.
         cursor = conn.execute("""
-            SELECT * FROM permits WHERE prod_city_id = ? ORDER BY estimated_cost DESC LIMIT 50
+            SELECT * FROM permits WHERE prod_city_id = ?
+            ORDER BY COALESCE(filing_date, issued_date, date) DESC, estimated_cost DESC
+            LIMIT 50
         """, (_prod_city_id,))
     else:
         if filter_state:
@@ -12573,8 +12581,11 @@ def city_landing_inner(city_slug):
                    COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
             FROM permits WHERE city = ?{state_clause}
         """, state_params).fetchone()
+        # V247 P1: sort by date, not cost — see prod_city_id branch above.
         cursor = conn.execute(f"""
-            SELECT * FROM permits WHERE city = ?{state_clause} ORDER BY estimated_cost DESC LIMIT 50
+            SELECT * FROM permits WHERE city = ?{state_clause}
+            ORDER BY COALESCE(filing_date, issued_date, date) DESC, estimated_cost DESC
+            LIMIT 50
         """, state_params)
 
     permit_count = stats_row['permit_count']
