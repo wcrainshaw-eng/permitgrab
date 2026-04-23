@@ -35,25 +35,42 @@ async function gotoCity(page, slug, query = '') {
 // ------ Scenarios ------
 
 async function gatedPreview(browser) {
-  const page = await newPage(browser);
-  await gotoCity(page, 'chicago-il');
+  // Run against both Chicago AND NYC — the P0 phone-leak bug hit NYC
+  // specifically (212 area codes showed unredacted) so single-city
+  // sampling would have kept missing it.
+  for (const slug of ['chicago-il', 'new-york-city']) {
+    const page = await newPage(browser);
+    await gotoCity(page, slug);
 
-  const probe = await page.evaluate(() => {
-    const reveal = document.querySelectorAll('.gate-reveal-btn').length;
-    const blurred = document.querySelectorAll('.gate-blur').length;
-    const cta = document.querySelectorAll('.gate-cta').length;
-    const contractorRows = document.querySelectorAll('.contractors-table tbody tr').length;
-    return { reveal, blurred, cta, contractorRows };
-  });
-  if (probe.reveal >= 1) pass('F1.1 "Reveal" CTAs on contractor rows');
-  else fail('F1.1 "Reveal" CTAs on contractor rows', `0 .gate-reveal-btn found`);
-  if (probe.blurred >= 1) pass('F1.2 blurred rows 6+');
-  else fail('F1.2 blurred rows 6+', `0 .gate-blur elements`);
-  if (probe.cta >= 1) pass('F1.3 below-table CTA banner');
-  else fail('F1.3 below-table CTA banner', `0 .gate-cta`);
-  if (probe.contractorRows >= 5) pass(`F1.4 contractor table has ${probe.contractorRows} rows`);
-  else fail('F1.4 contractor table rows', `only ${probe.contractorRows} rows`);
-  await page.close();
+    const probe = await page.evaluate(() => {
+      // Only count tel: links inside the contractors table so we don't
+      // double-count unrelated click-to-call links elsewhere on the page.
+      const contractorScope = document.querySelector('.contractors-table');
+      const telLinks = contractorScope
+        ? contractorScope.querySelectorAll('a[href^="tel:"]').length
+        : document.querySelectorAll('.contractors-table a[href^="tel:"]').length;
+      return {
+        reveal: document.querySelectorAll('.gate-reveal-btn').length,
+        blurred: document.querySelectorAll('.gate-blur').length,
+        cta: document.querySelectorAll('.gate-cta').length,
+        contractorRows: document.querySelectorAll('.contractors-table tbody tr').length,
+        telLinks,
+      };
+    });
+    // HARD assertion — anon must have ZERO tel: links in the contractors
+    // table. If this fails the phone gate is leaking and it's a P0.
+    if (probe.telLinks === 0) pass(`F1.0 ${slug} anon sees no tel: phone links`);
+    else fail(`F1.0 ${slug} phone leak (P0)`, `${probe.telLinks} tel: links visible to anon`);
+    if (probe.reveal >= 1) pass(`F1.1 ${slug} Reveal CTAs on contractor rows`);
+    else fail(`F1.1 ${slug} Reveal CTAs`, `0 .gate-reveal-btn found`);
+    if (probe.blurred >= 1) pass(`F1.2 ${slug} blurred rows 6+`);
+    else fail(`F1.2 ${slug} blurred rows`, `0 .gate-blur`);
+    if (probe.cta >= 1) pass(`F1.3 ${slug} below-table CTA banner`);
+    else fail(`F1.3 ${slug} CTA banner`, `0 .gate-cta`);
+    if (probe.contractorRows >= 5) pass(`F1.4 ${slug} contractor table has ${probe.contractorRows} rows`);
+    else fail(`F1.4 ${slug} rows`, `only ${probe.contractorRows}`);
+    await page.close();
+  }
 }
 
 async function filters(browser) {
