@@ -137,6 +137,29 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V258: New Orleans code enforcement — freshly-updated Socrata dataset
+    # 3ehi-je3s, last update 2026-04-23. Pairs with PR #150 permit fix.
+    'new-orleans-la': {
+        'prod_city_id': None,
+        'city': 'New Orleans',
+        'state': 'LA',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement All Violations',
+                'domain': 'data.nola.gov',
+                'resource_id': '3ehi-je3s',
+                'date_field': 'violationdate',
+                'id_field': 'violationid',
+                'description_field': 'description',
+                'status_field': None,
+                'type_field': 'violation',
+                'address_fields': {'full': 'location'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V184: 5 new Socrata SODA violation sources
     'seattle-wa': {
         'prod_city_id': None,
