@@ -12446,6 +12446,20 @@ def city_landing_inner(city_slug):
     db_slug = _INNER_ALIASES.get(city_slug, city_slug)
     city_slug = db_slug  # legacy var name used below for internal queries
 
+    # V251 F2: URL-param filters for the permits table (zip / trade / days).
+    # Pulled once up-front so both the stats query and the permits query can
+    # share the same clause. Sanitized: days is an allowed whitelist, zip is
+    # trimmed to 5 digits, trade is passed through (matches DB exactly).
+    _filter_zip = (request.args.get('zip') or '').strip()[:5]
+    _filter_trade = (request.args.get('trade') or '').strip()
+    try:
+        _filter_days = int(request.args.get('days') or 0)
+    except (TypeError, ValueError):
+        _filter_days = 0
+    if _filter_days not in (0, 7, 30, 90, 180, 365):
+        _filter_days = 0
+    _filters_active = bool(_filter_zip or _filter_trade or _filter_days)
+
     # V15: Check prod_cities status for this city
     is_prod_city = False
     prod_city_status = None
@@ -12566,23 +12580,35 @@ def city_landing_inner(city_slug):
     # V231 P0-7: LIMIT 50 (was 100). Template only renders 25 rows and
     # state_city_landing already uses 50; no reason to haul back 100.
     if _prod_city_id:
-        stats_row = conn.execute("""
+        # V251 F2: build the same filter clause for stats + permits queries so
+        # the two stay consistent when the visitor lands with ?zip=60614 etc.
+        _filter_sql = ""
+        _filter_params = [_prod_city_id]
+        if _filter_zip:
+            _filter_sql += " AND zip = ?"
+            _filter_params.append(_filter_zip)
+        if _filter_trade:
+            _filter_sql += " AND trade_category = ?"
+            _filter_params.append(_filter_trade)
+        if _filter_days:
+            _filter_sql += f" AND COALESCE(filing_date, issued_date, date) >= date('now', '-{_filter_days} days')"
+        stats_row = conn.execute(f"""
             SELECT COUNT(*) as permit_count,
                    COALESCE(SUM(estimated_cost), 0) as total_value,
                    COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
-            FROM permits WHERE prod_city_id = ?
-        """, (_prod_city_id,)).fetchone()
+            FROM permits WHERE prod_city_id = ?{_filter_sql}
+        """, _filter_params).fetchone()
         # V247 P1: was ORDER BY estimated_cost DESC, which meant the "Recent
         # Permits" table showed the 50 most-expensive historical permits, not
         # the 50 most recent. On Chicago this surfaced a batch of Oct 2025
         # high-value self-cert filings and made the page look 6 months stale
         # even after fresh collections. Sort by filing_date so "Recent" is
         # actually recent; tiebreak by estimated_cost for stable ordering.
-        cursor = conn.execute("""
-            SELECT * FROM permits WHERE prod_city_id = ?
+        cursor = conn.execute(f"""
+            SELECT * FROM permits WHERE prod_city_id = ?{_filter_sql}
             ORDER BY COALESCE(filing_date, issued_date, date) DESC, estimated_cost DESC
             LIMIT 50
-        """, (_prod_city_id,))
+        """, _filter_params)
     else:
         if filter_state:
             state_clause = " AND state = ?"
@@ -12841,6 +12867,31 @@ def city_landing_inner(city_slug):
         city_state=filter_state,
     )
 
+    # V251 F2: available zips and trades for the filter dropdowns. Narrowed
+    # to the top 20 most-common zips so the select stays usable (some big
+    # cities have 100+ zips). Quiet-fail to empty lists if queries fall over.
+    available_zips = []
+    available_trades = []
+    if _prod_city_id:
+        try:
+            available_zips = [r['zip'] for r in conn.execute(
+                """SELECT zip, COUNT(*) as c FROM permits
+                   WHERE prod_city_id = ? AND zip IS NOT NULL AND zip != ''
+                   GROUP BY zip ORDER BY c DESC LIMIT 20""",
+                (_prod_city_id,)
+            ).fetchall()]
+        except Exception:
+            pass
+        try:
+            available_trades = [r['trade_category'] for r in conn.execute(
+                """SELECT trade_category, COUNT(*) as c FROM permits
+                   WHERE prod_city_id = ? AND trade_category IS NOT NULL AND trade_category != ''
+                   GROUP BY trade_category ORDER BY c DESC LIMIT 15""",
+                (_prod_city_id,)
+            ).fetchall()]
+        except Exception:
+            pass
+
     return render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         city_name=config['name'],
@@ -12893,6 +12944,13 @@ def city_landing_inner(city_slug):
         violations=[],
         violations_count=0,
         market_insights=market_insights,  # V236 PR#5
+        # V251 F2: filter dropdown context
+        available_zips=available_zips,
+        available_trades=available_trades,
+        filter_zip=_filter_zip,
+        filter_trade=_filter_trade,
+        filter_days=_filter_days,
+        filters_active=_filters_active,
     )
 
 
