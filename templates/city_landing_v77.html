@@ -1047,8 +1047,15 @@ body {
             <span class="recency-dot {{ c.recency or 'gray' }}"
                   title="{% if c.recency == 'green' %}Pulled a permit in the last 7 days{% elif c.recency == 'yellow' %}Active in the last 30 days{% else %}No permit activity in 30+ days{% endif %}"></span>
             <span class="leader-rank">{{ loop.index }}.</span>
+            {# V251 F6: link to the contractor detail page. Honours the
+               gated preview — rows 6+ are blurred via gate-blur parent,
+               so the link is still clickable for logged-in/Pro users but
+               visually obscured for free/anon. License-number rows get
+               no link (they're placeholder names). #}
             {% if c.is_license_number %}
               <span class="contractor-license">{{ c.display_name }}</span>
+            {% elif c.id %}
+              <a href="/contractor/{{ c.id }}" class="contractor-name" style="text-decoration: none; color: inherit;">{{ c.display_name }}</a>
             {% else %}
               <span class="contractor-name">{{ c.display_name }}</span>
             {% endif %}

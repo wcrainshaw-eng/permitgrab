@@ -9525,6 +9525,134 @@ def contractors_page():
     return render_template('contractors.html', footer_cities=footer_cities)
 
 
+@app.route('/contractor/<int:contractor_id>')
+def contractor_detail(contractor_id):
+    """V251 F6: Contractor detail page.
+
+    Shows: business name, velocity + recency, gated phone, full permit
+    history, first-seen, violations-at-their-job-sites (address join).
+    Non-Pro visitors see the name + velocity + permit count but the phone
+    row is replaced with a "Subscribe to reveal" CTA matching F1/F3.
+    """
+    from contractor_profiles import is_license_number
+    from datetime import date as _date, datetime as _dt
+    conn = permitdb.get_connection()
+    prof = conn.execute("""
+        SELECT id, contractor_name_raw, contractor_name_normalized,
+               source_city_key, city, state,
+               total_permits, permits_90d, permits_30d, primary_trade,
+               trade_breakdown, avg_project_value, max_project_value,
+               total_project_value, primary_area, first_permit_date,
+               last_permit_date, permit_frequency, phone, website, email,
+               license_number, license_status, enrichment_status
+        FROM contractor_profiles WHERE id = ?
+    """, (contractor_id,)).fetchone()
+    if not prof:
+        return render_template('404.html'), 404
+
+    raw = prof['contractor_name_raw']
+    is_license = is_license_number(prof['contractor_name_normalized'])
+    display_name = f"License #{raw}" if is_license else raw
+
+    # V251 F5 velocity/recency (mirror of city-page computation)
+    today = _date.today()
+    def _days_since(s):
+        if not s: return None
+        try:
+            return (today - _dt.strptime(s[:10], '%Y-%m-%d').date()).days
+        except Exception:
+            return None
+    last_age = _days_since(prof['last_permit_date'])
+    first_age = _days_since(prof['first_permit_date'])
+    p30 = prof['permits_30d'] or 0
+    if p30 >= 10:
+        velocity_color = 'red'
+    elif p30 >= 5:
+        velocity_color = 'orange'
+    elif p30 >= 1:
+        velocity_color = 'blue'
+    else:
+        velocity_color = ''
+    if last_age is not None and last_age <= 7:
+        recency = 'green'
+    elif last_age is not None and last_age <= 30:
+        recency = 'yellow'
+    else:
+        recency = 'gray'
+    is_new = first_age is not None and first_age <= 7
+
+    # Permit history — match on contractor_name against the name raw + normalized
+    permits = conn.execute("""
+        SELECT filing_date, issued_date, date, permit_type, address,
+               description, estimated_cost, trade_category, status,
+               zip, source_city_key
+        FROM permits
+        WHERE source_city_key = ?
+          AND (UPPER(contractor_name) = UPPER(?)
+               OR UPPER(contractor_name) = UPPER(?)
+               OR UPPER(contact_name) = UPPER(?))
+        ORDER BY COALESCE(filing_date, issued_date, date) DESC
+        LIMIT 200
+    """, (prof['source_city_key'], raw, prof['contractor_name_normalized'], raw)).fetchall()
+
+    # Cities this contractor is also active in
+    other_cities = conn.execute("""
+        SELECT source_city_key, COUNT(*) as n
+        FROM permits
+        WHERE UPPER(contractor_name) = UPPER(?)
+          AND source_city_key != ?
+        GROUP BY source_city_key ORDER BY n DESC LIMIT 5
+    """, (raw, prof['source_city_key'])).fetchall()
+
+    # Violations at addresses this contractor worked. Join on normalized address.
+    violations = []
+    if permits:
+        addrs = list({p['address'] for p in permits if p['address']})[:50]
+        if addrs:
+            placeholders = ','.join(['?'] * len(addrs))
+            violations = conn.execute(f"""
+                SELECT violation_date, violation_type, violation_description,
+                       status, address
+                FROM violations
+                WHERE UPPER(address) IN ({placeholders})
+                ORDER BY violation_date DESC LIMIT 25
+            """, [a.upper() for a in addrs]).fetchall()
+
+    # Pretty city name for the nav/breadcrumb
+    city_name = prof['city'] or prof['source_city_key']
+
+    return render_template(
+        'contractor_detail.html',
+        contractor={
+            'id': prof['id'],
+            'display_name': display_name,
+            'is_license_number': is_license,
+            'source_city_key': prof['source_city_key'],
+            'city': city_name,
+            'state': prof['state'],
+            'total_permits': prof['total_permits'] or 0,
+            'permits_90d': prof['permits_90d'] or 0,
+            'permits_30d': p30,
+            'primary_trade': prof['primary_trade'],
+            'avg_project_value': prof['avg_project_value'],
+            'max_project_value': prof['max_project_value'],
+            'phone': prof['phone'],
+            'website': prof['website'],
+            'email': prof['email'],
+            'license_number': prof['license_number'],
+            'first_permit_date': prof['first_permit_date'],
+            'last_permit_date': prof['last_permit_date'],
+            'velocity_color': velocity_color,
+            'recency': recency,
+            'is_new': is_new,
+        },
+        permits=[dict(p) for p in permits],
+        other_cities=[dict(c) for c in other_cities],
+        violations=[dict(v) for v in violations],
+        canonical_url=f"{SITE_URL}/contractor/{contractor_id}",
+    )
+
+
 @app.route('/pricing')
 def pricing_page():
     """Render the Pricing page. V12.51: SQL-backed"""
