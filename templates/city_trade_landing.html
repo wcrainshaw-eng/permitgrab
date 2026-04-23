@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ trade.name }} Permits in {{ city.name }}, {{ city.state }} | PermitGrab</title>
 <meta name="description" content="Track new {{ trade.description_template }} in {{ city.name }}, {{ city.state }}. Real-time {{ trade.name }} contractor leads from {{ city.name }} building permits. Updated daily.">
-<link rel="canonical" href="https://permitgrab.com/permits/{{ city.slug }}/{{ trade.slug }}">
+{# V253: canonical honors caller-provided canonical_url so the V252 F7
+   trade-first URL (/solar/chicago-il) can be its own canonical. Falls
+   back to the legacy /permits/<city>/<trade> path when no override. #}
+<link rel="canonical" href="{{ canonical_url or ('https://permitgrab.com/permits/' ~ city.slug ~ '/' ~ trade.slug) }}">
 
 <!-- Open Graph -->
 <meta property="og:title" content="{{ trade.name }} Permits in {{ city.name }}, {{ city.state }} | PermitGrab">
 <meta property="og:description" content="Track new {{ trade.description_template }} in {{ city.name }}, {{ city.state }}. Real-time {{ trade.name }} contractor leads updated daily.">
-<meta property="og:url" content="https://permitgrab.com/permits/{{ city.slug }}/{{ trade.slug }}">
+<meta property="og:url" content="{{ canonical_url or ('https://permitgrab.com/permits/' ~ city.slug ~ '/' ~ trade.slug) }}">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://permitgrab.com/og-image.png">
 
