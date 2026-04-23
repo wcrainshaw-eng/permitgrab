@@ -9573,6 +9573,68 @@ def fire_webhooks_for_new_permits(new_permits):
     return fired
 
 
+def compute_competitor_alert_batches(window_days=1):
+    """V252 F2: for every user watching competitors, return the new permits
+    those competitors pulled in the last `window_days` days.
+
+    Returns [ {user_email, competitor, permits: [...] }, ... ] so the
+    existing digest sender can hand the payload to SendGrid.
+    """
+    conn = permitdb.get_connection()
+    batches = []
+    try:
+        users = db.session.execute(
+            db.text("SELECT email, watched_competitors FROM users "
+                    "WHERE watched_competitors IS NOT NULL "
+                    "AND watched_competitors != '[]' "
+                    "AND watched_competitors != ''")
+        ).fetchall()
+    except Exception as e:
+        print(f"[V252 F2] user fetch failed: {e}", flush=True)
+        return batches
+    for u in users:
+        email = u[0]
+        try:
+            watched = json.loads(u[1] or '[]')
+        except Exception:
+            watched = []
+        for name in watched:
+            rows = conn.execute(f"""
+                SELECT source_city_key, permit_number, permit_type, address,
+                       contractor_name, contact_name, estimated_cost,
+                       COALESCE(filing_date, issued_date, date) as permit_date
+                FROM permits
+                WHERE (UPPER(contractor_name) LIKE ? OR UPPER(contact_name) LIKE ?)
+                  AND COALESCE(filing_date, issued_date, date) >= date('now', '-{int(window_days)} days')
+                ORDER BY permit_date DESC
+                LIMIT 20
+            """, (f"%{name.upper()}%", f"%{name.upper()}%")).fetchall()
+            if rows:
+                batches.append({
+                    'user_email': email,
+                    'competitor': name,
+                    'permits': [dict(r) for r in rows],
+                })
+    return batches
+
+
+@app.route('/api/admin/competitor-alerts/preview')
+def admin_competitor_alert_preview():
+    """Admin endpoint — returns what would be sent on the next competitor-
+    alert run so we can sanity-check before wiring it into the digest loop.
+    """
+    key = request.args.get('key') or request.headers.get('X-Admin-Key')
+    expected = os.environ.get('ADMIN_KEY')
+    if not expected or key != expected:
+        return jsonify({'error': 'Admin key required'}), 401
+    try:
+        window = int(request.args.get('days', 1))
+    except (TypeError, ValueError):
+        window = 1
+    batches = compute_competitor_alert_batches(window_days=window)
+    return jsonify({'batch_count': len(batches), 'batches': batches})
+
+
 @app.route('/api/webhooks', methods=['GET'])
 def api_list_webhooks():
     user = get_current_user()
