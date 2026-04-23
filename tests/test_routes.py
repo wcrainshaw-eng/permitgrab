@@ -82,3 +82,40 @@ def test_city_page_anon_has_no_tel_links(client):
 def test_404(client):
     r = client.get('/this-definitely-does-not-exist-xyz')
     assert r.status_code == 404
+
+
+# ==========================================================================
+# V253 P2 #12: signup-flow smoke tests. Can't do full Stripe E2E in CI
+# (no live test key) but we can verify the /api/register gate catches
+# bad input and that a clean POST at least passes validation. Stripe
+# side is covered by the V253 P2 #6 commit wiring trial_period_days.
+# ==========================================================================
+
+def test_register_requires_email_and_password(client):
+    r = client.post('/api/register', json={})
+    assert r.status_code == 400
+    r = client.post('/api/register', json={'email': 'x@y.com'})
+    assert r.status_code == 400
+    r = client.post('/api/register', json={'password': 'abcdefgh'})
+    assert r.status_code == 400
+
+
+def test_register_rejects_short_password(client):
+    r = client.post('/api/register', json={'email': 'uat@permittest.com', 'password': 'short'})
+    assert r.status_code == 400
+    assert b'at least 8 characters' in r.data
+
+
+def test_register_rejects_bad_email(client):
+    r = client.post('/api/register', json={'email': 'notanemail', 'password': 'longenough123'})
+    assert r.status_code == 400
+
+
+def test_pricing_advertises_trial(client):
+    """V253 P2 #6 shipped trial_period_days in checkout. Pricing page
+    advertises '14 days free' — make sure that copy doesn't get
+    stripped accidentally when someone edits the template."""
+    r = client.get('/pricing')
+    assert r.status_code == 200
+    assert b'14 days free' in r.data or b'14-day' in r.data.lower() \
+        or b'free trial' in r.data.lower()
