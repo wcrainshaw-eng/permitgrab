@@ -1469,11 +1469,21 @@ def _backfill_sources_table():
 
 def _deferred_startup():
     """V69: Mark startup done but DO NOT start any background threads.
-    V93: Email scheduler is now auto-started (doesn't need Postgres)."""
+    V93: Email scheduler is now auto-started (doesn't need Postgres).
+
+    V252 CI fix: short-circuit under TESTING=1 so pytest's import of
+    server.py + a client.get() doesn't spawn v146_autostart /
+    v106_maintenance / email_scheduler daemon threads that keep
+    printing to stdout past interpreter shutdown and core-dump the
+    test process (exit 134) after all assertions pass.
+    """
     global _startup_done
     if _startup_done:
         return
     _startup_done = True
+    if os.environ.get('TESTING') or os.environ.get('PYTEST_CURRENT_TEST'):
+        print(f"[{datetime.now()}] V252 CI: _deferred_startup skipped under TESTING", flush=True)
+        return
     print(f"[{datetime.now()}] V145: Server starting — SQLite only")
 
     # V145: Create sources table (single source of truth)
