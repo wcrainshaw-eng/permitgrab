@@ -9501,6 +9501,46 @@ def city_report(city_slug):
     )
 
 
+@app.route('/leaderboard/<city_slug>')
+def leaderboard(city_slug):
+    """V252 F6: Public contractor-volume leaderboard for a city.
+    Free tier — pure SEO play. "Top 50 Contractors in X by Permit Volume."
+    Phones gated behind signup like everywhere else.
+    """
+    conn = permitdb.get_connection()
+    pc = conn.execute(
+        "SELECT id, city, state, city_slug FROM prod_cities WHERE city_slug=?",
+        (city_slug,),
+    ).fetchone()
+    if not pc:
+        return render_template('404.html'), 404
+    # Reuse F21's scoring pipeline. limit=50 for the leaderboard.
+    top = _get_top_contractors_for_city(city_slug, limit=50)
+    # Tag badges per spec. "Rising Star" omitted — needs prev-period metric
+    # we don't track; ship when that's added. "New Entrant" uses is_new
+    # from F5 (first permit within 7d; spec says 30d — widen here).
+    from datetime import date as _d, datetime as _dt
+    today = _d.today()
+    for i, c in enumerate(top):
+        c['rank'] = i + 1
+        c['badge_market_leader'] = (i < 3)
+        fpd = c.get('last_permit_date')  # approximation field
+        try:
+            first_age = (today - _dt.strptime((c.get('first_permit_date') or fpd or '')[:10], '%Y-%m-%d').date()).days \
+                        if (c.get('first_permit_date') or fpd) else None
+        except Exception:
+            first_age = None
+        c['badge_new_entrant'] = first_age is not None and first_age <= 30
+    now = datetime.now()
+    return render_template(
+        'leaderboard.html',
+        city=dict(pc),
+        contractors=top,
+        current_month=now.strftime('%B %Y'),
+        canonical_url=f"{SITE_URL}/leaderboard/{city_slug}",
+    )
+
+
 @app.route('/intel')
 def intel_dashboard():
     """V251 F19: Pro-only multi-city intel dashboard.
@@ -13088,6 +13128,7 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
                 'recency': recency,
                 'is_new': is_new,
                 'last_permit_date': r['last_permit_date'],
+                'first_permit_date': r['first_permit_date'],
                 'violations_count': violations_by_name.get(raw, 0),  # V251 F11
                 'lead_score': _score,  # V251 F21
                 'score_tier': score_tier,  # V251 F21

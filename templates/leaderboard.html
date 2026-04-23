@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top 50 Contractors in {{ city.city }}{% if city.state %}, {{ city.state }}{% endif %} — {{ current_month }} | PermitGrab</title>
+<meta name="description" content="{{ contractors|length }} most active building contractors in {{ city.city }} ranked by permit volume — {{ current_month }}. See permit counts, trades, and activity signals.">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:title" content="Top Contractors in {{ city.city }} — {{ current_month }}">
+<meta property="og:description" content="Ranked by permit volume. Real permit data from {{ city.city }} building department.">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "Top {{ contractors|length }} Contractors in {{ city.city }}",
+  "url": "{{ canonical_url }}",
+  "numberOfItems": {{ contractors|length }}
+}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --primary:#2563eb; --accent:#f97316; --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.5; }
+.hero { background: linear-gradient(135deg, #111827 0%, #1e3a5f 100%); color: white; padding: 44px 32px; }
+.hero-inner { max-width: 1100px; margin: 0 auto; }
+.hero .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.6); margin-bottom: 8px; }
+.hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+.hero .sub { font-size: 15px; color: rgba(255,255,255,.75); margin-top: 6px; }
+.container { max-width: 1100px; margin: 24px auto 48px; padding: 0 32px; }
+.lb-table { width: 100%; background: white; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.lb-table th { background: var(--gray-50); text-align: left; padding: 12px 16px; font-weight: 600; font-size: 12px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--gray-200); }
+.lb-table td { padding: 14px 16px; border-bottom: 1px solid var(--gray-100); font-size: 14px; }
+.lb-table tr:last-child td { border-bottom: none; }
+.rank { font-weight: 800; font-size: 16px; color: var(--gray-500); font-variant-numeric: tabular-nums; min-width: 30px; }
+.rank.top3 { color: var(--accent); font-size: 18px; }
+.contractor-name { font-weight: 600; color: var(--gray-900); }
+.contractor-name a { color: inherit; text-decoration: none; }
+.contractor-name a:hover { color: var(--primary); }
+.badges { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-left: 6px; vertical-align: middle; }
+.badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.3px; }
+.badge-leader { background: #fef3c7; color: #92400e; }
+.badge-new { background: #dcfce7; color: #166534; }
+.num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gray-900); text-align: right; }
+.gate-btn { display: inline-block; padding: 4px 10px; background: var(--primary); color: white !important; border-radius: 999px; font-size: 11px; font-weight: 600; text-decoration: none; }
+.back-link { display: inline-block; margin-bottom: 16px; color: var(--primary); text-decoration: none; font-size: 14px; }
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="label">Contractor Leaderboard · {{ current_month }}</div>
+    <h1>Top {{ contractors|length }} Contractors in {{ city.city }}{% if city.state %}, {{ city.state }}{% endif %}</h1>
+    <div class="sub">Ranked by total permit volume. Updated daily from {{ city.city }} building department data.</div>
+  </div>
+</section>
+
+<div class="container">
+  <a class="back-link" href="/permits/{{ city.city_slug }}">&larr; Back to {{ city.city }} permits</a>
+  <table class="lb-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Contractor</th>
+        <th>Trade</th>
+        <th style="text-align: right;">Total</th>
+        <th style="text-align: right;">90d</th>
+        <th style="text-align: right;">30d</th>
+        <th>Contact</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contractors %}
+      <tr>
+        <td><span class="rank {% if c.badge_market_leader %}top3{% endif %}">{{ c.rank }}</span></td>
+        <td>
+          <span class="contractor-name">
+            {% if c.is_license_number %}Licensed contractor{% elif c.id %}<a href="/contractor/{{ c.id }}">{{ c.display_name }}</a>{% else %}{{ c.display_name }}{% endif %}
+          </span>
+          <span class="badges">
+            {% if c.badge_market_leader %}<span class="badge badge-leader">🏆 Market Leader</span>{% endif %}
+            {% if c.badge_new_entrant %}<span class="badge badge-new">🆕 New Entrant</span>{% endif %}
+          </span>
+        </td>
+        <td>{{ c.primary_trade or '—' }}</td>
+        <td class="num">{{ "{:,}".format(c.total_permits) }}</td>
+        <td class="num">{{ c.permits_90d or 0 }}</td>
+        <td class="num">{{ c.permits_30d or 0 }}</td>
+        <td>
+          {% if session.get('user_email') and is_pro and c.phone %}
+            <a href="tel:{{ c.phone }}">{{ c.phone }}</a>
+          {% elif c.phone %}
+            <a href="/signup?next=/leaderboard/{{ city.city_slug }}" class="gate-btn">🔒 Reveal</a>
+          {% else %}
+            <span style="color: var(--gray-500); font-size: 12px;">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>
