@@ -369,6 +369,7 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 8. **Fix immediately, don't just report.** If you find a bug, fix it in the same PR.
 9. **MapServer queries MUST include returnGeometry=false.**
 10. **The daemon must be restarted after every deploy** via POST /api/admin/start-collectors.
+11. **Auto-merge your own PRs.** You are the reviewer, the merger, and the deployer. After `gh pr create`, immediately squash-merge with `gh pr merge --squash --delete-branch`. Never leave a PR open waiting for someone to click a button. If a merge conflicts, rebase and retry — don't stop.
 
 ---
 
