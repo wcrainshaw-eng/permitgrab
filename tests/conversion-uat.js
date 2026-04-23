@@ -278,6 +278,34 @@ async function mobileSignup(browser) {
   await page.close();
 }
 
+
+async function mobileCityPage(browser) {
+  // V253 P2 #13: half of B2B SaaS traffic is mobile. Fail loudly if a
+  // city page horizontally scrolls at 375px (breaks phone buyers).
+  for (const slug of ['chicago-il', 'new-york-city']) {
+    const page = await newPage(browser);
+    await page.setViewport({ width: 375, height: 812, deviceScaleFactor: 2 });
+    const resp = await page.goto(`${BASE_URL}/permits/${slug}`, { waitUntil: 'networkidle2', timeout: 25000 });
+    if (resp.status() !== 200) {
+      fail(`mobile /permits/${slug}`, `${resp.status()}`);
+      await page.close();
+      continue;
+    }
+    const probe = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+      hasFilterBar: !!document.querySelector('#f-trade'),
+      hasContractors: !!document.querySelector('.contractors-table'),
+    }));
+    if (probe.overflow <= 5) pass(`mobile /permits/${slug} no horizontal overflow (${probe.overflow}px)`);
+    else fail(`mobile /permits/${slug} overflow`, `${probe.overflow}px horizontal scroll at 375px`);
+    if (probe.hasFilterBar) pass(`mobile /permits/${slug} filter bar present`);
+    else fail(`mobile /permits/${slug} filter bar`, 'missing');
+    if (probe.hasContractors) pass(`mobile /permits/${slug} contractors table present`);
+    else fail(`mobile /permits/${slug} contractors table`, 'missing');
+    await page.close();
+  }
+}
+
 // ------ Runner ------
 (async () => {
   console.log('=== V251 Conversion UAT ===');
@@ -309,6 +337,8 @@ async function mobileSignup(browser) {
     console.log('\n--- Signup flow ---');
     await signupReachable(browser);
     await mobileSignup(browser);
+    console.log('\n--- Mobile city pages (375px) ---');
+    await mobileCityPage(browser);
 
     console.log(`\n=== RESULTS ===`);
     console.log(`Passed: ${results.pass}`);
