@@ -1425,6 +1425,35 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V274: Adams County CO — ArcGIS FeatureServer. CodeEnforcementCases
+    # at services3.arcgis.com/4PNQOtAivErR7nbT. 13,869 records, fresh
+    # through 2026-04-23. Rich schema — Record_ID, CombinedAddress,
+    # Description ("Trash, junk and debris on the side of house"),
+    # ApplicationStatus, Type (Blight, Zoning, etc.), Complainant,
+    # CaseOpened date. Accela-backed (LinkToAccela field present).
+    # Pairs with adams-county-co prod_city_id.
+    'adams-county-co-violations': {
+        'prod_city_id': None,
+        'city': 'Adams County',
+        'state': 'CO',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'platform': 'arcgis',
+                'resource_id': 'adams-county-co-code-enforcement',
+                'arcgis_url': 'https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/CodeEnforcementCases/FeatureServer/0',
+                'date_field': 'CaseOpened',
+                'id_field': 'Record_ID',
+                'description_field': 'Description',
+                'status_field': 'ApplicationStatus',
+                'type_field': 'Type',
+                'address_fields': {'full': 'CombinedAddress'},
+                'zip_field': None,
+                'lat_field': 'POINT_Y',
+                'lng_field': 'POINT_X',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
