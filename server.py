@@ -16271,6 +16271,51 @@ def schedule_email_tasks():
     last_lifecycle_date = None
     last_onboarding_date = None
 
+    # V276: Deploy-restart dedup. The counters above are in-memory, so three
+    # deploys in one morning = three morning threads, each with
+    # last_digest_date=None, each independently firing send_daily_digest()
+    # once 7 AM ET hits. That's exactly what happened on 2026-04-24 (V271
+    # 6:15 AM, V272 6:43 AM, V273 7:44 AM → 3 duplicate digests per user).
+    # Cure: seed the counters from system_state rows that the success-path
+    # already writes (`digest_last_success`, plus the two new lifecycle
+    # keys below). If today's date already appears, the 7-9 AM gate skips.
+    try:
+        _bootstrap_today = datetime.now(et).date()
+        _conn = permitdb.get_connection()
+        _seed = {}
+        for row in _conn.execute(
+            "SELECT key, value FROM system_state WHERE key IN "
+            "('digest_last_success', 'lifecycle_last_success', 'onboarding_last_success')"
+        ).fetchall():
+            # Normalize sqlite3.Row / tuple / dict into (key, value)
+            if isinstance(row, dict):
+                _seed[row['key']] = row['value']
+            else:
+                _seed[row[0]] = row[1]
+        for key, date_var in (
+            ('digest_last_success', 'digest'),
+            ('lifecycle_last_success', 'lifecycle'),
+            ('onboarding_last_success', 'onboarding'),
+        ):
+            iso = _seed.get(key)
+            if not iso:
+                continue
+            try:
+                stored = datetime.fromisoformat(iso).date()
+            except ValueError:
+                continue
+            if stored == _bootstrap_today:
+                if date_var == 'digest':
+                    last_digest_date = _bootstrap_today
+                elif date_var == 'lifecycle':
+                    last_lifecycle_date = _bootstrap_today
+                elif date_var == 'onboarding':
+                    last_onboarding_date = _bootstrap_today
+        print(f"[{datetime.now()}] V276: digest dedup bootstrap — digest={last_digest_date}, "
+              f"lifecycle={last_lifecycle_date}, onboarding={last_onboarding_date}")
+    except Exception as e:
+        print(f"[{datetime.now()}] V276: dedup bootstrap skipped ({e}); counters stay None")
+
     while True:
         try:
             now_utc = datetime.utcnow()
@@ -16326,6 +16371,17 @@ def schedule_email_tasks():
                         results = check_trial_lifecycle()
                         print(f"[{datetime.now()}] V64: Trial lifecycle complete - {results}")
                         last_lifecycle_date = today_date
+                        # V276: persist so deploy restarts skip re-running
+                        try:
+                            _conn = permitdb.get_connection()
+                            _conn.execute(
+                                "INSERT OR REPLACE INTO system_state (key, value, updated_at) "
+                                "VALUES ('lifecycle_last_success', ?, datetime('now'))",
+                                (datetime.now().isoformat(),)
+                            )
+                            _conn.commit()
+                        except Exception:
+                            pass
                     except Exception as e:
                         print(f"[{datetime.now()}] [ERROR] Trial lifecycle failed: {e}")
                         import traceback
@@ -16338,6 +16394,17 @@ def schedule_email_tasks():
                         sent = check_onboarding_nudges()
                         print(f"[{datetime.now()}] V64: Onboarding nudges complete - {sent} sent")
                         last_onboarding_date = today_date
+                        # V276: persist so deploy restarts skip re-running
+                        try:
+                            _conn = permitdb.get_connection()
+                            _conn.execute(
+                                "INSERT OR REPLACE INTO system_state (key, value, updated_at) "
+                                "VALUES ('onboarding_last_success', ?, datetime('now'))",
+                                (datetime.now().isoformat(),)
+                            )
+                            _conn.commit()
+                        except Exception:
+                            pass
                     except Exception as e:
                         print(f"[{datetime.now()}] [ERROR] Onboarding nudges failed: {e}")
                         import traceback
