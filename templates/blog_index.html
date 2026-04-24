@@ -90,6 +90,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <!-- V223 T6: Email capture — every blog visitor who isn't ready to pay
      $149 is still a qualified email lead. Wired to the existing
      /api/subscribe endpoint (V218 added server-side email validation). -->
+<!-- V308 (CODE_V280b Bug 19): hide for logged-in Pro users — they have
+     an account already; show a "Go to Dashboard" instead. -->
+{% if not user %}
 <section style="background: #f3f4f6; padding: 28px 20px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;">
   <div style="max-width: 640px; margin: 0 auto; text-align: center;">
     <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 6px;">Get free permit alerts for your city</h2>
@@ -108,6 +111,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <p id="blog-capture-status" style="font-size: 13px; color: #059669; margin: 10px 0 0; display: none;"></p>
   </div>
 </section>
+{% else %}
+<section style="background: #ecfdf5; padding: 22px 20px; border-top: 1px solid #d1fae5; border-bottom: 1px solid #d1fae5;">
+  <div style="max-width: 640px; margin: 0 auto; text-align: center;">
+    <p style="margin: 0; font-size: 14px; color: #065f46;">
+      Welcome back, {{ user.name or user.email.split('@')[0] }} &mdash;
+      <a href="/browse" style="color: #059669; text-decoration: underline; font-weight: 600;">go to your dashboard</a>
+      or
+      <a href="/my-leads" style="color: #059669; text-decoration: underline; font-weight: 600;">my leads</a>.
+    </p>
+  </div>
+</section>
+{% endif %}
 <script>
 (function(){
   var f = document.getElementById('blog-email-capture');
