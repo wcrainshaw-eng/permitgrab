@@ -955,6 +955,50 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V263: Boulder County CO — ArcGIS FeatureServer. Accela-sourced
+    # feed at maps.bouldercounty.org exposes 272K planning records
+    # across 8 modules (Building/Code/Planning/Licensing/AirQuality/
+    # PublicHealth/PublicWorks/SpecialEvents); base_where isolates
+    # Module='Code' (10,159 records) then whitelists the building-
+    # relevant DocketTypes so broad weed/sign/rubbish/liquor-review
+    # noise stays out. Pairs with boulder-county prod_city_id=949
+    # which already collects permits via Accela. Fresh through
+    # 2026-04-21.
+    'boulder-county-co': {
+        'prod_city_id': None,
+        'city': 'Boulder County',
+        'state': 'CO',
+        'endpoints': [
+            {
+                'name': 'Boulder County Code Enforcement (Accela-sourced)',
+                'platform': 'arcgis',
+                'resource_id': 'boulder-county-code-enforcement',
+                'arcgis_url': 'https://maps.bouldercounty.org/arcgis/rest/services/PLANNING/OP_Accela_Point/MapServer/0',
+                'mapserver_table': False,
+                'base_where': (
+                    "Module='Code' AND DocketType IN ("
+                    "'Zoning Enforcement',"
+                    "'Building Code Violation',"
+                    "'Grading Enforcement',"
+                    "'Illegal Dwelling Enforcement',"
+                    "'Multiple Rubbish Weeds and Unsafe Structure Enforcement',"
+                    "'Outdoor Storage',"
+                    "'Rental Licensing Enforcement',"
+                    "'Unsafe Structure Enforcement'"
+                    ")"
+                ),
+                'date_field': 'ApplicationDate',
+                'id_field': 'CAPID',
+                'description_field': 'Description',
+                'status_field': 'ApplicationStatus',
+                'type_field': 'DocketType',
+                'address_fields': {'full': 'Address'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
