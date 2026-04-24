@@ -1568,6 +1568,50 @@ body {
   </div>
 </section>
 
+{# V284 (CODE_V285 Gate 4): Property Owner Leads section. Suppressed
+   when property_owners is empty (Miami-Dade, Chicago have no data
+   yet). First 5 rows visible; remainder behind the existing
+   .gated-teaser paywall. #}
+{% if property_owners %}
+<section style="padding: 48px 0; background: white;">
+  <div style="max-width: 1040px; margin: 0 auto; padding: 0 20px;">
+    <h2 style="margin-bottom: 8px; font-size: 28px; color: #0f172a;">Who&rsquo;s Building in {{ city_name }}?</h2>
+    <p style="margin: 0 0 24px; color: #475569; font-size: 15px;">Property owners with active permits or flagged parcels. Great leads for solar, insurance, home-warranty, and renovation vendors.</p>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="background: #f1f5f9;">
+            <th style="text-align: left; padding: 10px 14px; font-weight: 600; color: #334155;">Property Address</th>
+            <th style="text-align: left; padding: 10px 14px; font-weight: 600; color: #334155;">Owner</th>
+            <th style="text-align: left; padding: 10px 14px; font-weight: 600; color: #334155;">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for po in property_owners[:5] %}
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 14px; color: #0f172a;">{{ po.address or '—' }}</td>
+            <td style="padding: 10px 14px; color: #0f172a;">{{ po.owner_name or '—' }}</td>
+            <td style="padding: 10px 14px; color: #64748b; font-size: 12px;">
+              {% if po.source and 'permit_record' in po.source %}Permit record{% elif po.source and 'assessor' in po.source %}County assessor{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if property_owners|length > 5 %}
+    <div class="gated-teaser" style="margin-top: 20px;">
+      <div class="teaser-inner">
+        <h4>{{ property_owners|length - 5 }}+ more property owners in {{ city_name }}</h4>
+        <p>Unlock full address and owner details, including mailing addresses for direct outreach. 14-day free trial.</p>
+        <a href="/signup?plan=pro&next=/permits/{{ city_slug }}" class="teaser-btn">Start Free Trial</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
 {# V283 (CODE_V285 Gate 5): visible FAQ section. city_landing had FAQPage
    JSON-LD but it was only structured data — not a real HTML FAQ users
    (or Googlebot in HTML-rendering mode) could see. Ships 5 Q&As with
