@@ -47,6 +47,12 @@ A city is "ad-ready" when it has ALL THREE:
 - **Detroit MI** (data.detroitmi.gov): Not indexed at api.us.socrata.com federated catalog (404) — host isn't a Socrata portal.
 - **Las Vegas NV** (opendata.lasvegasnevada.gov): ECONNREFUSED on search path.
 - **Nashville TN** (data.nashville.gov): Socrata catalog API returns 404; portal browse page requires JS rendering — can't enumerate datasets via WebFetch.
+- **Memphis TN**: 0 matches in ArcGIS Hub search. Already known dead via Accela (CLAUDE.md P1 — no contractor column in grid).
+- **Tampa FL**: 0 Tampa-specific datasets in ArcGIS Hub. Accela dead-end noted.
+- **Sacramento CA** (SACOG): Only a yearly housing-units summary at services.sacog.org — no individual-permit dataset with contractor info.
+- **Memphis TN, Tampa FL, Madison WI, Cincinnati OH, Colorado Springs CO, Birmingham AL, Huntsville AL, Chesapeake VA, Long Beach CA, Stockton CA, Virginia Beach VA** — all probed 2026-04-24 via ArcGIS Hub and/or direct endpoints. None expose a city-level building-permit feed with a contractor-name field. Top 100 by population is effectively exhausted via open portals at this point; remaining cities ship permit data through paid vendors (Accela, Viewpoint), state licensing DBs, or not at all.
+- **Naperville IL** (`Building_Permit_Contractors` FeatureServer, services1.arcgis.com/rXJ6QApc2sOtl1Pd): rich schema with `Contractor_Name`, `Business_Phone`, `Email`, `CONTRACTOR_ADDRESS`, `Contractor_Type`. BUT newest ISSUEDATE is 2024-02-02 — 14 months stale. Dataset was apparently a one-time snapshot. Dead by freshness rule.
+- **Bend OR** (`Permits_and_Contractors_Table`): six contractor-typed columns (ContractorName, GeneralContractorName, ElectricalContractorName, etc.), but first 2 sample records have all fields null. Would need further sampling — low population priority.
 
 ### V258 new-city wins 2026-04-24
 - **Philadelphia** — already in CITY_REGISTRY, phl.carto.com, fresh 2026-04-22. 1,253 real-business profiles, 11 phones, 7,270 violations. DDG enrichment fired (job `da6d8fd1613e`). No bulk PA phone source — DDG-only.
