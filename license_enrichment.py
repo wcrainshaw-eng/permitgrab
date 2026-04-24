@@ -227,6 +227,30 @@ STATE_CONFIGS = {
         'socrata_state_filter': "contractorlicensestatus='ACTIVE'",
         'city_slugs': ['seattle', 'seattle-wa'],
     },
+    'NY_BUFFALO': {
+        # V301: Buffalo NY city-level contractor registry on data.buffalony.gov.
+        # Three companion Socrata datasets cover the main trades:
+        #   xu7s-vsr5 — General/Home/Handyman (~8K rows)
+        #   h6v3-63kd — Master Electricians (~7.2K)
+        #   avrc-zchj — Plumbers (~6.4K)
+        # This config wires the General/Home/Handyman one first; the others
+        # can be added as additional state_codes later. Buffalo currently has
+        # 1,106 profiles / 15 phones; adding this registry should push it
+        # past 50 → ad-ready. Violations already wired.
+        # Sample row: BUSINESS NAME='KT CONSTRUCTION SERVICES', dayphn='(716)525-1097'.
+        'name': 'Buffalo NY Licensed Contractors (General/Home/Handyman)',
+        'format': 'socrata',
+        'socrata_url': 'https://data.buffalony.gov/resource/xu7s-vsr5.json',
+        'socrata_state_filter': "status='ACTIVE'",
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'businessname',
+            'phone': 'dayphn',
+            'license_type': 'description',
+            'license_exp': 'expdate',
+        },
+        'city_slugs': ['buffalo-ny', 'buffalo'],
+    },
     'NV_LASVEGAS': {
         # V299: Las Vegas Business Licenses on the same Opendata_lasvegas
         # org (F1v0ufATbBQScMtY) that publishes LV permits. 206,928 total
