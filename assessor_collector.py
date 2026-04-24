@@ -87,6 +87,33 @@ ASSESSOR_SOURCES = {
         'state': 'TX',
         'source_tag': 'assessor:bexar',
     },
+    'dc_vacant_blighted': {
+        # Washington DC — Integrated Tax System Vacant/Blighted Building
+        # extract at dcgis.dc.gov layer 80. Not a full parcel file but a
+        # filtered subset: 2,332 officially-flagged vacant or blighted
+        # properties, every row a concentrated distressed-property
+        # lead. Fields include owner name + split mailing address
+        # (ADDRESS1 / CITYSTZIP) + property type + neighborhood code.
+        # DC DOB open data doesn't publish code enforcement cases
+        # (V274 session finding) so this also doubles as DC's only
+        # violations-style signal until DOB migrates.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'DC Vacant/Blighted Buildings (ITSPE)',
+        'endpoint': 'https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Property_and_Land_WebMercator/MapServer/80',
+        'where_clause': 'OWNERNAME IS NOT NULL',
+        'field_map': {
+            'owner_name': 'OWNERNAME',
+            'address': 'PREMISEADD',
+            'owner_mailing_address': 'ADDRESS1',
+            'parcel_id': 'SSL',
+            # DC addresses bake city/state/zip into PREMISEADD
+            # ('835 KENNEDY ST NE WASHINGTON DC 20011') so no
+            # separate city/zip mapping — downstream address
+            # normalization handles it.
+        },
+        'state': 'DC',
+        'source_tag': 'assessor:dc_vacant_blighted',
+    },
     'nyc_pluto': {
         # NYC Department of Planning PLUTO (Primary Land Use Tax Lot
         # Output). 858,644 lots — every tax lot in the 5 boroughs.
