@@ -1062,6 +1062,47 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V266: Glendale AZ — ArcGIS FeatureServer. GlendaleOne Code
+    # Compliance Cases has 50,491 records, fresh through 2026-04-03.
+    # base_where keeps building-relevant RequestTypeName values
+    # (Property Maintenance, Building Without A Permit, Code Compliance
+    # Referral, Code General Requests, Graffiti) — drops pure nuisance
+    # (Animal, Noise, Yard Sale, Home-Based Business, Pool, Vehicle).
+    # Street components split across StreetNum/StreetName; existing
+    # parts-style address_fields assembler covers it. Pairs with
+    # existing glendale-az prod_city_id=21770 (currently paused —
+    # collector will resolve the FK via city+state lookup regardless).
+    'glendale-az': {
+        'prod_city_id': None,
+        'city': 'Glendale',
+        'state': 'AZ',
+        'endpoints': [
+            {
+                'name': 'GlendaleOne Code Compliance',
+                'platform': 'arcgis',
+                'resource_id': 'glendale-az-code-compliance',
+                'arcgis_url': 'https://services1.arcgis.com/9fVTQQSiODPjLUTa/arcgis/rest/services/GlendaleOne_Code_Compliance_Cases/FeatureServer/0',
+                'base_where': (
+                    "RequestTypeName IN ("
+                    "'Property Maintenance - Private Property',"
+                    "'Building Without A Permit',"
+                    "'Code Compliance - Referral',"
+                    "'Code General Requests',"
+                    "'Graffiti - Refer to Code Compliance'"
+                    ")"
+                ),
+                'date_field': 'RequestDate',
+                'id_field': 'CodeCaseNumber',
+                'description_field': 'Violation1',
+                'status_field': 'RequestStatus',
+                'type_field': 'RequestTypeName',
+                'address_fields': {'number': 'StreetNum', 'street': 'StreetName'},
+                'zip_field': None,
+                'lat_field': 'Latitude',
+                'lng_field': 'Longitude',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
