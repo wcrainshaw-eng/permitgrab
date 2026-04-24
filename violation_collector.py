@@ -1563,6 +1563,40 @@ VIOLATION_SOURCES = {
     #   Denver, Portland, Tucson, Mesa, Baton Rouge, Honolulu, Louisville, Raleigh, Virginia Beach.
     # Kansas City had two hits: nhtf-e75a (Historical, 2009-2011, skipped) and vq3e-m9ge (kept).
 
+    # V294: Henderson NV — ArcGIS MapServer CE Violations. 871 cases.
+    # Probed 2026-04-24: CASE='CE-26-2926', VIOLATION='Fire Lane Obstruction,...'
+    # Mix of STVR/parking + building-relevant; wiring all to cross ad-ready
+    # threshold (currently 0 violations, 140 phones, 2,570 profiles).
+    # No date column — use 2-digit year prefix from CASE ID via
+    # date_from_id_pattern + V294 century fix in collector.
+    'henderson': {
+        'prod_city_id': None,
+        'city': 'Henderson',
+        'state': 'NV',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Violations',
+                'platform': 'arcgis',
+                'resource_id': 'henderson-ce-violations',
+                'arcgis_url': 'https://maps.cityofhenderson.com/arcgis/rest/services/public/ComDevServices/MapServer/0',
+                'mapserver_table': True,
+                'date_field': None,
+                'date_from_id_pattern': r'CE-(\d{2})-\d+',
+                'incremental_where': "CASE LIKE 'CE-%'",
+                'orderby': 'OBJECTID ASC',
+                'id_field': 'CASE',
+                'description_field': 'VIOLATION',
+                'status_field': None,
+                'type_field': 'VIOLATION',
+                'address_fields': {'number': 'STREET_NUM', 'street': 'STREET_NAM',
+                                   'prefix': 'STREET_DIR', 'suffix': 'STREET_TYP'},
+                'zip_field': 'ZIP',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+
     # V289: Anaheim CA — ArcGIS FeatureServer. 168K cases, daily refresh.
     # Probed 2026-04-24: opendate 2026-04-24 on top record ("Unpermitted Construction").
     # Pairs with V289 city_configs refresh of Anaheim permits endpoint.
@@ -1752,6 +1786,10 @@ def normalize_violation(record, city_config, endpoint):
             if m:
                 try:
                     year = int(m.group(1))
+                    # V294: Henderson CE-26-2926 uses 2-digit year. Anchor
+                    # 00-99 to 20xx so we don't get 'Jan 1, AD 26' violations.
+                    if year < 100:
+                        year += 2000
                     date_val = f"{year:04d}-01-01"
                 except (ValueError, IndexError):
                     pass
