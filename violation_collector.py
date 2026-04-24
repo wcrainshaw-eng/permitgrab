@@ -1103,6 +1103,61 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V267: Columbia SC — ArcGIS FeatureServer. ColaCityGIS publishes
+    # "Code Violation Case Status" (service name CodeRental) with 7,852
+    # records, max OpenedDate 2026-01-15 (~3mo lag). Fields include
+    # CaseNum, Problem, CaseStatus, ADDRESS, Neighborhood — the
+    # Problem/CaseStatus/ADDRESS trio is clean lead-gen material (no
+    # need for base_where filtering). Pairs with existing columbia
+    # prod_city_id=647.
+    'columbia-sc': {
+        'prod_city_id': None,
+        'city': 'Columbia',
+        'state': 'SC',
+        'endpoints': [
+            {
+                'name': 'Code Violation Case Status',
+                'platform': 'arcgis',
+                'resource_id': 'columbia-sc-code-violation-status',
+                'arcgis_url': 'https://services1.arcgis.com/Mnt8FoJcogKtoVBs/arcgis/rest/services/CodeRental/FeatureServer/0',
+                'date_field': 'OpenedDate',
+                'id_field': 'CaseNum',
+                'description_field': 'Problem',
+                'status_field': 'CaseStatus',
+                'type_field': 'Problem',
+                'address_fields': {'full': 'ADDRESS'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V267: Wheaton IL — ArcGIS FeatureServer. Small dataset (363
+    # records) but fresh (max Created_Date 2026-04-21) and pre-
+    # formatted Location field already includes city/state/zip.
+    # Pairs with existing wheaton-il prod_city_id=22351.
+    'wheaton-il': {
+        'prod_city_id': None,
+        'city': 'Wheaton',
+        'state': 'IL',
+        'endpoints': [
+            {
+                'name': 'Code Violations',
+                'platform': 'arcgis',
+                'resource_id': 'wheaton-il-code-violations',
+                'arcgis_url': 'https://services2.arcgis.com/YyIQHvpylgCY7DEY/arcgis/rest/services/Code_Violations/FeatureServer/0',
+                'date_field': 'Created_Date',
+                'id_field': 'Reference_Number',
+                'description_field': 'Primary_Violation',
+                'status_field': 'Status',
+                'type_field': 'Primary_Violation',
+                'address_fields': {'full': 'Location'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
