@@ -1454,6 +1454,61 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V277: Lee County FL — ArcGIS FeatureServer. Nuisance Accumulation
+    # Violations at services2.arcgis.com/LvWGAAhHwbCJ2GMP. 93,750
+    # records, fresh through 2026-04-21. Split street components
+    # (address_number / street_name / unit_number) and city/postal_code
+    # as separate fields. Pairs with lee-county-fl prod_city_id.
+    'lee-county-fl-violations': {
+        'prod_city_id': None,
+        'city': 'Lee County',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'Nuisance Accumulation Violations',
+                'platform': 'arcgis',
+                'resource_id': 'lee-county-fl-nuisance-violations',
+                'arcgis_url': 'https://services2.arcgis.com/LvWGAAhHwbCJ2GMP/arcgis/rest/services/NuisanceAccumulationViolations/FeatureServer/0',
+                'date_field': 'file_date',
+                'id_field': 'record_number',
+                'description_field': 'record_type',
+                'status_field': 'record_status',
+                'type_field': 'record_type',
+                'address_fields': {'number': 'address_number', 'street': 'street_name'},
+                'zip_field': 'postal_code',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
+    # V277: Saint Paul MN — ArcGIS FeatureServer. PAULIE/53 "Vacant
+    # Buildings" layer. Small (392 records) but fresh (CreationDate
+    # 2026-04-22) and the vacant-building subset is a concentrated
+    # distressed-property lead-gen signal. Schema has ADDRESS,
+    # VACANT_AS_OF, DWELLING_TYPE, VB_CATEGORY (1/2/3 severity),
+    # WARD, LATITUDE, LONGGITUDE (note LONGGITUDE typo is upstream).
+    'saint-paul-mn-violations': {
+        'prod_city_id': None,
+        'city': 'Saint Paul',
+        'state': 'MN',
+        'endpoints': [
+            {
+                'name': 'Vacant Buildings',
+                'platform': 'arcgis',
+                'resource_id': 'saint-paul-mn-vacant-buildings',
+                'arcgis_url': 'https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/PAULIE/FeatureServer/53',
+                'date_field': 'CreationDate',
+                'id_field': 'PIN',
+                'description_field': 'DWELLING_TYPE',
+                'status_field': 'VB_CATEGORY',
+                'type_field': 'DWELLING_TYPE',
+                'address_fields': {'full': 'ADDRESS'},
+                'zip_field': None,
+                'lat_field': 'LATITUDE',
+                'lng_field': 'LONGGITUDE',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
