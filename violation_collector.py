@@ -1294,6 +1294,58 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V271: Seattle WA — Socrata. cos-data.seattle.gov/ez4a-iug7
+    # "Code Complaints and Violations", fresh through 2026-04-23
+    # (max opendate 2026-12-15 is an apparent data-entry typo in a
+    # few rows — normal-date rows dominate). Pairs with seattle
+    # prod_city_id=6 (#18 US by pop).
+    'seattle-wa-violations': {
+        'prod_city_id': None,
+        'city': 'Seattle',
+        'state': 'WA',
+        'endpoints': [
+            {
+                'name': 'Code Complaints and Violations',
+                'domain': 'cos-data.seattle.gov',
+                'resource_id': 'ez4a-iug7',
+                'date_field': 'opendate',
+                'id_field': 'recordnum',
+                'description_field': 'description',
+                'status_field': 'statuscurrent',
+                'type_field': 'recordtypedesc',
+                'address_fields': {'full': 'originaladdress1'},
+                'zip_field': 'originalzip',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
+    # V271: Cambridge MA — Socrata. data.cambridgema.gov/f8su-kv88
+    # "Housing Code Violations", fresh through 2026-04-13. Rich
+    # schema with full_address (already formatted with city/state/
+    # zip), code, description, status. Pairs with cambridge-ma
+    # prod_city_id=10.
+    'cambridge-ma-violations': {
+        'prod_city_id': None,
+        'city': 'Cambridge',
+        'state': 'MA',
+        'endpoints': [
+            {
+                'name': 'Housing Code Violations',
+                'domain': 'data.cambridgema.gov',
+                'resource_id': 'f8su-kv88',
+                'date_field': 'case_open_date',
+                'id_field': 'id',
+                'description_field': 'description',
+                'status_field': 'violation_status',
+                'type_field': 'permit_type',
+                'address_fields': {'full': 'full_address'},
+                'zip_field': None,
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
