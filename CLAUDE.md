@@ -75,6 +75,23 @@ A city is "ad-ready" when it has ALL THREE:
 
 **Takeaway:** All 6 California cities in V258 Tier 1-3 except the already-live ones lack a usable contractor-field permit API. CSLB name-matching is wired but there are no names to match. California's municipal permit data is fundamentally a metadata-only story across major cities.
 
+### V289 new-city win 2026-04-24
+- **Anaheim CA** — config existed in CITY_REGISTRY but endpoint was dead (`gis.anaheim.net/server`). V289 migrated to `services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Accela_Building_Permits/FeatureServer/0`. Probed: 189K total, 1,580 in last 90 days, **8,553 records have `contractorsphone` populated inline** (field_map now has `contact_phone: contractorsphone` — no DDG needed). Violations wired from same org: `CodeEnforcementCasesPublic/FeatureServer/0` (168K cases, daily refresh, top record 2026-04-24 "Unpermitted Construction"). Awaiting backfill verification.
+
+### V290 dead-ends confirmed 2026-04-24 (Top 101-200 hunt)
+- **Durham NC** (`services2.arcgis.com/G5vR3cOjh6g2Ed8E/arcgis/rest/services/Permits/FeatureServer/13`): daily refresh, but 24-field schema exposes only INSPECTOR names (BLDG_FNAME/BLDG_LNAME paired with BLDG_INSP). No contractor/applicant/business field anywhere across the 4 permit layers (Building/Electrical/Mechanical/Plumbing).
+- **Boise ID** (`services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/Housing_OpenData/FeatureServer/0`): 26-field schema is pure property-address + status. No contractor field.
+- **Irving TX** (data-cityofirving DCAT): 14 datasets with "permit" in name but newest permit dataset is ~1yr stale ("Feb 15 2022 Through Present" mod=2025-03-12). Code Violations datasets frozen at 2021 data. Dead by freshness.
+- **Gilbert AZ** (data.gilbertaz.gov): Single "Permits" dataset modified 2023-01-26. 3+ years stale. Dead.
+- **Tyler TX** (services5.arcgis.com/RmXXW3PwBZGOxlSe): `CONTRACTOR_NAME` field exists with real businesses ("BAILEY ELECTRIC") but zero records with ISSUED >= 2026-01-01. Dataset metadata was updated but record volume frozen at 2021. Dead by freshness.
+- **Fremont/Irvine/Chula Vista/Bakersfield/Anaheim-alt/Plano/Garland/Arlington TX/Winston-Salem/Fayetteville NC/Chandler AZ/Peoria AZ/Fort Wayne IN/Spokane WA/Moreno Valley/Oxnard/Fontana/Huntington Beach/Oceanside/Santa Clarita/Overland Park KS/Newport News VA/Jersey City NJ/Tacoma WA/SLC UT/Knoxville TN/Providence RI/Grand Rapids MI/Akron OH/Des Moines IA/Anchorage AK/St Louis/Milwaukee/Baltimore/Wichita** — tried ArcGIS Hub DCAT + direct Socrata catalogs across ~40 host patterns each. None expose a permit feed with a contractor-name field via OPEN portals. Either on Accela/Viewpoint (paid scraping), or state-licensing-DB only, or no digital portal.
+
+### V290 crisis + recovery (site down ~35 min)
+- **V287 Sentry integration** caused gunicorn worker hang: module-level `import sentry_sdk` + `FlaskIntegration` deadlocked the single Render worker. Site returned 502/HTTP 000 from 16:27Z to ~17:05Z even though SENTRY_DSN env var was unset (defensive gating didn't help).
+- **V288 revert PR** #192 was opened but `gh pr merge --squash` produced an EMPTY commit — GitHub's squash detected the revert as redundant with the targeted V287 and dropped the payload. `git show --numstat e8faa05` returns zero files.
+- **V290** #194 directly deletes the Sentry block from server.py + sentry-sdk[flask] from requirements.txt, bypassing the revert-squash path. Fix confirmed locally with grep.
+- **Lesson:** When reverting a merged PR via squash-merge, the GitHub squash engine can silently drop the revert payload. Prefer `git revert` → push → merge without `--squash`, or use a direct-edit PR when under duress.
+
 **You are autonomous. Don't stop to ask permission. Fix things, test things, deploy things. If something breaks, debug and fix it. Write clean PRs with descriptive titles.**
 
 ---
