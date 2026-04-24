@@ -14005,6 +14005,56 @@ def _get_market_insights(prod_city_id=None, city_name=None, city_state=None):
     }
 
 
+def _get_property_owners(city_name, state, limit=10):
+    """V284 (CODE_V285 Gate 4): fetch property_owner rows for the
+    city-page "Who's Building in {City}?" / "Property Owner Leads"
+    section.
+
+    property_owners uses (city, state, source) columns — not the
+    source_city_key pattern. For permit_record rows, city is
+    city-title-cased (e.g. 'Chicago', 'Miami'); for assessor rows
+    it's whatever the upstream uppercases it to (e.g. 'PHOENIX').
+    This helper case-insensitively matches either and returns at
+    most `limit` most-recently-loaded rows.
+
+    Returns [] on any error so the template's `{% if property_owners %}`
+    guard short-circuits to no section instead of 500ing.
+    """
+    if not city_name:
+        return []
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute(
+            "SELECT address, owner_name, owner_mailing_address, "
+            "parcel_id, source, last_updated "
+            "FROM property_owners "
+            "WHERE UPPER(city) = UPPER(?) "
+            "  AND (state IS NULL OR UPPER(state) = UPPER(?)) "
+            "  AND owner_name IS NOT NULL "
+            "  AND LENGTH(TRIM(owner_name)) > 2 "
+            "ORDER BY last_updated DESC "
+            "LIMIT ?",
+            (city_name, state or '', limit)
+        ).fetchall()
+        out = []
+        for r in rows:
+            if isinstance(r, dict):
+                out.append(r)
+            else:
+                out.append({
+                    'address': r[0],
+                    'owner_name': r[1],
+                    'owner_mailing_address': r[2],
+                    'parcel_id': r[3],
+                    'source': r[4],
+                    'last_updated': r[5],
+                })
+        return out
+    except Exception as e:
+        print(f"[V284] _get_property_owners({city_name},{state}) failed: {e}")
+        return []
+
+
 def city_landing_inner(city_slug):
     """Render SEO-optimized city landing page."""
     # V157: Slug aliases for cities where URL slug differs from DB slug.
@@ -14595,6 +14645,7 @@ def city_landing_inner(city_slug):
         violations=[],
         violations_count=0,
         market_insights=market_insights,  # V236 PR#5
+        property_owners=_get_property_owners(config['name'], current_state, limit=10),  # V284
         # V251 F2: filter dropdown context
         available_zips=available_zips,
         available_trades=available_trades,
@@ -14865,6 +14916,7 @@ def state_city_landing(state_slug, city_slug):
         city_state=city_state,
     )
     return render_template('city_landing_v77.html',
+        property_owners=_get_property_owners(display_name, city_state, limit=10),  # V284
         city_name=display_name,
         city_slug=city_slug,
         state_abbrev=city_state,
