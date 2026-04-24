@@ -426,6 +426,12 @@ def _migrate_create_sources_table():
             ON property_owners(address);
         CREATE INDEX IF NOT EXISTS idx_property_owners_parcel
             ON property_owners(parcel_id);
+        -- V278: unique index needed for INSERT OR IGNORE dedup in the
+        -- permit-owner extraction route. (address, owner_name, source)
+        -- allows the same address to have both a permit-record owner
+        -- row and an assessor-record owner row once Phase 2 lands.
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_property_owners_unique
+            ON property_owners(address, owner_name, source);
     ''')
 
     # V163: Drop dead tables
@@ -5273,6 +5279,88 @@ def _log_digest(recipient, result, status):
         conn.commit()
     except Exception:
         pass  # Table may not exist yet
+
+
+@app.route('/api/admin/extract-property-owners', methods=['POST'])
+def admin_extract_property_owners():
+    """V278 (task doc V276 Phase 1): Extract owner_name from already-
+    collected permits into the property_owners table. Runs for the
+    cities that have owner_name populated in their permit rows (NYC
+    via field_map owner_name=owner_name from DOB NOW dq6g-a4sc).
+
+    Miami-Dade's field_map maps ownername → owner_name but the live
+    permits table has 0 populated rows — the collector or upstream
+    feed isn't carrying the value through. That's a separate bug;
+    this route extracts what's actually in permits today and skips
+    cities with no populated owner_name.
+
+    Chicago's task-doc plan assumed a contact_type column with
+    'OWNER' values; the permits table has only a single contact_name
+    field with no type discriminator, so Chicago is a no-op here
+    until the collector is extended.
+
+    Uses INSERT OR IGNORE against the unique (address, owner_name,
+    source) index added in V278 so re-runs are idempotent.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    body = request.get_json(silent=True) or {}
+    slugs = body.get('source_city_keys') or ['new-york-city', 'miami-dade-county']
+    lookback_days = int(body.get('lookback_days') or 365)
+    conn = permitdb.get_connection()
+    results = {}
+    for slug in slugs:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM permits WHERE source_city_key = ? "
+            "AND owner_name IS NOT NULL AND LENGTH(TRIM(owner_name)) > 2 "
+            "AND address IS NOT NULL AND LENGTH(TRIM(address)) > 3 "
+            "AND date > date('now', ?)",
+            (slug, f'-{lookback_days} days')
+        ).fetchone()
+        candidate_count = row[0] if not isinstance(row, dict) else row['COUNT(*)']
+        source_tag = f'permit_record:{slug}'
+        before = conn.execute(
+            "SELECT COUNT(*) FROM property_owners WHERE source = ?",
+            (source_tag,)
+        ).fetchone()
+        before_n = before[0] if not isinstance(before, dict) else before['COUNT(*)']
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO property_owners
+                    (address, city, state, zip, owner_name, source, last_updated)
+                SELECT DISTINCT
+                    TRIM(p.address), p.city, p.state, p.zip,
+                    TRIM(p.owner_name), ?, datetime('now')
+                FROM permits p
+                WHERE p.source_city_key = ?
+                  AND p.owner_name IS NOT NULL
+                  AND LENGTH(TRIM(p.owner_name)) > 2
+                  AND p.address IS NOT NULL
+                  AND LENGTH(TRIM(p.address)) > 3
+                  AND p.date > date('now', ?)
+                """,
+                (source_tag, slug, f'-{lookback_days} days')
+            )
+            conn.commit()
+            after = conn.execute(
+                "SELECT COUNT(*) FROM property_owners WHERE source = ?",
+                (source_tag,)
+            ).fetchone()
+            after_n = after[0] if not isinstance(after, dict) else after['COUNT(*)']
+            results[slug] = {
+                'candidate_permit_rows': candidate_count,
+                'before': before_n,
+                'after': after_n,
+                'added': after_n - before_n,
+            }
+        except Exception as e:
+            results[slug] = {
+                'candidate_permit_rows': candidate_count,
+                'error': str(e)[:300],
+            }
+    return jsonify({'status': 'ok', 'lookback_days': lookback_days, 'results': results})
 
 
 @app.route('/api/admin/query', methods=['POST'])
