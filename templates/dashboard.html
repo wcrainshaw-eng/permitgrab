@@ -1735,39 +1735,27 @@ footer a:hover { color: white; }
   <div class="pricing-inner">
     <h2>Simple Pricing, Real Leads</h2>
     <p class="subtitle">Start free. Upgrade when you're closing deals.</p>
-    <div class="pricing-grid">
-      <div class="pricing-card featured">
-        <div class="pricing-badge">Most Popular</div>
+    <div class="pricing-grid" style="justify-content: center;">
+      <div class="pricing-card featured" style="max-width: 420px;">
         <div class="pricing-name">Pro</div>
         <div class="pricing-price">$149<span>/mo</span></div>
-        <div class="pricing-desc">For contractors ready to grow</div>
+        <div class="pricing-desc">Everything you need to turn permits into leads</div>
         <ul class="pricing-features">
-          <li>3 metro areas</li>
-          <li>All trade categories</li>
+          <li>All {{ city_count }}+ cities</li>
+          <li>Phone numbers & contact info</li>
+          <li>Property owner data (where available)</li>
+          <li>Code violation cross-reference</li>
           <li>Daily email alerts</li>
-          <li>Full 60-day history</li>
-          <li>Contact info & phone numbers</li>
-          <li>Export to CSV</li>
+          <li>CSV export</li>
           <li>Priority support</li>
         </ul>
         <a href="/signup?plan=pro" class="pricing-btn primary">Start Free Trial</a>
       </div>
-      <div class="pricing-card">
-        <div class="pricing-name">Enterprise</div>
-        <div class="pricing-price">$349<span>/mo</span></div>
-        <div class="pricing-desc">For teams & multi-location ops</div>
-        <ul class="pricing-features">
-          <li>All {{ city_count }}+ cities</li>
-          <li>All trades + custom filters</li>
-          <li>Real-time SMS + email alerts</li>
-          <li>Full historical data</li>
-          <li>API access</li>
-          <li>CRM integrations</li>
-          <li>Dedicated account manager</li>
-        </ul>
-        <a href="/signup?plan=enterprise" class="pricing-btn">Start Free Trial</a>
-      </div>
     </div>
+    <p style="text-align: center; margin-top: 20px; font-size: 14px; color: var(--gray-600);">
+      Need API access, multi-seat, or volume pricing?
+      <a href="mailto:wcrainshaw@gmail.com?subject=PermitGrab+custom+access" style="color: var(--accent);">Contact sales →</a>
+    </p>
   </div>
 </section>
 
