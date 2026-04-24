@@ -5363,6 +5363,53 @@ def admin_extract_property_owners():
     return jsonify({'status': 'ok', 'lookback_days': lookback_days, 'results': results})
 
 
+@app.route('/api/admin/collect-assessor-data', methods=['POST'])
+def admin_collect_assessor_data():
+    """V279 (task doc V276 Phase 2): Collect property owner + address
+    rows from a county assessor open data portal into property_owners.
+
+    Body:
+      {
+        "source": "maricopa",          # key in assessor_collector.ASSESSOR_SOURCES
+        "max_records": 5000,           # optional cap for smoke-test calls
+        "page_size": 1000,             # optional override (default 1000)
+        "start_offset": 0              # optional resume
+      }
+
+    This endpoint is synchronous on a Render worker (30-60s request
+    limit). For full backfills (Maricopa = 1.76M parcels, Phoenix
+    alone ~600K), call repeatedly with start_offset chained off the
+    previous response's last_offset. Alternately, wrap in a future
+    background task — out of V279 scope.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    body = request.get_json(silent=True) or {}
+    source = body.get('source') or 'maricopa'
+    max_records = body.get('max_records')
+    page_size = body.get('page_size')
+    start_offset = int(body.get('start_offset') or 0)
+    try:
+        from assessor_collector import collect as assessor_collect
+    except ImportError as e:
+        return jsonify({'status': 'error', 'error': f'assessor_collector import failed: {e}'}), 500
+    try:
+        result = assessor_collect(
+            source,
+            max_records=max_records,
+            page_size=page_size,
+            start_offset=start_offset,
+        )
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
+
+
 @app.route('/api/admin/query', methods=['POST'])
 def admin_query():
     """V34: Run a read-only SQL query for diagnostics.
