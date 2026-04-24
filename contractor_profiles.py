@@ -199,7 +199,7 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
 
             rows = conn.execute("""
                 SELECT contractor_name, trade_category, estimated_cost,
-                       filing_date, address
+                       filing_date, address, contact_phone
                 FROM permits
                 WHERE prod_city_id = ?
                   AND contractor_name IS NOT NULL
@@ -229,6 +229,12 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                 addresses = []
                 dates = []
                 raw_names = Counter()
+                # V258: carry permits.contact_phone into the profile when the
+                # source exposes BUSINESSPHONE inline (Henderson NV, Naperville
+                # IL, etc). Pick the most-common non-empty phone across the
+                # contractor's permits — protects against a single typo in one
+                # record and matches how display_raw is picked.
+                permit_phones = Counter()
 
                 for r in group_rows:
                     raw = r['contractor_name']
@@ -236,6 +242,7 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                     cost = r['estimated_cost']
                     filed = r['filing_date']
                     addr = r['address']
+                    phone = r['contact_phone'] if 'contact_phone' in r.keys() else None
 
                     raw_names[raw] += 1
                     trades[trade or 'General Construction'] += 1
@@ -243,6 +250,8 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                         costs.append(cost)
                     if addr:
                         addresses.append(addr)
+                    if phone and str(phone).strip():
+                        permit_phones[str(phone).strip()] += 1
                     if filed:
                         dates.append(filed)
                         # SQLite stores ISO dates as TEXT; lexicographic
@@ -263,8 +272,14 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                 is_active = 1 if (last_date and last_date >= cutoff_90) else 0
                 freq = _frequency_label(permits_90d)
                 display_raw = raw_names.most_common(1)[0][0]
+                # V258: most-common permit-inline phone, or None.
+                best_phone = permit_phones.most_common(1)[0][0] if permit_phones else None
 
                 # UPSERT (Postgres + SQLite compatible; no INSERT OR REPLACE).
+                # V258: phone column — set on INSERT, and on UPDATE only when
+                # the existing row's phone is NULL/empty. This avoids a permit-
+                # inline phone overwriting a later DDG/license-import enrichment,
+                # while still capturing permit phones the first time through.
                 conn.execute("""
                     INSERT INTO contractor_profiles (
                         contractor_name_raw, contractor_name_normalized,
@@ -273,8 +288,8 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                         primary_trade, trade_breakdown,
                         avg_project_value, max_project_value, total_project_value,
                         primary_area, first_permit_date, last_permit_date,
-                        is_active, permit_frequency, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        is_active, permit_frequency, phone, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(contractor_name_normalized, source_city_key) DO UPDATE SET
                         contractor_name_raw = excluded.contractor_name_raw,
                         city = excluded.city,
@@ -292,13 +307,18 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                         last_permit_date = excluded.last_permit_date,
                         is_active = excluded.is_active,
                         permit_frequency = excluded.permit_frequency,
+                        phone = CASE
+                            WHEN contractor_profiles.phone IS NULL OR contractor_profiles.phone = ''
+                            THEN excluded.phone
+                            ELSE contractor_profiles.phone
+                        END,
                         updated_at = excluded.updated_at
                 """, (display_raw, norm, slug, city_name, state,
                       total_permits, permits_90d, permits_30d,
                       primary_trade, trade_breakdown,
                       avg_val, max_val, total_val,
                       area, first_date, last_date,
-                      is_active, freq, now_iso))
+                      is_active, freq, best_phone, now_iso))
                 upserted += 1
 
             conn.commit()
