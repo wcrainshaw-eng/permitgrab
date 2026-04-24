@@ -157,10 +157,23 @@ def _insert_batch(rows, source_tag, state):
 
     Relies on V278's unique index (address, owner_name, source) for
     dedup so re-runs don't double-write.
+
+    V281: the permit-collection daemon holds long-running write locks
+    on the SQLite db, so this function retries on "database is locked"
+    with exponential backoff. Without retry the assessor route
+    consistently 500s during heavy permit cycles.
     """
     if not rows:
         return 0
     conn = permitdb.get_connection()
+    # Wait up to 30s for the daemon to release a write lock before
+    # giving up. SQLite's busy_timeout handles this at the driver
+    # layer without needing manual sleep loops, but it silently
+    # falls back to default on some connections — set it explicitly.
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+    except Exception:
+        pass
     inserted_before = conn.execute(
         "SELECT COUNT(*) FROM property_owners WHERE source = ?",
         (source_tag,)
@@ -197,16 +210,30 @@ def _insert_batch(rows, source_tag, state):
     if not payload:
         return 0
 
-    conn.executemany(
-        """
-        INSERT OR IGNORE INTO property_owners
-            (address, city, state, zip, owner_name,
-             owner_mailing_address, parcel_id, source, last_updated)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-        """,
-        payload
+    # V281: retry envelope. busy_timeout above should cover the
+    # common case, but if the daemon is holding a long writer-lock
+    # the pragma times out — fall back to exponential sleep + retry.
+    sql = (
+        "INSERT OR IGNORE INTO property_owners "
+        "(address, city, state, zip, owner_name, owner_mailing_address, "
+        " parcel_id, source, last_updated) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))"
     )
-    conn.commit()
+    last_err = None
+    for attempt in range(5):
+        try:
+            conn.executemany(sql, payload)
+            conn.commit()
+            break
+        except Exception as e:
+            last_err = e
+            msg = str(e).lower()
+            if 'locked' in msg or 'busy' in msg:
+                time.sleep(1.5 * (2 ** attempt))  # 1.5s, 3s, 6s, 12s, 24s
+                continue
+            raise
+    else:
+        raise RuntimeError(f"property_owners insert failed after retries: {last_err}")
 
     after = conn.execute(
         "SELECT COUNT(*) FROM property_owners WHERE source = ?",
