@@ -48,6 +48,11 @@ A city is "ad-ready" when it has ALL THREE:
 - **Las Vegas NV** (opendata.lasvegasnevada.gov): ECONNREFUSED on search path.
 - **Nashville TN** (data.nashville.gov): Socrata catalog API returns 404; portal browse page requires JS rendering — can't enumerate datasets via WebFetch.
 
+### V258 new-city wins 2026-04-24
+- **Philadelphia** — already in CITY_REGISTRY, phl.carto.com, fresh 2026-04-22. 1,253 real-business profiles, 11 phones, 7,270 violations. DDG enrichment fired (job `da6d8fd1613e`). No bulk PA phone source — DDG-only.
+- **Henderson NV** — PR #157 migrated from dead Socrata (fpc9-568j) to ArcGIS OpenDevPermits/2 at maps.cityofhenderson.com. Fresh (2026-04-18) with `OWNER` (business names like "JOHNNY RIBEIRO BUILDER, LLC") + `BUSINESSPHONE` (inline — "7022927679"). Phones come with the permit → skip enrichment entirely.
+- **Cleveland OH** — PR #158 migrated from stale Building_Permits/0 (frozen 2025-04-14) to Project_Records/0 at services3.arcgis.com. Fresh (2026-04-19) with `APPLICANT_BUSINESS` populated ("Fischer & Associates Architects Inc.", "Northedge Steel LLC"). Violations source (CCVIOL) already wired.
+
 ### V258 activation bugs to fix
 - **Louisville KY** routing: current config slug `louisville` + Kentucky state yields `louisville-co` (Colorado) at DB write time. 4,362 permits/360 profiles with KY business names are mis-attributed. Need a slug-routing fix so these become discoverable under a `louisville-ky` slug. Re-verified data is LIVE as of 2026-04-20.
 - **Worcester MA** collector: source has `Contractor_Name` populated (probed: "Aparicio Kitchen Designs INC", "IVAN PITTAMIGLIO BENITEZ") but all 6,041 stored permits have `contractor_name=""`. Field_map is correct; ArcGIS collector path is dropping the field. Root cause TBD.
