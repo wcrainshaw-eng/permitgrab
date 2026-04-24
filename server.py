@@ -5281,6 +5281,23 @@ def _log_digest(recipient, result, status):
         pass  # Table may not exist yet
 
 
+@app.route('/api/admin/debug-property-owners', methods=['POST'])
+def admin_debug_property_owners():
+    """V285 diagnostic: call _get_property_owners() in the same runtime
+    the city_landing renderer uses, so we can see why V284's section
+    is empty on /permits/new-york-city despite the raw SQL returning
+    5 rows. Returns the exact dict list the template would receive.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    body = request.get_json(silent=True) or {}
+    city = body.get('city') or 'New York City'
+    state = body.get('state') or 'NY'
+    rows = _get_property_owners(city, state, limit=10)
+    return jsonify({'city': city, 'state': state, 'count': len(rows), 'rows': rows})
+
+
 @app.route('/api/admin/extract-property-owners', methods=['POST'])
 def admin_extract_property_owners():
     """V278 (task doc V276 Phase 1): Extract owner_name from already-
