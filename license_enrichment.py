@@ -227,6 +227,31 @@ STATE_CONFIGS = {
         'socrata_state_filter': "contractorlicensestatus='ACTIVE'",
         'city_slugs': ['seattle', 'seattle-wa'],
     },
+    'OH_CLEVELAND': {
+        # V298: Cleveland Active Contractor Registrations — same opendataCLE
+        # org that serves Cleveland permits (dty2kHktVXHrqO8i). 2,548 active
+        # contractors with BUSINESS_NAME + B1_PHONE1 populated at 100%
+        # (probed 2026-04-24: "HJ WOODWORTH CONSTRUCTION, LLC" 216-502-5787,
+        # "HD BATH PRO, LLC" 216 377-2480, etc.). Cleveland currently has
+        # 2,244 profiles with 2 phones; violations already wired. Expected
+        # to push past 50-phone ad-ready threshold easily.
+        'name': 'Cleveland Active Contractor Registrations',
+        'format': 'arcgis_fs',
+        'arcgis_url': 'https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Active_Contractor_Registrations/FeatureServer/0',
+        'arcgis_where': "STATUS IN ('Issued','Approved','Active')",
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'BUSINESS_NAME',
+            'phone': 'B1_PHONE1',
+            'address': 'B1_ADDRESS1',
+            'city': 'B1_CITY',
+            'state': 'B1_STATE',
+            'zip': 'B1_ZIP',
+            'license_type': 'CONTRACTOR_LICENSE_TYPE',
+            'license_number': 'B1_ALT_ID',
+        },
+        'city_slugs': ['cleveland', 'cleveland-oh'],
+    },
     'TN_NASHVILLE': {
         # V297: Nashville Registered Professional Contractors — an ArcGIS
         # FeatureServer layer on the same NashvilleOpenData org as the
