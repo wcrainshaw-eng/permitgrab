@@ -8710,16 +8710,39 @@ def is_enterprise(user):
     return get_user_plan(user) == 'enterprise'
 
 
-# V69: COMPLETELY STATIC nav context — NO database access whatsoever
+# V305 (CODE_V280 PR1): nav context now reads the logged-in user from
+# session. Previously returned static None for `user`, so every template
+# using partials/nav.html's {% if user %} branch rendered the
+# Log-In/Sign-Up state — which is why city pages showed the logged-out
+# nav even when the homepage (client-side /api/me JS swap) showed
+# the right user. One DB lookup per request is fine; V69's "no DB
+# access" guard was needed during early boot churn that's long since
+# stabilized.
 @app.context_processor
 def inject_nav_context():
-    """V69: Return static empty data. NO DB calls until server is stable.
-    V252 F1: adds is_enterprise to the context so templates can gate on it."""
+    """Populate user/is_pro/is_enterprise for every template render.
+    Falls back to anonymous defaults on any lookup failure so this
+    can never break a request. V252 F1 added is_enterprise."""
+    user = None
+    plan = 'anonymous'
+    pro = False
+    enterprise = False
+    try:
+        email = session.get('user_email')
+        if email:
+            user = find_user_by_email(email)
+            if user:
+                plan = get_user_plan(user)
+                pro = plan in ('pro', 'professional', 'enterprise')
+                enterprise = plan == 'enterprise'
+    except Exception:
+        # Never break a request on the nav lookup.
+        user = None
     return {
-        'user': None,
-        'user_plan': 'anonymous',
-        'is_pro': False,
-        'is_enterprise': False,
+        'user': user,
+        'user_plan': plan,
+        'is_pro': pro,
+        'is_enterprise': enterprise,
         'nav_cities': []
     }
 
