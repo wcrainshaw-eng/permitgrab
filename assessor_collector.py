@@ -59,11 +59,56 @@ ASSESSOR_SOURCES = {
             'zip': 'PHYSICAL_ZIP',
             'owner_mailing_address': 'MAIL_ADDRESS',
             'parcel_id': 'APN',
-            'lat': 'LATITUDE',
-            'lng': 'LONGITUDE',
         },
         'state': 'AZ',
         'source_tag': 'assessor:maricopa',
+    },
+    'bexar': {
+        # Bexar County (San Antonio). 710K parcels. Schema richer than
+        # Maricopa — has assessed value (TotVal), year built, and
+        # split mailing (AddrLn1/AddrCity/AddrSt/Zip). Note sample
+        # data has literal "NULL" strings in some fields (YrBlt,
+        # AddrLn1) which the normalizer treats as null.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Bexar County Appraisal District Parcels',
+        'endpoint': 'https://maps.bexar.org/arcgis/rest/services/Parcels/MapServer/0',
+        'where_clause': 'Owner IS NOT NULL',
+        'field_map': {
+            'owner_name': 'Owner',
+            'address': 'Situs',
+            'city': 'AddrCity',
+            'zip': 'Zip',
+            'parcel_id': 'PropID',
+            # Mailing rolled up from several columns; assessor_collector
+            # doesn't currently concatenate — store the first line and
+            # add a second pass later if needed.
+            'owner_mailing_address': 'AddrLn1',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:bexar',
+    },
+    'nyc_pluto': {
+        # NYC Department of Planning PLUTO (Primary Land Use Tax Lot
+        # Output). 858,644 lots — every tax lot in the 5 boroughs.
+        # Socrata, not ArcGIS, so the collector uses the soda
+        # platform handler. Includes ownername, address, zipcode,
+        # assesstot, yearbuilt, zonedist1. Updated ~quarterly by
+        # NYC DCP (live probe: 2026-02-20).
+        'platform': 'soda',
+        'service_description': 'NYC PLUTO - Primary Land Use Tax Lot Output',
+        'endpoint': 'https://data.cityofnewyork.us/resource/64uk-42ks.json',
+        'where_clause': "ownername IS NOT NULL",
+        'field_map': {
+            'owner_name': 'ownername',
+            'address': 'address',
+            'zip': 'zipcode',
+            'parcel_id': 'bbl',
+        },
+        'state': 'NY',
+        'source_tag': 'assessor:nyc_pluto',
+        # PLUTO supports up to 50000 / page on Socrata. Start
+        # conservative at 5000 to keep per-page latency low.
+        'default_page_size': 5000,
     },
 }
 
@@ -87,6 +132,26 @@ def _fetch_arcgis_page(endpoint, where, offset, page_size, out_fields):
     return data.get('features', [])
 
 
+def _fetch_soda_page(endpoint, where, offset, page_size, out_fields):
+    """Fetch one page from a Socrata SODA endpoint. Returns a list
+    of dicts matching _fetch_arcgis_page's shape (each dict wrapped
+    under 'attributes' so the downstream row loop can share code).
+    """
+    params = {
+        '$limit': page_size,
+        '$offset': offset,
+        '$select': out_fields,
+        '$where': where,
+    }
+    resp = SESSION.get(endpoint, params=params, timeout=60)
+    resp.raise_for_status()
+    rows = resp.json() or []
+    # Normalize: arcgis returns [{'attributes': {...}}, ...]; soda
+    # returns [{...}, ...]. Wrap soda rows so the caller's remap
+    # step can be uniform.
+    return [{'attributes': r} for r in rows]
+
+
 def _insert_batch(rows, source_tag, state):
     """INSERT OR IGNORE a batch into property_owners.
 
@@ -103,20 +168,30 @@ def _insert_batch(rows, source_tag, state):
     before_n = inserted_before[0] if not isinstance(inserted_before, dict) else inserted_before['COUNT(*)']
 
     # Skip rows that would violate NOT NULL on address.
+    # V280: Bexar uses the literal string "NULL" in place of real
+    # nulls for YrBlt/AddrLn1 etc — treat those as empty.
+    def _clean(v):
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s or s.upper() == 'NULL':
+            return None
+        return s
+
     payload = []
     for r in rows:
-        addr = (r.get('address') or '').strip()
-        owner = (r.get('owner_name') or '').strip()
+        addr = _clean(r.get('address'))
+        owner = _clean(r.get('owner_name'))
         if not addr or not owner or len(addr) < 3 or len(owner) < 2:
             continue
         payload.append((
             addr,
-            (r.get('city') or '').strip() or None,
+            _clean(r.get('city')),
             state,
-            (r.get('zip') or '').strip() or None,
+            _clean(r.get('zip')),
             owner,
-            (r.get('owner_mailing_address') or '').strip() or None,
-            (r.get('parcel_id') or '').strip() or None,
+            _clean(r.get('owner_mailing_address')),
+            _clean(r.get('parcel_id')),
             source_tag,
         ))
     if not payload:
@@ -157,14 +232,15 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
     cfg = ASSESSOR_SOURCES.get(source_key)
     if not cfg:
         raise ValueError(f"Unknown assessor source: {source_key}")
-    if cfg['platform'] != 'arcgis_mapserver':
-        raise NotImplementedError(f"Platform {cfg['platform']} not wired yet")
+    platform = cfg['platform']
+    if platform not in ('arcgis_mapserver', 'soda'):
+        raise NotImplementedError(f"Platform {platform} not wired yet")
 
     field_map = cfg['field_map']
     # Build outFields param from the source field names so we only
     # pull the columns we actually need over the wire.
     out_fields = ','.join(v for v in field_map.values() if v)
-    page_size = page_size or DEFAULT_PAGE_SIZE
+    page_size = page_size or cfg.get('default_page_size') or DEFAULT_PAGE_SIZE
     offset = start_offset
     total_fetched = 0
     total_inserted = 0
@@ -177,10 +253,16 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
         remaining = (max_records - total_fetched) if max_records else page_size
         this_page = min(remaining, page_size)
         try:
-            features = _fetch_arcgis_page(
-                cfg['endpoint'], cfg['where_clause'],
-                offset, this_page, out_fields
-            )
+            if platform == 'arcgis_mapserver':
+                features = _fetch_arcgis_page(
+                    cfg['endpoint'], cfg['where_clause'],
+                    offset, this_page, out_fields
+                )
+            else:  # soda
+                features = _fetch_soda_page(
+                    cfg['endpoint'], cfg['where_clause'],
+                    offset, this_page, out_fields
+                )
         except Exception as e:
             # Surface the offset that failed so a re-run can resume.
             return {
