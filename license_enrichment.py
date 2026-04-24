@@ -810,38 +810,71 @@ def _build_fl_applicant_phone_sqlite(applicants_csv_path: str,
             phone TEXT NOT NULL
         )
     ''')
+    # V303: add a second index keyed on occupation_number (DBPR license
+    # number — same ID appears in both applicant + licensee CSVs). The
+    # original name_norm key only matches when the licensee field is an
+    # individual's name; 99% of real licensees in CONSTRUCTIONLICENSE_1
+    # are businesses ("ABC CONSTRUCTION INC") so name_norm never hits.
+    # License-number join is the natural key, boosts match rate from
+    # ~2 phones/100K rows to the full set.
+    conn.execute('''
+        CREATE TABLE applicant_phones_by_license (
+            license_number TEXT PRIMARY KEY,
+            phone TEXT NOT NULL
+        )
+    ''')
 
     inserted = 0
     skipped = 0
     batch: list[tuple] = []
+    batch_lic: list[tuple] = []
     BATCH = 2000
     for row in _iter_csv_no_header_from_file(applicants_csv_path, applicant_columns):
         first = row.get('first_name', '').strip()
         last = row.get('last_name', '').strip()
+        lic_no = row.get('occupation_number', '').strip()
         phone = _format_phone(row.get('phone', ''))
-        if not first or not last or not phone:
+        if not phone:
             skipped += 1
             continue
-        key = _norm(f'{first} {last}')
-        if not key:
-            skipped += 1
-            continue
-        batch.append((key, phone))
+        # Index by license_number always (V303) — works for business licensees.
+        if lic_no:
+            batch_lic.append((lic_no, phone))
+        # Also keep the name index for the minority of individual-name
+        # licensee rows (sole proprietors, handyman licenses, etc.).
+        if first and last:
+            key = _norm(f'{first} {last}')
+            if key:
+                batch.append((key, phone))
         if len(batch) >= BATCH:
             conn.executemany(
                 'INSERT OR IGNORE INTO applicant_phones(name_norm, phone) VALUES (?, ?)',
                 batch,
             )
-            inserted += conn.total_changes  # approximate
+            inserted += conn.total_changes
             batch.clear()
+        if len(batch_lic) >= BATCH:
+            conn.executemany(
+                'INSERT OR IGNORE INTO applicant_phones_by_license(license_number, phone) VALUES (?, ?)',
+                batch_lic,
+            )
+            batch_lic.clear()
     if batch:
         conn.executemany(
             'INSERT OR IGNORE INTO applicant_phones(name_norm, phone) VALUES (?, ?)',
             batch,
         )
+    if batch_lic:
+        conn.executemany(
+            'INSERT OR IGNORE INTO applicant_phones_by_license(license_number, phone) VALUES (?, ?)',
+            batch_lic,
+        )
     conn.commit()
     row = conn.execute('SELECT COUNT(*) FROM applicant_phones').fetchone()
     total = row[0] if row else 0
+    row2 = conn.execute('SELECT COUNT(*) FROM applicant_phones_by_license').fetchone()
+    total_lic = row2[0] if row2 else 0
+    print(f"[V303] applicant phone index: {total:,} name_norm / {total_lic:,} license_number", flush=True)
     conn.close()
     print(f"[V244c] applicant phone SQLite: {total:,} rows at {db_path} "
           f"(skipped {skipped:,})", flush=True)
@@ -1001,6 +1034,16 @@ def _import_fl_streaming(state_code: str, config: dict) -> dict:
             ).fetchone()
             return row[0] if row else None
 
+        # V303: license-number lookup for business licensees (most of them).
+        def _lookup_phone_by_license(license_number: str) -> str | None:
+            if not license_number:
+                return None
+            row = phone_conn.execute(
+                'SELECT phone FROM applicant_phones_by_license WHERE license_number = ?',
+                (license_number,),
+            ).fetchone()
+            return row[0] if row else None
+
         # Phase 2b+2c: stream each licensee CSV, match + commit.
         matched_total = 0
         licensee_count = 0
@@ -1033,7 +1076,13 @@ def _import_fl_streaming(state_code: str, config: dict) -> dict:
                         if lic_city_slug not in hit['city_slug'] and hit['city_slug'] not in lic_city_slug:
                             continue
 
-                    phone = _lookup_phone(ln_norm)
+                    # V303: license_number (board_number) is the natural
+                    # join key between applicant + licensee files. Try it
+                    # first, then fall back to the name-based lookups.
+                    board_number = lic.get('board_number') or ''
+                    phone = _lookup_phone_by_license(board_number)
+                    if not phone:
+                        phone = _lookup_phone(ln_norm)
                     if not phone and ',' in lic.get('licensee_name', ''):
                         parts = [p.strip() for p in lic['licensee_name'].split(',', 1)]
                         if len(parts) == 2 and parts[0] and parts[1]:
