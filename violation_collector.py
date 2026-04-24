@@ -1371,6 +1371,60 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V273: Plano TX — ArcGIS FeatureServer. Property Standards
+    # Violations at maps.planogis.org. **228,147 records**, fresh
+    # through 2026-04-24. Schema: SITE_ADDR / VIOLATION_TYPE /
+    # DATE_OBSERVED / PROPERTY_TYPE / VIOLATION_STATUS. Pairs with
+    # plano-tx prod_city_id (existing, active).
+    'plano-tx-violations': {
+        'prod_city_id': None,
+        'city': 'Plano',
+        'state': 'TX',
+        'endpoints': [
+            {
+                'name': 'Property Standards Violations',
+                'platform': 'arcgis',
+                'resource_id': 'plano-tx-property-standards',
+                'arcgis_url': 'https://maps.planogis.org/arcgiswad/rest/services/OpenData/NeighborhoodServices_PropertyViolations/FeatureServer/0',
+                'date_field': 'DATE_OBSERVED',
+                'id_field': 'ObjectID',
+                'description_field': 'VIOLATION_TYPE',
+                'status_field': 'VIOLATION_STATUS',
+                'type_field': 'PROPERTY_TYPE',
+                'address_fields': {'full': 'SITE_ADDR'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V273: Lakeland FL — ArcGIS FeatureServer. IMS Enforcement Cases
+    # at services1.arcgis.com/mcbQY5xNGGGM1vBX. 1,159 records with
+    # CASENO, CASENAME (descriptive text like "Stop work order
+    # posted full remodel without proper permits"), SITE_ADDR/CITY/
+    # ZIP, CASETYPE, STATUS, STARTED. Fresh through 2026-04-14.
+    'lakeland-fl-violations': {
+        'prod_city_id': None,
+        'city': 'Lakeland',
+        'state': 'FL',
+        'endpoints': [
+            {
+                'name': 'IMS Enforcement Cases',
+                'platform': 'arcgis',
+                'resource_id': 'lakeland-fl-enforcement-cases',
+                'arcgis_url': 'https://services1.arcgis.com/mcbQY5xNGGGM1vBX/arcgis/rest/services/IMS_Enforcement_Cases/FeatureServer/0',
+                'date_field': 'STARTED',
+                'id_field': 'CASENO',
+                'description_field': 'CASENAME',
+                'status_field': 'STATUS',
+                'type_field': 'CASETYPE',
+                'address_fields': {'full': 'SITE_ADDR'},
+                'zip_field': 'SITE_ZIP',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
