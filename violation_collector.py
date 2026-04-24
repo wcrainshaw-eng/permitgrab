@@ -1346,6 +1346,31 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V272: Reading PA — Socrata. readingpa.data.socrata.com/b2kb-9vvv
+    # "Code Violations", fresh through 2026-04-18. Schema has
+    # parcel_address, codedesc, codecategory, violstatus,
+    # citationissuedate. Pairs with reading-pa prod_city_id=21967.
+    'reading-pa-violations': {
+        'prod_city_id': None,
+        'city': 'Reading',
+        'state': 'PA',
+        'endpoints': [
+            {
+                'name': 'Code Violations',
+                'domain': 'readingpa.data.socrata.com',
+                'resource_id': 'b2kb-9vvv',
+                'date_field': 'citationissuedate',
+                'id_field': 'casenumber',
+                'description_field': 'codedesc',
+                'status_field': 'violstatus',
+                'type_field': 'codecategory',
+                'address_fields': {'full': 'parcel_address'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
