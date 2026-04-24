@@ -813,6 +813,42 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V260: Scottsdale AZ — ArcGIS MapServer TABLE (non-spatial). 17.8K
+    # code violation records, rolling year (max DateComplaintReceived
+    # 2026-04-20 at check time). Pairs with 762 existing contractor
+    # profiles → moves Scottsdale toward ad-ready. ViolationCategory
+    # includes vacation-rental (STVR) cases plus substantive land-use
+    # items. Street components are split across number/direction/name/
+    # type fields; _build_address assembles via the parts-style
+    # address_fields config.
+    'scottsdale-az': {
+        'prod_city_id': None,
+        'city': 'Scottsdale',
+        'state': 'AZ',
+        'endpoints': [
+            {
+                'name': 'Planning and Development Code Violations',
+                'platform': 'arcgis',
+                'resource_id': 'scottsdale-code-violations',
+                'arcgis_url': 'https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/10',
+                'mapserver_table': True,
+                'date_field': 'DateComplaintReceived',
+                'id_field': 'ViolationID',
+                'description_field': 'ViolationCode',
+                'status_field': 'ComplaintStatus',
+                'type_field': 'ViolationCategory',
+                'address_fields': {
+                    'number': 'StreetNumber',
+                    'prefix': 'StreetDirection',
+                    'street': 'StreetName',
+                    'suffix': 'StreetType',
+                },
+                'zip_field': 'ZipCode',
+                'lat_field': 'Latitude',
+                'lng_field': 'Longitude',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
