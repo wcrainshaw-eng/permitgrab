@@ -1736,22 +1736,9 @@ footer a:hover { color: white; }
     <h2>Simple Pricing, Real Leads</h2>
     <p class="subtitle">Start free. Upgrade when you're closing deals.</p>
     <div class="pricing-grid">
-      <div class="pricing-card">
-        <div class="pricing-name">Starter</div>
-        <div class="pricing-price">$0<span>/mo</span></div>
-        <div class="pricing-desc">Perfect for testing the waters</div>
-        <ul class="pricing-features">
-          <li>1 metro area</li>
-          <li>1 trade category</li>
-          <li>Weekly email digest</li>
-          <li>Last 7 days of permits</li>
-          <li>Basic search & filters</li>
-        </ul>
-        <a href="/signup" class="pricing-btn">Get Started Free</a>
-      </div>
       <div class="pricing-card featured">
         <div class="pricing-badge">Most Popular</div>
-        <div class="pricing-name">Professional</div>
+        <div class="pricing-name">Pro</div>
         <div class="pricing-price">$149<span>/mo</span></div>
         <div class="pricing-desc">For contractors ready to grow</div>
         <ul class="pricing-features">
@@ -1763,11 +1750,11 @@ footer a:hover { color: white; }
           <li>Export to CSV</li>
           <li>Priority support</li>
         </ul>
-        <a href="/pricing" class="pricing-btn primary">Start 14-Day Trial</a>
+        <a href="/signup?plan=pro" class="pricing-btn primary">Start Free Trial</a>
       </div>
       <div class="pricing-card">
         <div class="pricing-name">Enterprise</div>
-        <div class="pricing-price">$499<span>/mo</span></div>
+        <div class="pricing-price">$349<span>/mo</span></div>
         <div class="pricing-desc">For teams & multi-location ops</div>
         <ul class="pricing-features">
           <li>All {{ city_count }}+ cities</li>
@@ -1778,7 +1765,7 @@ footer a:hover { color: white; }
           <li>CRM integrations</li>
           <li>Dedicated account manager</li>
         </ul>
-        <a href="mailto:wcrainshaw@gmail.com" class="pricing-btn">Contact Sales</a>
+        <a href="/signup?plan=enterprise" class="pricing-btn">Start Free Trial</a>
       </div>
     </div>
   </div>
@@ -2088,12 +2075,15 @@ function applyFilters() {
   // V12.59: Don't run until data is loaded
   if (!dataReady) return;
 
-  const city = document.getElementById('filter-city').value;
-  const trade = document.getElementById('filter-trade').value;
-  const value = document.getElementById('filter-value').value;
-  const status = document.getElementById('filter-status').value;
-  const quality = document.getElementById('filter-quality').value;
-  const search = document.getElementById('filter-search').value.toLowerCase();
+  // V275: filter bar is hidden on homepage (is_homepage=True) so all six
+  // #filter-* elements are absent from the DOM. Use optional chaining to
+  // default to empty strings instead of throwing TypeError on .value.
+  const city = document.getElementById('filter-city')?.value || '';
+  const trade = document.getElementById('filter-trade')?.value || '';
+  const value = document.getElementById('filter-value')?.value || '';
+  const status = document.getElementById('filter-status')?.value || '';
+  const quality = document.getElementById('filter-quality')?.value || '';
+  const search = (document.getElementById('filter-search')?.value || '').toLowerCase();
 
   // V13.1: If city changed, fetch fresh data from API instead of filtering in-memory
   // This is critical because allPermits only contains one city's data initially
@@ -2144,12 +2134,13 @@ function applyFilters() {
 
 // V13.1: Fetch permits from API with all current filter values
 async function fetchPermitsWithFilters() {
-  const city = document.getElementById('filter-city').value;
-  const trade = document.getElementById('filter-trade').value;
-  const value = document.getElementById('filter-value').value;
-  const status = document.getElementById('filter-status').value;
-  const quality = document.getElementById('filter-quality').value;
-  const search = document.getElementById('filter-search').value;
+  // V275: filter bar absent on homepage — guard every .value access.
+  const city = document.getElementById('filter-city')?.value || '';
+  const trade = document.getElementById('filter-trade')?.value || '';
+  const value = document.getElementById('filter-value')?.value || '';
+  const status = document.getElementById('filter-status')?.value || '';
+  const quality = document.getElementById('filter-quality')?.value || '';
+  const search = document.getElementById('filter-search')?.value || '';
 
   const params = new URLSearchParams();
   if (city) params.set('city', city);
@@ -2823,9 +2814,10 @@ function exportCSV() {
   }
 
   // Build query params from current filters
-  const city = document.getElementById('filter-city').value;
-  const trade = document.getElementById('filter-trade').value;
-  const quality = document.getElementById('filter-quality').value;
+  // V275: guard against missing filter elements (homepage has none).
+  const city = document.getElementById('filter-city')?.value || '';
+  const trade = document.getElementById('filter-trade')?.value || '';
+  const quality = document.getElementById('filter-quality')?.value || '';
 
   let url = '/api/export?';
   if (city) url += `city=${encodeURIComponent(city)}&`;
@@ -2850,13 +2842,14 @@ async function saveCurrentSearch() {
   }
 
   // Capture current filter state
+  // V275: guard against missing filter elements (homepage has none).
   const searchData = {
-    city: document.getElementById('filter-city').value,
-    trade: document.getElementById('filter-trade').value,
-    value_tier: document.getElementById('filter-value').value,
-    status: document.getElementById('filter-status').value,
-    quality: document.getElementById('filter-quality').value,
-    search_text: document.getElementById('filter-search').value
+    city: document.getElementById('filter-city')?.value || '',
+    trade: document.getElementById('filter-trade')?.value || '',
+    value_tier: document.getElementById('filter-value')?.value || '',
+    status: document.getElementById('filter-status')?.value || '',
+    quality: document.getElementById('filter-quality')?.value || '',
+    search_text: document.getElementById('filter-search')?.value || ''
   };
 
   try {
