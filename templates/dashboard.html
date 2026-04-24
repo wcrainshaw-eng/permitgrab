@@ -1481,8 +1481,8 @@ footer a:hover { color: white; }
       </div>
       <div class="how-step">
         <div class="step-icon">&#9997;</div>
-        <h3>We Organize & Score</h3>
-        <p>Every permit is categorized by trade and scored by lead quality</p>
+        <h3>We Organize & Categorize</h3>
+        <p>Every permit is categorized by trade, value tier, and location</p>
       </div>
       <div class="how-step">
         <div class="step-icon">&#127942;</div>
@@ -1740,13 +1740,17 @@ footer a:hover { color: white; }
         <div class="pricing-name">Pro</div>
         <div class="pricing-price">$149<span>/mo</span></div>
         <div class="pricing-desc">Everything you need to turn permits into leads</div>
+        {# V307 (CODE_V280b Bug 21): "cross-reference" implied a UI feature
+           that doesn't exist. Violation records ARE in the DB and shown
+           on individual violation queries, just not as a cross-reference
+           badge on each permit row. Say what we actually ship. #}
         <ul class="pricing-features">
           <li>All {{ city_count }}+ cities</li>
           <li>Phone numbers & contact info</li>
+          <li>Code violation records</li>
           <li>Property owner data (where available)</li>
-          <li>Code violation cross-reference</li>
-          <li>Daily email alerts</li>
-          <li>CSV export</li>
+          <li>Daily and weekly digest alerts</li>
+          <li>CSV export (all cities)</li>
           <li>Priority support</li>
         </ul>
         <a href="/signup?plan=pro" class="pricing-btn primary">Start Free Trial</a>
