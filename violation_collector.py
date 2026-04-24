@@ -721,6 +721,98 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V259: Denver CO — ArcGIS FeatureServer TABLE under ODC 311. Agency
+    # filter isolates the Community Planning & Development subset
+    # (~19.7K rolling-12-month records; ~10K match building-relevant
+    # Case_Summary values). V198 dead-end note flagged the geospatial
+    # hub as having no "violations" dataset — true, but the 311 table
+    # exposes CPD code-enforcement service requests with address +
+    # case date, which is what we need. The base_where pre-filters to
+    # building-permit / structural / construction-violation Case_Summary
+    # values so nuisance 311 (graffiti, parking, tree) stays excluded.
+    'denver-co': {
+        'prod_city_id': None,
+        'city': 'Denver',
+        'state': 'CO',
+        'endpoints': [
+            {
+                'name': 'CPD Code Enforcement 311',
+                'platform': 'arcgis',
+                'resource_id': 'denver-cpd-311',
+                'arcgis_url': 'https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_service_requests_311/FeatureServer/66',
+                'mapserver_table': True,
+                'base_where': (
+                    "Agency='Community Planning & Development' AND ("
+                    "Case_Summary LIKE '%Construction%' OR "
+                    "Case_Summary LIKE '%Permit%' OR "
+                    "Case_Summary LIKE '%Violation%' OR "
+                    "Case_Summary LIKE '%Illegal Occupancy%' OR "
+                    "Case_Summary LIKE '%Illegal Home Business%' OR "
+                    "Case_Summary LIKE '%Dilapidated%' OR "
+                    "Case_Summary LIKE '%Vacant%' OR "
+                    "Case_Summary LIKE '%Inspection%'"
+                    ")"
+                ),
+                'date_field': 'Case_Created_Date',
+                'id_field': 'OBJECTID',
+                'description_field': 'Case_Summary',
+                'status_field': 'Case_Status',
+                'type_field': 'Case_Summary',
+                'address_fields': {'full': 'Incident_Address_1'},
+                'zip_field': 'Incident_Zip_Code',
+                'lat_field': 'Latitude',
+                'lng_field': 'Longitude',
+            },
+        ],
+    },
+    # V259: San Antonio TX — ArcGIS FeatureServer. 311 All Service Calls
+    # includes Development Services / Property Maintenance cases which
+    # are the city's code enforcement workflow (no separate violations
+    # dataset exists — V198 DCAT audit confirmed). base_where filters to
+    # building-relevant TypeName values (dangerous premise, building
+    # without permit, structure concerns, CoO investigation, emergency
+    # demolition); drops pure nuisance (graffiti, overgrown yard, junk
+    # vehicle, illegal parking). ~13K matching records; max opened
+    # 2025-12-07 (feed refresh lag is ~4 months but historical coverage
+    # is dense).
+    'san-antonio-tx': {
+        'prod_city_id': None,
+        'city': 'San Antonio',
+        'state': 'TX',
+        'endpoints': [
+            {
+                'name': '311 Property Maintenance',
+                'platform': 'arcgis',
+                'resource_id': 'san-antonio-311-property-maintenance',
+                'arcgis_url': 'https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/311_All_Service_Calls/FeatureServer/0',
+                'base_where': (
+                    "ReasonName='Code Enforcement' AND ("
+                    "TypeName LIKE '%Dangerous Premise%' OR "
+                    "TypeName LIKE '%Building Without%' OR "
+                    "TypeName LIKE '%Structure Concerns%' OR "
+                    "TypeName LIKE '%Structure Maintenance%' OR "
+                    "TypeName LIKE '%Certificate of Occupancy%' OR "
+                    "TypeName LIKE '%Emergency Demolition%' OR "
+                    "TypeName LIKE '%DP Warrant%' OR "
+                    "TypeName LIKE '%Vacant/Overgrown%' OR "
+                    "TypeName LIKE '%Property Maintenance%' OR "
+                    "TypeName LIKE '%Improper Sewer%' OR "
+                    "TypeName LIKE '%Broken Sewer%' OR "
+                    "TypeName LIKE '%Absentee Property%'"
+                    ")"
+                ),
+                'date_field': 'OpenedDateTime',
+                'id_field': 'CaseID',
+                'description_field': 'ObjectDescription',
+                'status_field': 'CaseStatus',
+                'type_field': 'TypeName',
+                'address_fields': {'full': 'ObjectDescription'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
@@ -1065,6 +1157,13 @@ def collect_violations_from_endpoint(city_config, endpoint):
             else:
                 where_clause = f"{date_field} >= timestamp '{arcgis_ts_literal}'"
                 order_by = f"{date_field} DESC"
+            # V259: base_where pre-filters shared 311/all-cases feeds
+            # (Denver ODC 311 Agency=CPD, SA 311 Category=Property
+            # Maintenance) down to the code-enforcement subset before
+            # the date/incremental filter is AND-ed on top.
+            base_where = endpoint.get('base_where')
+            if base_where:
+                where_clause = f"({base_where}) AND ({where_clause})"
             params = {
                 'where': where_clause,
                 'outFields': '*',

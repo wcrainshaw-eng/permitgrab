@@ -280,9 +280,11 @@ FL DBPR covers 6+ cities (Miami-Dade, Orlando, Tampa, Hialeah, St. Petersburg, C
 | Cape Coral | ArcGIS MapServer | capeims.capecoral.gov/.../OpenData/MapServer/5 |
 | Cleveland | ArcGIS FeatureServer | services3.arcgis.com/dty2kHktVXHrqO8i/... |
 | Fort Lauderdale | ArcGIS MapServer | gis.fortlauderdale.gov/arcgis/rest/services/... |
+| Denver | ArcGIS FeatureServer TABLE | services1.arcgis.com/zdB7qR0BtYrg0Xpl/.../ODC_service_requests_311/FeatureServer/66 (V259) — Agency=CPD + Case_Summary whitelist |
+| San Antonio | ArcGIS FeatureServer | services.arcgis.com/g1fRTDLeMgspWrYp/.../311_All_Service_Calls/FeatureServer/0 (V259) — ReasonName=Code Enforcement + TypeName whitelist |
 
 ### Known dead ends for violations
-San Antonio, San Diego, Dallas, Houston, Henderson NV, Minneapolis (Tableau only), Denver
+San Diego (pre-2018 archive, live only via Accela scrape), Dallas (Socrata archives frozen 2018, no live ArcGIS feature service), Houston (CKAN Excel-only), Minneapolis (Tableau dashboard only — no REST feed), Henderson NV (ComDevServices/0 has CE Violations but ~80 building-relevant of 871; rest is STVR/parking/camping nuisance — low lead-gen value, skip until needed)
 
 ---
 
