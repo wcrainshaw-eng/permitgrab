@@ -1568,6 +1568,52 @@ body {
   </div>
 </section>
 
+{# V283 (CODE_V285 Gate 5): visible FAQ section. city_landing had FAQPage
+   JSON-LD but it was only structured data — not a real HTML FAQ users
+   (or Googlebot in HTML-rendering mode) could see. Ships 5 Q&As with
+   city-name interpolation + a mirrored FAQPage JSON-LD so the
+   structured data stays in sync with visible content. #}
+<section class="faq-section" style="padding: 64px 0; background: #f8fafc;">
+  <div style="max-width: 840px; margin: 0 auto; padding: 0 20px;">
+    <h2 style="text-align: center; margin-bottom: 40px; font-size: 32px; color: #0f172a;">Frequently Asked Questions about {{ city_name }} Building Permits</h2>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <details style="background: white; padding: 20px 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 17px; color: #0f172a;">How many building permits does PermitGrab track in {{ city_name }}?</summary>
+        <p style="margin: 12px 0 0; color: #475569; line-height: 1.6;">PermitGrab currently tracks {{ permit_count|default(0) }} building permits in {{ city_name }}, {{ state_name }}. Data is pulled daily from the official municipal open-data source and includes permit number, address, permit type, contractor, status, and estimated value where available.</p>
+      </details>
+      <details style="background: white; padding: 20px 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 17px; color: #0f172a;">How fresh is the {{ city_name }} permit data?</summary>
+        <p style="margin: 12px 0 0; color: #475569; line-height: 1.6;">Most cities refresh their open-data portals on a 24-hour cadence, so new permits typically appear in PermitGrab within 1&ndash;3 days of filing. {{ city_name }} is collected on every daemon cycle; if the upstream source has a known delay we note it on the page.</p>
+      </details>
+      <details style="background: white; padding: 20px 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 17px; color: #0f172a;">How can contractors find construction leads in {{ city_name }}?</summary>
+        <p style="margin: 12px 0 0; color: #475569; line-height: 1.6;">Contractors find leads in {{ city_name }} by filtering PermitGrab by trade and ZIP code, then contacting the permit applicant (owner or general contractor) directly. Pro subscribers get verified phone numbers and can set up saved-search email alerts so new matches land in their inbox the same day they&rsquo;re filed.</p>
+      </details>
+      <details style="background: white; padding: 20px 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 17px; color: #0f172a;">What&rsquo;s included in the free trial?</summary>
+        <p style="margin: 12px 0 0; color: #475569; line-height: 1.6;">The 14-day free trial includes full Pro access to {{ city_name }} &mdash; unlimited phone and website reveals, CSV export, trade and value-tier filters, lead scoring, and violation cross-reference flags. No credit card required.</p>
+      </details>
+      <details style="background: white; padding: 20px 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 17px; color: #0f172a;">Can I cancel anytime?</summary>
+        <p style="margin: 12px 0 0; color: #475569; line-height: 1.6;">Yes. Cancel any time from your account page &mdash; no contracts, no cancellation fees. Your subscription stays active through the end of the current billing period.</p>
+      </details>
+    </div>
+  </div>
+</section>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"How many building permits does PermitGrab track in {{ city_name }}?","acceptedAnswer":{"@type":"Answer","text":"PermitGrab currently tracks {{ permit_count|default(0) }} building permits in {{ city_name }}, {{ state_name }}. Data is pulled daily from the official municipal open-data source and includes permit number, address, permit type, contractor, status, and estimated value where available."}},
+    {"@type":"Question","name":"How fresh is the {{ city_name }} permit data?","acceptedAnswer":{"@type":"Answer","text":"Most cities refresh their open-data portals on a 24-hour cadence, so new permits typically appear in PermitGrab within 1-3 days of filing. {{ city_name }} is collected on every daemon cycle; if the upstream source has a known delay we note it on the page."}},
+    {"@type":"Question","name":"How can contractors find construction leads in {{ city_name }}?","acceptedAnswer":{"@type":"Answer","text":"Contractors find leads in {{ city_name }} by filtering PermitGrab by trade and ZIP code, then contacting the permit applicant directly. Pro subscribers get verified phone numbers and can set up saved-search email alerts."}},
+    {"@type":"Question","name":"What's included in the free trial?","acceptedAnswer":{"@type":"Answer","text":"The 14-day free trial includes full Pro access to {{ city_name }} - unlimited phone and website reveals, CSV export, trade and value-tier filters, lead scoring, and violation cross-reference flags. No credit card required."}},
+    {"@type":"Question","name":"Can I cancel anytime?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cancel any time from your account page - no contracts, no cancellation fees. Your subscription stays active through the end of the current billing period."}}
+  ]
+}
+</script>
+
 {% include 'partials/footer.html' %}
 
 <script>
