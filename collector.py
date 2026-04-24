@@ -1006,6 +1006,11 @@ def fetch_arcgis(config, days_back):
             "resultRecordCount": page_size,
             "resultOffset": offs,
             "orderByFields": f"{date_field} DESC",
+            # V295: ArcGIS *Table* endpoints (e.g. Las Vegas OpenData_Building_Permits_
+            # at services1.arcgis.com/F1v0ufATbBQScMtY/.../FeatureServer/0 — a Table,
+            # not a Feature Layer) 400 with "Invalid or missing input parameters"
+            # when returnGeometry defaults to true. Safe for Feature Layers too.
+            "returnGeometry": "false",
             "f": "json",
         }
         r = SESSION.get(query_endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
@@ -1420,6 +1425,8 @@ def fetch_arcgis_bulk(config, days_back=90):
             "outFields": "*",
             "resultRecordCount": ARCGIS_BULK_PAGE_SIZE,
             "resultOffset": offset,
+            # V295: Tables (no-geometry) 400 without this. Safe for Features.
+            "returnGeometry": "false",
             "f": "json",
         }
 
@@ -2494,6 +2501,8 @@ def fetch_history_arcgis(config, years_back=1):
         "outFields": "*",
         "resultRecordCount": 5000,
         "orderByFields": f"{date_field} DESC",
+        # V295: Tables require this; no-op for Features.
+        "returnGeometry": "false",
         "f": "json",
     }
 
