@@ -908,6 +908,53 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V262: Little Rock AR — Socrata. "Little Rock 311 Service Calls"
+    # 2x6n-j9fb at data.littlerock.gov. Updated daily (last refresh
+    # 2026-04-23). 265K records of issue_type='Code Violations' — but
+    # the bulk is High Grass/Trash/Parking nuisance, so $where filters
+    # to the building-relevant housing + rental code subset (~30K of
+    # 265K). Socrata collector supports $where clauses via the existing
+    # `extra_where` hook? No — need to leverage a per-source filter.
+    # Using the date_field gating alone would pull nuisance noise, so
+    # bake the subcategory whitelist into a combined where clause
+    # (Socrata SODA supports this natively in $where). Pairs with 638
+    # existing little-rock-ar profiles.
+    'little-rock-ar': {
+        'prod_city_id': None,
+        'city': 'Little Rock',
+        'state': 'AR',
+        'endpoints': [
+            {
+                'name': '311 Housing Code Violations',
+                'domain': 'data.littlerock.gov',
+                'resource_id': '2x6n-j9fb',
+                'date_field': 'ticket_created_date_time',
+                'id_field': 'ticket_id',
+                'description_field': 'issue_sub_category',
+                'status_field': 'ticket_status',
+                'type_field': 'issue_sub_category',
+                'address_fields': {'full': 'street_address'},
+                'zip_field': 'zip',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+                # Socrata extra filter bolted onto the $where via the
+                # existing Socrata branch's $where builder — we need
+                # the ReasonName-style subset so nuisance-only tickets
+                # stay out of the digest. (High Grass + Trash + Parking
+                # in Yard + Graffiti + Abandoned Vehicle are the
+                # nuisance we're excluding; what's left is Housing /
+                # Rental Code / Rental Inspections / Illegal Dumping /
+                # Mobile-home variants.)
+                'socrata_extra_where': (
+                    "issue_type = 'Code Violations' AND "
+                    "(issue_sub_category LIKE 'Housing%' OR "
+                    "issue_sub_category LIKE '%Rental%' OR "
+                    "issue_sub_category LIKE '%Mobile Home%' OR "
+                    "issue_sub_category = 'Illegal Dumping')"
+                ),
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
@@ -1272,11 +1319,20 @@ def collect_violations_from_endpoint(city_config, endpoint):
                 # explicitly suppressed.
                 params['returnGeometry'] = 'false'
         else:
+            # V262: socrata_extra_where pre-filters shared 311/all-cases
+            # feeds (Little Rock issue_type/sub_category) down to the
+            # code-enforcement subset. AND-combined with the incremental
+            # date clause so bulk nuisance tickets stay out of the
+            # digest.
+            where_clause = f"{date_field} > '{last_date}'"
+            extra = endpoint.get('socrata_extra_where')
+            if extra:
+                where_clause = f"({extra}) AND ({where_clause})"
             params = {
                 '$limit': batch_size,
                 '$offset': offset,
                 '$order': f"{date_field} DESC",
-                '$where': f"{date_field} > '{last_date}'",
+                '$where': where_clause,
             }
 
         if first_page_params is None:
