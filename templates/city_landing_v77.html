@@ -917,7 +917,10 @@ body {
 </section>
 
 <!-- V204-4 / V211-1: Subscription CTA banner + inline email capture -->
+<!-- V308 (CODE_V280b Bug 7): hidden for logged-in users — paying customer
+     should see data, not upsells. -->
 {% if permit_count > 0 %}
+{% if not user %}
 <section style="background: #eef5ff; padding: 20px 32px; border-top: 1px solid #dbeafe; border-bottom: 1px solid #dbeafe;">
   <div style="max-width: 1200px; margin: 0 auto; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
     <div style="flex: 1; min-width: 260px;">
@@ -930,6 +933,7 @@ body {
     </div>
   </div>
 </section>
+{% endif %}
 
 {# V236 PR#5: data-driven insights paragraph — unique per-city prose so
    Google Ads Quality Score and SEO see real content instead of template
@@ -949,6 +953,8 @@ body {
      Copy now reflects active filters so the visitor subscribes to exactly
      what they're viewing ("Get Electrical permit alerts for Chicago in 60614").
      For non-filtered visits it falls back to the generic city digest. -->
+<!-- V308 (CODE_V280b Bug 7): hidden for logged-in users — they have an account. -->
+{% if not user %}
 <section class="email-capture" id="email-capture">
   <h3 style="margin: 0 0 8px 0;">&#128276; Get
     {%- if filter_trade %} {{ filter_trade }}{% endif %}
@@ -968,8 +974,11 @@ body {
     <p id="v211-sub-message" style="margin: 8px 0 0; font-size: 14px; min-height: 20px;"></p>
   </form>
 </section>
+{% endif %}
 
 <!-- V209-3: Scarcity banner -->
+<!-- V308 (CODE_V280b Bug 7): hidden for logged-in users. -->
+{% if not user %}
 <section style="background: #fffbeb; padding: 12px 32px; border-bottom: 1px solid #fde68a;">
   <div style="max-width: 1200px; margin: 0 auto; font-size: 13px; color: #92400e;">
     <strong>&#9889; Limited availability:</strong>
@@ -985,6 +994,7 @@ body {
     <a href="/pricing" style="color: #92400e; text-decoration: underline; margin-left: 8px;">Claim a slot &rarr;</a>
   </div>
 </section>
+{% endif %}
 {% endif %}
 
 <!-- V251 F2: FILTER BAR (was V177). Trade + zip dropdowns are server-rendered
