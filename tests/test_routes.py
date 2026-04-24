@@ -124,18 +124,28 @@ def test_pricing_advertises_trial(client):
         or b'free trial' in r.data.lower()
 
 
-def test_pricing_no_99_tier(client):
-    """V255 P0#1 killed the Starter $99 tier and the bulk-credits $49/$99
-    waitlist card. If either reappears on /pricing, the 'exactly two
-    tiers' directive is violated — fail loudly."""
+def test_pricing_single_tier(client):
+    """V304 (CODE_V280 PR0) collapsed /pricing to one tier at $149/mo.
+    The V255 contract ("exactly two tiers") was superseded. Now the
+    guard is: Pro $149 must be present, every other price point
+    ($49, $99, $349, $499) must NOT appear. Custom asks route to a
+    Contact sales mailto link."""
     r = client.get('/pricing')
     assert r.status_code == 200
     body = r.data
-    assert b'$99<' not in body and b'$49<' not in body, \
-        'V255 violation: sub-$149 price point visible on /pricing'
+    # Pro must be present.
     assert b'$149<' in body, 'Pro $149 price missing from /pricing'
-    assert b'$349<' in body, 'Enterprise $349 price missing from /pricing'
-    # No billing toggle either
+    # No other price points.
+    for forbidden in (b'$49<', b'$99<', b'$349<', b'$499<'):
+        assert forbidden not in body, \
+            f'V304 violation: {forbidden.decode()} tier visible on /pricing'
+    # No "Most Popular" badge when there's only one card.
+    assert b'Most Popular' not in body, \
+        'V304 violation: "Most Popular" badge reintroduced'
+    # Contact sales path must exist for API/volume asks.
+    assert b'Contact sales' in body or b'contact sales' in body, \
+        'V304 violation: Contact sales link missing for custom asks'
+    # No billing toggle either (V255 legacy guard retained).
     assert b'monthly-btn' not in body and b'annual-btn' not in body, \
         'V255 violation: Monthly/Annual toggle reintroduced'
 
