@@ -22,7 +22,7 @@ A city is "ad-ready" when it has ALL THREE:
 ### Known dead ends for new-city onboarding (don't re-research)
 - **Washington DC** (maps2.dcgis.dc.gov FeatureServer 18): PERMIT_APPLICANT field is individual names (e.g. "KENNETH BEECHNER"), not business names. 14,187 total permits, only 50% have any applicant, and those aren't contractors. Owner field also individuals. No separate contractor field.
 - **Boston** (data.boston.gov CKAN, resource 6ddcd912-32a0-43df-9908-63574f8c7e77): 722k permits, daily updates, rich fields (address/zip/declared_valuation/status/worktype). But `applicant` is individual licensee names ("Iliya Iliev", "paul roper", "HomeWorks Energy" occasional business) same pattern as DC. Municipal permit-pull convention: licensed individual files, business name not captured at the permit record. Would need a MA state licensing DB join (license_enrichment.py pattern) to map individual → business — deferred.
-- **Louisville Active Permits** (services1.arcgis.com/79kfd2K6fskCAkyg/): CONTRACTOR field exists and is populated with real business names ("PAYNE ELECTRIC COMPANY INC"), but dataset frozen at 2019-02. Hub metadata says modified 2024-08 but actual records stop 2019.
+- **Louisville Active Permits** — ~~previously frozen 2019~~ **RE-VERIFIED 2026-04-24: LIVE AGAIN.** newest ISSUE_DATE = 2026-04-20. services1.arcgis.com/79kfd2K6fskCAkyg/active_construction_permits/0 is publishing current data with CONTRACTOR field populated ("HOWELL CONSTRUCTION", "HDDS INC"). **BUT:** Louisville KY permits are currently stored under slug `louisville-co` (Colorado) — 4,362 permits, 576 with contractor, 360 profiles, 0 phones. Slug routing bug needs fixing before this city can ship.
 - **Baltimore Permits** (egisdata.baltimorecity.gov FS/3): No contractor field at all. Fields are OBJECTID, CaseNumber, Description, Address, BLOCKLOT, ExistingUse, ProposedUse, Cost. Owner/applicant not exposed.
 - **Oklahoma City** (data.okc.gov): Blocked by Incapsula WAF — can't probe programmatically.
 - **Hialeah violations:** No public ArcGIS/Socrata feed. Miami-Dade county violations return 0 Hialeah addresses (CCVIOL_gdb is unincorporated-only).
@@ -47,6 +47,10 @@ A city is "ad-ready" when it has ALL THREE:
 - **Detroit MI** (data.detroitmi.gov): Not indexed at api.us.socrata.com federated catalog (404) — host isn't a Socrata portal.
 - **Las Vegas NV** (opendata.lasvegasnevada.gov): ECONNREFUSED on search path.
 - **Nashville TN** (data.nashville.gov): Socrata catalog API returns 404; portal browse page requires JS rendering — can't enumerate datasets via WebFetch.
+
+### V258 activation bugs to fix
+- **Louisville KY** routing: current config slug `louisville` + Kentucky state yields `louisville-co` (Colorado) at DB write time. 4,362 permits/360 profiles with KY business names are mis-attributed. Need a slug-routing fix so these become discoverable under a `louisville-ky` slug. Re-verified data is LIVE as of 2026-04-20.
+- **Worcester MA** collector: source has `Contractor_Name` populated (probed: "Aparicio Kitchen Designs INC", "IVAN PITTAMIGLIO BENITEZ") but all 6,041 stored permits have `contractor_name=""`. Field_map is correct; ArcGIS collector path is dropping the field. Root cause TBD.
 
 ### V258 already-configured — activation pending
 - **Philadelphia** (phl.carto.com/permits, platform=carto): 11,875 permits (newest 2026-04-22 FRESH), 1,253 real-business profiles ("Hormigon LLC", "Ricco Construction Corp"), 11 phones, 7,270 violations (newest 2026-04-22 FRESH). Only gap: phone count. DDG enrichment fired job `da6d8fd1613e` 2026-04-24. PA has no bulk state license DB → DDG-only.
