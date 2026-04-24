@@ -1232,10 +1232,15 @@ def _enrich_by_name(state_code: str, config: dict,
         hit = name_idx.get(norm) if norm else None
         if not hit:
             continue
+        # V300: registry datasets (e.g. Nashville
+        # Registered_Professional_Contractors_view_2, Cleveland
+        # Active_Contractor_Registrations, LV Business_Licenses_OpenData)
+        # don't all carry a license_number or license_exp column. Treat
+        # those field_map keys as optional — missing → '' on write.
         phone = _format_phone(hit.get(fm['phone']))
-        lic = hit.get(fm['license_number']) or ''
-        lic_type = hit.get(fm['license_type']) or ''
-        lic_exp = hit.get(fm['license_exp']) or ''
+        lic = hit.get(fm.get('license_number', ''), '') or ''
+        lic_type = hit.get(fm.get('license_type', ''), '') or ''
+        lic_exp = hit.get(fm.get('license_exp', ''), '') or ''
         status = 'expired' if _is_expired(lic_exp) else 'active'
         try:
             conn.execute("""
