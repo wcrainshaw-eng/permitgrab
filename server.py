@@ -91,37 +91,6 @@ def get_related_posts(current_slug, limit=3):
         same_category.extend(other[:limit - len(same_category)])
     return same_category[:limit]
 
-# V287: Sentry error monitoring. Defensive import + env-var gated init —
-# the package is in requirements.txt but if it's absent from a local
-# virtualenv the import raises and we silently continue. DSN comes from
-# Render env var SENTRY_DSN; without it, sentry_sdk.init is skipped so
-# local dev and smoke tests behave as before.
-try:
-    import sentry_sdk
-    from sentry_sdk.integrations.flask import FlaskIntegration
-    _SENTRY_DSN = os.environ.get('SENTRY_DSN')
-    if _SENTRY_DSN:
-        sentry_sdk.init(
-            dsn=_SENTRY_DSN,
-            integrations=[FlaskIntegration()],
-            # 10% perf-tracing sample per task-doc spec. Err events are
-            # always captured regardless of this sample rate.
-            traces_sample_rate=0.1,
-            environment=os.environ.get('SENTRY_ENVIRONMENT', 'production'),
-            release=os.environ.get('RENDER_GIT_COMMIT', 'unknown')[:12],
-            # PII off — we don't want user emails/IPs in stack frames
-            # unless we opt in explicitly per feature.
-            send_default_pii=False,
-        )
-        print(f"[V287] Sentry initialized (env={os.environ.get('SENTRY_ENVIRONMENT', 'production')})")
-except ImportError:
-    # sentry-sdk not installed in this virtualenv (e.g. local dev
-    # without the optional dep). Silently continue without telemetry.
-    pass
-except Exception as _sentry_err:
-    # init() raised for some other reason — don't crash the app.
-    print(f"[V287] Sentry init skipped: {_sentry_err}")
-
 # V12.17: static_url_path='' serves static files from root (needed for GSC verification)
 app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 # V229 E2: fall back to a process-random key when SECRET_KEY env var isn't

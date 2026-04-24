@@ -12,10 +12,6 @@ psycopg2-binary==2.9.9
 pytz==2024.1
 beautifulsoup4==4.12.3
 psutil>=5.9
-# V287: Sentry Flask SDK — only activates when SENTRY_DSN env var is set
-# on Render. The import is defensive so local dev / smoke tests still
-# pass if the package isn't installed in a particular virtualenv.
-sentry-sdk[flask]>=2.0
 # duckduckgo-search removed — causes build failures on Render, search done locally instead
 # V229 B1: removed V227's httpx/selectolax/tenacity/pybreaker too — they
 # only supported enrichment_engine.py which was never imported by server.py
