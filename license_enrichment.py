@@ -227,6 +227,28 @@ STATE_CONFIGS = {
         'socrata_state_filter': "contractorlicensestatus='ACTIVE'",
         'city_slugs': ['seattle', 'seattle-wa'],
     },
+    'TN_NASHVILLE': {
+        # V297: Nashville Registered Professional Contractors — an ArcGIS
+        # FeatureServer layer on the same NashvilleOpenData org as the
+        # Building_Permits_Issued_2 source we already collect for Nashville
+        # permits. 7,574 rows, each with Company_Name + Phone + E_Mail.
+        # Per-city config (not state): Tennessee has no state bulk source,
+        # and this registry only covers Nashville-area trades.
+        'name': 'Nashville Registered Professional Contractors',
+        'format': 'arcgis_fs',
+        'arcgis_url': 'https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Registered_Professional_Contractors_view_2/FeatureServer/0',
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'Company_Name',
+            'phone': 'Phone',
+            'address': 'Address',
+            'city': 'City',
+            'state': 'ST',
+            'zip': 'ZIP',
+            'license_type': 'Prof__Type',
+        },
+        'city_slugs': ['nashville', 'nashville-tn'],
+    },
     'FL': {
         # V238: Florida DBPR publishes three separate headerless CSVs.
         # The applicant file carries phones; the licensee files carry
@@ -962,6 +984,44 @@ def _import_fl_streaming(state_code: str, config: dict) -> dict:
                 pass
 
 
+def _fetch_arcgis_fs(url: str, where: str = '1=1') -> list[dict]:
+    """V297: Page through an ArcGIS FeatureServer layer and return one
+    flat list of attribute dicts. Used for Nashville's
+    Registered_Professional_Contractors_view_2 (7,574 rows with Phone +
+    E_Mail inline). Same output shape as _fetch_socrata so the downstream
+    _enrich_by_name path is unchanged.
+    """
+    results = []
+    offset = 0
+    batch = 2000
+    base = url.rstrip('/').rstrip('/query')
+    while True:
+        params = {
+            'where': where,
+            'outFields': '*',
+            'returnGeometry': 'false',
+            'resultOffset': offset,
+            'resultRecordCount': batch,
+            'f': 'json',
+        }
+        r = requests.get(base + '/query', params=params, timeout=SOCRATA_TIMEOUT)
+        r.raise_for_status()
+        body = r.json()
+        if 'error' in body:
+            raise RuntimeError(f"ArcGIS error: {body['error']}")
+        feats = body.get('features', [])
+        if not feats:
+            break
+        for f in feats:
+            attrs = f.get('attributes', {})
+            if attrs:
+                results.append(attrs)
+        if len(feats) < batch and not body.get('exceededTransferLimit'):
+            break
+        offset += batch
+    return results
+
+
 def _fetch_socrata(url: str, where: str | None = None) -> list[dict]:
     """Page through a Socrata .json endpoint. Returns every matching row
     in one list. Stops early if a page comes back shorter than the limit
@@ -1223,6 +1283,28 @@ def _import_state_inner(state_code: str) -> dict:
         summary['by_name'] = _enrich_by_name(state_code, config, {}, raw)
         summary['elapsed_seconds'] = round(time.time() - t0, 2)
         print(f"[V240b] {state_code}: import complete — {summary}", flush=True)
+        return summary
+
+    if fmt == 'arcgis_fs':
+        # V297: ArcGIS FeatureServer registry (e.g. Nashville
+        # Registered_Professional_Contractors_view_2). Same fetch →
+        # name-match pipeline as Socrata/csv_dict; just a different
+        # pager on the fetch side.
+        print(f"[V297] {state_code}: fetching {config['name']}", flush=True)
+        raw = _fetch_arcgis_fs(
+            config['arcgis_url'],
+            where=config.get('arcgis_where', '1=1'),
+        )
+        print(f"[V297] {state_code}: fetched {len(raw)} rows in "
+              f"{time.time()-t0:.1f}s", flush=True)
+        summary = {
+            'state': state_code,
+            'source_rows': len(raw),
+            'strategy': config.get('match_strategy', 'name'),
+        }
+        summary['by_name'] = _enrich_by_name(state_code, config, {}, raw)
+        summary['elapsed_seconds'] = round(time.time() - t0, 2)
+        print(f"[V297] {state_code}: import complete — {summary}", flush=True)
         return summary
 
     if fmt == 'csv_dict':
