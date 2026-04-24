@@ -1189,6 +1189,35 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V269: Syracuse NY — ArcGIS FeatureServer. Code_Violations_V2 at
+    # services6.arcgis.com/bdPqSfflsdgFRVVM. 144,680 records, fresh
+    # through 2026-04-23. Rich schema — complaint_address, complaint
+    # _type_name (e.g. Vacant House), violation text, Neighborhood,
+    # Vacant flag, lat/lon. No filter needed since the feed is
+    # already scoped to code enforcement. Pairs with syracuse-ny
+    # prod_city_id=21827.
+    'syracuse-ny': {
+        'prod_city_id': None,
+        'city': 'Syracuse',
+        'state': 'NY',
+        'endpoints': [
+            {
+                'name': 'Code Violations',
+                'platform': 'arcgis',
+                'resource_id': 'syracuse-ny-code-violations',
+                'arcgis_url': 'https://services6.arcgis.com/bdPqSfflsdgFRVVM/arcgis/rest/services/Code_Violations_V2/FeatureServer/0',
+                'date_field': 'violation_date',
+                'id_field': 'violation_number',
+                'description_field': 'violation',
+                'status_field': 'status_type_name',
+                'type_field': 'complaint_type_name',
+                'address_fields': {'full': 'complaint_address'},
+                'zip_field': 'complaint_zip',
+                'lat_field': 'Latitude',
+                'lng_field': 'Longitude',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
