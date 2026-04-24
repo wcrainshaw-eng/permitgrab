@@ -1028,6 +1028,40 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V265: Louisville Metro KY — ArcGIS FeatureServer. Metro 311
+    # service requests, per-year layers. The current-year (2026) layer
+    # has 59.7K rows; base_where isolates Exterior (2.9K — construction
+    # debris, trash piles) + Interior (839) + Graffiti (216) —
+    # the property-maintenance subset of 311. Skips Streets/Sidewalks/
+    # Trees/Animals/Signals nuisance. Pairs with existing louisville
+    # Metro permits (776 recent at last audit). Per-year endpoints
+    # means next year we'll need to rotate to metro_311_2027 — flag
+    # for V285 calendar maintenance.
+    'louisville-metro-ky': {
+        'prod_city_id': None,
+        'city': 'Louisville Metro',
+        'state': 'KY',
+        'endpoints': [
+            {
+                'name': 'Metro 311 Code Enforcement (2026)',
+                'platform': 'arcgis',
+                'resource_id': 'louisville-metro-311-2026',
+                'arcgis_url': 'https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/metro_311_2026/FeatureServer/0',
+                'base_where': (
+                    "service_name IN ('Exterior','Interior','Graffiti')"
+                ),
+                'date_field': 'requested_datetime',
+                'id_field': 'service_request_id',
+                'description_field': 'description',
+                'status_field': 'status_description',
+                'type_field': 'service_name',
+                'address_fields': {'full': 'address'},
+                'zip_field': 'zip_code',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
