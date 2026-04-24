@@ -999,6 +999,35 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V264: Aurora CO — ArcGIS MapServer Feature Layer. City publishes
+    # Code Enforcement Violations as rolling-window datasets
+    # (1-month/6-months/1-year) under ags.auroragov.org/aurora/rest/
+    # services/OpenData/MapServer. The 1-year layer gives the most
+    # backfill headroom (12,227 records, fresh through 2026-04-21).
+    # Pairs with Aurora prod_city_id that already collects permits
+    # via accela (Aurora CO had 968 recent permits in last audit).
+    'aurora-co': {
+        'prod_city_id': None,
+        'city': 'Aurora',
+        'state': 'CO',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Violations (1 Year)',
+                'platform': 'arcgis',
+                'resource_id': 'aurora-co-code-violations-1y',
+                'arcgis_url': 'https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/206',
+                'date_field': 'violation_date',
+                'id_field': 'OBJECTID',
+                'description_field': 'violation_comments',
+                'status_field': 'folderstatus',
+                'type_field': 'Violation',
+                'address_fields': {'full': 'ADDRESS'},
+                'zip_field': None,
+                'lat_field': 'LATITUDE',
+                'lng_field': 'LONGITUDE',
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
