@@ -1039,7 +1039,7 @@ VIOLATION_SOURCES = {
     # for V285 calendar maintenance.
     'louisville-metro-ky': {
         'prod_city_id': None,
-        'city': 'Louisville Metro',
+        'city': 'Louisville',
         'state': 'KY',
         'endpoints': [
             {
@@ -1152,6 +1152,37 @@ VIOLATION_SOURCES = {
                 'status_field': 'Status',
                 'type_field': 'Primary_Violation',
                 'address_fields': {'full': 'Location'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V268: Pasadena CA — ArcGIS FeatureServer. CodeComplianceCases
+    # has 2,057 rows with CTP{YEAR}-XXXXX case numbers but no explicit
+    # date field. Reuses Phoenix's date_from_id_pattern + incremental_
+    # where approach to filter by year prefix. Schema unusual: carries
+    # Assigned_Officer PHONE/EMAIL as case-level metadata (officer
+    # contact, not violator). Pairs with pasadena prod_city_id=653.
+    'pasadena-ca': {
+        'prod_city_id': None,
+        'city': 'Pasadena',
+        'state': 'CA',
+        'endpoints': [
+            {
+                'name': 'Pasadena Code Compliance Cases',
+                'platform': 'arcgis',
+                'resource_id': 'pasadena-ca-code-compliance',
+                'arcgis_url': 'https://services2.arcgis.com/zNjnZafDYCAJAbN0/arcgis/rest/services/CodeComplianceCases/FeatureServer/0',
+                'date_field': None,
+                'date_from_id_pattern': r'CTPB?(\d{4})-\d+',
+                'incremental_where': "CASENUMBER LIKE 'CTP{YEAR}%' OR CASENUMBER LIKE 'CTPB{YEAR}%'",
+                'orderby': 'ObjectID ASC',
+                'id_field': 'CASENUMBER',
+                'description_field': 'DESCRIPTION',
+                'status_field': 'Case_Status',
+                'type_field': 'CodeType',
+                'address_fields': {'full': 'Case_Address'},
                 'zip_field': None,
                 'lat_field': None,
                 'lng_field': None,
