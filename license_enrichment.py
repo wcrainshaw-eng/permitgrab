@@ -227,6 +227,41 @@ STATE_CONFIGS = {
         'socrata_state_filter': "contractorlicensestatus='ACTIVE'",
         'city_slugs': ['seattle', 'seattle-wa'],
     },
+    'NY_BUFFALO_ELEC': {
+        # V302: Buffalo Master Electrician registry — sibling dataset to V301's
+        # General/Home/Handyman. Same schema (businessname + dayphn + status).
+        # V301 alone lifted Buffalo 15 → 45 phones; 5 short of ad-ready. This
+        # layer adds ~7.2K Master Electrician rows targeting Buffalo electrical
+        # contractors that the General registry misses.
+        'name': 'Buffalo NY Licensed Contractors (Master Electrician)',
+        'format': 'socrata',
+        'socrata_url': 'https://data.buffalony.gov/resource/h6v3-63kd.json',
+        'socrata_state_filter': "status='ACTIVE'",
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'businessname',
+            'phone': 'dayphn',
+            'license_type': 'description',
+            'license_exp': 'expdate',
+        },
+        'city_slugs': ['buffalo-ny', 'buffalo'],
+    },
+    'NY_BUFFALO_PLUMB': {
+        # V302: Buffalo Plumber registry (Journeyman + Master) — completes
+        # the trio. ~6.4K rows. Same schema.
+        'name': 'Buffalo NY Licensed Contractors (Plumbers)',
+        'format': 'socrata',
+        'socrata_url': 'https://data.buffalony.gov/resource/avrc-zchj.json',
+        'socrata_state_filter': "status='ACTIVE'",
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'businessname',
+            'phone': 'dayphn',
+            'license_type': 'description',
+            'license_exp': 'expdate',
+        },
+        'city_slugs': ['buffalo-ny', 'buffalo'],
+    },
     'NY_BUFFALO': {
         # V301: Buffalo NY city-level contractor registry on data.buffalony.gov.
         # Three companion Socrata datasets cover the main trades:
