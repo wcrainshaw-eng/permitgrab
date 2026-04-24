@@ -5427,7 +5427,7 @@ CITY_REGISTRY = {
         "state": "CA",
         "slug": "anaheim",
         "platform": "arcgis",
-        "endpoint": "https://gis.anaheim.net/server/rest/services/GIS/Accela_Building_Permits/FeatureServer/0",
+        "endpoint": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Accela_Building_Permits/FeatureServer/0",
         "dataset_id": "Accela_Building_Permits",
         "description": "Building Permits via Accela",
         "field_map": {
@@ -5439,13 +5439,14 @@ CITY_REGISTRY = {
             "status": "casestatus",
             "estimated_cost": "jobvaluation",
             "contractor_name": "contractorsname",
+            "contact_phone": "contractorsphone",
             "parcel": "parcel",
         },
         "date_field": "permitissued",
         "date_format": "date",
         "limit": 2000,
         "active": True,
-        "notes": "V54: Fixed date_format from 'none' to 'date' â DATE syntax confirmed working. Fresh data Mar 2026.",
+        "notes": "V289: refreshed endpoint from dead gis.anaheim.net to ArcGIS Online services3. Added contact_phone=contractorsphone (8,553/189K records have inline phones — no enrichment needed). V54: Fixed date_format from 'none' to 'date'â DATE syntax confirmed working. Fresh data Mar 2026.",
     },
 
     "riverside": {

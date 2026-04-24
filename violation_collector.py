@@ -1562,6 +1562,32 @@ VIOLATION_SOURCES = {
     # V197 PHASE 2 SOCRATA MISSES (on-domain catalog search returned 0 violation hits):
     #   Denver, Portland, Tucson, Mesa, Baton Rouge, Honolulu, Louisville, Raleigh, Virginia Beach.
     # Kansas City had two hits: nhtf-e75a (Historical, 2009-2011, skipped) and vq3e-m9ge (kept).
+
+    # V289: Anaheim CA — ArcGIS FeatureServer. 168K cases, daily refresh.
+    # Probed 2026-04-24: opendate 2026-04-24 on top record ("Unpermitted Construction").
+    # Pairs with V289 city_configs refresh of Anaheim permits endpoint.
+    'anaheim': {
+        'prod_city_id': None,
+        'city': 'Anaheim',
+        'state': 'CA',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Cases',
+                'platform': 'arcgis',
+                'resource_id': 'anaheim-code-enforcement',
+                'arcgis_url': 'https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/CodeEnforcementCasesPublic/FeatureServer/0',
+                'date_field': 'opendate',
+                'id_field': 'casenumber',
+                'description_field': 'description',
+                'status_field': 'casestatus',
+                'type_field': 'description',
+                'address_fields': {'full': 'address'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
 }
 
 
