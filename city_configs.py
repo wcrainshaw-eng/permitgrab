@@ -38425,9 +38425,9 @@ BULK_SOURCES = {
         "endpoint": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Building_Permits/FeatureServer/0/query",
         "dataset_id": "Building_Permits_WakeCounty",
         "description": "Wake County NC Building Permits â Raleigh, Cary, Durham, Apex, Holly Springs, Fuquay-Varina, Wake Forest, Knightdale, Garner, Wendell, Zebulon, Morrisville, Rolesville",
-        "city_field": "jurisdiction",
+        "city_field": "originalcity",
         "field_map": {
-            "permit_number": "permitnumber",
+            "permit_number": "permitnum",
             "permit_type": "permittypemapped",
             "work_type": "workclass",
             "permit_class": "permitclass",
@@ -38439,6 +38439,7 @@ BULK_SOURCES = {
             "contact_email": "contractoremail",
             "contact_phone": "contractorphone",
             "contractor_license": "contractorlicnum",
+            "owner_name": "parcelownername",
             "status": "statuscurrent",
             "description": "proposedworkdescription",
             "num_units": "housingunitstotal",
@@ -38449,7 +38450,7 @@ BULK_SOURCES = {
         "date_format": "epoch",
         "limit": 5000,
         "active": True,
-        "notes": "V33: Wake County NC via Open Data Raleigh ArcGIS Hub. 182K records. INCREDIBLE fields: contractor name/email/phone/license, est cost, sqft, housing units, fees, jurisdiction. Covers Raleigh, Cary, Apex, Holly Springs, Wake Forest, Garner, Knightdale, etc.",
+        "notes": "V296: city_field switched from 'jurisdiction' (Census GEOID — only Raleigh) to 'originalcity' (11 real city values: APEX, CARY, FUQUAY VARINA, GARNER, HOLLY SPRINGS, KNIGHTDALE, MORRISVILLE, RALEIGH, ROLESVILLE, WAKE FOREST). Also fixed permit_number mapping from 'permitnumber' (field doesn't exist) to 'permitnum'. Added owner_name for V276. V33: Wake County NC via Open Data Raleigh ArcGIS Hub. 182K records with contractorcompanyname + contractorphone + contractoremail + contractorlicnum.",
     },
 
     "riverside_county_ca_bulk": {
