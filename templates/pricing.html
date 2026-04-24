@@ -461,16 +461,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <div class="plan-price">$149<span>/month</span></div>
         <div class="plan-desc">Everything you need to turn permits into leads</div>
 
+        {# V307 (CODE_V280b Bug 21): only list features that actually work.
+           Dropped: "Violation cross-reference flags" (Bug 13, not built),
+           "Contractor detail pages + permit history" (Bug 3, not built),
+           "Lead scoring (Hot/Warm/Cold)" (doesn't exist anywhere). #}
         <ul class="features-list">
-          <li><span class="check">&#10003;</span> <strong>All cities — every ad-ready market</strong></li>
-          <li><span class="check">&#10003;</span> <strong>Unlimited phone + website reveals</strong></li>
-          <li><span class="check">&#10003;</span> Property owner data where available</li>
-          <li><span class="check">&#10003;</span> Violation cross-reference flags</li>
+          <li><span class="check">&#10003;</span> <strong>Access to all city permit data</strong></li>
+          <li><span class="check">&#10003;</span> <strong>Contractor names and phone numbers</strong></li>
+          <li><span class="check">&#10003;</span> Code violation records</li>
+          <li><span class="check">&#10003;</span> Property owner data (where available)</li>
+          <li><span class="check">&#10003;</span> Daily and weekly digest alerts</li>
           <li><span class="check">&#10003;</span> Trade, zip, date, and value filters</li>
-          <li><span class="check">&#10003;</span> Daily email alerts + saved searches</li>
-          <li><span class="check">&#10003;</span> Contractor detail pages + permit history</li>
-          <li><span class="check">&#10003;</span> Lead scoring (Hot / Warm / Cold)</li>
-          <li><span class="check">&#10003;</span> CSV export</li>
+          <li><span class="check">&#10003;</span> CSV export (all cities)</li>
         </ul>
 
         <a href="/signup?plan=pro&next=/pricing?plan=pro" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
