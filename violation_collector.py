@@ -849,6 +849,65 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V261: Baton Rouge LA — ArcGIS FeatureServer. EBRGIS 311 Citizen
+    # Request feed shared across 4 departments; base_where isolates
+    # Division='BLIGHT ENFORCEMENT' under DEVELOPMENT → 2,917 records,
+    # fresh through 2026-04-21. Blight typenames are substantive
+    # property-maintenance work (condemned/torn-down, missing windows,
+    # debris removal) mixed with nuisance (junk vehicles, tall grass).
+    # Pairs with 1,004 existing baton-rouge-la profiles.
+    'baton-rouge-la': {
+        'prod_city_id': None,
+        'city': 'Baton Rouge',
+        'state': 'LA',
+        'endpoints': [
+            {
+                'name': 'Blight Enforcement (EBRGIS 311)',
+                'platform': 'arcgis',
+                'resource_id': 'baton-rouge-blight-enforcement',
+                'arcgis_url': 'https://services.arcgis.com/KYvXadMcgf0K1EzK/arcgis/rest/services/311_Citizen_Request_for_Service___All_Requests/FeatureServer/0',
+                'base_where': "Division='BLIGHT ENFORCEMENT'",
+                'date_field': 'createdate',
+                'id_field': 'id',
+                'description_field': 'comments',
+                'status_field': 'StatusDesc',
+                'type_field': 'typename',
+                'address_fields': {'full': 'StreetAddress'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V261: Raleigh NC — ArcGIS FeatureServer. "Ask Raleigh Requests"
+    # is the city's 311 system; base_where isolates CATEGORY='Housing
+    # & Neighborhoods' which covers Public Nuisance + Unsafe Housing
+    # Conditions (~1.2K records, max applied 2026-01-21 at check time —
+    # ~3mo refresh lag, comparable to San Antonio's 311 lag pattern).
+    # Pairs with 895 existing raleigh contractor profiles.
+    'raleigh-nc': {
+        'prod_city_id': None,
+        'city': 'Raleigh',
+        'state': 'NC',
+        'endpoints': [
+            {
+                'name': 'Housing & Neighborhoods (Ask Raleigh)',
+                'platform': 'arcgis',
+                'resource_id': 'raleigh-housing-neighborhoods',
+                'arcgis_url': 'https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Ask_Raleigh_Requests/FeatureServer/0',
+                'base_where': "CATEGORY='Housing & Neighborhoods'",
+                'date_field': 'APPLIED_DATE',
+                'id_field': 'NUMBER',
+                'description_field': 'REQUEST_TYPE',
+                'status_field': 'STATUS',
+                'type_field': 'SERVICE',
+                'address_fields': {'full': 'ADDRESS'},
+                'zip_field': 'ZIP_CODE',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
