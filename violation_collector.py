@@ -1218,6 +1218,82 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V270: Cincinnati OH — Socrata. data.cincinnati-oh.gov/cncm-znd6
+    # "Code Enforcement", fresh through 2026-04-22. Rich schema
+    # (comp_type_desc, work_subtype, full_address, neighborhood, lat/
+    # lon). Pairs with cincinnati-oh prod_city_id=9.
+    'cincinnati-oh-violations': {
+        'prod_city_id': None,
+        'city': 'Cincinnati',
+        'state': 'OH',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement',
+                'domain': 'data.cincinnati-oh.gov',
+                'resource_id': 'cncm-znd6',
+                'date_field': 'entered_date',
+                'id_field': 'number_key',
+                'description_field': 'comp_type_desc',
+                'status_field': 'data_status_display',
+                'type_field': 'work_subtype',
+                'address_fields': {'full': 'full_address'},
+                'zip_field': None,
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
+    # V270: Norfolk VA — Socrata. data.norfolk.gov/mxtv-99gh
+    # "Neighborhood Quality Code Enforcement Cases", fresh through
+    # 2026-04-22. Pairs with norfolk-va prod_city_id=71.
+    'norfolk-va': {
+        'prod_city_id': None,
+        'city': 'Norfolk',
+        'state': 'VA',
+        'endpoints': [
+            {
+                'name': 'Neighborhood Quality Code Enforcement Cases',
+                'domain': 'data.norfolk.gov',
+                'resource_id': 'mxtv-99gh',
+                'date_field': 'violation_created_date',
+                'id_field': 'violation_ordinance',
+                'description_field': 'violation_ordinance',
+                'status_field': 'violation_status',
+                'type_field': 'complaint_type',
+                'address_fields': {'full': 'complaint_street'},
+                'zip_field': None,
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
+    # V270: Montgomery County MD — Socrata. data.montgomerycountymd.
+    # gov/k9nj-z35d "Housing Code Violations", fresh through 2026-04-19.
+    # Very rich schema (case_number, date_filed, street_address, city,
+    # zip, condition, code_reference). Covers Silver Spring,
+    # Gaithersburg, Bethesda, etc. Pairs with montgomery-county
+    # prod_city_id=501.
+    'montgomery-county-md-violations': {
+        'prod_city_id': None,
+        'city': 'Montgomery County',
+        'state': 'MD',
+        'endpoints': [
+            {
+                'name': 'Housing Code Violations',
+                'domain': 'data.montgomerycountymd.gov',
+                'resource_id': 'k9nj-z35d',
+                'date_field': 'date_filed',
+                'id_field': 'violation_id',
+                'description_field': 'condition',
+                'status_field': 'disposition',
+                'type_field': 'item',
+                'address_fields': {'full': 'street_address'},
+                'zip_field': 'zip_code',
+                'lat_field': None,
+                'lng_field': None,
+            },
+        ],
+    },
     # V198 PHASE 2 SKIPS (probed via DCAT/SSH, documented):
     #   - Houston TX: only publishes XLSX via CKAN (no JSON/CSV endpoint)
     #   - San Diego CA: seshat.datasd.org CSV returns 403, data.sandiego.gov not CKAN
