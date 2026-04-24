@@ -11228,9 +11228,18 @@ def api_reset_password():
 
 @app.route('/get-alerts')
 def get_alerts_page():
-    """Render the Get Alerts page."""
-    cities = get_cities_with_data()  # Only show cities with data
-    footer_cities = cities
+    """Render the Get Alerts page.
+
+    V309 (CODE_V280b Bug 22): the UAT report flagged /get-alerts as a
+    suspected 502 trigger. get_cities_with_data() can return 600+ rows;
+    rendering them all into a <select> dropdown is fine memory-wise but
+    puts every row through the Jinja loop. Cap at 200 (all ad-ready +
+    active cities fit well under that) and pass a short footer list
+    instead of the full city set — footer only renders the first 8 anyway.
+    """
+    all_cities = get_cities_with_data()
+    cities = all_cities[:200]  # dropdown cap
+    footer_cities = all_cities[:20]  # footer shows <=8
     return render_template('get_alerts.html', cities=cities, footer_cities=footer_cities)
 
 
@@ -13777,9 +13786,42 @@ def get_state_data(state_slug):
     }
 
 
+# V309 (CODE_V280b Bug 23): 301 redirects for common slug variations that
+# users (and Google) try before landing on our canonical slugs. Without
+# these, /permits/miami-dade and /permits/nyc 404 — confusing for ad
+# clicks and bad for SEO. Maps colloquial/short forms to the real
+# prod_cities.city_slug values.
+_PERMIT_SLUG_ALIASES = {
+    'miami-dade': 'miami-dade-county',
+    'miami': 'miami-dade-county',
+    'nyc': 'new-york-city',
+    'new-york': 'new-york-city',
+    'chicago': 'chicago-il',
+    'phoenix': 'phoenix-az',
+    'san-antonio': 'san-antonio-tx',
+    'austin': 'austin-tx',
+    'raleigh-nc': 'raleigh',  # DB has bare 'raleigh' slug
+    'buffalo': 'buffalo-ny',
+    'nashville': 'nashville-tn',
+    'orlando': 'orlando-fl',
+    'tampa': 'tampa-fl',
+    'cleveland': 'cleveland-oh',
+    'baton-rouge': 'baton-rouge-la',
+    'st-louis': 'st-louis-mo',
+    'kansas-city': 'kansas-city-mo',
+    'las-vegas-nevada': 'las-vegas',
+    'vegas': 'las-vegas',
+}
+
+
 @app.route('/permits/<state_slug>')
 def state_or_city_landing(state_slug):
     """Route that handles both state hub pages and city landing pages."""
+    # V309 (CODE_V280b Bug 23): slug alias → 301 redirect BEFORE state lookup
+    # so that /permits/miami-dade → /permits/miami-dade-county, etc. SEO-safe
+    # 301 so the old URL's link equity flows to the canonical one.
+    if state_slug in _PERMIT_SLUG_ALIASES:
+        return redirect(f'/permits/{_PERMIT_SLUG_ALIASES[state_slug]}', code=301)
     # Check if it's a state slug first
     if state_slug in STATE_CONFIG:
         state_data = get_state_data(state_slug)
