@@ -182,8 +182,54 @@ CITY_REGISTRY = {
         # V233 P1-1: data.lacity.org/resource/pi9x-tg5x has NO contractor/
         # applicant/licensee/contact field. Schema fetched 2026-04-21 —
         # only permit metadata + APN + zoning. Enrichment not possible.
+        # V286: see los_angeles_cofo below — primary LA source has no
+        # contractor field; CoO dataset is the contractor-bearing path.
         "has_contractor_field": False,
         "notes": "V233 P1-1: No contractor field upstream. V19: Full 27-field map â zone, APC, CPA, neighborhood council (CNC), census tract, council district, APN, use code/desc, lat/lon, EV charger flag, solar flag, work description, valuation, status/status_date. Data through Mar 22, 2026. Verified.",
+    },
+
+    # V286: LA "Building and Safety Certificate of Occupancy" at
+    # data.lacity.org/resource/3f9m-afei. The primary los_angeles
+    # config (pi9x-tg5x) has NO contractor field upstream per V233
+    # P1-1, so the LA city page had 32 contractor_profiles from ~29K
+    # permits. This CoO dataset carries contractors_business_name +
+    # contractor city/state + license_number + license_type — the
+    # profile-building fields LA was missing. CoO is a post-completion
+    # signal so it's slower than permit-issue events, but it is the
+    # only LA source with contractor data. Shared slug "los-angeles"
+    # so permits dedup into the same city pool.
+    "los_angeles_cofo": {
+        "name": "Los Angeles",
+        "state": "CA",
+        "slug": "los-angeles",
+        "lat": 34.052,
+        "lon": -118.244,
+        "platform": "socrata",
+        "endpoint": "https://data.lacity.org/resource/3f9m-afei.json",
+        "dataset_id": "3f9m-afei",
+        "description": "LA Certificates of Occupancy (contractors_business_name)",
+        "field_map": {
+            "permit_number": "cofo_number",
+            "permit_type": "permit_type",
+            "permit_sub_type": "permit_sub_type",
+            "address": "street_name",
+            "zip": "zip_code",
+            "filing_date": "cofo_issue_date",
+            "issued_date": "cofo_issue_date",
+            "status": "latest_status",
+            "description": "work_description",
+            "estimated_cost": "valuation",
+            "contractor_name": "contractors_business_name",
+            "license_number": "license",
+            "contractor_city": "contractor_city",
+            "contractor_state": "contractor_state",
+            "apn": "assessor_parcel",
+        },
+        "date_field": "cofo_issue_date",
+        "limit": 2000,
+        "active": True,
+        "has_contractor_field": True,
+        "notes": "V286: Added as secondary LA source after pi9x-tg5x confirmed contractor-less. 3f9m-afei live-probed 2026-04-24 — fresh (max cofo_issue_date 2026-04-17) with contractors_business_name populated. Some rows are OWNER-BUILDER (self-permit); real-contractor rows ship license number and contractor address.",
     },
 
     "austin": {
