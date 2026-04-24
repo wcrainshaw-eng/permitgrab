@@ -227,6 +227,32 @@ STATE_CONFIGS = {
         'socrata_state_filter': "contractorlicensestatus='ACTIVE'",
         'city_slugs': ['seattle', 'seattle-wa'],
     },
+    'NV_LASVEGAS': {
+        # V299: Las Vegas Business Licenses on the same Opendata_lasvegas
+        # org (F1v0ufATbBQScMtY) that publishes LV permits. 206,928 total
+        # licenses but filtered to active trades here. Probed 2026-04-24:
+        # "VEGAS MASONRY AND CONCRETE LLC" 702-803-0874, "VEGAS GRANITE
+        # AND MARBLE LLC" 702-868-3300 — real businesses with phones.
+        # LV permits source (V292/V295) just delivered 4,418 contractor
+        # names with no phones; this cross-reference pushes LV to 10+.
+        'name': 'Las Vegas Business Licenses',
+        'format': 'arcgis_fs',
+        'arcgis_url': 'https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/Business_Licenses_OpenData/FeatureServer/0',
+        # Trim to active + construction-adjacent trades so we aren't
+        # fuzzy-matching restaurant owners into our contractor table.
+        'arcgis_where': "Status = 'Active' AND (Type_of_Business LIKE '%Contractor%' OR Type_of_Business LIKE '%Building%' OR Type_of_Business LIKE '%Plumb%' OR Type_of_Business LIKE '%Electric%' OR Type_of_Business LIKE '%HVAC%' OR Type_of_Business LIKE '%Roof%' OR Type_of_Business LIKE '%Construction%')",
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'Business_Name',
+            'phone': 'Phone',
+            'address': 'Address',
+            'zip': 'Zip_Code',
+            'license_type': 'Type_of_Business',
+            'license_number': 'License__',
+        },
+        'city_slugs': ['las-vegas', 'las-vegas-nv', 'north-las-vegas',
+                       'henderson'],  # Henderson benefits too (same metro)
+    },
     'OH_CLEVELAND': {
         # V298: Cleveland Active Contractor Registrations — same opendataCLE
         # org that serves Cleveland permits (dty2kHktVXHrqO8i). 2,548 active
