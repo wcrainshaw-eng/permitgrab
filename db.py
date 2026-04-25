@@ -522,6 +522,15 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_permits_source_city_key ON permits(source_city_key);
         -- V229-addendum G3: composite for trade-page insights (city + trade)
         CREATE INDEX IF NOT EXISTS idx_permits_city_trade ON permits(source_city_key, trade_category);
+        -- V331 (CODE_V321 Bug G): unified-table sort by (slug, date DESC).
+        -- The V328 unified query orders by COALESCE(filing_date, issued_date,
+        -- date) DESC under WHERE source_city_key = ?. Without a date-suffixed
+        -- composite index SQLite scans every permit for the city then sorts.
+        -- San Antonio (60K) + Phoenix (40K) tipped /permits/* over the 3s
+        -- soft budget in V329 live UAT.
+        CREATE INDEX IF NOT EXISTS idx_permits_city_date ON permits(source_city_key, date DESC);
+        CREATE INDEX IF NOT EXISTS idx_permits_city_filing ON permits(source_city_key, filing_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_permits_city_contractor ON permits(source_city_key, contractor_name);
 
         CREATE TABLE IF NOT EXISTS permit_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -917,6 +926,13 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_violations_city_state ON violations(city, state);
         CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date);
         CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status);
+        -- V331 (CODE_V321 Bug G): composite for unified-table date-sorted
+        -- queries on (city, state, violation_date DESC). The V328 'all'
+        -- branch UNION-ALLs this with the permits side; without this
+        -- index the violations subquery scans the city's whole row set
+        -- before sorting.
+        CREATE INDEX IF NOT EXISTS idx_violations_city_date
+            ON violations(city, state, violation_date DESC);
     """)
     conn.commit()
 
