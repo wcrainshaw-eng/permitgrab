@@ -91,6 +91,15 @@ A city is "ad-ready" when it has ALL THREE:
 - **Honolulu HI**: data.honolulu.gov has 8 permit datasets but newest (4vab-c87q "Building Permits Jan 2005-June 30, 2025") is 10 months stale. Other datasets frozen 2016-2019. Dead by freshness.
 - **Madison WI, Saint Paul MN, Lansing MI, Mobile AL, Lexington KY, Richmond VA, Portland OR**: federated Socrata search returns 0 hits matching their domain. Madison ArcGIS (maps.cityofmadison.com) root has no relevant services. Lansing's gis.lansingmi.gov times out from Render.
 
+### V319/V320/V321 — recurring CITY_REGISTRY ↔ prod_cities slug trap
+2026-04-24: shipped V319 (Miami `CompanyName → contractor_name`) + V320 (Arlington TX `NameofBusiness → contractor_name`) + V321 (rename `miami_fl` → `miami_fl_arcgis2`). The big lesson: when adding a contractor mapping, **always confirm prod_cities.source_id matches the CITY_REGISTRY key you're patching**. Same trap hit Cambridge (cambridge vs cambridge_ma at V315→V316) and Miami (miami_fl vs miami_fl_arcgis2 at V319→V321). Fix-before-ship check:
+```sql
+SELECT city_slug, source_id FROM prod_cities WHERE city LIKE '%<CITY>%';
+```
+Then `grep -n '"<source_id>":' city_configs.py` — if the key isn't there, the daemon's `collect_single_city` falls through to 'not_found' and silently never collects (visible in scraper_runs as `status=error` with no error_message).
+
+Also: after a contractor field_map fix, the daemon takes one full collection cycle (~30 min) AND a worker module reload to apply. Force-collect via `/api/admin/force-collection` will pull fresh records under the new field_map only after the gunicorn worker restarts. Multiple rapid PRs queue Render deploys; expect lag.
+
 ### V315 wins + dead-ends 2026-04-24 (new-city hunt)
 - **Cambridge MA** ✅ ad-ready candidate. Already in CITY_REGISTRY at qu2z-8suj (Building Permits: Addition/Alteration), 613 permits / 389 profiles. Old field_map mapped applicant_name → contact_name only — all 389 profiles were individuals. Source ALSO has firm_name (real businesses: "Long Home LLC", "Vining Construction", "Rogers Insulation Specialists Co Inc", "advanced green insulation", "HomeWorks"). 425 of 432 2026 records have firm_name populated (98.4%). V315 adds `firm_name → contractor_name` + license_number mapping. Profile consolidation happens after next worker restart picks up the new module import.
 - **Aurora CO** dead. ags.auroragov.org/aurora/rest/services/OpenData/MapServer/156 (Building Permits 6 Months) has 7,546 fresh records but 43-field schema has ZERO contractor/applicant/business/company/firm fields. Same DC/Boston pattern. Has a usable violations feed at MapServer/161 (3,484, 6mo) but we don't onboard violation-only cities.
