@@ -11758,7 +11758,11 @@ def api_analytics_volume():
     GET /api/analytics/volume
     Query params: city, weeks (default 12)
     Returns weekly permit counts for trend analysis.
-    V12.51: Uses SQLite for efficient aggregation.
+
+    V312 (CODE_V280b Bug 9): use COALESCE(filing_date, issued_date, date)
+    so cities that only populate `date` (Phoenix, Miami-Dade, San Antonio)
+    show up. Volume was empty before because the WHERE filter required
+    filing_date to be non-null.
     """
     city = request.args.get('city', '')
     weeks = int(request.args.get('weeks', 12))
@@ -11767,20 +11771,24 @@ def api_analytics_volume():
     now = datetime.now()
     cutoff = (now - timedelta(weeks=weeks)).strftime('%Y-%m-%d')
 
-    # Build query with optional city filter
     if city:
         cursor = conn.execute("""
-            SELECT filing_date, COUNT(*) as cnt
+            SELECT COALESCE(filing_date, issued_date, date) AS filing_date,
+                   COUNT(*) AS cnt
             FROM permits
-            WHERE city = ? AND filing_date >= ? AND filing_date IS NOT NULL
-            GROUP BY filing_date
+            WHERE city = ?
+              AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+              AND COALESCE(filing_date, issued_date, date) >= ?
+            GROUP BY COALESCE(filing_date, issued_date, date)
         """, (city, cutoff))
     else:
         cursor = conn.execute("""
-            SELECT filing_date, COUNT(*) as cnt
+            SELECT COALESCE(filing_date, issued_date, date) AS filing_date,
+                   COUNT(*) AS cnt
             FROM permits
-            WHERE filing_date >= ? AND filing_date IS NOT NULL
-            GROUP BY filing_date
+            WHERE COALESCE(filing_date, issued_date, date) IS NOT NULL
+              AND COALESCE(filing_date, issued_date, date) >= ?
+            GROUP BY COALESCE(filing_date, issued_date, date)
         """, (cutoff,))
 
     # Aggregate by week
@@ -11884,22 +11892,29 @@ def api_analytics_values():
     now = datetime.now()
     cutoff = (now - timedelta(weeks=weeks)).strftime('%Y-%m-%d')
 
-    # Build query with optional city filter
+    # V312 (CODE_V280b Bug 9): same COALESCE date treatment as volume API.
     if city:
         cursor = conn.execute("""
-            SELECT filing_date, SUM(estimated_cost) as total_value, COUNT(*) as cnt
+            SELECT COALESCE(filing_date, issued_date, date) AS filing_date,
+                   SUM(estimated_cost) AS total_value,
+                   COUNT(*) AS cnt
             FROM permits
-            WHERE city = ? AND filing_date >= ? AND filing_date IS NOT NULL
-                  AND estimated_cost > 0
-            GROUP BY filing_date
+            WHERE city = ?
+              AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+              AND COALESCE(filing_date, issued_date, date) >= ?
+              AND estimated_cost > 0
+            GROUP BY COALESCE(filing_date, issued_date, date)
         """, (city, cutoff))
     else:
         cursor = conn.execute("""
-            SELECT filing_date, SUM(estimated_cost) as total_value, COUNT(*) as cnt
+            SELECT COALESCE(filing_date, issued_date, date) AS filing_date,
+                   SUM(estimated_cost) AS total_value,
+                   COUNT(*) AS cnt
             FROM permits
-            WHERE filing_date >= ? AND filing_date IS NOT NULL
-                  AND estimated_cost > 0
-            GROUP BY filing_date
+            WHERE COALESCE(filing_date, issued_date, date) IS NOT NULL
+              AND COALESCE(filing_date, issued_date, date) >= ?
+              AND estimated_cost > 0
+            GROUP BY COALESCE(filing_date, issued_date, date)
         """, (cutoff,))
 
     # Initialize week buckets
@@ -14964,6 +14979,51 @@ def city_landing_inner(city_slug):
         city_state=filter_state,
     )
 
+    # V312 (CODE_V280b Bug 8): hide the Value column when <5% of this city's
+    # permits have an estimated_cost. Most permit feeds don't expose dollar
+    # amounts; rendering a column of em-dashes makes the page look broken.
+    hide_value_column = False
+    if _prod_city_id:
+        try:
+            _vc = permitdb.get_connection().execute("""
+                SELECT
+                  COUNT(*) AS total,
+                  SUM(CASE WHEN estimated_cost IS NOT NULL AND estimated_cost > 0
+                           THEN 1 ELSE 0 END) AS with_value
+                FROM permits
+                WHERE prod_city_id = ?
+            """, (_prod_city_id,)).fetchone()
+            if _vc and _vc['total'] >= 50:
+                _coverage = (_vc['with_value'] or 0) / _vc['total']
+                hide_value_column = _coverage < 0.05
+        except Exception:
+            hide_value_column = False
+
+    # V312 (CODE_V280b Bug 13): pull recent violations for this city. Keyed
+    # by (city, state) tuple per CLAUDE.md violations schema. Limit 25 rows
+    # for the in-page tab so we don't blow the response size on cities with
+    # many violations (NYC HPD has 4M+).
+    violations_rows = []
+    violations_total = 0
+    try:
+        _vconn = permitdb.get_connection()
+        violations_total = _vconn.execute("""
+            SELECT COUNT(*) AS n FROM violations
+            WHERE city = ? AND state = ?
+        """, (filter_name, filter_state)).fetchone()['n']
+        if violations_total > 0:
+            violations_rows = [dict(r) for r in _vconn.execute("""
+                SELECT violation_date AS date, address,
+                       violation_description AS description,
+                       violation_type, status
+                FROM violations
+                WHERE city = ? AND state = ?
+                ORDER BY violation_date DESC
+                LIMIT 25
+            """, (filter_name, filter_state)).fetchall()]
+    except Exception as e:
+        print(f"[V312 violations] query failed for {city_slug}: {e}", flush=True)
+
     # V251 F2: available zips and trades for the filter dropdowns. Narrowed
     # to the top 20 most-common zips so the select stays usable (some big
     # cities have 100+ zips). Use a fresh connection (the page-scoped `conn`
@@ -15039,8 +15099,9 @@ def city_landing_inner(city_slug):
         total_permits=permit_count,
         last_collection=last_collected,
         is_active=not is_coming_soon,
-        violations=[],
-        violations_count=0,
+        violations=violations_rows,            # V312 (Bug 13)
+        violations_count=violations_total,     # V312 (Bug 13)
+        hide_value_column=hide_value_column,   # V312 (Bug 8)
         market_insights=market_insights,  # V236 PR#5
         property_owners=_get_property_owners(config['name'], current_state, limit=10),  # V284
         # V251 F2: filter dropdown context

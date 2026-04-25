@@ -629,6 +629,18 @@ async function loadCities() {
     data.cities.forEach(c => {
       select.add(new Option(c, c));
     });
+    // V312 (CODE_V280b Bug 9): default to a city with data instead of
+    // "All Cities" — Chicago has the most permits across the network and
+    // gives the user a chart-shaped experience on first load.
+    var preferred = ['Chicago', 'New York', 'Phoenix', 'San Antonio', 'Miami-Dade County'];
+    for (var i = 0; i < preferred.length; i++) {
+      var match = Array.from(select.options).find(o => o.value === preferred[i]);
+      if (match) {
+        select.value = preferred[i];
+        loadAnalytics();
+        return;
+      }
+    }
   } catch (e) {
     console.error('Failed to load cities:', e);
   }
