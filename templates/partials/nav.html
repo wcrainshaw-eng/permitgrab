@@ -208,6 +208,11 @@
             style="display: none; font-size: 12px; background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 10px; font-weight: 600;"
             title="Free phone-reveal credits remaining this month">— reveals left</span>
       {% endif %}
+      {# V337 (CODE_V333 Bug I): top-level Get Alerts for logged-in users.
+         V333 placed it in the user dropdown but the directive specifies the
+         main nav row before Analytics — more visible for free users who are
+         the digest signup audience. #}
+      <a href="/get-alerts">Get Alerts</a>
       {# V312 (CODE_V280b Bug 10): Early Intel hidden until the page actually
          surfaces signals. Don't advertise empty features. #}
       <a href="/analytics">Analytics <span style="font-size: 10px; background: #f97316; padding: 2px 6px; border-radius: 10px; margin-left: 2px;">PRO</span></a>
@@ -223,10 +228,8 @@
           <a href="/saved-contractors">Saved Contractors</a>
           {% endif %}
           <a href="/account">Account</a>
-          {# V333 (CODE_V321 Bug I): "Get Alerts" used to vanish when a user
-             logged in. Free signed-in users are exactly the right audience
-             for the digest signup — surface it in the user dropdown. #}
-          <a href="/get-alerts">Get Alerts</a>
+          {# V337 superseded V333's dropdown placement of Get Alerts —
+             promoted to the top-level nav row alongside Analytics. #}
           {% if is_pro %}
           <a href="/billing">Billing</a>
           {% endif %}
