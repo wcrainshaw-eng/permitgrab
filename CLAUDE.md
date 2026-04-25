@@ -59,9 +59,8 @@ A city is "ad-ready" when it has ALL THREE:
 - **Henderson NV** — PR #157 migrated from dead Socrata (fpc9-568j) to ArcGIS OpenDevPermits/2 at maps.cityofhenderson.com. Fresh (2026-04-18) with `OWNER` (business names like "JOHNNY RIBEIRO BUILDER, LLC") + `BUSINESSPHONE` (inline — "7022927679"). Phones come with the permit → skip enrichment entirely.
 - **Cleveland OH** — PR #158 migrated from stale Building_Permits/0 (frozen 2025-04-14) to Project_Records/0 at services3.arcgis.com. Fresh (2026-04-19) with `APPLICANT_BUSINESS` populated ("Fischer & Associates Architects Inc.", "Northedge Steel LLC"). Violations source (CCVIOL) already wired.
 
-### V258 TODO: CKAN violation collector support
-- Pittsburgh has a fresh violations feed at WPRDC: resource_id `70c06278-92c5-4040-ab28-17671866f81c` ("Pittsburgh PLI/DOMI/ES Violations Report", updated 2026-04-23 daily). Fields: `casefile_number`, `investigation_date`, `address`, `investigation_findings`, `case_file_type`, `status`. BUT `violation_collector.collect_violations_from_endpoint` only handles Socrata SODA + Carto + ArcGIS. CKAN's `datastore_search_sql` endpoint needs a 3rd-platform branch (~30 lines).
-- Pittsburgh also needs phones (PA no-bulk, DDG-only). Wire CKAN violations + find an alternate phone approach to make Pittsburgh a real candidate.
+### V258 TODO: CKAN violation collector support — DONE in V322
+- ✅ V322 added is_ckan branch to collect_violations_from_endpoint and VIOLATION_SOURCES['pittsburgh'] entry. WPRDC `70c06278-...` (573K records) now eligible. Pittsburgh phones still gated on PA-no-bulk-DB (DDG-only).
 
 ### V258 activation bugs to fix
 - **Louisville KY** routing: current config slug `louisville` + Kentucky state yields `louisville-co` (Colorado) at DB write time. 4,362 permits/360 profiles with KY business names are mis-attributed. Need a slug-routing fix so these become discoverable under a `louisville-ky` slug. Re-verified data is LIVE as of 2026-04-20.
