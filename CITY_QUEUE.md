@@ -77,6 +77,12 @@ have confirmed endpoints with contractor names — just add the config.
 - High Point NC: only Permit Activity Dashboards (3 of them), no queryable feature service (V343-followup probed 2026-04-25)
 - Chapel Hill NC: only Ephesus-Fordham renovation density tile-services frozen 2004-2017, no live permit feed (V343-followup probed 2026-04-25)
 - Hialeah FL violations: confirmed permanent dead-end after 3rd probe — no public ArcGIS or sitemap-discoverable code-enforcement feed exists. 108 phones (largest non-ad-ready phone count) but the violations leg is unsolvable from our side; needs Hialeah IT to publish a feed.
+- McKinney TX: services1.arcgis.com B8MwidgHpU2dWUmv UnderConstruction/0 has NameOfBusiness field but newest IssueDate is 2023-09-26 (frozen 2.5 years) and all sample NameOfBusiness values are blank (V345 probed 2026-04-25)
+- Lewisville TX: 0 ArcGIS results (V345 probed 2026-04-25)
+- Pearland TX: 0 ArcGIS results (V345 probed 2026-04-25)
+- Round Rock TX: only Large Development Projects + Current Developments view (zoning/plats/annexation), no permit-record feed with contractor field (V345 probed 2026-04-25)
+- Newport News VA: 0 ArcGIS results (V345 probed 2026-04-25)
+- Knoxville TN: 0 ArcGIS results (V345 probed 2026-04-25)
 
 ## Monitoring for New Cities
 
