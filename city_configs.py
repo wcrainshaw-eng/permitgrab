@@ -941,6 +941,12 @@ CITY_REGISTRY = {
         "date_field": "IssuedDate",
         "date_format": "epoch",
         "active": True,
+        # V319: schema exposes CompanyName + CompanyAddress/City/Zip alongside
+        # the existing permit fields, but the old field_map ignored it. Result:
+        # 7,842 fresh Miami permits in DB, only 77 with contractor names (1%).
+        # Adding contractor_name → CompanyName. Miami already has FL DBPR phone
+        # enrichment configured statewide, so once profiles are built they get
+        # the same name-match phones as Miami-Dade county did.
         "field_map": {
             "permit_number": "PermitNumber",
             "permit_type": "PropertyType",
@@ -950,8 +956,10 @@ CITY_REGISTRY = {
             "issued_date": "IssuedDate",
             "date": "IssuedDate",
             "status": "BuildingPermitStatusDescription",
+            "contractor_name": "CompanyName",
+            "contact_name": "CompanyName",
         },
-        "notes": "V63: City of Miami ArcGIS endpoint. Separate from miami_dade (county). Has IssuedDate with epoch format.",
+        "notes": "V63: City of Miami ArcGIS endpoint. Separate from miami_dade (county). Has IssuedDate with epoch format. V319: added CompanyName → contractor_name mapping.",
     },
 
     "raleigh": {
