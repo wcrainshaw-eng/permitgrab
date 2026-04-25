@@ -15456,14 +15456,26 @@ CITY_REGISTRY = {
         "endpoint": "https://data.cityoforlando.net/resource/ryhf-m453.json",
         "dataset_id": "ryhf-m453",
         "description": "Orlando FL Permit Applications",
+        # V352: V321 trap #5 this session. The "orlando" CITY_REGISTRY entry
+        # at line 1900 has the rich field map (with contractor_name, owner_name,
+        # work_type) but its slug "orlando" is orphaned in prod_cities — the
+        # active prod_cities row uses slug "orlando-fl" which routes to this
+        # entry with the stripped 7-field map (no contractor, no owner).
+        # Result: 16,947 permits collected, only 20.4% with contractor names.
+        # Both configs hit the same Socrata resource (ryhf-m453) so merging
+        # the rich field_map here is enough. Orlando is already ad-ready
+        # (57 phones via FL DBPR) — this should bump that further.
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "application_type",
+            "work_type": "worktype",
             "description": "project_name",
             "status": "application_status",
             "filing_date": "processed_date",
             "address": "permit_address",
             "estimated_cost": "estimated_cost",
+            "contractor_name": "contractor_name",
+            "owner_name": "property_owner_name",
         },
         "date_field": "processed_date",
         "limit": 2000,
