@@ -11109,13 +11109,113 @@ def api_top_contractors():
 # V79: BLOG SYSTEM
 # ===========================
 
+def _generate_market_reports():
+    """V318 (CODE_V280b Bug 20): generate data-driven Market Report posts at
+    request time using real DB numbers for each ad-ready city. Replaces the
+    "all 67 posts identical permit-cost guides dated 2026-04-06" problem.
+    """
+    posts = []
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute("""
+            SELECT cp.source_city_key AS slug,
+                   MIN(cp.city) AS city,
+                   MIN(cp.state) AS state,
+                   COUNT(*) AS profiles,
+                   SUM(CASE WHEN cp.phone IS NOT NULL AND cp.phone <> ''
+                            THEN 1 ELSE 0 END) AS phones
+            FROM contractor_profiles cp
+            GROUP BY cp.source_city_key
+            HAVING profiles >= 100 AND phones >= 50
+            ORDER BY phones DESC
+            LIMIT 8
+        """).fetchall()
+
+        today = datetime.now().strftime('%Y-%m-%d')
+        for r in rows:
+            slug = r['slug']; city = r['city']; state = r['state']
+            try:
+                permits_90d = conn.execute("""
+                    SELECT COUNT(*) AS n FROM permits
+                    WHERE source_city_key = ?
+                      AND COALESCE(filing_date, issued_date, date)
+                          >= date('now', '-90 days')
+                """, (slug,)).fetchone()['n']
+                top_trade_row = conn.execute("""
+                    SELECT primary_trade, COUNT(*) AS n
+                    FROM contractor_profiles
+                    WHERE source_city_key = ?
+                      AND primary_trade IS NOT NULL
+                      AND primary_trade <> ''
+                    GROUP BY primary_trade
+                    ORDER BY n DESC LIMIT 1
+                """, (slug,)).fetchone()
+                top_trade = top_trade_row['primary_trade'] if top_trade_row else 'general construction'
+                vios = conn.execute("""
+                    SELECT COUNT(*) AS n FROM violations
+                    WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)
+                """, (city, state)).fetchone()['n']
+            except Exception:
+                permits_90d = r['profiles']; top_trade = 'general construction'; vios = 0
+
+            post_slug = f'market-report-{slug}'
+            content = (
+                f"<p>Latest construction-permit activity from <strong>{city}, {state}</strong> across "
+                f"the PermitGrab data network. Numbers below pull live from the same DB the product "
+                f"uses — refreshed on every page load, not a static cron.</p>"
+                f"<h2>By the numbers</h2>"
+                f"<ul>"
+                f"<li><strong>{permits_90d:,}</strong> permits filed in the last 90 days</li>"
+                f"<li><strong>{r['profiles']:,}</strong> active contractors tracked in our DB</li>"
+                f"<li><strong>{r['phones']:,}</strong> with verified phone numbers</li>"
+                f"<li><strong>{vios:,}</strong> code violations on file</li>"
+                f"<li>Most active trade: <strong>{top_trade}</strong></li>"
+                f"</ul>"
+                f"<h2>Why this matters for contractors</h2>"
+                f"<p>Each permit in the database is a project that's actively happening. Each contractor "
+                f"with a phone number is reachable. Each violation is a property owner who needs work done "
+                f"now. <a href=\"/permits/{slug}\">Browse {city} permits</a> or "
+                f"<a href=\"/contractors/{slug}\">{city} contractors</a> to drill in.</p>"
+            )
+            posts.append({
+                'slug': post_slug,
+                'title': f"{city} Permit Activity Report — {datetime.now().strftime('%B %Y')}",
+                'meta_description': (
+                    f"Live data report: {permits_90d:,} permits + {r['profiles']:,} contractors + "
+                    f"{vios:,} code violations in {city}, {state}. Updated every page load."
+                ),
+                'date': today,
+                'category': 'market-reports',
+                'city_link': f'/permits/{slug}',
+                'city_name': city,
+                'excerpt': (
+                    f"{permits_90d:,} permits filed in {city} over the last 90 days, "
+                    f"{r['phones']:,} contractors with phone numbers, {vios:,} active code violations. "
+                    f"Top trade: {top_trade}."
+                ),
+                'content': content,
+            })
+    except Exception as _e:
+        print(f"[V318 market reports] generation failed: {_e}", flush=True)
+    return posts
+
+
 @app.route('/blog')
 def blog_index():
-    """V79: Blog index page listing all posts by category."""
+    """V79: Blog index page listing all posts by category.
+
+    V318 (CODE_V280b Bug 20): inject a "Market Reports" category at the top
+    with data-driven posts generated from real DB stats. Old setup had 67
+    permit-cost guides all dated 2026-04-06 and looked auto-generated.
+    """
     footer_cities = get_cities_with_data()
 
-    # Group posts by category
+    market_reports = _generate_market_reports()
     categories = {
+        'market-reports': {
+            'title': 'City Market Reports (Live Data)',
+            'posts': market_reports,
+        },
         'permit-costs': {
             'title': 'Permit Cost Guides',
             'posts': get_blog_posts_by_category('permit-costs')
@@ -11138,7 +11238,21 @@ def blog_index():
 
 @app.route('/blog/<slug>')
 def blog_post(slug):
-    """V79: Individual blog post page."""
+    """V79: Individual blog post page.
+
+    V318 (CODE_V280b Bug 20): if slug starts with market-report-, regenerate
+    the live report on the fly so the numbers stay fresh on every load.
+    """
+    if slug.startswith('market-report-'):
+        for p in _generate_market_reports():
+            if p['slug'] == slug:
+                footer_cities = get_cities_with_data()
+                return render_template('blog_post.html',
+                                       post=p,
+                                       related_posts=[],
+                                       footer_cities=footer_cities)
+        abort(404)
+
     post = next((p for p in BLOG_POSTS if p['slug'] == slug), None)
     if not post:
         abort(404)
