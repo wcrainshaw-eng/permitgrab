@@ -15295,6 +15295,19 @@ def city_landing_inner(city_slug):
     except Exception as e:
         print(f"[V328 unified] query failed for {city_slug}: {e}", flush=True)
 
+    # V332 (CODE_V321 Bug D): strip the redundant "PERMIT -" / "PERMIT –"
+    # prefix that Chicago and a few other Accela-style sources put on
+    # every type_label. The full string is still on permits.permit_type
+    # (and the detail card) — this is purely cosmetic for the table pill.
+    _prefix_strip = ('PERMIT - ', 'PERMIT – ', 'Permit - ', 'Permit – ')
+    for _r in unified_records:
+        _t = _r.get('type_label')
+        if _t and isinstance(_t, str):
+            for _p in _prefix_strip:
+                if _t.startswith(_p):
+                    _r['type_label'] = _t[len(_p):]
+                    break
+
     _total_pages = max(1, (total_records + _per_page - 1) // _per_page)
 
     # V251 F2: available zips and trades for the filter dropdowns. Narrowed
