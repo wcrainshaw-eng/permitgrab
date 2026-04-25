@@ -527,6 +527,14 @@ CITY_REGISTRY = {
         "endpoint": "https://data.cambridgema.gov/resource/qu2z-8suj.json",
         "dataset_id": "qu2z-8suj",
         "description": "Building Permits: Addition/Alteration (data.cambridgema.gov)",
+        # V315: Cambridge exposes firm_name (real business — "Vining
+        # Construction", "Long Home LLC", "Building Construction Group LLC")
+        # alongside applicant_name (individual licensee). Old field_map
+        # mapped contact_name=applicant_name only, so 389 profiles were all
+        # individuals. Switch contractor_name to firm_name so profile-build
+        # dedupes by business; keep contact_name=applicant_name for the
+        # named contact. 425 of 432 2026 records have firm_name populated
+        # (98.4%) — verified 2026-04-24.
         "field_map": {
             "permit_number": "id",
             "permit_type": "permit_type",
@@ -537,13 +545,15 @@ CITY_REGISTRY = {
             "estimated_cost": "building_cost",
             "total_cost": "total_cost",
             "description": "detailed_description_of_work",
+            "contractor_name": "firm_name",
             "contact_name": "applicant_name",
+            "license_number": "license_number",
             "parcel": "mbl",
         },
         "date_field": "applicant_submit_date",
         "limit": 2000,
         "active": True,
-        "notes": "V24: Switched to qu2z-8suj (Addition/Alteration permits). Fresh data verified Mar 2026.",
+        "notes": "V24: Switched to qu2z-8suj (Addition/Alteration permits). Fresh data verified Mar 2026. V315: added firm_name → contractor_name mapping.",
     },
 
     "washington_dc": {
