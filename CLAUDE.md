@@ -12,7 +12,8 @@ A city is "ad-ready" when it has ALL THREE:
 3. **Violations** (>0 code enforcement violation records)
 
 **Current state (2026-04-25, post-V326 merges + CA license import):**
-- **Ad-ready (13):** Chicago (3,498 phones), San Antonio (3,828), Miami-Dade (3,818), Phoenix (1,080), **Los Angeles (591 — new this session via CA CSLB import)**, NYC (466), Henderson (362), Anaheim (242), Cleveland (147), San Jose (104), Nashville (73), Buffalo (68), Orlando (57)
+- **Ad-ready (13):** San Antonio (3,828), Miami-Dade (3,818), Chicago (3,498), Phoenix (1,080), **NYC (783 — restored via NY DOL re-import)**, **Los Angeles (591 — new this session via CA CSLB import)**, Henderson (362), Anaheim (242), Cleveland (147), San Jose (104), Buffalo (84), Nashville (73), Orlando (57)
+- **Periodic state license re-imports are the highest-leverage hidden lever.** CSLB/DBPR/DOL/DLI imports decay as new contractor profiles accumulate that haven't been name-matched. Re-running this session yielded LA +564 phones, NYC +317, Buffalo +16, Minneapolis +7, Hialeah +18 (FL). Schedule monthly state-import refresh in autonomous loop.
 - **Older snapshot below from 2026-04-23, post-V250 merges:**
 - **Ad-ready (6):** Chicago (3,494 phones), NYC (466), Phoenix (1,079), San Jose (95), Miami-Dade (245), **Orlando** (57 — new this cycle, FL DBPR 2nd-import lift)
 - **Near-miss — phones gap:** Cape Coral (44, need 6), Fort Lauderdale (22), Columbus (12), Buffalo (15)
