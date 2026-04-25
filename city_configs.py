@@ -929,7 +929,7 @@ CITY_REGISTRY = {
         "notes": "V19: Replaced dead MD_OpenData/MapServer with ArcGIS FeatureServer miamidade_permit_data. SUPERB data: ContractorName/Phone/Address, OwnerName, EstimatedValue, SquareFootage, ArchitectName, ApplicationTypeDescription, ProposedUseDescription. Verified Mar 2026 with permits issued 3/22/2026.",
     },
 
-    "miami_fl": {
+    "miami_fl_arcgis2": {
         "name": "Miami",
         "state": "FL",
         "slug": "miami-fl",
