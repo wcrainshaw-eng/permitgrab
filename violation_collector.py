@@ -1765,7 +1765,17 @@ def _parse_date(date_str):
     # failing to parse and dropping every row during insert.
     if s.endswith('Z'):
         s = s[:-1]
-    for fmt in ('%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
+    # V325: added '%Y-%m-%d %H:%M:%S' (space separator). Boston CKAN
+    # status_dttm comes through as '2026-04-23 00:17:00' — without this
+    # format, _parse_date returns None and the violation gets dropped
+    # before insert (silent loss of every Boston record on V324).
+    for fmt in (
+        '%Y-%m-%dT%H:%M:%S.%f',
+        '%Y-%m-%dT%H:%M:%S',
+        '%Y-%m-%d %H:%M:%S.%f',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d',
+    ):
         try:
             dt = datetime.strptime(s[:26], fmt)
             if dt.year < 2020 or dt > datetime.now() + timedelta(days=7):
