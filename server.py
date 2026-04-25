@@ -15210,15 +15210,23 @@ def city_landing_inner(city_slug):
         _filter, _page, _per_page = 'all', 1, 25
 
     unified_records = []
-    total_records = 0
+    # V330: reuse counts the route already computed instead of re-running
+    # COUNT(*) on permits + violations. The 'all' filter previously did a
+    # SELECT (subquery_a) + (subquery_b) which on San Antonio scanned 60K+
+    # permits + 5K violations every page load (4.2s response time per
+    # post-deploy live UAT). permit_count is already populated above from
+    # prod_cities; violations_total comes from the V312 query a few blocks
+    # up. They're at most 30s stale because of how the route is built but
+    # pagination math doesn't need exact counts down to the row.
+    if _filter == 'permits':
+        total_records = permit_count or 0
+    elif _filter == 'violations':
+        total_records = violations_total or 0
+    else:
+        total_records = (permit_count or 0) + (violations_total or 0)
     try:
         _uconn = permitdb.get_connection()
         if _filter == 'permits':
-            count_row = _uconn.execute(
-                "SELECT COUNT(*) AS n FROM permits WHERE source_city_key = ?",
-                (city_slug,)
-            ).fetchone()
-            total_records = (count_row['n'] if count_row else 0) or 0
             unified_records = [{
                 'record_type': 'permit',
                 'record_date': r['record_date'],
@@ -15240,11 +15248,6 @@ def city_landing_inner(city_slug):
                 LIMIT ? OFFSET ?
             """, (city_slug, _per_page, (_page - 1) * _per_page)).fetchall()]
         elif _filter == 'violations':
-            count_row = _uconn.execute(
-                "SELECT COUNT(*) AS n FROM violations WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?)",
-                (filter_name, filter_state)
-            ).fetchone()
-            total_records = (count_row['n'] if count_row else 0) or 0
             unified_records = [{
                 'record_type': 'violation',
                 'record_date': r['record_date'],
@@ -15265,14 +15268,6 @@ def city_landing_inner(city_slug):
                 LIMIT ? OFFSET ?
             """, (filter_name, filter_state, _per_page, (_page - 1) * _per_page)).fetchall()]
         else:
-            count_row = _uconn.execute("""
-                SELECT
-                  (SELECT COUNT(*) FROM permits WHERE source_city_key = ?) +
-                  (SELECT COUNT(*) FROM violations
-                   WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?))
-                AS n
-            """, (city_slug, filter_name, filter_state)).fetchone()
-            total_records = (count_row['n'] if count_row else 0) or 0
             unified_records = [dict(r) for r in _uconn.execute("""
                 SELECT 'permit' AS record_type,
                        COALESCE(filing_date, issued_date, date) AS record_date,
