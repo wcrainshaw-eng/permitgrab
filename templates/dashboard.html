@@ -1399,7 +1399,8 @@ footer a:hover { color: white; }
         </div>
       </div>
       <a href="/contractors">Contractors</a>
-      <a href="/early-intel">Early Intel <span style="font-size: 10px; background: var(--yellow); color: var(--gray-900); padding: 2px 6px; border-radius: 10px; margin-left: 2px;">NEW</span></a>
+      {# V317 (CODE_V280b Bug 10): Early Intel hidden until the page actually
+         surfaces signals. dashboard.html nav was missed by V312's nav.html-only fix. #}
       <a href="/analytics">Analytics <span style="font-size: 10px; background: var(--accent); padding: 2px 6px; border-radius: 10px; margin-left: 2px;">Pro</span></a>
       <a href="/pricing">Pricing</a>
       <a href="/get-alerts">Get Alerts</a>
@@ -1645,7 +1646,7 @@ footer a:hover { color: white; }
     <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; justify-content: space-between; align-items: center;">
       <div>
         <strong>You're viewing <span id="banner-total">{{ "{:,}".format(initial_stats.total_permits | default(0)) }}</span>+ leads</strong>
-        <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Early Intel, Analytics, and unlimited exports.</span>
+        <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Analytics, and unlimited exports.</span>
       </div>
       <a href="/pricing" style="background: #f97316; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap;">See Plans →</a>
     </div>

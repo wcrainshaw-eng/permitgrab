@@ -9064,7 +9064,7 @@ def dashboard_redirect():
                 (r['slug'],)
             ).fetchone()
             vc = conn.execute(
-                "SELECT COUNT(*) AS n FROM violations WHERE city = ? AND state = ?",
+                "SELECT COUNT(*) AS n FROM violations WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)",
                 (r['name'], r['state'])
             ).fetchone()
             tracked.append({
@@ -15013,17 +15013,20 @@ def city_landing_inner(city_slug):
         except Exception:
             hide_value_column = False
 
-    # V312 (CODE_V280b Bug 13): pull recent violations for this city. Keyed
-    # by (city, state) tuple per CLAUDE.md violations schema. Limit 25 rows
-    # for the in-page tab so we don't blow the response size on cities with
-    # many violations (NYC HPD has 4M+).
+    # V312 (CODE_V280b Bug 13): pull recent violations for this city.
+    # V317 fix: case-insensitive city match. CITY_REGISTRY has chicago_il
+    # name="CHICAGO" (uppercase) but violations table city="Chicago" — the
+    # original case-sensitive WHERE returned 0 rows for Chicago. Use UPPER()
+    # on both sides so it works regardless of registry casing convention.
+    # Limit 25 rows for the in-page tab so we don't blow the response size
+    # on cities with many violations (NYC HPD has 4M+).
     violations_rows = []
     violations_total = 0
     try:
         _vconn = permitdb.get_connection()
         violations_total = _vconn.execute("""
             SELECT COUNT(*) AS n FROM violations
-            WHERE city = ? AND state = ?
+            WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)
         """, (filter_name, filter_state)).fetchone()['n']
         if violations_total > 0:
             violations_rows = [dict(r) for r in _vconn.execute("""
@@ -15031,7 +15034,7 @@ def city_landing_inner(city_slug):
                        violation_description AS description,
                        violation_type, status
                 FROM violations
-                WHERE city = ? AND state = ?
+                WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)
                 ORDER BY violation_date DESC
                 LIMIT 25
             """, (filter_name, filter_state)).fetchall()]
