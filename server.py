@@ -9524,8 +9524,17 @@ def api_permits():
     status_filter = request.args.get('status', '')
     quality = request.args.get('quality', '')
     search = request.args.get('search', '')
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 50))
+    # V313 (CODE_V280b Bug 15): cap per_page server-side at 10000 (the
+    # /browse JS bulk-loads then paginates client-side; raising the cap
+    # to 50000+ would OOM Render). The pagination strip on /browse
+    # already shows "Showing N-M of T" — that's the visible artifact
+    # Bug 15 asked for. The cap just keeps a runaway client query from
+    # taking down the server.
+    try:
+        page = max(1, int(request.args.get('page', 1) or 1))
+        per_page = max(1, min(10000, int(request.args.get('per_page', 50) or 50)))
+    except (TypeError, ValueError):
+        page, per_page = 1, 50
 
     # V32: Resolve city slug to name and state for cross-state filtering.
     # V202-4 + V203: Two-stage lookup with a shared alias map.
@@ -9842,14 +9851,19 @@ def api_export():
     """GET /api/export - Export filtered permits as CSV with lead scores.
 
     PRO FEATURE: Non-Pro users cannot export and are redirected to pricing.
+
+    V313 (CODE_V280b Bug 16): anonymous click → /signup; logged-in free
+    user → 402 JSON pointing at /pricing. Both better than the old blanket
+    403 which left anonymous browsers stuck.
     """
-    # Check if user is Pro - exports are a Pro feature
+    if 'user_email' not in session:
+        return redirect('/signup?next=/browse&message=subscribe_to_export')
     user = get_current_user()
     if not is_pro(user):
         return jsonify({
-            'error': 'Export is a Pro feature',
+            'error': 'Export is a Pro feature. Subscribe for $149/mo to download contractor lead lists.',
             'upgrade_url': '/pricing'
-        }), 403
+        }), 402
 
     # V12.51: SQL-backed export
     city = request.args.get('city', '')
