@@ -318,6 +318,31 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V322: Pittsburgh PA — first CKAN-platform city. WPRDC publishes
+    # PLI/DOMI/ES violations via CKAN datastore at data.wprdc.org. 573K
+    # records as of 2026-04-25. Adds CKAN support to violation_collector.
+    'pittsburgh': {
+        'prod_city_id': None,
+        'city': 'Pittsburgh',
+        'state': 'PA',
+        'platform': 'ckan',
+        'endpoints': [
+            {
+                'name': 'PLI/DOMI/ES Violations Report',
+                'ckan_domain': 'data.wprdc.org',
+                'ckan_resource_id': '70c06278-92c5-4040-ab28-17671866f81c',
+                'date_field': 'investigation_date',
+                'id_field': 'casefile_number',
+                'description_field': 'investigation_findings',
+                'status_field': 'status',
+                'type_field': 'case_file_type',
+                'address_fields': {'full': 'address'},
+                'zip_field': None,
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
     # V197: Expansion — 1 new Socrata + 5 new ArcGIS sources
     'kansas-city-mo': {
         'prod_city_id': None,
@@ -1822,13 +1847,22 @@ def normalize_violation(record, city_config, endpoint):
 
 
 def collect_violations_from_endpoint(city_config, endpoint):
-    """Fetch violations from a SODA, Carto, or ArcGIS endpoint."""
+    """Fetch violations from a SODA, Carto, ArcGIS, or CKAN endpoint.
+
+    V322: added CKAN support for WPRDC (data.wprdc.org) — Pittsburgh PLI
+    violations are published as CKAN datastore resources. Detection key
+    is `ckan_resource_id` in the endpoint dict; querying uses the
+    datastore_search_sql action so we can paginate + sort + filter.
+    """
     is_carto = 'carto_base' in endpoint
     is_arcgis = endpoint.get('platform') == 'arcgis'
+    is_ckan = 'ckan_resource_id' in endpoint
     if is_carto:
         base_url = endpoint['carto_base']
     elif is_arcgis:
         base_url = endpoint['arcgis_url'].rstrip('/') + '/query'
+    elif is_ckan:
+        base_url = f"https://{endpoint['ckan_domain']}/api/3/action/datastore_search_sql"
     else:
         base_url = f"https://{endpoint['domain']}/resource/{endpoint['resource_id']}.json"
     date_field = endpoint.get('date_field')
@@ -1900,12 +1934,25 @@ def collect_violations_from_endpoint(city_config, endpoint):
         arcgis_ts_literal = last_dt.strftime('%Y-%m-%d %H:%M:%S')
 
     while total_inserted < max_records:
-        # V170: Build request based on platform (SODA vs Carto vs ArcGIS)
+        # V170: Build request based on platform (SODA vs Carto vs ArcGIS vs CKAN)
         if is_carto:
             table = endpoint['carto_table']
             sql = (f"SELECT * FROM {table} WHERE {date_field} > '{last_date}' "
                    f"ORDER BY {date_field} DESC LIMIT {batch_size} OFFSET {offset}")
             params = {'q': sql, 'format': 'json'}
+        elif is_ckan:
+            # V322: CKAN datastore_search_sql. resource_id needs to be
+            # double-quoted in the SQL identifier; date filter mirrors
+            # the SODA/Carto pattern so we resume from the last
+            # successful date instead of pulling 573K rows every cycle.
+            rid = endpoint['ckan_resource_id']
+            sql = (
+                f'SELECT * FROM "{rid}" '
+                f"WHERE \"{date_field}\" > '{last_date[:10]}' "
+                f'ORDER BY "{date_field}" DESC '
+                f"LIMIT {batch_size} OFFSET {offset}"
+            )
+            params = {'sql': sql}
         elif is_arcgis:
             # V243: dateless MapServer tables use an incremental_where
             # template (Phoenix filters by the year prefix in the case
@@ -1965,7 +2012,8 @@ def collect_violations_from_endpoint(city_config, endpoint):
             resp = SESSION.get(base_url, params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            # V170: Carto wraps in 'rows', SODA returns array, ArcGIS wraps in 'features'.
+            # V170: Carto wraps in 'rows', SODA returns array, ArcGIS wraps
+            # in 'features'. V322: CKAN wraps in result.records.
             if is_arcgis:
                 if isinstance(data, dict) and 'error' in data:
                     err = data['error']
@@ -1976,6 +2024,14 @@ def collect_violations_from_endpoint(city_config, endpoint):
                 records = [f.get('attributes', {}) for f in feats]
             elif is_carto:
                 records = data.get('rows', []) if isinstance(data, dict) else []
+            elif is_ckan:
+                if isinstance(data, dict) and not data.get('success', True):
+                    err = data.get('error', {})
+                    print(f"  [V322] CKAN error: {err}")
+                    resp.close()
+                    break
+                records = (data.get('result', {}) or {}).get('records', []) \
+                          if isinstance(data, dict) else []
             else:
                 records = data
             resp.close()
