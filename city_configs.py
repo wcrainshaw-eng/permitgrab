@@ -1014,51 +1014,6 @@ CITY_REGISTRY = {
         "notes": "V19: Replaced broken Building_Permits endpoint with working 180-day rolling feed. GOLD: contractor company, DBA, address, city, state, zip, email, phone, license number. Also: fees, est cost, CO/COC dates, housing units, land use, jurisdiction. Verified Mar 2026.",
     },
 
-    # V340 (CODE_V333 hunt): Greensboro NC — ArcGIS MapServer with Contractor +
-    # OwnerName fields, 123K records, newest 2026-04-20 (fresh). Real businesses
-    # (KIRKLAND INC, KEYWAY CONCEPTS, NC ROOFING, PENDRY HOME IMPROVEMENTS).
-    # Owner mailing address fields available — V276 property-owner pipeline
-    # candidate.
-    "greensboro_nc": {
-        "name": "Greensboro",
-        "state": "NC",
-        "slug": "greensboro-nc",
-        "lat": 36.0726,
-        "lon": -79.7920,
-        "platform": "arcgis",
-        "endpoint": "https://gis.greensboro-nc.gov/arcgis/rest/services/OpenGateCity/OpenData_HRES_DS/MapServer/2/query",
-        "dataset_id": "OpenData_HRES_DS_BI_Permits",
-        "description": "Greensboro Engineering & Inspections - Building Permits (ArcGIS MapServer)",
-        "field_map": {
-            "permit_number": "PermitNum",
-            "permit_type": "PermitType",
-            "work_type": "ApplicationType",
-            "construction_type": "TypeConstructionDesc",
-            "occupancy": "OccupancyDesc",
-            "address": "FullAddress",
-            "filing_date": "EntryDate",
-            "issued_date": "IssuedDate",
-            "finalize_date": "FinalCODate",
-            "status": "CurrentStatus",
-            "estimated_cost": "TotalCost",
-            "square_feet": "BuildingSqFt",
-            "num_units": "NumUnits",
-            "description": "Description",
-            "contractor_name": "Contractor",
-            "owner_name": "OwnerName",
-            "owner_mail_address": "OwnerMailAddress",
-            "owner_mail_city": "OwnerMailCity",
-            "owner_mail_state": "OwnerMailState",
-            "owner_mail_zip": "OwnerMailZip",
-            "zoning": "Zoning",
-        },
-        "date_field": "EntryDate",
-        "date_format": "date",
-        "limit": 2000,
-        "active": True,
-        "notes": "V340: Greensboro NC - ArcGIS MapServer at gis.greensboro-nc.gov OpenData_HRES_DS layer 2 (BI_Permits). 123,228 records covering 1998-present, newest EntryDate 2026-04-20. Real-business Contractor field. OwnerMailAddress/City/State/Zip fields populate the V276 property-owner pipeline. Pop ~300K (NC #3 city).",
-    },
-
     # V23 AUDIT: 2026-03-28 - NO_DATA - ArcGIS endpoint needs verification
     "phoenix": {
         "name": "Phoenix",
@@ -8071,19 +8026,37 @@ CITY_REGISTRY = {
         "endpoint": "https://gis.greensboro-nc.gov/arcgis/rest/services/OpenGateCity/OpenData_HRES_DS/MapServer/2/query",
         "dataset_id": "OpenData_HRES_DS_MapServer_2",
         "description": "City of Greensboro Building Permits",
+        # V342: two real bugs in the prior field_map.
+        # 1. "contact_name": "Contractor" — should be "contractor_name". The
+        #    profile builder keys off contractor_name, so 1,063 permits with
+        #    real businesses (KIRKLAND INC, KEYWAY CONCEPTS, NC ROOFING) were
+        #    landing as contacts and only 356 of them rolled up into
+        #    contractor_profiles (and only 1 phone for the city).
+        # 2. "zip": "Zoning" — Zoning is a zoning code (e.g. R-3), not a
+        #    postal zip. Removed; zip would have to be parsed out of FullAddress.
+        # Also added EntryDate as filing_date and the OwnerMailAddress/City/
+        # State/Zip fields for the V276 property-owner pipeline.
         "field_map": {
             "permit_number": "PermitNum",
             "permit_type": "PermitType",
             "work_type": "ApplicationType",
+            "construction_type": "TypeConstructionDesc",
+            "occupancy": "OccupancyDesc",
             "address": "FullAddress",
-            "zip": "Zoning",
-            "owner_name": "OwnerName",
-            "contact_name": "Contractor",
-            "filing_date": "IssuedDate",
+            "filing_date": "EntryDate",
             "issue_date": "IssuedDate",
+            "finalize_date": "FinalCODate",
             "status": "CurrentStatus",
             "estimated_cost": "TotalCost",
+            "square_feet": "BuildingSqFt",
+            "num_units": "NumUnits",
             "description": "Description",
+            "contractor_name": "Contractor",
+            "owner_name": "OwnerName",
+            "owner_mail_address": "OwnerMailAddress",
+            "owner_mail_city": "OwnerMailCity",
+            "owner_mail_state": "OwnerMailState",
+            "owner_mail_zip": "OwnerMailZip",
         },
         "date_field": "IssuedDate",
         "date_format": "date",
