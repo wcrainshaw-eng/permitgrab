@@ -7356,6 +7356,12 @@ CITY_REGISTRY = {
         "endpoint": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0/query",
         "dataset_id": "building_permits",
         "description": "Permits Issued by Building Safety - City of Tempe Open Data (ArcGIS)",
+        # V314: Tempe exposes ContractorPhone + ContractorEmail + ContractorLicNum
+        # inline. Previously only ContractorCompanyName was mapped → 25 profiles
+        # for 2,446 permits with 0 phones. Adding contractor_name (was missing —
+        # the collector wrote the Python string "None" for every permit where
+        # contractor_name had no mapping), contact_phone, email, license_number
+        # should lift Tempe from 25 profiles / 0 phones to ~1000 / 300+ phones.
         "field_map": {
             "permit_number": "PermitNum",
             "permit_type": "PermitType",
@@ -7366,7 +7372,11 @@ CITY_REGISTRY = {
             "status": "StatusCurrent",
             "estimated_cost": "EstProjectCost",
             "description": "Description",
+            "contractor_name": "ContractorCompanyName",
             "contact_name": "ContractorCompanyName",
+            "contact_phone": "ContractorPhone",
+            "email": "ContractorEmail",
+            "license_number": "ContractorLicNum",
         },
         "date_field": "IssuedDate",
         "limit": 2000,
