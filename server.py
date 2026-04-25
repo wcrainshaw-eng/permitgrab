@@ -9018,10 +9018,152 @@ def index():
 # V9 Fix 9: /dashboard redirects to homepage (V13.7: redirect to login if not authenticated)
 @app.route('/dashboard')
 def dashboard_redirect():
-    """Redirect /dashboard to /browse for authenticated users, /login for unauthenticated."""
+    """V311 (CODE_V280b Bug 4): real personalized dashboard.
+
+    Was a redirect to /browse which dumped logged-in users on the
+    marketing homepage — per Wes: "A clean list of their cities with
+    permit counts is 100x better than redirecting to the marketing
+    homepage."
+
+    Renders a user dashboard with:
+      • welcome + plan status
+      • top-line stats (ad-ready count, permits this week, etc.)
+      • tracked cities table (for now: the 12 ad-ready + their profile
+        phone/violation counts so the user sees what they're paying for)
+      • recent permits across those cities
+      • quick action buttons
+    """
     if 'user_email' not in session:
         return redirect('/login?redirect=dashboard&message=login_required')
-    return redirect('/browse')
+
+    user = find_user_by_email(session['user_email'])
+    if not user:
+        return redirect('/login')
+    plan = get_user_plan(user)
+    pro = plan in ('pro', 'professional', 'enterprise')
+
+    # Ad-ready cities = what the user actually gets with their plan.
+    conn = permitdb.get_connection()
+    tracked = []
+    try:
+        rows = conn.execute("""
+            SELECT cp.source_city_key AS slug, MIN(cp.city) AS name, MIN(cp.state) AS state,
+                   COUNT(*) AS profiles,
+                   SUM(CASE WHEN cp.phone IS NOT NULL AND cp.phone <> '' THEN 1 ELSE 0 END) AS phones
+            FROM contractor_profiles cp
+            GROUP BY cp.source_city_key
+            HAVING COUNT(*) >= 100
+               AND SUM(CASE WHEN cp.phone IS NOT NULL AND cp.phone <> '' THEN 1 ELSE 0 END) >= 50
+            ORDER BY phones DESC
+            LIMIT 20
+        """).fetchall()
+        for r in rows or []:
+            # pull per-city permit + violation counts
+            pc = conn.execute(
+                "SELECT COUNT(*) AS n FROM permits WHERE source_city_key = ?",
+                (r['slug'],)
+            ).fetchone()
+            vc = conn.execute(
+                "SELECT COUNT(*) AS n FROM violations WHERE city = ? AND state = ?",
+                (r['name'], r['state'])
+            ).fetchone()
+            tracked.append({
+                'slug': r['slug'], 'name': r['name'], 'state': r['state'],
+                'profiles': r['profiles'], 'phones': r['phones'],
+                'permits': pc['n'] if pc else 0,
+                'violations': vc['n'] if vc else 0,
+            })
+    except Exception:
+        tracked = []
+
+    ad_ready_count = len(tracked)
+    total_cities = 0
+    try:
+        total_cities = conn.execute(
+            "SELECT COUNT(*) AS n FROM prod_cities WHERE status = 'active'"
+        ).fetchone()['n']
+    except Exception:
+        pass
+
+    permits_week = 0
+    try:
+        permits_week = conn.execute(
+            "SELECT COUNT(*) AS n FROM permits WHERE filing_date >= date('now', '-7 days')"
+        ).fetchone()['n']
+    except Exception:
+        pass
+
+    active_contractors = 0
+    try:
+        active_contractors = conn.execute(
+            "SELECT COUNT(*) AS n FROM contractor_profiles"
+        ).fetchone()['n']
+    except Exception:
+        pass
+
+    violations_count = 0
+    try:
+        violations_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM violations"
+        ).fetchone()['n']
+    except Exception:
+        pass
+
+    # Recent permits across tracked cities. 20 max, ordered by date desc.
+    recent_permits = []
+    if tracked:
+        slugs = [t['slug'] for t in tracked]
+        placeholders = ','.join('?' * len(slugs))
+        try:
+            rows = conn.execute(f"""
+                SELECT source_city_key, city, address, permit_type,
+                       contractor_name, contact_name,
+                       COALESCE(filing_date, issued_date, date) AS date
+                FROM permits
+                WHERE source_city_key IN ({placeholders})
+                  AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                ORDER BY date DESC
+                LIMIT 20
+            """, slugs).fetchall()
+            for r in rows or []:
+                recent_permits.append({
+                    'source_city_key': r['source_city_key'],
+                    'city': r['city'],
+                    'address': r['address'],
+                    'permit_type': r['permit_type'],
+                    'contractor_name': r['contractor_name'],
+                    'contact_name': r['contact_name'],
+                    'date': (r['date'] or '')[:10],
+                })
+        except Exception:
+            pass
+
+    return render_template(
+        'my_dashboard.html',
+        user=user,
+        is_pro=pro,
+        tracked_cities=tracked,
+        ad_ready_count=ad_ready_count,
+        total_cities=total_cities,
+        permits_week=permits_week,
+        active_contractors=active_contractors,
+        violations_count=violations_count,
+        recent_permits=recent_permits,
+    )
+
+
+@app.route('/contractors/<slug>')
+def contractors_by_city(slug):
+    """V311 (CODE_V280b Bug 6): per-city contractor directory.
+
+    The /contractors page is city-scoped under the hood but its UI
+    doesn't expose deep links. Adding /contractors/<slug> lets us
+    point directly to one city's contractor roster (useful for SEO,
+    internal links from city pages, and the dashboard's Browse flow).
+    """
+    footer_cities = get_cities_with_data()
+    return render_template('contractors.html', footer_cities=footer_cities,
+                          default_city_slug=slug)
 
 
 @app.route('/browse')
@@ -10752,81 +10894,98 @@ def api_contractors():
     """
     GET /api/contractors
     Query params: city, search, sort_by, sort_order, page, per_page
-    Returns aggregated contractor data from permits.
-    V12.51: SQL-backed, V13.5: Added error handling
+
+    V311 (CODE_V280b Bug 5): query contractor_profiles directly instead of
+    loading 100K permits + aggregating in Python. The old path returned 0
+    contractors on prod because permitdb.query_permits with per_page=100000
+    timed out under the 512MB Render budget. Capped at 500 rows.
     """
     try:
-        city = request.args.get('city', '')
-        permits, _ = permitdb.query_permits(city=city or None, page=1, per_page=100000)
-
-        # Aggregate by contractor name
-        contractors = {}
-        for p in permits:
-            name = p.get('contact_name', '').strip()
-            if not name or name.lower() in ('n/a', 'unknown', 'none', ''):
-                continue
-
-            if name not in contractors:
-                contractors[name] = {
-                    'name': name,
-                    'total_permits': 0,
-                    'total_value': 0,
-                    'cities': set(),
-                    'trades': {},
-                    'most_recent_date': '',
-                    'permits': [],
-                }
-
-            contractors[name]['total_permits'] += 1
-            contractors[name]['total_value'] += p.get('estimated_cost', 0) or 0
-            contractors[name]['cities'].add(p.get('city', ''))
-
-            trade = p.get('trade_category', 'Other')
-            contractors[name]['trades'][trade] = contractors[name]['trades'].get(trade, 0) + 1
-
-            filing_date = p.get('filing_date', '')
-            if filing_date > contractors[name]['most_recent_date']:
-                contractors[name]['most_recent_date'] = filing_date
-
-            contractors[name]['permits'].append(p.get('permit_number'))
-
-        # Convert to list and determine primary trade
-        contractor_list = []
-        for name, data in contractors.items():
-            primary_trade = max(data['trades'].items(), key=lambda x: x[1])[0] if data['trades'] else 'Unknown'
-            contractor_list.append({
-                'name': data['name'],
-                'total_permits': data['total_permits'],
-                'total_value': data['total_value'],
-                'cities': sorted(list(data['cities'])),
-                'city_count': len(data['cities']),
-                'primary_trade': primary_trade,
-                'most_recent_date': data['most_recent_date'],
-                'permit_ids': data['permits'][:50],
-            })
-
-        # Search filter
-        search = request.args.get('search', '').lower()
-        if search:
-            contractor_list = [c for c in contractor_list if search in c['name'].lower()]
-
-        # Sorting
+        city = request.args.get('city', '').strip()
+        search = request.args.get('search', '').strip().lower()
         sort_by = request.args.get('sort_by', 'total_permits')
         sort_order = request.args.get('sort_order', 'desc')
-        reverse = sort_order == 'desc'
+        try:
+            page = max(1, int(request.args.get('page', 1) or 1))
+            per_page = max(1, min(100, int(request.args.get('per_page', 50) or 50)))
+        except (TypeError, ValueError):
+            page, per_page = 1, 50
+        reverse = sort_order != 'asc'
+
+        conn = permitdb.get_connection()
+        conn.row_factory = sqlite3.Row
+
+        if city:
+            sql = """
+                SELECT contractor_name_raw AS name,
+                       primary_trade,
+                       COALESCE(total_permits, 0) AS total_permits,
+                       COALESCE(total_project_value, 0) AS total_value,
+                       last_permit_date,
+                       city, state
+                FROM contractor_profiles
+                WHERE source_city_key = ?
+                  AND contractor_name_raw IS NOT NULL
+                  AND contractor_name_raw != ''
+                  AND LENGTH(contractor_name_raw) >= 3
+                ORDER BY total_permits DESC
+                LIMIT 500
+            """
+            rows = conn.execute(sql, (city,)).fetchall()
+            contractor_list = [{
+                'name': r['name'],
+                'total_permits': r['total_permits'] or 0,
+                'total_value': r['total_value'] or 0,
+                'cities': [f"{r['city']}, {r['state']}"] if r['city'] else [],
+                'city_count': 1 if r['city'] else 0,
+                'primary_trade': r['primary_trade'] or 'Other',
+                'most_recent_date': r['last_permit_date'] or '',
+            } for r in rows]
+        else:
+            sql = """
+                SELECT contractor_name_normalized AS norm,
+                       MAX(contractor_name_raw) AS name,
+                       SUM(COALESCE(total_permits, 0)) AS total_permits,
+                       SUM(COALESCE(total_project_value, 0)) AS total_value,
+                       MAX(last_permit_date) AS last_permit_date,
+                       MAX(primary_trade) AS primary_trade,
+                       GROUP_CONCAT(city || ', ' || state, '|') AS city_blob,
+                       COUNT(DISTINCT source_city_key) AS city_count
+                FROM contractor_profiles
+                WHERE contractor_name_raw IS NOT NULL
+                  AND contractor_name_raw != ''
+                  AND LENGTH(contractor_name_raw) >= 3
+                GROUP BY contractor_name_normalized
+                ORDER BY total_permits DESC
+                LIMIT 500
+            """
+            rows = conn.execute(sql).fetchall()
+            contractor_list = []
+            for r in rows:
+                cities = sorted({c.strip() for c in (r['city_blob'] or '').split('|')
+                                 if c and c.strip() and c.strip() != ', '})
+                contractor_list.append({
+                    'name': r['name'],
+                    'total_permits': r['total_permits'] or 0,
+                    'total_value': r['total_value'] or 0,
+                    'cities': cities,
+                    'city_count': r['city_count'] or 0,
+                    'primary_trade': r['primary_trade'] or 'Other',
+                    'most_recent_date': r['last_permit_date'] or '',
+                })
+
+        if search:
+            contractor_list = [c for c in contractor_list if search in c['name'].lower()]
 
         if sort_by == 'name':
             contractor_list.sort(key=lambda x: x['name'].lower(), reverse=reverse)
         elif sort_by == 'total_value':
-            contractor_list.sort(key=lambda x: x['total_value'], reverse=reverse)
+            contractor_list.sort(key=lambda x: x['total_value'] or 0, reverse=reverse)
         elif sort_by == 'most_recent_date':
             contractor_list.sort(key=lambda x: x['most_recent_date'] or '', reverse=reverse)
         else:
-            contractor_list.sort(key=lambda x: x['total_permits'], reverse=reverse)
+            contractor_list.sort(key=lambda x: x['total_permits'] or 0, reverse=reverse)
 
-        # Pagination
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 50))
         total = len(contractor_list)
         start = (page - 1) * per_page
         page_contractors = contractor_list[start:start + per_page]
