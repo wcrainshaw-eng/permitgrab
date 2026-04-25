@@ -301,7 +301,7 @@ FL DBPR covers 6+ cities (Miami-Dade, Orlando, Tampa, Hialeah, St. Petersburg, C
 | San Antonio | ArcGIS FeatureServer | services.arcgis.com/g1fRTDLeMgspWrYp/.../311_All_Service_Calls/FeatureServer/0 (V259) — ReasonName=Code Enforcement + TypeName whitelist |
 
 ### Known dead ends for violations
-San Diego (pre-2018 archive, live only via Accela scrape), Dallas (Socrata archives frozen 2018, no live ArcGIS feature service), Houston (CKAN Excel-only), Minneapolis (Tableau dashboard only — no REST feed), Henderson NV (ComDevServices/0 has CE Violations but ~80 building-relevant of 871; rest is STVR/parking/camping nuisance — low lead-gen value, skip until needed)
+San Diego (pre-2018 archive, live only via Accela scrape), Dallas (Socrata archives frozen 2018, no live ArcGIS feature service), Houston (CKAN Excel-only), Minneapolis (Tableau dashboard only — no REST feed), Henderson NV (ComDevServices/0 has CE Violations but ~80 building-relevant of 871; rest is STVR/parking/camping nuisance — low lead-gen value, skip until needed), **Las Vegas NV** (V313 2026-04-24: data.lasvegasnevada.gov TCP-times-out from Render egress; api.us.socrata.com federated search returns 0 LV datasets — LV not on Socrata at all; Clark County maps.clarkcountynv.gov has a CodeEnforcement folder but it lists empty; PW/Complaints8 is development-services-review workflow, not code enforcement; ArcGIS Hub at opendata-lasvegas.opendata.arcgis.com has a UI but DCAT 404 + search API 401. 380 phones on LV are an ad-ready candidate but violations gap is structurally unsolvable.)
 
 ---
 
