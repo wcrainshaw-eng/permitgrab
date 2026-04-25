@@ -1145,7 +1145,9 @@ body {
               <span style="color: var(--gray-400);">-</span>
               {% endif %}
             </td>
-            <td class="description hide-mobile" title="{{ permit.description or '' }}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}...{% endif %}</td>
+            <td class="description hide-mobile"
+                title="{{ permit.description or '' }}"
+                style="{% if permit.description and permit.description|length > 80 %}cursor: help; border-bottom: 1px dotted var(--gray-300);{% endif %}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}…{% endif %}</td>
             {% if not hide_value_column %}
             <td class="permit-value" style="text-align: right; font-variant-numeric: tabular-nums;{% if _val >= 100000 %} color: #166534; font-weight: 600;{% endif %}">
               {% if _val > 0 %}${{ "{:,.0f}".format(_val) }}{% else %}<span style="color: var(--gray-400);">—</span>{% endif %}
