@@ -43,6 +43,13 @@ have confirmed endpoints with contractor names — just add the config.
 - Boston MA: applicant is individual licensee names, not businesses
 - Naperville IL: data 14 months stale
 - All California major cities except Anaheim: no contractor field in permit APIs
+- Albuquerque NM: coageo.cabq.gov City_Building_Permits FS/0 has Owner+Applicant+Contractor fields populated with real businesses (TOFEL CONSTRUCTION, BRADBURY STAMM, HOME DEPOT) but newest DateIssued is 2024-04-12 — frozen 2 years (V339 probed 2026-04-25)
+- Tucson AZ: gis.tucsonaz.gov PDSD_ResidentialBldg MapServer/85 — 31-field schema has zero contractor/applicant/business field; only PROJECTNAME and DESCRIPTION (V339 probed 2026-04-25)
+- El Paso TX: ArcGIS portal returns mining permits + traffic permits; no building-permit feature service surfaces a contractor field (V339 probed 2026-04-25)
+- Lincoln NE: gis.lincoln.ne.gov Residential_New_Construction_Permits MS/0 has 53 fields but none contain contractor/applicant/business/builder data (V339 probed 2026-04-25)
+- Tulsa OK: ArcGIS search returns only a StoryMap citing 2023-2024 permits, no queryable feature service (V339 probed 2026-04-25)
+- Omaha NE: ArcGIS search returns 0 building-permit feature services for Omaha or Douglas County NE (V339 probed 2026-04-25)
+- Jacksonville FL: ArcGIS portal returns only Jacksonville OREGON UGB; data.coj.net not indexed in Socrata federated catalog (V339 probed 2026-04-25)
 
 ## Monitoring for New Cities
 
