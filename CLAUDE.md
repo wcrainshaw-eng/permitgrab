@@ -220,6 +220,21 @@ ssh -T $RENDER_SSH 'curl -s "https://example.com/arcgis/rest/services/.../MapSer
 - If newest record is from this week → PROCEED
 - 300K records from 2015 = worthless. 50 records from yesterday = gold.
 
+### Step 3b: HARD GATE — Verify contractor names BEFORE writing any code
+SSH into the endpoint and examine 5+ records. You MUST confirm ALL of these
+before writing ANY city_configs.py code:
+  ✓ A field exists with real business names (not license numbers, not codes)
+  ✓ At least 3 of 5 sample records have non-empty contractor names
+  ✓ Names look like real businesses ("Smith Plumbing LLC", not "EV1110")
+
+If ANY check fails → log a one-line dead-end in DEAD_ENDS.md and MOVE ON.
+Do NOT write any code. Do NOT create a PR. Do NOT modify city_configs.py.
+The entire check takes under 60 seconds via SSH.
+
+**Tempe, Aurora, Boulder, Las Vegas violations all had PRs written, merged,
+and deployed before discovering the data was unusable. That's 30+ minutes
+wasted per city. This gate prevents that.**
+
 ### Step 4: Check for Contractor Names
 The response MUST have a field containing real business names (not license numbers, not "N/A", not blank). Without contractor names → no profiles → city is useless.
 
@@ -238,6 +253,17 @@ FROM permits WHERE source_city_key = 'new-city-slug'
 GROUP BY source_city_key
 ```
 If permits > 0 AND with_name > 0 AND newest is recent → success.
+
+### Time Limits (ENFORCED)
+- City endpoint research: 5 minutes MAX. If you can't find a working
+  endpoint with contractor names in 5 minutes, log "needs research" and
+  move to the next city.
+- City config wiring: 5 minutes MAX. Copy a similar existing config,
+  change the fields, deploy.
+- Dead-end investigation: 2 minutes MAX. One SSH test. If it fails,
+  log one line and move on.
+- Total per city: 10 minutes. If a city isn't producing data in 10
+  minutes, skip it.
 
 ---
 
@@ -439,6 +465,38 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 
 7. **No 500 errors in recent logs**: Check Render dashboard or `scraper_runs` for errors
 
+### Visual UAT — Click Through as Three Personas (after EVERY template change)
+
+**LOGGED-OUT visitor:**
+  □ Homepage loads in < 5 seconds
+  □ Click a city → city page loads with data in unified table
+  □ Unified table has rows, pagination works, filter dropdown works
+  □ Click "Pricing" → pricing card is CENTERED, not left-aligned
+  □ Click "Sign Up" → signup form loads
+  □ Nav "Cities" dropdown opens on click, shows real cities
+  □ Footer links all work
+  □ No duplicate sections anywhere on city page
+
+**FREE user (test account):**
+  □ Login works, nav shows username
+  □ "Get Alerts" link visible in nav
+  □ City page shows same unified table + phone gating
+  □ Analytics page loads
+  □ Phone numbers are masked until reveal
+
+**PRO user (test pro account):**
+  □ All phones visible (no masking)
+  □ CSV export works
+  □ Intel dashboard loads
+  □ No "upgrade" prompts shown
+
+**For ALL personas, check:**
+  □ No elements visually misaligned (especially single-card layouts)
+  □ No broken links (click every nav item)
+  □ Page doesn't freeze or take > 5 seconds
+  □ FAQ text matches actual product (no references to nonexistent plans)
+  □ Mobile: hamburger menu works, no horizontal scroll
+
 ### After Every Deploy:
 1. Restart the daemon: `POST /api/admin/start-collectors`
 2. Wait 5 minutes, then check health
@@ -482,6 +540,16 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 9. **MapServer queries MUST include returnGeometry=false.**
 10. **The daemon must be restarted after every deploy** via POST /api/admin/start-collectors.
 11. **Auto-merge your own PRs.** You are the reviewer, the merger, and the deployer. After `gh pr create`, immediately squash-merge with `gh pr merge --squash --delete-branch`. Never leave a PR open waiting for someone to click a button. If a merge conflicts, rebase and retry — don't stop.
+12. **Check CITY_QUEUE.md first.** Before researching any new city, check if
+    it's already in the queue as "Ready to Wire" — if so, skip research and
+    just wire the config. If it's in "Dead Ends" — skip it entirely.
+13. **Batch dead-end logging.** Do NOT make a separate commit for each dead-end
+    city. Accumulate dead-ends during a work session and log them in ONE batch
+    commit to DEAD_ENDS.md at the end. Never spend more than 60 seconds
+    documenting a dead end.
+14. **Never ship untested infrastructure.** New dependencies (Sentry, monitoring
+    packages, etc.) MUST use guarded imports (try/except) and be tested locally
+    before deploying. The V287 Sentry incident wasted 45 minutes and 3 commits.
 
 ---
 
@@ -489,6 +557,22 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 
 You are not a task runner. You are the engineering team. When you finish something, you
 start the next thing. When you hit a wall, you pivot. When everything is green, you BUILD.
+
+### Work Priority: Fast Track First, Slow Track After
+
+**FAST TRACK (5 min each, do these first):**
+- Process cities from CITY_QUEUE.md "Ready to Wire" list
+- Fix known broken field_maps (one-line changes)
+- Run enrichment imports for cities that need phone refresh
+- Apply exact bug fixes from instruction files
+
+**SLOW TRACK (30+ min each, do after fast track is empty):**
+- Research new cities (update CITY_QUEUE.md)
+- Complex bug fixes requiring investigation
+- New feature development
+- Template changes + full visual UAT
+
+Always empty the fast track before starting slow track work.
 
 ### THE LOOP (run continuously, never exit)
 
