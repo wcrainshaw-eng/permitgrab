@@ -62,7 +62,7 @@
   margin-top: 12px;
   padding: 8px 0;
 }
-.site-nav .nav-dropdown:hover .dropdown-menu { display: block; }
+.site-nav .nav-dropdown.dropdown-open .dropdown-menu { display: block; }
 .site-nav .dropdown-menu a {
   display: block;
   padding: 10px 16px;
@@ -156,7 +156,7 @@
     background: rgba(255,255,255,.1);
     color: white;
   }
-  .site-nav .nav-dropdown.mobile-dropdown-open .dropdown-menu { display: block; }
+  .site-nav .nav-dropdown.dropdown-open .dropdown-menu { display: block; }
 }
 </style>
 
@@ -183,12 +183,12 @@
           <a href="/permits/chicago-il">Chicago</a>
           <a href="/permits/new-york-city">New York City</a>
           <a href="/permits/phoenix-az">Phoenix</a>
+          <a href="/permits/san-antonio-tx">San Antonio</a>
           <a href="/permits/miami-dade-county">Miami-Dade</a>
-          <a href="/permits/san-jose">San Jose</a>
           <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/austin-tx">Austin</a>
-          <a href="/permits/seattle">Seattle</a>
-          <a href="/permits/san-francisco">San Francisco</a>
+          <a href="/permits/san-jose">San Jose</a>
+          <a href="/permits/orlando-fl">Orlando</a>
+          <a href="/permits/cleveland-oh">Cleveland</a>
           {% endif %}
         </div>
       </div>
@@ -248,21 +248,33 @@
     });
   }
 
-  // Mobile dropdown toggles
-  if (window.innerWidth <= 768) {
-    document.querySelectorAll('.site-nav .nav-dropdown .dropdown-toggle').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        this.closest('.nav-dropdown').classList.toggle('mobile-dropdown-open');
+  // V327 (CODE_V320 Bug 2): click-toggle dropdowns on desktop AND mobile.
+  // Old behavior was pure CSS :hover on desktop — dropdown vanished the
+  // moment the cursor left, making nav unusable. Now click opens/closes
+  // and click-outside closes. One unified .dropdown-open class.
+  document.querySelectorAll('.site-nav .nav-dropdown .dropdown-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var dd = this.closest('.nav-dropdown');
+      // Close all other dropdowns first
+      document.querySelectorAll('.site-nav .nav-dropdown').forEach(function(other) {
+        if (other !== dd) other.classList.remove('dropdown-open');
       });
+      dd.classList.toggle('dropdown-open');
     });
-  }
+  });
 
-  // Close menu when clicking outside
+  // Close any open dropdown when clicking anywhere outside the nav
   document.addEventListener('click', function(e) {
-    if (!nav.contains(e.target) && nav.classList.contains('mobile-open')) {
+    if (!e.target.closest('.nav-dropdown')) {
+      document.querySelectorAll('.site-nav .nav-dropdown').forEach(function(dd) {
+        dd.classList.remove('dropdown-open');
+      });
+    }
+    if (nav && !nav.contains(e.target) && nav.classList.contains('mobile-open')) {
       nav.classList.remove('mobile-open');
-      toggle.textContent = '☰';
+      if (toggle) toggle.textContent = '☰';
     }
   });
 })();

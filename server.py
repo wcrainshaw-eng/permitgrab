@@ -8718,11 +8718,49 @@ def is_enterprise(user):
 # the right user. One DB lookup per request is fine; V69's "no DB
 # access" guard was needed during early boot churn that's long since
 # stabilized.
+_NAV_CITIES_CACHE = {'expires_at': 0, 'value': []}
+
+
+def _get_nav_cities():
+    """V327 (CODE_V320 Bug 1): cache the ad-ready dropdown list. The old
+    context processor returned [] which forced every template into the
+    9-city hardcoded fallback in partials/nav.html and dropped San
+    Antonio (3,828 phones, our #1 city). Querying prod_cities + profile
+    counts on every render would tank Render's single-worker latency
+    so we cache for 5 minutes."""
+    import time as _t
+    now = _t.time()
+    if now < _NAV_CITIES_CACHE['expires_at']:
+        return _NAV_CITIES_CACHE['value']
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute("""
+            SELECT pc.city_slug AS slug, pc.city AS name,
+                   COALESCE(cp.profiles, 0) AS profile_count
+            FROM prod_cities pc
+            LEFT JOIN (
+                SELECT source_city_key, COUNT(*) AS profiles
+                FROM contractor_profiles
+                GROUP BY source_city_key
+            ) cp ON cp.source_city_key = pc.city_slug
+            WHERE pc.status = 'active' AND COALESCE(cp.profiles, 0) > 50
+            ORDER BY profile_count DESC
+            LIMIT 20
+        """).fetchall()
+        cities = [{'slug': r['slug'], 'name': r['name']} for r in rows or []]
+    except Exception:
+        cities = []
+    _NAV_CITIES_CACHE['value'] = cities
+    _NAV_CITIES_CACHE['expires_at'] = now + 300
+    return cities
+
+
 @app.context_processor
 def inject_nav_context():
-    """Populate user/is_pro/is_enterprise for every template render.
-    Falls back to anonymous defaults on any lookup failure so this
-    can never break a request. V252 F1 added is_enterprise."""
+    """Populate user/is_pro/is_enterprise/nav_cities for every template
+    render. Falls back to anonymous defaults on any lookup failure so this
+    can never break a request. V252 F1 added is_enterprise. V327 wired
+    nav_cities to prod_cities (was an empty list, forcing fallback)."""
     user = None
     plan = 'anonymous'
     pro = False
@@ -8743,7 +8781,7 @@ def inject_nav_context():
         'user_plan': plan,
         'is_pro': pro,
         'is_enterprise': enterprise,
-        'nav_cities': []
+        'nav_cities': _get_nav_cities(),
     }
 
 
