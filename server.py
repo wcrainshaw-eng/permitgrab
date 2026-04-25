@@ -8244,6 +8244,15 @@ def load_stats():
     except Exception:
         return {}
 
+# V349 (CODE_V333 Part 4 FIX 3): cache get_cities_with_data() output.
+# 47 call sites across the file, called twice per city render (footer +
+# nearby cities) plus on every homepage/dashboard load. Each call hits
+# permitdb.get_prod_cities() which scans the prod_cities table. Caching
+# this for 5 min avoids the per-request scan.
+_CITIES_WITH_DATA_CACHE = {'expires_at': 0, 'value': None}
+_CITIES_WITH_DATA_TTL = 300
+
+
 def get_cities_with_data():
     """V15/V34: Get cities with VERIFIED data, sorted by permit volume.
 
@@ -8253,7 +8262,16 @@ def get_cities_with_data():
 
     V15: Uses prod_cities table if available (collector redesign).
     Falls back to heuristics-based filtering if prod_cities is empty.
+
+    V349: Internal 5-min in-memory cache. Repeat callers get the same list
+    object back without a DB hit.
     """
+    import time as _t
+    _now = _t.time()
+    _cached = _CITIES_WITH_DATA_CACHE
+    if _cached['value'] is not None and _now < _cached['expires_at']:
+        return _cached['value']
+
     # V15/V34: Try prod_cities first (collector redesign)
     # V34: total_permits is synced with actual DB counts on startup,
     # so we can trust it for filtering. No expensive JOIN needed per-request.
@@ -8262,6 +8280,8 @@ def get_cities_with_data():
             # min_permits=1 filters out cities with 0 real permits
             prod_cities = permitdb.get_prod_cities(status='active', min_permits=1)
             if prod_cities:
+                _CITIES_WITH_DATA_CACHE['value'] = prod_cities
+                _CITIES_WITH_DATA_CACHE['expires_at'] = _now + _CITIES_WITH_DATA_TTL
                 return prod_cities
     except Exception as e:
         print(f"[V15] Error getting prod_cities: {e}")
@@ -8513,6 +8533,9 @@ def get_cities_with_data():
 
     # Sort by permit count descending (top cities first)
     cities_with_counts.sort(key=lambda x: x.get('permit_count', 0), reverse=True)
+    # V349: cache the heuristic-fallback result too.
+    _CITIES_WITH_DATA_CACHE['value'] = cities_with_counts
+    _CITIES_WITH_DATA_CACHE['expires_at'] = _now + _CITIES_WITH_DATA_TTL
     return cities_with_counts
 
 
