@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Dashboard — PermitGrab</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #2563eb; --accent: #f97316; --accent-dark: #ea580c;
+  --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+  --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563;
+  --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+       background: var(--gray-50); color: var(--gray-800); line-height: 1.5; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+.welcome { font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; }
+.sub { color: var(--gray-500); font-size: 14px; margin-bottom: 28px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.card { background: white; border: 1px solid var(--gray-200); border-radius: 10px; padding: 18px 20px; }
+.card-label { color: var(--gray-500); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.card-value { font-size: 26px; font-weight: 700; color: var(--gray-900); margin-top: 6px; }
+.card-value small { font-size: 14px; font-weight: 500; color: var(--gray-500); }
+.section { background: white; border: 1px solid var(--gray-200); border-radius: 10px; padding: 22px 24px; margin-bottom: 20px; }
+.section h2 { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--gray-100); text-align: left; }
+th { color: var(--gray-500); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .05em; }
+td a { color: var(--primary); text-decoration: none; }
+td a:hover { text-decoration: underline; }
+.plan-pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+             background: #dcfce7; color: #166534; }
+.plan-pill.free { background: #fef3c7; color: #92400e; }
+a.btn { display: inline-block; padding: 8px 14px; background: var(--accent); color: white; text-decoration: none;
+        border-radius: 6px; font-size: 13px; font-weight: 600; }
+a.btn-outline { background: white; border: 1px solid var(--gray-300); color: var(--gray-700); }
+.empty { color: var(--gray-500); font-style: italic; }
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<div class="wrap">
+  <div class="welcome">Welcome back, {{ user.name or user.email.split('@')[0] }}</div>
+  <div class="sub">
+    {% if is_pro %}
+      <span class="plan-pill">Pro — $149/mo</span>
+      &middot; <a href="/account" style="color: var(--primary);">Manage account</a>
+    {% else %}
+      <span class="plan-pill free">Free</span>
+      &middot; <a href="/pricing" style="color: var(--primary);">Upgrade to Pro →</a>
+    {% endif %}
+  </div>
+
+  {# Top-line stats across the cities that actually have data. #}
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Ad-Ready Cities</div>
+      <div class="card-value">{{ ad_ready_count|default(0) }} <small>/ {{ total_cities|default(0) }}</small></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Permits this week</div>
+      <div class="card-value">{{ "{:,}".format(permits_week|default(0)) }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Active contractors</div>
+      <div class="card-value">{{ "{:,}".format(active_contractors|default(0)) }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Violations tracked</div>
+      <div class="card-value">{{ "{:,}".format(violations_count|default(0)) }}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Your Tracked Cities</h2>
+    {% if tracked_cities %}
+    <table>
+      <thead>
+        <tr><th>City</th><th>Permits</th><th>Contractors</th><th>Phones</th><th>Violations</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for c in tracked_cities %}
+        <tr>
+          <td>{{ c.name }}, {{ c.state }}</td>
+          <td>{{ "{:,}".format(c.permits or 0) }}</td>
+          <td>{{ "{:,}".format(c.profiles or 0) }}</td>
+          <td>{{ c.phones or 0 }}</td>
+          <td>{{ "{:,}".format(c.violations or 0) }}</td>
+          <td><a href="/permits/{{ c.slug }}">Browse permits →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No tracked cities yet. <a href="/cities">Browse all cities →</a></p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Recent Permits</h2>
+    {% if recent_permits %}
+    <table>
+      <thead>
+        <tr><th>Date</th><th>City</th><th>Address</th><th>Type</th><th>Contractor</th></tr>
+      </thead>
+      <tbody>
+      {% for p in recent_permits %}
+        <tr>
+          <td>{{ p.date }}</td>
+          <td><a href="/permits/{{ p.source_city_key }}">{{ p.city }}</a></td>
+          <td>{{ p.address or '—' }}</td>
+          <td>{{ p.permit_type or '—' }}</td>
+          <td>{{ p.contractor_name or p.contact_name or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No recent permits across your tracked cities.</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Quick Actions</h2>
+    <p style="margin-bottom: 12px; color: var(--gray-600); font-size: 13px;">
+      Jump into the product.
+    </p>
+    <a class="btn" href="/browse">Browse All Permits</a>
+    <a class="btn btn-outline" href="/contractors" style="margin-left: 8px;">Find Contractors</a>
+    <a class="btn btn-outline" href="/my-leads" style="margin-left: 8px;">My Leads</a>
+    {% if is_pro %}
+    <a class="btn btn-outline" href="/analytics" style="margin-left: 8px;">Analytics</a>
+    {% endif %}
+  </div>
+</div>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>
