@@ -2935,6 +2935,54 @@ def admin_refresh_emblems():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/backfill-property-owners', methods=['POST'])
+def admin_backfill_property_owners():
+    """V356 (CODE_V351 Part 3 Step 2): seed property_owners from the
+    owner_name field already present on permits for cities whose feeds
+    expose it (NYC, Miami-Dade today; more as field_maps add owner_name).
+
+    Body or query param: city (optional). When unset, runs across all
+    cities that have any permit with a non-empty owner_name. Idempotent
+    via INSERT OR IGNORE on (source_city_key, owner_name, property_address)
+    — re-running adds new rows but doesn't dedupe existing ones.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        body = request.get_json(silent=True) or {}
+        city_slug = body.get('city') or request.args.get('city')
+        conn = permitdb.get_connection()
+        if city_slug:
+            sql = """
+                INSERT INTO property_owners (source_city_key, owner_name,
+                                             property_address, data_source)
+                SELECT DISTINCT source_city_key, owner_name, address, 'permit_record'
+                FROM permits
+                WHERE source_city_key = ?
+                  AND owner_name IS NOT NULL AND owner_name != ''
+            """
+            cursor = conn.execute(sql, (city_slug,))
+        else:
+            sql = """
+                INSERT INTO property_owners (source_city_key, owner_name,
+                                             property_address, data_source)
+                SELECT DISTINCT source_city_key, owner_name, address, 'permit_record'
+                FROM permits
+                WHERE owner_name IS NOT NULL AND owner_name != ''
+            """
+            cursor = conn.execute(sql)
+        rows = cursor.rowcount
+        conn.commit()
+        return jsonify({
+            'status': 'ok',
+            'rows_inserted': rows,
+            'scope': city_slug or 'all_cities',
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/enrich-contractors', methods=['POST'])
 def admin_enrich_contractors():
     """V182: Enrich contractor_profiles for one city via Google Places.
