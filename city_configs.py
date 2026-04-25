@@ -37702,29 +37702,39 @@ CITY_REGISTRY = {
         "lat": 42.374,
         "lon": -71.110,
         "platform": "socrata",
-        "endpoint": "https://data.cambridgema.gov/resource/9qm7-wbdc.json",
-        "dataset_id": "9qm7-wbdc",
-        "description": "City of Cambridge MA Building Permits",
+        # V316: switched from 9qm7-wbdc (New Construction) to qu2z-8suj
+        # (Addition/Alteration). 9qm7 lacks firm_name; qu2z exposes
+        # firm_name with real businesses ("Long Home LLC", "Vining
+        # Construction", "Rogers Insulation Specialists Co Inc") in
+        # 98.4% of 2026 records (425 of 432 verified 2026-04-24).
+        # The daemon's prod_cities source_id is cambridge_ma, so this
+        # is the entry that actually drives Cambridge data flow.
+        # Was previously a duplicate of the "cambridge" registry key
+        # but with a worse dataset.
+        "endpoint": "https://data.cambridgema.gov/resource/qu2z-8suj.json",
+        "dataset_id": "qu2z-8suj",
+        "description": "Cambridge MA Building Permits: Addition/Alteration",
         "field_map": {
             "permit_number": "id",
             "permit_type": "permit_type",
             "address": "full_address",
-            "filing_date": "issue_date",
-            "description": "description_of_work",
+            "filing_date": "applicant_submit_date",
+            "issue_date": "issue_date",
+            "description": "detailed_description_of_work",
             "status": "status",
-            "estimated_cost": "total_cost_of_construction",
+            "estimated_cost": "building_cost",
+            "total_cost": "total_cost",
             "latitude": "latitude",
             "longitude": "longitude",
-            "architect_name": "architect_name",
-            "architect_firm": "architect_firm",
-            "construction_type": "construction_type",
-            "stories_above_grade": "stories_above_grade",
-            "gross_square_footage": "gross_square_footage",
+            "contractor_name": "firm_name",
+            "contact_name": "applicant_name",
+            "license_number": "license_number",
+            "parcel": "mbl",
         },
-        "date_field": "issue_date",
+        "date_field": "applicant_submit_date",
         "limit": 2000,
         "active": True,
-        "notes": "V92: Cambridge MA. Rich data with architect, sq footage, construction type. Data through Apr 2026.",
+        "notes": "V92→V316: switched to qu2z-8suj for firm_name (real businesses). 425/432 2026 records have firm_name populated.",
     },
 
     "peoria_az": {
