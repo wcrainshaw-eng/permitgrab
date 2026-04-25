@@ -86,6 +86,14 @@ A city is "ad-ready" when it has ALL THREE:
 - **Tyler TX** (services5.arcgis.com/RmXXW3PwBZGOxlSe): `CONTRACTOR_NAME` field exists with real businesses ("BAILEY ELECTRIC") but zero records with ISSUED >= 2026-01-01. Dataset metadata was updated but record volume frozen at 2021. Dead by freshness.
 - **Fremont/Irvine/Chula Vista/Bakersfield/Anaheim-alt/Plano/Garland/Arlington TX/Winston-Salem/Fayetteville NC/Chandler AZ/Peoria AZ/Fort Wayne IN/Spokane WA/Moreno Valley/Oxnard/Fontana/Huntington Beach/Oceanside/Santa Clarita/Overland Park KS/Newport News VA/Jersey City NJ/Tacoma WA/SLC UT/Knoxville TN/Providence RI/Grand Rapids MI/Akron OH/Des Moines IA/Anchorage AK/St Louis/Milwaukee/Baltimore/Wichita** — tried ArcGIS Hub DCAT + direct Socrata catalogs across ~40 host patterns each. None expose a permit feed with a contractor-name field via OPEN portals. Either on Accela/Viewpoint (paid scraping), or state-licensing-DB only, or no digital portal.
 
+### V321/V322 broken-extraction sweep 2026-04-25
+Audited all cities in DB with permits>1000 + profiles<100 + fresh data. Findings (slug pre-flight + schema probe):
+- **Newport Beach CA** (newport_beach_ca, ArcGIS DashBuildingPermits): 1,679 permits, schema 33 fields, NONE contractor-related. Dead.
+- **Fayetteville NC** (fayetteville_nc, ArcGIS SPA_Dashboard_Permits): 1,386 permits, 25-field schema with no contractor field. Dead.
+- **Richmond VA + Palmdale CA** — both Accela platform, known dead-end pattern (HTML grid, no contractor column).
+- **austin_tx, tempe_az_arcgis, seattle_wa**: prod_cities source_ids that are ORPHANED — no matching CITY_REGISTRY key. Daemon's `collect_single_city` falls through to 'not_found'. Tempe/Seattle/Austin are also independently structurally dead (no contractor in source). Not worth fixing the slug routing for these.
+- **dallas** (registry key, dallas ArcGIS T_BU_Permits_FY2023_24): 14,336 permits with 13,570 contractor names + phone/email, BUT newest ISSUE_DATE is 2023-12-29 (frozen 16 months). Could be backfilled as historical contractor reference but stale-by-our-rules.
+
 ### V317/V318/V319 dead-ends 2026-04-24 (new-city hunt continued)
 - **Boulder CO**: maps.bouldercolorado.gov ArcGIS root has 14 folders but only `pds/ExportPermitWebMap` (geoprocessor, not data), `plan/ROWPermit2` (right-of-way only — sidewalk/utility cuts), and `cv/CommuterPermitNetworkLayer` / `ParkingPermitsMap` (commuter/parking). No building permits feed exposed.
 - **Honolulu HI**: data.honolulu.gov has 8 permit datasets but newest (4vab-c87q "Building Permits Jan 2005-June 30, 2025") is 10 months stale. Other datasets frozen 2016-2019. Dead by freshness.
