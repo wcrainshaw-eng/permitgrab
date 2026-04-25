@@ -1791,10 +1791,24 @@ def normalize_violation(record, city_config, endpoint):
     # + 'carto_base'). Fall back through a sane prefix ladder so the
     # source_violation_id stays unique across sources and Philly's L&I
     # Carto feed stops raising KeyError here and getting silently dropped.
+    # V323: id_prefix derivation must avoid IndexError when none of the
+    # platform-specific keys are present. The previous chain called
+    # ''.rsplit('/', 2)[-2] unconditionally — for CKAN endpoints (no
+    # arcgis_url, no resource_id, no carto_table) that raised IndexError
+    # inside normalize_violation, which is caught silently in the outer
+    # try/except — every Pittsburgh record was dropped (92K api_rows,
+    # 0 inserted). Guard the rsplit and add ckan_resource_id to the chain.
+    _arcgis_seg = ''
+    _arc_url = endpoint.get('arcgis_url') or ''
+    if _arc_url:
+        _parts = _arc_url.rsplit('/', 2)
+        if len(_parts) >= 2:
+            _arcgis_seg = _parts[-2]
     id_prefix = (
         endpoint.get('resource_id')
         or endpoint.get('carto_table')
-        or endpoint.get('arcgis_url', '').rsplit('/', 2)[-2]
+        or endpoint.get('ckan_resource_id')
+        or _arcgis_seg
         or 'violations'
     )
     source_id = f"{id_prefix}_{vid}" if vid else None
