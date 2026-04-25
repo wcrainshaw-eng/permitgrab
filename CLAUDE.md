@@ -550,6 +550,11 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 14. **Never ship untested infrastructure.** New dependencies (Sentry, monitoring
     packages, etc.) MUST use guarded imports (try/except) and be tested locally
     before deploying. The V287 Sentry incident wasted 45 minutes and 3 commits.
+15. **City expansion is PAUSED.** The top 200 US cities by population have been
+    investigated. CITY_QUEUE.md "Ready to Wire" is nearly empty. Do NOT spend
+    ANY time probing new cities unless Wes explicitly adds them to CITY_QUEUE.md
+    "Ready to Wire" section. If you finish all other work, run enrichment imports
+    or data quality audits — never city hunting.
 
 ---
 
@@ -584,7 +589,12 @@ Always empty the fast track before starting slow track work.
 
 #### Phase 2: GROW THE DATA (every session)
 5. Phone enrichment → check near-miss cities, trigger imports if needed
-6. City expansion → pick next city from top 100 by population, research → test → add
+6. **CITY EXPANSION (PAUSED — DO NOT RUN)** — Top 200 US cities have been
+   investigated; 60+ cities are confirmed dead ends in CITY_QUEUE.md. Do NOT
+   probe new cities. If "Ready to Wire" has entries, wire those ONLY. Otherwise
+   skip this phase entirely. Redirect time to: enrichment imports (re-run FL
+   DBPR, MN DLI, NY DOL, WA L&I, CA CSLB), data quality audits, property owner
+   pipeline (Phase 8).
 7. Violation expansion → find sources for cities that have profiles but no violations
 8. Backfill any cities with <6 months of data
 
