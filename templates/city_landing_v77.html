@@ -1384,83 +1384,11 @@ function v328ApplyFilter(val) {
 </section>
 {% endif %}
 
-<!-- V252 F3: STALLED PROJECTS — permits 6-12mo old still marked active/open.
-     High-intent handover leads: the homeowner probably fired their contractor
-     or ran out of money. Whoever reaches them first usually wins the work. -->
-{% if stalled_permits %}
-<section class="section">
-  <div class="section-header">
-    <h2>Stalled Projects in {{ city_name }}</h2>
-    <p>Permits filed 6–12 months ago that are still marked active/open — prime handover opportunities for contractors willing to step in.</p>
-  </div>
-  <div class="permits-table-container">
-    <div class="permits-table-wrap">
-      <table class="permits-table">
-        <thead>
-          <tr>
-            <th>Filed</th>
-            <th>Address</th>
-            <th>Type</th>
-            <th style="text-align: right;">Value</th>
-            <th>Original Contractor</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in stalled_permits %}
-          <tr>
-            <td>{{ (p.permit_date or '')[:10] }}</td>
-            <td>{{ p.address or '—' }}</td>
-            <td>{{ p.permit_type or '—' }}</td>
-            <td style="text-align: right; font-variant-numeric: tabular-nums;">
-              {% if p.estimated_cost and p.estimated_cost > 0 %}${{ "{:,.0f}".format(p.estimated_cost) }}{% else %}—{% endif %}
-            </td>
-            <td>
-              {% if session.get('user_email') and is_pro %}
-                {{ p.contractor_name or '—' }}
-              {% else %}
-                <a href="/signup?next=/permits/{{ city_slug }}" class="gate-reveal-btn">🔒 Reveal</a>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% if not (session.get('user_email') and is_pro) %}
-  <p style="margin-top: 12px; font-size: 13px; color: var(--gray-500); text-align: center;">
-    Subscribe to see the original contractor on each stalled project and contact the property owner directly.
-  </p>
-  {% endif %}
-</section>
-{% endif %}
-
-<!-- V251 F13: ZIP HEATMAP — top 10 zips by permit volume, click to filter.
-     Hidden when the city's data source doesn't populate zip (Chicago,
-     Orlando, Phoenix permit feeds omit zip, so the grid stays empty). -->
-{% if zip_heatmap %}
-{% set _max_z = zip_heatmap | map(attribute='permits_total') | max %}
-<section class="section">
-  <div class="section-header">
-    <h2>Permit Activity by Zip Code</h2>
-    <p>Top 10 zips in {{ city_name }} by permit volume. Click a cell to filter the tables above.</p>
-  </div>
-  <div class="zip-heatmap">
-    {% for z in zip_heatmap %}
-    {# 0..1 intensity from permits_total vs max for this city. Clamp to 0.12
-       minimum so the least-active cell still reads as an active cell. #}
-    {% set _intensity = (z.permits_total / _max_z) if _max_z else 0 %}
-    {% set _alpha = 0.12 + (_intensity * 0.78) %}
-    <a class="zip-cell" href="/permits/{{ city_slug }}?zip={{ z.zip }}"
-       style="background: rgba(37, 99, 235, {{ '%.2f' % _alpha }}); color: {% if _intensity > 0.55 %}white{% else %}var(--gray-900){% endif %};">
-      <div class="zip-label">{{ z.zip }}</div>
-      <div class="zip-total">{{ "{:,}".format(z.permits_total) }}</div>
-      <div class="zip-sub">{{ z.permits_90d }}/90d &middot; {{ z.contractors }} contractors</div>
-    </a>
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
+<!-- V355 (CODE_V351 Part 2 Bug E): "Stalled Projects" (V252 F3) and "Permit
+     Activity by Zip Code" (V251 F13) sections were rendered below-fold and
+     contributed two extra aggregate queries per page load. Removed entirely
+     per directive. server.py now defaults stalled_permits=[] and
+     zip_heatmap=[] so any partial that still references them is a no-op. -->
 
 <!-- V251 F14: PERMIT TYPES BREAKDOWN — now with a horizontal CSS bar chart
      alongside the card grid. No JS dependency. Bar width = share of this

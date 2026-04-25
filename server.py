@@ -15187,51 +15187,15 @@ def city_landing_inner(city_slug):
         city_slug, limit=25, new_this_week_only=_new_week_only
     )
 
-    # V252 F3: stalled permits — permits 6-12 months old that are still
-    # active / open / issued. Homeowner likely fired their contractor or
-    # ran out of money; these are the HOTTEST handover leads for
-    # contractors willing to take over. Limit 10 shown on the page.
+    # V355 (CODE_V351 Part 2 Bug E): the stalled-projects (V252 F3) and
+    # zip-heatmap (V251 F13) sections are removed from the city page in
+    # this same PR. Their backing queries scanned the full per-city permits
+    # slice (two more aggregate scans on top of V338's stats cache) and
+    # were rendered below-fold where almost nobody scrolls. Defaulting both
+    # collections to [] keeps the template variable contract for any other
+    # caller / partial that still references them.
     stalled_permits = []
-    if _prod_city_id:
-        try:
-            _sconn = permitdb.get_connection()
-            stalled_permits = [dict(r) for r in _sconn.execute("""
-                SELECT address, contractor_name, permit_type, estimated_cost,
-                       COALESCE(filing_date, issued_date, date) as permit_date
-                FROM permits
-                WHERE prod_city_id = ?
-                  AND COALESCE(filing_date, issued_date, date) BETWEEN date('now', '-12 months') AND date('now', '-6 months')
-                  AND LOWER(COALESCE(status, '')) IN ('active', 'open', 'issued')
-                ORDER BY (estimated_cost IS NULL), estimated_cost DESC
-                LIMIT 10
-            """, (_prod_city_id,)).fetchall()]
-        except Exception as e:
-            print(f"[V252 F3] stalled permits query failed for {city_slug}: {e}", flush=True)
-
-    # V251 F13: zip heatmap — top 10 zip codes by permit volume with
-    # contractor counts and 90-day permit counts for trend signal.
-    # Skipped silently when the city's permit feed doesn't populate zip
-    # (Chicago, Orlando, Phoenix data sources don't). Uses a fresh
-    # connection since the page-scoped `conn` can have a stale cursor
-    # by the time we reach here — same pattern as F2 dropdowns.
     zip_heatmap = []
-    if _prod_city_id:
-        try:
-            _hconn = permitdb.get_connection()
-            zip_heatmap = [dict(r) for r in _hconn.execute("""
-                SELECT zip,
-                       COUNT(*) as permits_total,
-                       COUNT(CASE WHEN COALESCE(filing_date, issued_date, date)
-                                  >= date('now', '-90 days') THEN 1 END) as permits_90d,
-                       COUNT(DISTINCT contractor_name) as contractors
-                FROM permits
-                WHERE prod_city_id = ? AND zip IS NOT NULL AND zip != ''
-                GROUP BY zip
-                ORDER BY permits_total DESC
-                LIMIT 10
-            """, (_prod_city_id,)).fetchall()]
-        except Exception as e:
-            print(f"[V251 F13] zip heatmap query failed for {city_slug}: {e}", flush=True)
 
     # V226 T10: compute freshness age in days so the template can bucket
     # the badge into fresh / aging / stale. None when we don't have a date.
