@@ -15193,6 +15193,115 @@ def city_landing_inner(city_slug):
     except Exception as e:
         print(f"[V312 violations] query failed for {city_slug}: {e}", flush=True)
 
+    # V328 (CODE_V320 Part B): unified permits + violations table.
+    # Replaces both the "Recent Permits" preview and the V312 violations
+    # block with one date-sorted feed plus a filter dropdown and proper
+    # pagination. Reads ?page, ?filter, ?per_page from the request.
+    try:
+        _filter = (request.args.get('filter', 'all') or 'all').lower()
+        if _filter not in ('all', 'permits', 'violations'):
+            _filter = 'all'
+        try:
+            _page = max(1, int(request.args.get('page', 1) or 1))
+            _per_page = max(10, min(100, int(request.args.get('per_page', 25) or 25)))
+        except (TypeError, ValueError):
+            _page, _per_page = 1, 25
+    except Exception:
+        _filter, _page, _per_page = 'all', 1, 25
+
+    unified_records = []
+    total_records = 0
+    try:
+        _uconn = permitdb.get_connection()
+        if _filter == 'permits':
+            count_row = _uconn.execute(
+                "SELECT COUNT(*) AS n FROM permits WHERE source_city_key = ?",
+                (city_slug,)
+            ).fetchone()
+            total_records = (count_row['n'] if count_row else 0) or 0
+            unified_records = [{
+                'record_type': 'permit',
+                'record_date': r['record_date'],
+                'address': r['address'],
+                'type_label': r['type_label'],
+                'description': r['description'],
+                'contractor_name': r['contractor_name'],
+                'status': None,
+            } for r in _uconn.execute("""
+                SELECT COALESCE(filing_date, issued_date, date) AS record_date,
+                       address,
+                       permit_type AS type_label,
+                       description,
+                       contractor_name
+                FROM permits
+                WHERE source_city_key = ?
+                  AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                ORDER BY record_date DESC
+                LIMIT ? OFFSET ?
+            """, (city_slug, _per_page, (_page - 1) * _per_page)).fetchall()]
+        elif _filter == 'violations':
+            count_row = _uconn.execute(
+                "SELECT COUNT(*) AS n FROM violations WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?)",
+                (filter_name, filter_state)
+            ).fetchone()
+            total_records = (count_row['n'] if count_row else 0) or 0
+            unified_records = [{
+                'record_type': 'violation',
+                'record_date': r['record_date'],
+                'address': r['address'],
+                'type_label': r['type_label'],
+                'description': r['description'],
+                'contractor_name': None,
+                'status': r['status'] or 'Open',
+            } for r in _uconn.execute("""
+                SELECT violation_date AS record_date,
+                       address,
+                       COALESCE(violation_type, '') AS type_label,
+                       violation_description AS description,
+                       status
+                FROM violations
+                WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?)
+                ORDER BY violation_date DESC
+                LIMIT ? OFFSET ?
+            """, (filter_name, filter_state, _per_page, (_page - 1) * _per_page)).fetchall()]
+        else:
+            count_row = _uconn.execute("""
+                SELECT
+                  (SELECT COUNT(*) FROM permits WHERE source_city_key = ?) +
+                  (SELECT COUNT(*) FROM violations
+                   WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?))
+                AS n
+            """, (city_slug, filter_name, filter_state)).fetchone()
+            total_records = (count_row['n'] if count_row else 0) or 0
+            unified_records = [dict(r) for r in _uconn.execute("""
+                SELECT 'permit' AS record_type,
+                       COALESCE(filing_date, issued_date, date) AS record_date,
+                       address,
+                       permit_type AS type_label,
+                       description,
+                       contractor_name,
+                       NULL AS status
+                FROM permits
+                WHERE source_city_key = ?
+                  AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                UNION ALL
+                SELECT 'violation' AS record_type,
+                       violation_date AS record_date,
+                       address,
+                       COALESCE(violation_type, '') AS type_label,
+                       violation_description AS description,
+                       NULL AS contractor_name,
+                       COALESCE(status, 'Open') AS status
+                FROM violations
+                WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?)
+                ORDER BY record_date DESC
+                LIMIT ? OFFSET ?
+            """, (city_slug, filter_name, filter_state, _per_page, (_page - 1) * _per_page)).fetchall()]
+    except Exception as e:
+        print(f"[V328 unified] query failed for {city_slug}: {e}", flush=True)
+
+    _total_pages = max(1, (total_records + _per_page - 1) // _per_page)
+
     # V251 F2: available zips and trades for the filter dropdowns. Narrowed
     # to the top 20 most-common zips so the select stays usable (some big
     # cities have 100+ zips). Use a fresh connection (the page-scoped `conn`
@@ -15271,6 +15380,12 @@ def city_landing_inner(city_slug):
         violations=violations_rows,            # V312 (Bug 13)
         violations_count=violations_total,     # V312 (Bug 13)
         hide_value_column=hide_value_column,   # V312 (Bug 8)
+        unified_records=unified_records,       # V328 (CODE_V320 Part B)
+        total_records=total_records,           # V328
+        current_page=_page,                    # V328
+        total_pages=_total_pages,              # V328
+        current_filter=_filter,                # V328
+        per_page=_per_page,                    # V328
         market_insights=market_insights,  # V236 PR#5
         property_owners=_get_property_owners(config['name'], current_state, limit=10),  # V284
         # V251 F2: filter dropdown context

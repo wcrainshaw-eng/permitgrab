@@ -1094,74 +1094,99 @@ body {
     {% endfor %}
   </div>
   {% endif %}
+  {# V328 (CODE_V320 Part B): unified permits + violations table. Replaces
+     both the old "Recent Permits" preview table and the V312 violations
+     section with one date-sorted feed, a filter dropdown
+     (Permits & Violations / Permits Only / Violations Only), and proper
+     pagination. Server reads ?page, ?filter, ?per_page from the URL. #}
   <div class="permits-table-container">
-    <div class="permits-table-header">
-      <h3>Recent Permits</h3>
-      {# V327 (CODE_V320 Bug 3): keep on-city link instead of /?city= which
-         dropped auth state by routing through homepage. Pagination + filter
-         lands in V328 (Part B). #}
-      <a href="/permits/{{ city_slug }}">View all {{ permit_count }} permits &rarr;</a>
+    <div class="permits-table-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h3>Building Activity in {{ city_name }}</h3>
+        <p style="font-size: 13px; color: var(--gray-500); margin-top: 4px;">
+          {{ "{:,}".format(total_records or 0) }} records — permits and code violations sorted by date
+        </p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <select id="record-filter" onchange="v328ApplyFilter(this.value)"
+                style="padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; background: white; color: var(--gray-700); cursor: pointer;">
+          <option value="all" {% if current_filter == 'all' %}selected{% endif %}>Permits &amp; Violations</option>
+          <option value="permits" {% if current_filter == 'permits' %}selected{% endif %}>Permits Only</option>
+          <option value="violations" {% if current_filter == 'violations' %}selected{% endif %}>Violations Only</option>
+        </select>
+        <a href="/api/permits/{{ city_slug }}/export.csv" download
+           style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; color: var(--gray-700); text-decoration: none; font-weight: 500;">📥 CSV</a>
+      </div>
     </div>
     <div class="permits-table-wrap">
       <table class="permits-table">
         <thead>
           <tr>
             <th>Date</th>
+            <th style="width: 90px;">Type</th>
             <th>Address</th>
-            <th>Type</th>
-            <th class="hide-mobile">Description</th>
-            {% if not hide_value_column %}<th style="text-align: right;">Value</th>{% endif %}
-            <th>Contractor/Applicant</th>
+            <th class="hide-mobile">Details</th>
+            <th>Contractor / Status</th>
           </tr>
         </thead>
         <tbody id="permits-tbody">
-          {% for permit in recent_permits[:25] %}
-          {# V209-3: NEW badge for permits filed in the last 7 days #}
-          {% set is_new = permit.filing_date and permit.filing_date >= current_week_start %}
-          {# V251 F8: estimated_cost may be a number, None (→ '—' via V223
-             cleanup), or a blank string. Try a float conversion; anything
-             that fails or is ≤0 renders a dash. #}
-          {% set _val = 0 %}
-          {% if permit.estimated_cost is number %}
-            {% set _val = permit.estimated_cost %}
-          {% endif %}
-          {# V310 (CODE_V280b PR2): clickable row → expand address-centric
-             detail card. data-address fuels the /api/address-detail lookup. #}
-          <tr data-trade="{{ permit.trade_category or '' }}"
-              data-address="{{ permit.address or '' }}"
+          {% for r in unified_records %}
+          <tr data-address="{{ r.address or '' }}"
               data-city-slug="{{ city_slug }}"
               style="cursor: pointer;"
               onclick="v310ToggleDetail(this)">
+            <td>{{ (r.record_date[:10] if r.record_date else '—') }}</td>
             <td>
-              {# Strip time component — some sources (DC, Miami-Dade) deliver
-                 ISO timestamps like "2026-02-20T00:00:00.000" that leak into
-                 the table verbatim. Truncate to 10 chars so every date renders
-                 as YYYY-MM-DD regardless of source format. #}
-              {{ (permit.filing_date[:10] if permit.filing_date else 'N/A') }}
-              {% if is_new %}<span class="badge-new">NEW</span>{% endif %}
-            </td>
-            <td class="address">{{ permit.address or 'Address not listed' }}</td>
-            <td>
-              {% if permit.permit_type %}
-              <span class="permit-type">{{ permit.permit_type }}</span>
+              {% if r.record_type == 'permit' %}
+              <span class="permit-type">{{ r.type_label or 'Permit' }}</span>
               {% else %}
-              <span style="color: var(--gray-400);">-</span>
+              <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">Violation</span>
               {% endif %}
             </td>
+            <td class="address">{{ r.address or '—' }}</td>
             <td class="description hide-mobile"
-                title="{{ permit.description or '' }}"
-                style="{% if permit.description and permit.description|length > 80 %}cursor: help; border-bottom: 1px dotted var(--gray-300);{% endif %}">{{ (permit.description or 'No description')[:80] }}{% if permit.description and permit.description|length > 80 %}…{% endif %}</td>
-            {% if not hide_value_column %}
-            <td class="permit-value" style="text-align: right; font-variant-numeric: tabular-nums;{% if _val >= 100000 %} color: #166534; font-weight: 600;{% endif %}">
-              {% if _val > 0 %}${{ "{:,.0f}".format(_val) }}{% else %}<span style="color: var(--gray-400);">—</span>{% endif %}
+                title="{{ r.description or '' }}"
+                style="{% if r.description and r.description|length > 80 %}cursor: help; border-bottom: 1px dotted var(--gray-300);{% endif %}">{{ (r.description or '—')[:80] }}{% if r.description and r.description|length > 80 %}…{% endif %}</td>
+            <td>
+              {% if r.record_type == 'permit' %}
+                {{ r.contractor_name or '—' }}
+              {% else %}
+                <span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #fef3c7; color: #92400e;">{{ r.status or 'Open' }}</span>
+              {% endif %}
             </td>
-            {% endif %}
-            <td>{{ permit.contractor_name or permit.contact_name or '-' }}</td>
           </tr>
           {% endfor %}
+          {% if not unified_records %}
+          <tr><td colspan="5" style="padding: 28px; text-align: center; color: var(--gray-500);">No records match the current filter.</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
+    {% if total_pages and total_pages > 1 %}
+    <div style="display: flex; justify-content: center; align-items: center; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gray-200); flex-wrap: wrap;">
+      <span style="font-size: 12px; color: var(--gray-500); margin-right: 12px;">
+        Page {{ current_page }} of {{ total_pages }} &middot; {{ "{:,}".format(total_records) }} total
+      </span>
+      {% if current_page > 1 %}
+      <a href="/permits/{{ city_slug }}?page={{ current_page - 1 }}&filter={{ current_filter }}"
+         style="padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; color: var(--gray-600); text-decoration: none;">← Prev</a>
+      {% endif %}
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == current_page %}
+        <span style="padding: 6px 12px; background: var(--primary); color: white; border-radius: 6px; font-size: 13px; font-weight: 600;">{{ p }}</span>
+        {% elif p <= 2 or p > total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
+        <a href="/permits/{{ city_slug }}?page={{ p }}&filter={{ current_filter }}"
+           style="padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; color: var(--gray-600); text-decoration: none;">{{ p }}</a>
+        {% elif p == 3 or p == total_pages - 1 %}
+        <span style="color: var(--gray-400);">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if current_page < total_pages %}
+      <a href="/permits/{{ city_slug }}?page={{ current_page + 1 }}&filter={{ current_filter }}"
+         style="padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; color: var(--gray-600); text-decoration: none;">Next →</a>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
   {% else %}
   {% if permit_count == 0 %}
@@ -1178,52 +1203,14 @@ body {
   {% endif %}
 </section>
 
-{# V312 (CODE_V280b Bug 13): Violations section. Renders only when this city
-   actually has code-enforcement records — empty cities skip the block so we
-   don't tease something we can't deliver. Address-centric expansion happens
-   in v310ToggleDetail (PR2); this block is the dedicated browse view. #}
-{% if violations_count and violations_count > 0 %}
-<section class="violations-section" id="violations" style="background: white; border-radius: 12px; padding: 28px; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(0,0,0,.05);">
-  <div class="section-header" style="margin-bottom: 18px;">
-    <h2 style="font-size: 22px; font-weight: 700; color: #111827;">Code Violations in {{ city_name }}
-      <span style="font-size: 14px; color: #6b7280; font-weight: 500;">— {{ "{:,}".format(violations_count) }} on record</span>
-    </h2>
-    <p style="font-size: 14px; color: #6b7280; margin-top: 6px;">
-      Properties with open or recent code enforcement actions. These are motivated-owner leads.
-    </p>
-  </div>
-  <div style="overflow-x: auto;">
-    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-      <thead>
-        <tr style="background: #f9fafb;">
-          <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; text-transform: uppercase; font-size: 11px; letter-spacing: .05em;">Date</th>
-          <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; text-transform: uppercase; font-size: 11px; letter-spacing: .05em;">Address</th>
-          <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; text-transform: uppercase; font-size: 11px; letter-spacing: .05em;">Description</th>
-          <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; text-transform: uppercase; font-size: 11px; letter-spacing: .05em;">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for v in violations[:25] %}
-        <tr data-address="{{ v.address or '' }}"
-            data-city-slug="{{ city_slug }}"
-            style="cursor: pointer; border-bottom: 1px solid #f3f4f6;"
-            onclick="v310ToggleDetail(this)">
-          <td style="padding: 8px 10px;">{{ (v.date[:10] if v.date else '—') }}</td>
-          <td style="padding: 8px 10px;">{{ v.address or '—' }}</td>
-          <td style="padding: 8px 10px;" title="{{ v.description or '' }}">{{ (v.description or '—')[:80] }}{% if v.description and v.description|length > 80 %}…{% endif %}</td>
-          <td style="padding: 8px 10px;"><span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #fef3c7; color: #92400e;">{{ v.status or 'Open' }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if violations_count > 25 %}
-  <p style="margin-top: 14px; font-size: 13px; color: #6b7280; text-align: center;">
-    Showing 25 of {{ "{:,}".format(violations_count) }}. Click any row to see permits at the same address.
-  </p>
-  {% endif %}
-</section>
-{% endif %}
+<script>
+function v328ApplyFilter(val) {
+  var url = new URL(window.location.href);
+  url.searchParams.set('filter', val);
+  url.searchParams.set('page', '1');
+  window.location = url.toString();
+}
+</script>
 
 <!-- V182 PR2 + V204-3: TOP CONTRACTORS -->
 {% if top_contractors or new_week_only %}
