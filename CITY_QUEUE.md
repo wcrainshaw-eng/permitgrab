@@ -83,6 +83,10 @@ have confirmed endpoints with contractor names — just add the config.
 - Round Rock TX: only Large Development Projects + Current Developments view (zoning/plats/annexation), no permit-record feed with contractor field (V345 probed 2026-04-25)
 - Newport News VA: 0 ArcGIS results (V345 probed 2026-04-25)
 - Knoxville TN: 0 ArcGIS results (V345 probed 2026-04-25)
+- Surprise AZ: only "Active Projects" feature service with AZ-to-FL extent (not Surprise-specific) (V346 probed 2026-04-25)
+- Goodyear AZ: 0 ArcGIS results (V346 probed 2026-04-25)
+- Avondale AZ: 0 ArcGIS results (V346 probed 2026-04-25)
+- Scottsdale AZ: only a Web Map ("Development Activity - Building Permits: Issued & Completed"), no underlying feature service URL exposed in catalog (V346 probed 2026-04-25)
 
 ## Monitoring for New Cities
 
