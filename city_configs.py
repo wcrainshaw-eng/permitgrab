@@ -18025,14 +18025,37 @@ CITY_REGISTRY = {
         "endpoint": "https://data.littlerock.gov/resource/mkfu-qap3.json",
         "dataset_id": "mkfu-qap3",
         "description": "Little Rock AR Planning & Development Permits",
+        # V351: same V321 trap as Greensboro V342, Tallahassee V343, Tacoma
+        # V347. The "little_rock" CITY_REGISTRY entry at line 5187 had the
+        # rich 22-field map (with contractor_name: contractor) but its slug
+        # "little-rock" was orphaned — no matching prod_cities row. The
+        # active little_rock_ar config was using slug "little-rock-ar" but
+        # with a stripped-down 7-field map and no contractor mapping.
+        # Result: 19,948 permits collected, 1.7% contractor extraction.
+        # AR has no bulk state license DB so phones rely on DDG enrichment.
         "field_map": {
             "permit_number": "permitnumber",
-            "permit_type": "permitdesc",
-            "description": "projectdesc",
-            "status": "permitstatus",
-            "filing_date": "appdate",
+            "permit_type": "permittype",
+            "permit_description": "permitdesc",
             "address": "propertyaddress",
+            "state": "propertystate",
+            "description": "projectdesc",
+            "building_use_code": "bldusecode",
+            "building_use": "bldusedesc",
+            "permit_milestone": "permitmilestone",
+            "work_class": "workclass",
+            "work_class_mapped": "workclassmapped",
+            "filing_date": "appdate",
+            "issue_date": "permitissuedate",
+            "expiration_date": "permitexpiredate",
+            "last_modified": "lastmodifieddate",
             "estimated_cost": "declvltn",
+            "sqft": "squarefeet",
+            "total_fees": "amount",
+            "fee_description": "feedesc",
+            "contractor_trade": "contractortrade",
+            "contractor_name": "contractor",
+            "status": "permitstatus",
         },
         "date_field": "appdate",
         "limit": 2000,
