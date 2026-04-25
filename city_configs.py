@@ -35211,12 +35211,40 @@ CITY_REGISTRY = {
         "slug": "tacoma-wa-accela",
         "lat": 47.253,
         "lon": -122.444,
-        "platform": "accela",
-        "_accela_city_key": "tacoma",
-        "endpoint": "https://aca-prod.accela.com/TACOMA/Cap/CapHome.aspx?module=Building&TabName=Building",
-        "description": "Building Permits via Accela Citizen Access",
+        # V347: migrated from Accela HTML scraper to direct ArcGIS export.
+        # The Accela path was 3,843 permits with no contractor names parsed
+        # (same dead-end pattern as Tampa/Memphis P1). Tacoma actually
+        # publishes the same Accela data through services3.arcgis.com as a
+        # FeatureServer with applicant_name populated. Verified 2026-04-25:
+        # 107,202 records, newest 2026-05-31, ~90% real businesses (MASTEC,
+        # AAA FIRE PROTECTION, ELITE ROOFING, APOLLO MECHANICAL CONTRACTORS,
+        # YORK ENTERPRISES LLC, PACIFIC HEATING & COOLING).
+        # WA L&I license DB covers WA contractors for phone enrichment,
+        # so this should also lift Tacoma's phone count over time.
+        "platform": "arcgis",
+        "endpoint": "https://services3.arcgis.com/SCwJH1pD8WSn5T5y/arcgis/rest/services/accela_permit_data/FeatureServer/0/query",
+        "dataset_id": "tacoma_accela_permit_data",
+        "description": "Tacoma WA Accela Permit Data (ArcGIS FeatureServer export)",
+        "field_map": {
+            "permit_number": "permit_number",
+            "permit_type": "permit_type",
+            "work_type": "permit_subtype",
+            "category": "permit_category",
+            "address": "address_line_1",
+            "zip": "zip",
+            "filing_date": "application_date",
+            "issue_date": "issued_date",
+            "status": "current_status",
+            "estimated_cost": "valuation",
+            "description": "description",
+            "contractor_name": "applicant_name",
+            "parcel": "parcel_number",
+        },
+        "date_field": "application_date",
+        "date_format": "date",
+        "limit": 2000,
         "active": True,
-        "notes": "V73: New Accela city. Pop ~219K.",
+        "notes": "V347 migrated from Accela HTML scraper (3,843 permits, no contractors) to ArcGIS FeatureServer export at services3.arcgis.com/SCwJH1pD8WSn5T5y. 107K records, fresh through 2026-05-31. Pop ~219K. Pairs with WA L&I license DB for phone enrichment.",
     },
 
     "tehachapi_ca_accela": {
