@@ -332,6 +332,15 @@ body {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
+  /* V332 (CODE_V321 Bug D): Chicago repeats "PERMIT - EXPRESS PERMIT
+     PROGRAM" on nearly every row; the 200px pill dwarfed every other
+     column. Cap width and ellipsize. The full string still surfaces in
+     the address-detail card on row click. */
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 /* V182 PR2: Top Contractors section */
