@@ -34,3 +34,29 @@ The remaining unconfigured cities overwhelmingly use proprietary permitting plat
 - Custom CSS portals (Des Moines, Cedar Rapids)
 
 Cities that DO have public APIs (Socrata, ArcGIS FeatureServer, CKAN) are almost all already configured in CITY_REGISTRY from prior onboarding rounds (V12-V88). The research confirms the coverage ceiling is real at ~250 cities with current public API sources.
+
+## V196 — SSH-Verified Re-Test Results
+
+**Key finding: local curl was NOT proxy-blocked.** SSH testing via Render produced the SAME results as local testing. The fabricated endpoints really are fake.
+
+### SSH verification (tested from Render server):
+
+| Endpoint | SSH Result | Verdict |
+|---|---|---|
+| **Providence RI** (data.providenceri.gov/resource/ufmm-rbej) | ✅ S=200, JSON, 2 records | WORKS but data from 2019 (stale) |
+| Norman OK ArcGIS hub | ✅ S=200, 150 datasets | Hub alive, 0 permit datasets |
+| Topeka KS (data.topeka.org) | S=200, HTML | City website, NOT Socrata — fabricated resource ID |
+| Lexington KY (data.lexingtonky.gov) | S=200, HTML | City website, NOT Socrata — fabricated resource ID. Real path: ACCELA (LEXKY, already configured) |
+| Fargo ND (data.fargond.gov) | S=200, HTML | City website, NOT Socrata — fabricated resource ID |
+| Des Moines (data.dsm.city) | S=200, HTML | City website, NOT Socrata — fabricated resource ID |
+| St. Louis (data.stlouis-mo.gov) | S=200, HTML | Custom CMS, not Socrata |
+| Chattanooga (chattadata.org) | S=200, HTML | Pantheon "No Site Detected" — portal DOWN |
+| Allentown PA (data.allentownpa.gov) | DNS FAIL | Domain doesn't exist — fabricated |
+| Billings MT (data.billingsmt.gov) | DNS FAIL | Domain doesn't exist — fabricated |
+| **Chicago (control test)** | ✅ S=200, JSON, 2 records | Known-working endpoint confirmed SSH testing works |
+
+### Conclusion
+
+The V87/V88 population expansion generated CITY_REGISTRY entries with fabricated Socrata URLs. The fabrication pattern: `data.{cityname}.gov/resource/{random-4chars}.json`. Most city domains (data.topeka.org, data.fargond.gov, etc.) are real city websites but DON'T have Socrata SODA APIs. The resource IDs are random strings that don't correspond to real datasets.
+
+**Coverage ceiling confirmed at ~250 cities with genuine public APIs.**
