@@ -7046,6 +7046,10 @@ CITY_REGISTRY = {
         "endpoint": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/1/query",
         "dataset_id": "OD_Property_IssuedPermits",
         "description": "Issued Permits - 3yr rolling",
+        # V320: schema exposes NameofBusiness (real business names) but
+        # old field_map didn't capture it — 3,586 permits, 1 contractor.
+        # Adding mapping; DDG enrichment is the standard fallback for TX
+        # (no bulk state license phone DB).
         "field_map": {
             "permit_number": "FOLDERSEQUENCE",
             "permit_type": "FOLDERTYPE",
@@ -7055,6 +7059,8 @@ CITY_REGISTRY = {
             "status": "STATUSDESC",
             "estimated_cost": "ConstructionValuationDeclared",
             "description": "FOLDERCONDITION",
+            "contractor_name": "NameofBusiness",
+            "contact_name": "NameofBusiness",
         },
         "date_field": "ISSUEDATE",
         "date_format": "date",
