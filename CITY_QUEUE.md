@@ -11,6 +11,7 @@ have confirmed endpoints with contractor names — just add the config.
 
 ## Needs Investigation (promising but unverified)
 <!-- Cities with known open data portals but contractor field unconfirmed -->
+- Tallahassee/Leon County FL (V340 probed 2026-04-25): intervector.leoncountyfl.gov MapServices/TLC_OverlayPermitsActive_D_WM/MapServer/0 has GOLD schema — ContractorCompanyName, ContractorPhone, ContractorEmail, ContractorAddress1/Zip, ContractorLicenseNum (FL state license) all inline. 1,997 records. BUT freshness unverifiable — orderBy DESC and ApplyDte WHERE filters both error with "Failed to execute query". Sample TCB180/190/200/210 prefixes suggest 2018-2021 permits. PubDte uniformly 2026-01-01 (bulk republish). If a freshness-friendly query path exists this is a potential ad-ready FL city candidate (FL DBPR also covers it for license matching).
 
 ## Dead Ends (skip forever)
 <!-- One line per city. Include why. -->
@@ -57,6 +58,13 @@ have confirmed endpoints with contractor names — just add the config.
 - Riverside CA: only Riverside COUNTY permits surface (PLUSActivities_PD), no city-of-Riverside building permit feed (V340 probed 2026-04-25)
 - Glendale AZ: no AZ-specific result; Glendale CA has a permits-by-walkshed analytical layer but no permit-record feed (V340 probed 2026-04-25)
 - Lubbock TX: only a performance-metrics dashboard, no queryable feature service (V340 probed 2026-04-25)
+- Hampton VA: 0 ArcGIS results for Hampton-specific permits (V341 probed 2026-04-25)
+- Augusta GA: 0 ArcGIS results, no Augusta-Richmond County permit feed (V341 probed 2026-04-25)
+- Modesto CA: 0 ArcGIS results (V341 probed 2026-04-25)
+- Pembroke Pines FL / South Florida: 0 ArcGIS results (V341 probed 2026-04-25)
+- Hartford CT: 0 building-permit ArcGIS results, only environmental + Census layers (V341 probed 2026-04-25)
+- Huntington Beach / Long Beach CA: only a Survey123 inspection request form, no permit feed (V341 probed 2026-04-25)
+- Rochester NY: code enforcement + demolitions feeds exist but no building-permits feed; full permit data lives on a 3rd-party tolemi.com SaaS (V341 probed 2026-04-25)
 
 ## Monitoring for New Cities
 
