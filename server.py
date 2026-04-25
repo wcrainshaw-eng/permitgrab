@@ -8776,12 +8776,19 @@ def inject_nav_context():
     except Exception:
         # Never break a request on the nav lookup.
         user = None
+    # V335 (CODE_V321 Bug H): default footer_cities to the same cached list
+    # the nav uses. Per-route render_template(..., footer_cities=...) calls
+    # still override this — but routes that don't pass footer_cities (pricing,
+    # about, error pages) used to fall through to a 7-city hardcoded list in
+    # partials/footer.html that diverged from the nav dropdown.
+    nav_cities = _get_nav_cities()
     return {
         'user': user,
         'user_plan': plan,
         'is_pro': pro,
         'is_enterprise': enterprise,
-        'nav_cities': _get_nav_cities(),
+        'nav_cities': nav_cities,
+        'footer_cities': nav_cities,
     }
 
 
