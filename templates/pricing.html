@@ -67,10 +67,10 @@
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "What's included in the free plan?",
+      "name": "What can I see before subscribing?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The free plan lets you browse all building permits, filter by city, trade, and value, and see permit details and project values. Contact information is available with the Professional plan."
+        "text": "Before subscribing, you can browse all building permits, filter by city, trade, and value, and see permit details and project values. Contact information and CSV export require a Pro subscription."
       }
     },
     {
@@ -172,7 +172,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 /* PRICING CARDS */
 .pricing-section { padding: 16px 32px 40px; } /* V223 T5: was 32/48 */
 .pricing-inner { max-width: 900px; margin: 0 auto; }
-.pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+/* V334 (CODE_V321 Bug A): collapsed from 2-col grid to centered single column
+   when V304 dropped Enterprise. Old layout left an empty right slot and the
+   single card sat left-aligned. */
+.pricing-grid { display: flex; justify-content: center; gap: 32px; }
 
 .pricing-card {
   background: white;
@@ -427,7 +430,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .annual-savings.show { display: block; }
 
 @media (max-width: 768px) {
-  .pricing-grid { grid-template-columns: 1fr; }
+  .pricing-grid { flex-direction: column; align-items: center; }
   .hero h1 { font-size: 36px; }
   .plan-price { font-size: 36px; }
   .footer-inner { flex-direction: column; gap: 32px; }
@@ -554,8 +557,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <h2 class="faq-title">Frequently Asked Questions</h2>
 
     <div class="faq-item">
-      <div class="faq-question">What's included in the free plan?</div>
-      <div class="faq-answer">The free plan lets you browse all building permits, filter by city, trade, and value, and see permit details and project values. Contact information is available with the Professional plan.</div>
+      {# V334 (CODE_V321 Bug B): rewritten — there is no free plan card on
+         the page after V304 collapsed the tiers. Frame it as a pre-subscription
+         preview instead. #}
+      <div class="faq-question">What can I see before subscribing?</div>
+      <div class="faq-answer">Before subscribing, you can browse all building permits, filter by city, trade, and value, and see permit details and project values. Contact information and CSV export require a Pro subscription.</div>
     </div>
 
     <div class="faq-item">
