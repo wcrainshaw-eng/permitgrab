@@ -8,6 +8,7 @@ have confirmed endpoints with contractor names — just add the config.
 <!-- Add cities here after SSH-testing confirms contractor_name field works -->
 <!-- Format: - CityName ST: platform resource_id, contractor_field: fieldname, tested: date -->
 - Greensboro NC: arcgis MapServer gis.greensboro-nc.gov OpenData_HRES_DS/2 BI_Permits — was already in CITY_REGISTRY as key "greensboro" but field_map mapped Contractor→contact_name (typo) and zip→Zoning (wrong). V342 fixed both. V340's duplicate "greensboro_nc" entry was reverted.
+- Asheville NC: ALREADY correctly wired at "asheville_nc" → slug "asheville". Endpoint gis.ashevillenc.gov AccelaPermitsView/2 fresh through 2026-05-26 with real businesses (8MSOLAR LLC, LEDFORD ELECTRIC, AMERICAN AIR HEATING & COOLING). 64,383 records, 1,719 already collected. Uses contact_name slot but V180 fallback handles it. NC has no bulk state license DB so phones are DDG-only.
 
 ## Needs Investigation (promising but unverified)
 <!-- Cities with known open data portals but contractor field unconfirmed -->
@@ -69,6 +70,13 @@ have confirmed endpoints with contractor names — just add the config.
 - Hartford CT: 0 building-permit ArcGIS results, only environmental + Census layers (V341 probed 2026-04-25)
 - Huntington Beach / Long Beach CA: only a Survey123 inspection request form, no permit feed (V341 probed 2026-04-25)
 - Rochester NY: code enforcement + demolitions feeds exist but no building-permits feed; full permit data lives on a 3rd-party tolemi.com SaaS (V341 probed 2026-04-25)
+- Wilmington NC / New Hanover County: 0 ArcGIS results (V343-followup probed 2026-04-25)
+- Charleston SC / Charleston County: only "Windshield Survey" damage-assessment app, no permit feed (V343-followup probed 2026-04-25)
+- Savannah GA / Chatham County: only CRS_GMC_Maps community-rating inventory, no permit feed (V343-followup probed 2026-04-25)
+- Cary NC: 0 ArcGIS results (V343-followup probed 2026-04-25)
+- High Point NC: only Permit Activity Dashboards (3 of them), no queryable feature service (V343-followup probed 2026-04-25)
+- Chapel Hill NC: only Ephesus-Fordham renovation density tile-services frozen 2004-2017, no live permit feed (V343-followup probed 2026-04-25)
+- Hialeah FL violations: confirmed permanent dead-end after 3rd probe — no public ArcGIS or sitemap-discoverable code-enforcement feed exists. 108 phones (largest non-ad-ready phone count) but the violations leg is unsolvable from our side; needs Hialeah IT to publish a feed.
 
 ## Monitoring for New Cities
 
