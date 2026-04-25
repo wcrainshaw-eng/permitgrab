@@ -7714,17 +7714,34 @@ CITY_REGISTRY = {
         "lat": 30.438,
         "lon": -84.281,
         "platform": "arcgis",
-        "endpoint": "https://intervector.leoncountyfl.gov/intervector/rest/services/MapServices/TLC_OverlayPermitsActive_D_WM/MapServer/0/query",
-        "dataset_id": "TLC_OverlayPermitsActive_D_WM",
-        "description": "Tallahassee-Leon County Active Building Permits",
+        # V343: switched to the Trends MapServer (Last 1 Year layer 2). The
+        # original V18 endpoint was TLC_OverlayPermitsActive_D_WM/0 — that's
+        # the *currently-active* permits dataset (long-running commercial
+        # projects from 2018-2021 still in their permit lifecycle). Total
+        # record count was 1,997 with sample TCB180/190/200/210 prefixes.
+        # The Trends MapServer at the same host is updated nightly from
+        # Tallahassee + Leon County permit DBs, with sub-layers split by
+        # time window. Layer 2 = Single Family Last 1 Year. Sample probe
+        # 2026-04-25 returned PubDte=2026-04-21 (4 days old) with real
+        # businesses (KENT DEVELOPMENT LLC) and ContractorPhone inline
+        # (8502965113 for ALPHA MOBILE HOME).
+        "endpoint": "https://intervector.leoncountyfl.gov/intervector/rest/services/MapServices/TLC_OverlayPermitsActiveTrends_D_WM/MapServer/2/query",
+        "dataset_id": "TLC_OverlayPermitsActiveTrends_SF_LastYear",
+        "description": "Tallahassee-Leon County Single-Family Permit Applications (Last 1 Year, ArcGIS Trends MapServer)",
+        # V343: contact_name → contractor_name. The collector's V180 fallback
+        # would copy contact_name into contractor_name, so this isn't fixing
+        # a data bug — but using the right slot makes downstream behavior
+        # less surprising and matches the Anaheim/San Jose/Phoenix pattern
+        # where ContractorCompanyName fills contractor_name directly.
         "field_map": {
             "permit_number": "PermitNum",
             "permit_type": "PermitType",
             "work_type": "WorkClass",
             "address": "OriginalAddress1",
             "zip": "OriginalZip",
-            "contact_name": "ContractorCompanyName",
+            "contractor_name": "ContractorCompanyName",
             "contractor_phone": "ContractorPhone",
+            "contact_phone": "ContractorPhone",
             "contractor_email": "ContractorEmail",
             "contractor_license": "ContractorLicenseNum",
             "filing_date": "AppliedDate",

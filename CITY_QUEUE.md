@@ -11,7 +11,11 @@ have confirmed endpoints with contractor names — just add the config.
 
 ## Needs Investigation (promising but unverified)
 <!-- Cities with known open data portals but contractor field unconfirmed -->
-- Tallahassee/Leon County FL (V340 probed 2026-04-25): intervector.leoncountyfl.gov MapServices/TLC_OverlayPermitsActive_D_WM/MapServer/0 has GOLD schema — ContractorCompanyName, ContractorPhone, ContractorEmail, ContractorAddress1/Zip, ContractorLicenseNum (FL state license) all inline. 1,997 records. BUT freshness unverifiable — orderBy DESC and ApplyDte WHERE filters both error with "Failed to execute query". Sample TCB180/190/200/210 prefixes suggest 2018-2021 permits. PubDte uniformly 2026-01-01 (bulk republish). If a freshness-friendly query path exists this is a potential ad-ready FL city candidate (FL DBPR also covers it for license matching).
+<!-- Tallahassee resolved in V343: switched endpoint from TLC_OverlayPermitsActive_D_WM/0
+     (stuck commercials 2018-2021) to TLC_OverlayPermitsActiveTrends_D_WM/2
+     (Single Family Last 1 Year, updated nightly). Real ContractorPhone inline.
+     FL DBPR import will lift license-only contractors. -->
+
 
 ## Dead Ends (skip forever)
 <!-- One line per city. Include why. -->
