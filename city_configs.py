@@ -747,13 +747,23 @@ CITY_REGISTRY = {
         "endpoint": "https://www.portlandmaps.com/arcgis/rest/services/Public/BDS_Permit/FeatureServer/22/query",
         "dataset_id": "BDS_Permit_AllPermits",
         "description": "Bureau of Development Services - All Permits",
+        # V353: BDS_Permit/22 CUSTOMER field contains numeric license IDs
+        # like "3487614", "3514390", NOT business names. The previous
+        # contact_name mapping was producing 11,368 permits with "contractor
+        # names" that were really license numbers (V180 fallback then copied
+        # them into contractor_name). The contractor_profiles builder
+        # rejects numeric-only names, so 0 profiles rolled up. Re-slotting
+        # to contractor_license keeps the data but stops misrepresenting it.
+        # OR has no bulk state license DB so this license # can't be
+        # name-matched today. Portland is structurally a contractor-data
+        # dead-end via this endpoint until a different feed is found.
         "field_map": {
             "permit_number": "SEQUENCE",
             "permit_type": "FOLDERTYPE",
             "work_type": "FOLDERACTION",
             "address": "PROPSTREET",
             "zip": "",
-            "contact_name": "CUSTOMER",
+            "contractor_license": "CUSTOMER",
             "filing_date": "ISSUED",
             "status": "STATUS",
             "estimated_cost": "SUBMITTEDVALUATION",
