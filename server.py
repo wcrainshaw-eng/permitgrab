@@ -8720,6 +8720,79 @@ def is_enterprise(user):
 # stabilized.
 _NAV_CITIES_CACHE = {'expires_at': 0, 'value': []}
 
+# V338 (CODE_V333 Part 4): per-city stats cache keyed by prod_city_id (or
+# fallback to city/state pair when there is no prod_cities row). The city
+# landing page used to fire 4 separate aggregate queries on the permits
+# table per request — stats_row, _max_row (newest date), hide_value_column
+# coverage, and violations_total — each scanning the full city slice. On
+# Chicago (16K permits) every page load re-scanned a million-row table four
+# times. Coalesce them into one cached payload with a 5-min TTL.
+_CITY_STATS_CACHE = {}  # {cache_key: (expires_at, payload_dict)}
+_CITY_STATS_TTL = 300
+
+def _get_cached_city_stats(cache_key, prod_city_id, city_name, state, conn):
+    """Cache (permit_count, total_value, high_value_count, with_value,
+    newest_date, violations_total) per city for 5 minutes. cache_key is the
+    city_slug for prod_city branches and 'name|state' otherwise."""
+    import time as _t
+    now = _t.time()
+    cached = _CITY_STATS_CACHE.get(cache_key)
+    if cached and now < cached[0]:
+        return cached[1]
+
+    if prod_city_id:
+        row = conn.execute("""
+            SELECT COUNT(*) AS permit_count,
+                   COALESCE(SUM(estimated_cost), 0) AS total_value,
+                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) AS high_value_count,
+                   SUM(CASE WHEN estimated_cost IS NOT NULL AND estimated_cost > 0
+                            THEN 1 ELSE 0 END) AS with_value,
+                   MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) AS newest_date
+            FROM permits WHERE prod_city_id = ?
+        """, (prod_city_id,)).fetchone()
+    elif state:
+        row = conn.execute("""
+            SELECT COUNT(*) AS permit_count,
+                   COALESCE(SUM(estimated_cost), 0) AS total_value,
+                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) AS high_value_count,
+                   SUM(CASE WHEN estimated_cost IS NOT NULL AND estimated_cost > 0
+                            THEN 1 ELSE 0 END) AS with_value,
+                   MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) AS newest_date
+            FROM permits WHERE city = ? AND state = ?
+        """, (city_name, state)).fetchone()
+    else:
+        row = conn.execute("""
+            SELECT COUNT(*) AS permit_count,
+                   COALESCE(SUM(estimated_cost), 0) AS total_value,
+                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) AS high_value_count,
+                   SUM(CASE WHEN estimated_cost IS NOT NULL AND estimated_cost > 0
+                            THEN 1 ELSE 0 END) AS with_value,
+                   MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) AS newest_date
+            FROM permits WHERE city = ?
+        """, (city_name,)).fetchone()
+
+    viol_total = 0
+    try:
+        if state:
+            viol_row = conn.execute("""
+                SELECT COUNT(*) AS n FROM violations
+                WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)
+            """, (city_name, state)).fetchone()
+            viol_total = viol_row['n'] if viol_row else 0
+    except Exception:
+        viol_total = 0
+
+    payload = {
+        'permit_count': (row['permit_count'] if row else 0) or 0,
+        'total_value': (row['total_value'] if row else 0) or 0,
+        'high_value_count': (row['high_value_count'] if row else 0) or 0,
+        'with_value': (row['with_value'] if row else 0) or 0,
+        'newest_date': row['newest_date'] if row else None,
+        'violations_total': viol_total,
+    }
+    _CITY_STATS_CACHE[cache_key] = (now + _CITY_STATS_TTL, payload)
+    return payload
+
 
 def _get_nav_cities():
     """V327 (CODE_V320 Bug 1): cache the ad-ready dropdown list. The old
@@ -8788,6 +8861,9 @@ def inject_nav_context():
         'is_pro': pro,
         'is_enterprise': enterprise,
         'nav_cities': nav_cities,
+        # V338: footer was overridden per-route to get_cities_with_data() (a
+        # full prod_cities scan). The override callers can keep doing that;
+        # the default is the cached nav list.
         'footer_cities': nav_cities,
     }
 
@@ -14819,12 +14895,17 @@ def city_landing_inner(city_slug):
         if _filter_min_value:
             # Whitelisted int above — safe to inline.
             _filter_sql += f" AND estimated_cost >= {_filter_min_value}"
-        stats_row = conn.execute("""
-            SELECT COUNT(*) as permit_count,
-                   COALESCE(SUM(estimated_cost), 0) as total_value,
-                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
-            FROM permits WHERE prod_city_id = ?
-        """, (_prod_city_id,)).fetchone()
+        # V338: replace the live stats query with cached payload (covers
+        # permit_count/total_value/high_value_count + newest_date +
+        # with_value + violations_total in one shared 5-min cache slot).
+        _stats_payload = _get_cached_city_stats(
+            f"slug:{city_slug}", _prod_city_id, filter_name, filter_state, conn
+        )
+        stats_row = {
+            'permit_count': _stats_payload['permit_count'],
+            'total_value': _stats_payload['total_value'],
+            'high_value_count': _stats_payload['high_value_count'],
+        }
         if _filters_active:
             _filtered_row = conn.execute(f"""
                 SELECT COUNT(*) as n FROM permits WHERE prod_city_id = ?{_filter_sql}
@@ -14850,12 +14931,15 @@ def city_landing_inner(city_slug):
         else:
             state_clause = ""
             state_params = (filter_name,)
-        stats_row = conn.execute(f"""
-            SELECT COUNT(*) as permit_count,
-                   COALESCE(SUM(estimated_cost), 0) as total_value,
-                   COUNT(CASE WHEN estimated_cost >= 100000 THEN 1 END) as high_value_count
-            FROM permits WHERE city = ?{state_clause}
-        """, state_params).fetchone()
+        # V338: cached stats (see prod_city branch above).
+        _stats_payload = _get_cached_city_stats(
+            f"name:{filter_name}|{filter_state or ''}", None, filter_name, filter_state, conn
+        )
+        stats_row = {
+            'permit_count': _stats_payload['permit_count'],
+            'total_value': _stats_payload['total_value'],
+            'high_value_count': _stats_payload['high_value_count'],
+        }
         # V247 P1: sort by date, not cost — see prod_city_id branch above.
         cursor = conn.execute(f"""
             SELECT * FROM permits WHERE city = ?{state_clause}
@@ -14875,17 +14959,9 @@ def city_landing_inner(city_slug):
     # every city with any permit data shows an "Updated as of" line.
     if permit_count > 0 and not newest_permit_date:
         try:
-            if _prod_city_id:
-                _max_row = conn.execute(
-                    "SELECT MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,''))) "
-                    "FROM permits WHERE prod_city_id = ?",
-                    (_prod_city_id,),
-                ).fetchone()
-            else:
-                _max_row = conn.execute(f"""
-                    SELECT MAX(COALESCE(NULLIF(filing_date,''),NULLIF(issued_date,''),NULLIF(date,'')))
-                    FROM permits WHERE city = ?{state_clause}
-                """, state_params).fetchone()
+            # V338: read newest_date out of the cached stats payload instead
+            # of re-running a MAX(date) scan over the city's permit slice.
+            _max_row = (_stats_payload.get('newest_date'),) if _stats_payload.get('newest_date') else None
             if _max_row and _max_row[0]:
                 newest_permit_date = _max_row[0]
         except Exception:
@@ -15155,22 +15231,17 @@ def city_landing_inner(city_slug):
     # V312 (CODE_V280b Bug 8): hide the Value column when <5% of this city's
     # permits have an estimated_cost. Most permit feeds don't expose dollar
     # amounts; rendering a column of em-dashes makes the page look broken.
+    # V338: derive value-coverage from the cached stats payload — same
+    # numbers, no extra query. The 50-row floor still applies so a brand-new
+    # city with 3 permits doesn't suppress the column.
     hide_value_column = False
-    if _prod_city_id:
-        try:
-            _vc = permitdb.get_connection().execute("""
-                SELECT
-                  COUNT(*) AS total,
-                  SUM(CASE WHEN estimated_cost IS NOT NULL AND estimated_cost > 0
-                           THEN 1 ELSE 0 END) AS with_value
-                FROM permits
-                WHERE prod_city_id = ?
-            """, (_prod_city_id,)).fetchone()
-            if _vc and _vc['total'] >= 50:
-                _coverage = (_vc['with_value'] or 0) / _vc['total']
-                hide_value_column = _coverage < 0.05
-        except Exception:
-            hide_value_column = False
+    try:
+        _total = _stats_payload.get('permit_count') or 0
+        _with_value = _stats_payload.get('with_value') or 0
+        if _total >= 50:
+            hide_value_column = (_with_value / _total) < 0.05
+    except Exception:
+        hide_value_column = False
 
     # V312 (CODE_V280b Bug 13): pull recent violations for this city.
     # V317 fix: case-insensitive city match. CITY_REGISTRY has chicago_il
@@ -15180,13 +15251,12 @@ def city_landing_inner(city_slug):
     # Limit 25 rows for the in-page tab so we don't blow the response size
     # on cities with many violations (NYC HPD has 4M+).
     violations_rows = []
-    violations_total = 0
+    # V338: read violations_total from the cached stats payload (one query
+    # already paid for upstream). Skip the LIMIT 25 sample query when total
+    # is zero.
+    violations_total = _stats_payload.get('violations_total', 0) if _stats_payload else 0
     try:
         _vconn = permitdb.get_connection()
-        violations_total = _vconn.execute("""
-            SELECT COUNT(*) AS n FROM violations
-            WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)
-        """, (filter_name, filter_state)).fetchone()['n']
         if violations_total > 0:
             violations_rows = [dict(r) for r in _vconn.execute("""
                 SELECT violation_date AS date, address,
