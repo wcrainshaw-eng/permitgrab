@@ -87,6 +87,7 @@ have confirmed endpoints with contractor names — just add the config.
 - Goodyear AZ: 0 ArcGIS results (V346 probed 2026-04-25)
 - Avondale AZ: 0 ArcGIS results (V346 probed 2026-04-25)
 - Scottsdale AZ: only a Web Map ("Development Activity - Building Permits: Issued & Completed"), no underlying feature service URL exposed in catalog (V346 probed 2026-04-25)
+- shovels.ai third-party datasets (V348 probed 2026-04-25): nationwide permit feeds at services5.arcgis.com/ygiShlCiglrHaijs/.../All_Permits_Started_during_4Q25 (965K permits) and per-trade nationwide feeds (electrical 220K, roofing 79K, new-construction 45K). LA-specific Esri Living Atlas dataset has gold schema (CONTRACTOR_NAME/PHONE/EMAIL/WEBSITE + APPLICANT_PHONE/EMAIL + OWNER_NAME/PHONE/EMAIL). DO NOT INGEST: shovels.ai is a paid SaaS competitor and ingesting their data raises ToS + competitive-IP concerns; the nationwide 4Q25 endpoint also returned 400 (likely access-restricted). Documented for awareness only — same logic as the no-state-portals rule (don't rely on data we don't control).
 
 ## Monitoring for New Cities
 
