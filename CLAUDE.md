@@ -320,13 +320,15 @@ FL DBPR covers 6+ cities (Miami-Dade, Orlando, Tampa, Hialeah, St. Petersburg, C
 | LA (open) | Socrata | u82d-eh7z at data.lacity.org |
 | LA (closed) | Socrata | rken-a55j at data.lacity.org |
 | Orlando | Socrata | k6e8-nw6w at data.cityoforlando.net |
-| St. Pete | Socrata | tmdq-gg7f at stat.stpete.org |
+| ~~St. Pete~~ | ~~Socrata tmdq-gg7f~~ | DEAD — V326 2026-04-25: stat.stpete.org redirects to www.stpete.org HTML homepage; Socrata datasets removed/migrated. Not in VIOLATION_SOURCES anyway. |
 | Mesa | Socrata | hgf6-yenu at data.mesaaz.gov |
 | Miami-Dade | ArcGIS | services.arcgis.com/8Pc9XBTAsYuxx9Ny/.../CCVIOL_gdb/FeatureServer/0 |
 | Phoenix | ArcGIS MapServer | maps.phoenix.gov/pub/rest/services/Public/NSD_Property_Maintenance/MapServer/0 |
 | Cape Coral | ArcGIS MapServer | capeims.capecoral.gov/.../OpenData/MapServer/5 |
 | Cleveland | ArcGIS FeatureServer | services3.arcgis.com/dty2kHktVXHrqO8i/... |
-| Fort Lauderdale | ArcGIS MapServer | gis.fortlauderdale.gov/arcgis/rest/services/... |
+| ~~Fort Lauderdale~~ | ~~ArcGIS MapServer~~ | DEAD-BY-FRESHNESS — V326 2026-04-25: gis.fortlauderdale.gov CodeCase MapServer/0 has 66,436 records but newest INITDATE is 2019-10-03 (6+ years stale). Configured but every collection cycle returns 0 inserts because the date filter excludes everything. |
+| Pittsburgh | CKAN | data.wprdc.org resource 70c06278-... (V322) |
+| Boston | CKAN | data.boston.gov resource 90ed3816-... (V324) |
 | Denver | ArcGIS FeatureServer TABLE | services1.arcgis.com/zdB7qR0BtYrg0Xpl/.../ODC_service_requests_311/FeatureServer/66 (V259) — Agency=CPD + Case_Summary whitelist |
 | San Antonio | ArcGIS FeatureServer | services.arcgis.com/g1fRTDLeMgspWrYp/.../311_All_Service_Calls/FeatureServer/0 (V259) — ReasonName=Code Enforcement + TypeName whitelist |
 
