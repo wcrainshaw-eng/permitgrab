@@ -9204,6 +9204,167 @@ def health_check():
     }), 200
 
 
+@app.route('/api/address-detail')
+@limiter.limit("60 per minute")
+def api_address_detail():
+    """V310 (CODE_V280b PR2 / CODE_V310): address-centric detail card.
+
+    Query: ?address=<permit.address>&city=<source_city_key>
+    Returns JSON with all permits + violations + property-owner info for
+    that address. Phone and owner mailing address are gated on auth —
+    anonymous callers see null for those fields.
+
+    Per Wes's architecture note: "The ADDRESS is the anchor." Everything
+    stacks under the address. This endpoint is the server side of the
+    expandable-row detail view that unlocks the dead grid.
+    """
+    raw_addr = (request.args.get('address') or '').strip()
+    city_slug = (request.args.get('city') or request.args.get('city_slug') or '').strip()
+    if not raw_addr or not city_slug:
+        return jsonify({'error': 'address and city required'}), 400
+
+    # Simple normalization: uppercase + collapse whitespace. Addresses in
+    # permits/violations are stored as-ingested, so exact matching is
+    # brittle. We use a LIKE with the shortest distinctive prefix
+    # ("1234 N MAIN") to catch variants ("1234 N MAIN ST #3B",
+    # "1234 North Main Street"). Cap the prefix length to keep the
+    # LIKE selective enough to hit the index.
+    upper = raw_addr.upper().strip()
+    # Drop suite/unit markers so "1234 MAIN ST #3B" groups with "1234 MAIN ST"
+    import re as _re
+    upper = _re.sub(r'\s+(UNIT|APT|SUITE|STE|#)\s*\S+.*$', '', upper)
+    upper = _re.sub(r'\s+', ' ', upper).strip()
+    like_prefix = upper[:48] + '%'  # leading portion of the normalized address
+
+    logged_in = bool(session.get('user_email'))
+    conn = permitdb.get_connection()
+
+    # Permits at this address
+    permits = []
+    try:
+        rows = conn.execute("""
+            SELECT p.id, p.filing_date, p.issued_date, p.date, p.permit_type,
+                   p.description, p.estimated_cost, p.permit_number, p.status,
+                   p.contractor_name, p.contact_name, p.contact_phone,
+                   p.trade_category, p.address, p.source_city_key
+            FROM permits p
+            WHERE p.source_city_key = ?
+              AND UPPER(p.address) LIKE ?
+            ORDER BY COALESCE(p.filing_date, p.issued_date, p.date) DESC
+            LIMIT 25
+        """, (city_slug, like_prefix)).fetchall()
+    except Exception as e:
+        rows = []
+
+    # Cache contractor_profiles lookups by (business_name, source_city_key)
+    prof_cache = {}
+
+    def _contractor_info(business_name):
+        if not business_name:
+            return None
+        key = (business_name, city_slug)
+        if key in prof_cache:
+            return prof_cache[key]
+        try:
+            cp = conn.execute("""
+                SELECT business_name, phone, trade_category,
+                       total_permits, source_city_key
+                FROM contractor_profiles
+                WHERE source_city_key = ? AND business_name = ?
+                LIMIT 1
+            """, (city_slug, business_name)).fetchone()
+        except Exception:
+            cp = None
+        out = None
+        if cp:
+            out = {
+                'business_name': cp['business_name'],
+                'phone': cp['phone'] if logged_in else None,
+                'trade_category': cp['trade_category'],
+                'total_permits': cp['total_permits'] or 0,
+            }
+        prof_cache[key] = out
+        return out
+
+    for r in rows or []:
+        contractor_name = r['contractor_name'] or r['contact_name'] or ''
+        permits.append({
+            'id': r['id'],
+            'date': (r['filing_date'] or r['issued_date'] or r['date'] or '')[:10],
+            'type': r['permit_type'] or '',
+            'value': r['estimated_cost'],
+            'permit_number': r['permit_number'],
+            'status': r['status'],
+            'description': r['description'] or '',
+            'address': r['address'],
+            'trade_category': r['trade_category'],
+            'contractor': _contractor_info(contractor_name) or (
+                {'business_name': contractor_name,
+                 'phone': r['contact_phone'] if logged_in else None,
+                 'trade_category': r['trade_category'],
+                 'total_permits': None} if contractor_name else None
+            ),
+        })
+
+    # Violations at this address (city+state scoped — violations use city/state, not slug)
+    violations = []
+    try:
+        # Derive city name + state from the first permit's prod_cities row
+        pc = conn.execute(
+            "SELECT city, state FROM prod_cities WHERE city_slug = ? LIMIT 1",
+            (city_slug,)
+        ).fetchone()
+        if pc:
+            vrows = conn.execute("""
+                SELECT violation_date, violation_description, status,
+                       source_violation_id, violation_type, address
+                FROM violations
+                WHERE city = ? AND state = ? AND UPPER(address) LIKE ?
+                ORDER BY violation_date DESC
+                LIMIT 20
+            """, (pc['city'], pc['state'], like_prefix)).fetchall()
+            for v in vrows or []:
+                violations.append({
+                    'date': (v['violation_date'] or '')[:10],
+                    'description': v['violation_description'] or v['violation_type'] or '',
+                    'status': v['status'],
+                    'case_number': v['source_violation_id'],
+                    'address': v['address'],
+                })
+    except Exception:
+        pass
+
+    # Property owner (optional — table may be empty for this city)
+    owner = None
+    try:
+        orow = conn.execute("""
+            SELECT owner_name, owner_mailing_address, parcel_id, source
+            FROM property_owners
+            WHERE UPPER(address) LIKE ?
+            ORDER BY last_updated DESC
+            LIMIT 1
+        """, (like_prefix,)).fetchone()
+        if orow:
+            owner = {
+                'owner_name': orow['owner_name'],
+                # Mailing address is sensitive → logged-in only.
+                'mailing_address': orow['owner_mailing_address'] if logged_in else None,
+                'parcel_id': orow['parcel_id'],
+                'source': orow['source'],
+            }
+    except Exception:
+        pass
+
+    return jsonify({
+        'address': upper,
+        'city_slug': city_slug,
+        'logged_in': logged_in,
+        'permits': permits,
+        'violations': violations,
+        'property': owner,
+    })
+
+
 @app.route('/api/permits')
 @limiter.limit("60 per minute")
 def api_permits():

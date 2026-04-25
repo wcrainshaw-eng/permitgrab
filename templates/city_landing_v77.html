@@ -1122,7 +1122,13 @@ body {
           {% if permit.estimated_cost is number %}
             {% set _val = permit.estimated_cost %}
           {% endif %}
-          <tr data-trade="{{ permit.trade_category or '' }}">
+          {# V310 (CODE_V280b PR2): clickable row → expand address-centric
+             detail card. data-address fuels the /api/address-detail lookup. #}
+          <tr data-trade="{{ permit.trade_category or '' }}"
+              data-address="{{ permit.address or '' }}"
+              data-city-slug="{{ city_slug }}"
+              style="cursor: pointer;"
+              onclick="v310ToggleDetail(this)">
             <td>
               {# Strip time component — some sources (DC, Miami-Dade) deliver
                  ISO timestamps like "2026-02-20T00:00:00.000" that leak into
@@ -1669,6 +1675,146 @@ body {
 </script>
 
 {% include 'partials/footer.html' %}
+
+{# V310 (CODE_V280b PR2): address-centric expandable detail card.
+   Click any permit row → fetch /api/address-detail → render card inline. #}
+<style>
+  tr.v310-detail-row td { background: #f8fafc; padding: 0; border-bottom: 2px solid var(--gray-200); }
+  .v310-detail-card { padding: 18px 24px; font-size: 14px; line-height: 1.5; color: var(--gray-700); }
+  .v310-detail-card h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); font-weight: 700; }
+  .v310-detail-card .addr { font-size: 17px; font-weight: 700; color: var(--gray-900); margin: 0 0 16px; }
+  .v310-detail-card .section { margin-bottom: 18px; }
+  .v310-detail-card .perm-row { padding: 10px 12px; margin-bottom: 8px; background: white; border: 1px solid var(--gray-200); border-radius: 6px; }
+  .v310-detail-card .perm-row .meta { color: var(--gray-500); font-size: 12px; margin-bottom: 4px; }
+  .v310-detail-card .perm-row .contractor { font-weight: 600; color: var(--gray-800); }
+  .v310-detail-card .perm-row .desc { color: var(--gray-600); margin-top: 4px; font-size: 13px; }
+  .v310-detail-card .viol-row { padding: 10px 12px; margin-bottom: 6px; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 4px; }
+  .v310-detail-card .phone-masked { color: var(--gray-400); font-family: monospace; }
+  .v310-detail-card .phone-visible { color: var(--accent-dark, #ea580c); font-weight: 600; }
+  .v310-detail-card .unlock-link { color: var(--accent, #f97316); font-size: 12px; margin-left: 8px; text-decoration: none; }
+  .v310-detail-card .loading { color: var(--gray-500); font-style: italic; }
+  .v310-detail-card .owner-card { background: #f0f9ff; border-left: 3px solid #0284c7; padding: 10px 12px; border-radius: 4px; }
+</style>
+<script>
+(function(){
+  // In-flight fetches keyed by cache key so double-clicks don't double-hit.
+  var _v310Cache = {};
+
+  function _escape(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function _renderCard(data) {
+    var logged = !!data.logged_in;
+    var out = ['<div class="v310-detail-card">'];
+    out.push('<div class="addr">📍 ' + _escape(data.address) + '</div>');
+
+    // Permits section
+    if (data.permits && data.permits.length) {
+      out.push('<div class="section"><h4>Permits at this address (' + data.permits.length + ')</h4>');
+      data.permits.forEach(function(p) {
+        var v = (p.value && p.value > 0) ? '$' + Number(p.value).toLocaleString('en-US', {maximumFractionDigits: 0}) : '';
+        var meta = [p.date, p.type, v, p.permit_number].filter(Boolean).join(' · ');
+        out.push('<div class="perm-row">');
+        out.push('<div class="meta">' + _escape(meta) + '</div>');
+        if (p.contractor && p.contractor.business_name) {
+          var phoneHtml;
+          if (p.contractor.phone) {
+            phoneHtml = '<a class="phone-visible" href="tel:+1' + p.contractor.phone.replace(/[^0-9]/g,'') + '">📞 ' + _escape(p.contractor.phone) + '</a>';
+          } else if (logged) {
+            phoneHtml = '<span style="color: var(--gray-400);">No phone on file</span>';
+          } else {
+            phoneHtml = '<span class="phone-masked">📞 ●●●-●●●-●●●●</span><a class="unlock-link" href="/pricing">Unlock with Pro →</a>';
+          }
+          out.push('<div class="contractor">' + _escape(p.contractor.business_name) + ' &middot; ' + phoneHtml);
+          if (p.contractor.total_permits) {
+            out.push(' <span style="color: var(--gray-500); font-size: 12px;">(' + p.contractor.total_permits + ' permits)</span>');
+          }
+          out.push('</div>');
+        }
+        if (p.description) {
+          out.push('<div class="desc">' + _escape(p.description) + '</div>');
+        }
+        out.push('</div>');
+      });
+      out.push('</div>');
+    }
+
+    // Violations section
+    if (data.violations && data.violations.length) {
+      out.push('<div class="section"><h4>🚨 Violations at this address (' + data.violations.length + ')</h4>');
+      data.violations.forEach(function(v) {
+        out.push('<div class="viol-row">');
+        out.push('<strong>' + _escape(v.date) + '</strong> &middot; ' + _escape(v.description));
+        if (v.status) out.push(' <span style="color: var(--gray-500); font-size: 12px;">(' + _escape(v.status) + ')</span>');
+        if (v.case_number) out.push(' <span style="color: var(--gray-500); font-size: 12px;">[' + _escape(v.case_number) + ']</span>');
+        out.push('</div>');
+      });
+      out.push('</div>');
+    }
+
+    // Property owner section
+    if (data.property && data.property.owner_name) {
+      out.push('<div class="section"><h4>🏠 Property Owner</h4>');
+      out.push('<div class="owner-card">');
+      out.push('<strong>' + _escape(data.property.owner_name) + '</strong>');
+      if (data.property.mailing_address) {
+        out.push('<div style="margin-top: 4px;">Mailing: ' + _escape(data.property.mailing_address) + '</div>');
+      } else if (!logged) {
+        out.push('<div style="margin-top: 4px; color: var(--gray-500);">Mailing address <a href="/pricing">unlocks with Pro →</a></div>');
+      }
+      if (data.property.parcel_id) {
+        out.push('<div style="font-size: 12px; color: var(--gray-500); margin-top: 4px;">Parcel ' + _escape(data.property.parcel_id) + '</div>');
+      }
+      out.push('</div></div>');
+    }
+
+    out.push('</div>');
+    return out.join('');
+  }
+
+  window.v310ToggleDetail = function(row) {
+    var next = row.nextElementSibling;
+    // If the next row is already the detail, just collapse.
+    if (next && next.classList.contains('v310-detail-row')) {
+      next.parentNode.removeChild(next);
+      return;
+    }
+    // Collapse any other open detail first.
+    var open = document.querySelectorAll('tr.v310-detail-row');
+    for (var i = 0; i < open.length; i++) open[i].parentNode.removeChild(open[i]);
+
+    var address = row.getAttribute('data-address') || '';
+    var city = row.getAttribute('data-city-slug') || '';
+    if (!address || !city) return;
+
+    // Insert placeholder row.
+    var colspan = row.children.length || 6;
+    var detail = document.createElement('tr');
+    detail.className = 'v310-detail-row';
+    detail.innerHTML = '<td colspan="' + colspan + '"><div class="v310-detail-card loading">Loading address detail…</div></td>';
+    row.parentNode.insertBefore(detail, row.nextSibling);
+
+    // Fetch (cached per address+city key).
+    var key = city + '|' + address;
+    if (_v310Cache[key]) {
+      detail.firstChild.innerHTML = _renderCard(_v310Cache[key]);
+      return;
+    }
+    fetch('/api/address-detail?address=' + encodeURIComponent(address) + '&city=' + encodeURIComponent(city))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        _v310Cache[key] = d;
+        detail.firstChild.innerHTML = _renderCard(d);
+      })
+      .catch(function(){
+        detail.firstChild.innerHTML = '<div class="v310-detail-card" style="color:#dc2626;">Could not load details — please try again.</div>';
+      });
+  };
+})();
+</script>
 
 <script>
 // V211-1: Email capture form — POSTs to /api/subscribe (existing endpoint
