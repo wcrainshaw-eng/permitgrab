@@ -343,6 +343,39 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V324: Boston MA — second CKAN-platform city. data.boston.gov
+    # "Public Works / Code Enforcement Violations" resource has 889K
+    # records, fresh daily (last_modified 2026-04-24). Address comes
+    # composed from violation_stno + violation_street + violation_suffix
+    # because Boston doesn't pre-build a single address column. Bonus:
+    # contact_addr1/zip carry property-owner mailing addresses — future
+    # property_owners enrichment hook.
+    'boston': {
+        'prod_city_id': None,
+        'city': 'Boston',
+        'state': 'MA',
+        'platform': 'ckan',
+        'endpoints': [
+            {
+                'name': 'Code Enforcement Violations',
+                'ckan_domain': 'data.boston.gov',
+                'ckan_resource_id': '90ed3816-5e70-443c-803d-9a71f44470be',
+                'date_field': 'status_dttm',
+                'id_field': 'case_no',
+                'description_field': 'description',
+                'status_field': 'status',
+                'type_field': 'code',
+                'address_fields': {
+                    'number': 'violation_stno',
+                    'street': 'violation_street',
+                    'suffix': 'violation_suffix',
+                },
+                'zip_field': 'violation_zip',
+                'lat_field': 'latitude',
+                'lng_field': 'longitude',
+            },
+        ],
+    },
     # V197: Expansion — 1 new Socrata + 5 new ArcGIS sources
     'kansas-city-mo': {
         'prod_city_id': None,
