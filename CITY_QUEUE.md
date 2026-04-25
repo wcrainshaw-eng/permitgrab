@@ -7,6 +7,7 @@ have confirmed endpoints with contractor names — just add the config.
 ## Ready to Wire (confirmed endpoint + contractor field)
 <!-- Add cities here after SSH-testing confirms contractor_name field works -->
 <!-- Format: - CityName ST: platform resource_id, contractor_field: fieldname, tested: date -->
+- Greensboro NC: arcgis MapServer gis.greensboro-nc.gov OpenData_HRES_DS/2 BI_Permits, contractor_field: Contractor, tested: 2026-04-25 — wired in V340
 
 ## Needs Investigation (promising but unverified)
 <!-- Cities with known open data portals but contractor field unconfirmed -->
@@ -50,6 +51,12 @@ have confirmed endpoints with contractor names — just add the config.
 - Tulsa OK: ArcGIS search returns only a StoryMap citing 2023-2024 permits, no queryable feature service (V339 probed 2026-04-25)
 - Omaha NE: ArcGIS search returns 0 building-permit feature services for Omaha or Douglas County NE (V339 probed 2026-04-25)
 - Jacksonville FL: ArcGIS portal returns only Jacksonville OREGON UGB; data.coj.net not indexed in Socrata federated catalog (V339 probed 2026-04-25)
+- Reno NV: 0 ArcGIS Reno-specific results, only StoryMap reference (V340 probed 2026-04-25)
+- Toledo OH: ArcGIS results are for Toledo SPAIN, no Toledo OH building permit feed (V340 probed 2026-04-25)
+- Norfolk VA: 0 results in ArcGIS federated search (V340 probed 2026-04-25)
+- Riverside CA: only Riverside COUNTY permits surface (PLUSActivities_PD), no city-of-Riverside building permit feed (V340 probed 2026-04-25)
+- Glendale AZ: no AZ-specific result; Glendale CA has a permits-by-walkshed analytical layer but no permit-record feed (V340 probed 2026-04-25)
+- Lubbock TX: only a performance-metrics dashboard, no queryable feature service (V340 probed 2026-04-25)
 
 ## Monitoring for New Cities
 
