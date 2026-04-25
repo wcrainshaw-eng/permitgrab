@@ -1221,6 +1221,54 @@ function v328ApplyFilter(val) {
 }
 </script>
 
+{# V357 (CODE_V351 Part 3 Step 4): property owners section. Hidden when
+   property_owners is empty (cities without owner_name backfill or
+   assessor data). Owner names are gated for non-Pro users — first 3
+   chars + "***" same pattern the contractor table uses for phones. #}
+{% if property_owners %}
+<section class="section">
+  <div class="section-header">
+    <h2>Recent Property Owners in {{ city_name }}</h2>
+    <p>Properties with recent permit activity — owner information from public records. Pro subscribers see full names; free visitors see masked names.</p>
+  </div>
+  <div class="permits-table-container">
+    <div class="permits-table-wrap">
+      <table class="permits-table">
+        <thead>
+          <tr>
+            <th>Property Address</th>
+            <th>Owner Name</th>
+            <th style="text-align: right;">Assessed Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for owner in property_owners[:20] %}
+          <tr>
+            <td>{{ owner.property_address or '—' }}</td>
+            <td>
+              {% if session.get('user_email') and is_pro %}
+                {{ owner.owner_name }}
+              {% else %}
+                {{ owner.owner_name[:3] }}***
+              {% endif %}
+            </td>
+            <td style="text-align: right; font-variant-numeric: tabular-nums;">
+              {% if owner.assessed_value and owner.assessed_value > 0 %}${{ "{:,.0f}".format(owner.assessed_value) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if not (session.get('user_email') and is_pro) %}
+  <p style="margin-top: 12px; font-size: 13px; color: var(--gray-500); text-align: center;">
+    Subscribe to see full owner names and contact information for properties with recent permit activity in {{ city_name }}.
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
 <!-- V182 PR2 + V204-3: TOP CONTRACTORS -->
 {% if top_contractors or new_week_only %}
 {% set contractors_enriched = top_contractors | selectattr('phone') | list | length %}
