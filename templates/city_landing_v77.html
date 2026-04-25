@@ -1097,7 +1097,10 @@ body {
   <div class="permits-table-container">
     <div class="permits-table-header">
       <h3>Recent Permits</h3>
-      <a href="/?city={{ city_name }}">View all {{ permit_count }} permits &rarr;</a>
+      {# V327 (CODE_V320 Bug 3): keep on-city link instead of /?city= which
+         dropped auth state by routing through homepage. Pagination + filter
+         lands in V328 (Part B). #}
+      <a href="/permits/{{ city_slug }}">View all {{ permit_count }} permits &rarr;</a>
     </div>
     <div class="permits-table-wrap">
       <table class="permits-table">
@@ -1523,48 +1526,11 @@ body {
   </div>
 </section>
 
-<!-- V162 / V209-3: CODE VIOLATIONS SECTION — positioned as lead source -->
-{% if violations and violations|length > 0 %}
-<section class="section" style="background: var(--gray-100); max-width: none; padding-left: 32px; padding-right: 32px;">
-  <div style="max-width: 1200px; margin: 0 auto;">
-    <div class="section-header">
-      <h2>&#128293; Active Code Violations in {{ city_name }} <span style="background: #dc2626; color: white; font-size: 13px; padding: 2px 10px; border-radius: 12px; margin-left: 8px; font-weight: 500;">{{ violations_count|default(0) }}</span></h2>
-      <p class="violation-pitch">Contractors who fix code violations get called first. These properties MUST hire a contractor to resolve their violations &mdash; sorted by most recent.</p>
-    </div>
-
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-        <thead>
-          <tr style="border-bottom: 2px solid var(--gray-300); text-align: left;">
-            <th style="padding: 10px 12px; font-weight: 600; color: var(--gray-700);">Date</th>
-            <th style="padding: 10px 12px; font-weight: 600; color: var(--gray-700);">Type</th>
-            <th style="padding: 10px 12px; font-weight: 600; color: var(--gray-700);">Description</th>
-            <th style="padding: 10px 12px; font-weight: 600; color: var(--gray-700);">Address</th>
-            <th style="padding: 10px 12px; font-weight: 600; color: var(--gray-700);">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for v in violations %}
-          <tr style="border-bottom: 1px solid var(--gray-200);">
-            <td style="padding: 8px 12px; white-space: nowrap; color: var(--gray-600);">{{ v.violation_date or 'N/A' }}</td>
-            <td style="padding: 8px 12px; color: var(--gray-700);">{{ v.violation_type or '' }}</td>
-            <td style="padding: 8px 12px; color: var(--gray-600); max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{{ (v.violation_description or '')[:100] }}</td>
-            <td style="padding: 8px 12px; color: var(--gray-700);">{{ v.address or '' }}</td>
-            <td style="padding: 8px 12px;">
-              {% if v.status and v.status.lower() in ('open','active','pending') %}
-                <span style="background: #fef2f2; color: #dc2626; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">{{ v.status }}</span>
-              {% else %}
-                <span style="background: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">{{ v.status or 'Unknown' }}</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-{% endif %}
+{# V327 (CODE_V320 Bug 4): old V162/V209-3 violations section deleted —
+   it duplicated V312's "Code Violations in {{ city_name }}" section
+   above with mismatched styling (different table CSS, fire emoji, red
+   badge). V328 (Part B) replaces both with a single unified
+   permits+violations table. #}
 
 <!-- V79: RELATED BLOG POSTS -->
 {% if blog_posts %}
