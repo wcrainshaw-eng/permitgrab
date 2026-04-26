@@ -166,6 +166,8 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Richmond VA (loop V363 re-probe 2026-04-26): data.richmondgov.com federated catalog returns 0 Richmond-specific datasets (only Chicago/Calgary/Seattle/etc results). Portal isn't publishing permits via Socrata API. Dead via this path.
 - Cincinnati OH thvx-5mem (loop V363 re-probe 2026-04-26): ACTUALLY FRESH — newest date_issued 2026-04-24. NO contractor field. WIRED IN V384 (Accela → Socrata migration). Joins no-contractor cohort.
 - Norfolk VA fahm-yuh4 (loop V363 re-probe 2026-04-26): ACTUALLY FRESH — newest application_date 2026-04-22. NO contractor field. EXISTING V26 config had 5 wrong field names (ftpuser/permit_address/etc). FIELD_MAP FIXED IN V385.
+- Syracuse NY (loop V363 re-probe 2026-04-26): item id 2cc4e180fc6540fbb4fc6fafde311d7b returns "Item does not exist or is inaccessible" via arcgis.com/sharing/rest. data-syr.opendata.arcgis.com Hub DCAT only has Assessment Final Roll datasets (2011, 2012). V363 directive's source for the Syracuse violations item ID was incorrect. Dead via this path.
+- Greensboro NC violations (loop V363 Part A re-probe 2026-04-26): gis.greensboro-nc.gov OpenGateCity/OpenData_CC_DS/MapServer/3 (CC_All_Violations) — schema is rich (CaseNumber, ViolationCode, ViolationDescription, IssuedDate, CaseStatus, FullAddress, ResponsibleParty, ClearDate). BUT newest IssuedDate is 2024-06-18 (~22 months stale). The Hub modified-date refreshes (2026-04-20) reflect metadata edits, not new records. Dead by freshness.
 
 ## License-Enrichment Opportunities (separate platform — needs new collector path)
 <!-- Sources that ENRICH existing-city contractor profiles with license validation /
