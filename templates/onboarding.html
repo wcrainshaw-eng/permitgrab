@@ -393,11 +393,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </div>
       </div>
 
-      <a href="/" class="btn btn-primary">
+      {# V390 (CODE_V286 grind follow-up): "Go to Dashboard" was href="/"
+         which renders the cold-visitor marketing landing page, not the
+         user dashboard a brand-new signup expects. Send them straight
+         to /dashboard so the very first authenticated experience is the
+         "what you're paying for" view (tracked cities, recent permits,
+         phones), not another tier of marketing. #}
+      <a href="/dashboard" class="btn btn-primary">
         Go to Dashboard
       </a>
-      <a href="/pricing" class="btn btn-secondary">
-        See Professional Plan
+      <a href="/start-checkout?plan=pro" class="btn btn-secondary">
+        Start 14-day Pro Trial
       </a>
     </div>
   </div>
