@@ -302,9 +302,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button type="submit" class="btn btn-primary" id="submit-btn">Create Account</button>
     </form>
 
+    {# V380 (CODE_V363 P0 follow-up): when a user lands on /signup
+       via the V375 trial-CTA path (?plan=pro&next=/start-checkout...),
+       they may already have an account. The "Log in" link must
+       preserve those params so login redirects them to checkout
+       instead of dropping them on the homepage. JS rewrites the
+       href on load. #}
     <div class="auth-footer">
-      Already have an account? <a href="/login">Log in</a>
+      Already have an account? <a href="/login" id="login-link">Log in</a>
     </div>
+    <script>
+    (function() {
+      var qs = window.location.search || '';
+      if (qs.length > 1) {
+        var link = document.getElementById('login-link');
+        if (link) link.href = '/login' + qs;
+      }
+    })();
+    </script>
 
     <!-- V254 Phase 1: free-reveal headline. 10 credits per new signup
          is the whole conversion lever — surface it first. -->

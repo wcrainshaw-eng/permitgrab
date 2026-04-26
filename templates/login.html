@@ -341,10 +341,21 @@ async function handleLogin(event) {
 
     if (response.ok) {
       showAlert('Login successful! Redirecting...', 'success');
-      // Check for redirect param
+      // V380 (CODE_V363 P0 follow-up): honor both ?next= (the V375
+      // signup-flow param) and ?redirect= (legacy bare-slug param).
+      // Same-origin guard: only redirect to paths starting with "/"
+      // so a malicious ?next=https://attacker.example can't ride the
+      // login event off-site.
+      const nextParam = urlParams.get('next');
       const redirect = urlParams.get('redirect');
+      let dest = '/';
+      if (nextParam && nextParam.charAt(0) === '/') {
+        dest = nextParam;
+      } else if (redirect) {
+        dest = '/' + redirect;
+      }
       setTimeout(() => {
-        window.location.href = redirect ? '/' + redirect : '/';
+        window.location.href = dest;
       }, 500);
     } else {
       showAlert(data.error || 'Invalid email or password', 'error');
