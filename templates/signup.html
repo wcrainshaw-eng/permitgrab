@@ -395,9 +395,16 @@ async function handleSignup(event) {
     const data = await response.json();
 
     if (response.ok) {
+      // V375 (CODE_V363 P0): honor ?next= so users coming from the
+      // "Start Free Trial" button go to Stripe checkout after
+      // creating their account, instead of getting parked at
+      // /onboarding and losing the conversion.
+      var qs = new URLSearchParams(window.location.search);
+      var nextUrl = qs.get('next');
+      var safeNext = (nextUrl && nextUrl.charAt(0) === '/') ? nextUrl : '/onboarding';
       showAlert('Account created! Redirecting...', 'success');
       setTimeout(() => {
-        window.location.href = '/onboarding';
+        window.location.href = safeNext;
       }, 1000);
     } else {
       showAlert(data.error || 'Registration failed. Please try again.', 'error');
