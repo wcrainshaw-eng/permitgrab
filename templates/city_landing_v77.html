@@ -1542,10 +1542,15 @@ function v328ApplyFilter(val) {
          empty even when the current city's page was full. Show a real
          count when we have one, otherwise "View →". #}
       {% for city in nearby_cities %}
-      <a href="/permits/{{ state_slug }}/{{ city.city_slug }}" class="nearby-city-link">
+      {# V360 (CODE_V360 Bug 3): get_prod_cities() returns dicts keyed
+         `name` / `slug` / `permit_count`, not `city` / `city_slug` /
+         `total_permits`. The wrong field names produced empty <div class="name">
+         tags, "View ->" without a label, and href="/permits/{state_slug}/"
+         (no city) on every card — making the section visually broken. #}
+      <a href="/permits/{{ state_slug }}/{{ city.slug or city.city_slug }}" class="nearby-city-link">
         <div>
-          <div class="name">{{ city.city }}</div>
-          <div class="permits">{% if city.total_permits and city.total_permits > 0 %}{{ city.total_permits }} permits{% else %}View &rarr;{% endif %}</div>
+          <div class="name">{{ city.name or city.city }}</div>
+          <div class="permits">{% set _pc = city.permit_count or city.total_permits or 0 %}{% if _pc > 0 %}{{ _pc }} permits{% else %}View &rarr;{% endif %}</div>
         </div>
         <span class="arrow">&rarr;</span>
       </a>
