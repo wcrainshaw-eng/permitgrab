@@ -46,6 +46,21 @@ a.btn-outline { background: white; border: 1px solid var(--gray-300); color: var
 {% include 'partials/nav.html' %}
 
 <div class="wrap">
+  {# V379 (CODE_V363 P0 follow-up): when /start-checkout sends an
+     already-paid user back here it appends ?already_subscribed=1.
+     Without this banner the user clicks "Start Free Trial", lands on
+     a dashboard that looks identical to before, and assumes the click
+     did nothing. Same for ?checkout=success on Stripe success_url. #}
+  {% if request.args.get('already_subscribed') %}
+  <div style="background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;">
+    <strong>You're already subscribed.</strong> Pro is active on your account — you have everything the trial would unlock. <a href="/account" style="color: #047857; font-weight: 600;">Manage subscription →</a>
+  </div>
+  {% elif request.args.get('checkout') == 'success' %}
+  <div style="background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;">
+    <strong>Welcome to Pro!</strong> Your 14-day free trial is active. You can browse every contractor's phone, export CSVs, and watch the violation feed for your cities.
+  </div>
+  {% endif %}
+
   <div class="welcome">Welcome back, {{ user.name or user.email.split('@')[0] }}</div>
   <div class="sub">
     {% if is_pro %}
