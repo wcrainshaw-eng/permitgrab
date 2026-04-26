@@ -1518,19 +1518,28 @@ footer a:hover { color: white; }
     <p style="font-size: 15px; color: #4b5563; margin-bottom: 20px;">
       PermitGrab tracks freshly-issued building permits from official city portals in {{ state_count }} states. Browse permits filtered by trade, project value, and neighborhood on any of our active city pages:
     </p>
+    {# V371 (loop /CODE_V286 grind): top SEO grid was anchoring city
+       names regardless of whether we have data. Houston/San Diego/Dallas/
+       San Francisco all returned thin pages because their permit feeds
+       are dead-ends per CLAUDE.md (no contractor field, frozen, or no
+       API). Anchor instead to the 13 confirmed ad-ready cities with
+       fresh permit data + phone-enriched contractors — those pages are
+       the ones we want Google to index and the ones a click-through
+       won't disappoint. #}
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 40px; font-size: 14px;">
+      <a href="/permits/san-antonio-tx" style="color: #2563eb; text-decoration: none;">San Antonio Building Permits</a>
+      <a href="/permits/miami-dade-county" style="color: #2563eb; text-decoration: none;">Miami-Dade Building Permits</a>
+      <a href="/permits/chicago-il" style="color: #2563eb; text-decoration: none;">Chicago Building Permits</a>
+      <a href="/permits/phoenix-az" style="color: #2563eb; text-decoration: none;">Phoenix Building Permits</a>
       <a href="/permits/new-york-city" style="color: #2563eb; text-decoration: none;">New York City Building Permits</a>
       <a href="/permits/los-angeles" style="color: #2563eb; text-decoration: none;">Los Angeles Building Permits</a>
-      <a href="/permits/chicago-il" style="color: #2563eb; text-decoration: none;">Chicago Building Permits</a>
-      <a href="/permits/houston-tx" style="color: #2563eb; text-decoration: none;">Houston Building Permits</a>
-      <a href="/permits/phoenix-az" style="color: #2563eb; text-decoration: none;">Phoenix Building Permits</a>
-      <a href="/permits/philadelphia" style="color: #2563eb; text-decoration: none;">Philadelphia Building Permits</a>
-      <a href="/permits/san-antonio-tx" style="color: #2563eb; text-decoration: none;">San Antonio Building Permits</a>
-      <a href="/permits/san-diego" style="color: #2563eb; text-decoration: none;">San Diego Building Permits</a>
-      <a href="/permits/dallas-tx" style="color: #2563eb; text-decoration: none;">Dallas Building Permits</a>
-      <a href="/permits/austin-tx" style="color: #2563eb; text-decoration: none;">Austin Building Permits</a>
-      <a href="/permits/fort-worth" style="color: #2563eb; text-decoration: none;">Fort Worth Building Permits</a>
-      <a href="/permits/san-francisco" style="color: #2563eb; text-decoration: none;">San Francisco Building Permits</a>
+      <a href="/permits/henderson" style="color: #2563eb; text-decoration: none;">Henderson NV Building Permits</a>
+      <a href="/permits/anaheim" style="color: #2563eb; text-decoration: none;">Anaheim Building Permits</a>
+      <a href="/permits/cleveland-oh" style="color: #2563eb; text-decoration: none;">Cleveland Building Permits</a>
+      <a href="/permits/san-jose" style="color: #2563eb; text-decoration: none;">San Jose Building Permits</a>
+      <a href="/permits/buffalo-ny" style="color: #2563eb; text-decoration: none;">Buffalo Building Permits</a>
+      <a href="/permits/nashville-tn" style="color: #2563eb; text-decoration: none;">Nashville Building Permits</a>
+      <a href="/permits/orlando-fl" style="color: #2563eb; text-decoration: none;">Orlando Building Permits</a>
     </div>
 
     <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 16px;">
@@ -1538,16 +1547,24 @@ footer a:hover { color: white; }
     </h2>
     <p style="font-size: 15px; color: #4b5563; margin-bottom: 20px;">
       Open building code violations are some of the strongest contractor leads you can buy. The owner has a deadline, a fine, and a written reason to hire someone tomorrow. PermitGrab indexes official city violation feeds alongside permit data so you see both in one place. Cities with violation coverage include
+      {# V371: was naming Houston / San Francisco / Seattle / Nashville /
+         Columbus as having violation feeds, none of which are configured
+         in violation_collector.py — Google could ding the page for
+         content/data mismatch and a click-through saw zero violations.
+         Now lists only cities with active VIOLATION_SOURCES entries. #}
       <a href="/permits/new-york-city" style="color: #2563eb;">New York</a>,
       <a href="/permits/chicago-il" style="color: #2563eb;">Chicago</a>,
+      <a href="/permits/los-angeles" style="color: #2563eb;">Los Angeles</a>,
       <a href="/permits/philadelphia" style="color: #2563eb;">Philadelphia</a>,
-      <a href="/permits/houston-tx" style="color: #2563eb;">Houston</a>,
       <a href="/permits/austin-tx" style="color: #2563eb;">Austin</a>,
-      <a href="/permits/san-francisco" style="color: #2563eb;">San Francisco</a>,
-      <a href="/permits/seattle" style="color: #2563eb;">Seattle</a>,
-      <a href="/permits/nashville" style="color: #2563eb;">Nashville</a>,
-      <a href="/permits/columbus" style="color: #2563eb;">Columbus</a>, and
-      <a href="/permits/san-jose" style="color: #2563eb;">San Jose</a>.
+      <a href="/permits/miami-dade-county" style="color: #2563eb;">Miami-Dade</a>,
+      <a href="/permits/phoenix-az" style="color: #2563eb;">Phoenix</a>,
+      <a href="/permits/san-antonio-tx" style="color: #2563eb;">San Antonio</a>,
+      <a href="/permits/orlando-fl" style="color: #2563eb;">Orlando</a>,
+      <a href="/permits/cleveland-oh" style="color: #2563eb;">Cleveland</a>,
+      <a href="/permits/anaheim" style="color: #2563eb;">Anaheim</a>,
+      <a href="/permits/pittsburgh" style="color: #2563eb;">Pittsburgh</a>, and
+      <a href="/permits/boston" style="color: #2563eb;">Boston</a>.
     </p>
 
     <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin: 40px 0 16px;">
