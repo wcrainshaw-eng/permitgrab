@@ -8226,22 +8226,33 @@ CITY_REGISTRY = {
         "name": "Lincoln",
         "state": "NE",
         "slug": "lincoln",
-        "platform": "accela",
-        "_accela_city_key": "lincoln",
-        "endpoint": "https://aca-prod.accela.com/LINCOLN",
-        "agency_code": "LINCOLN",
-        "description": "Building Permits via Accela Citizen Access",
+        # V363 (CODE_V362 Part C): migrated from Accela HTML scraper to
+        # gis.lincoln.ne.gov ArcGIS MapServer. Accela path was producing
+        # 345 stuck permits with no contractor data (HTML grid limitation,
+        # CLAUDE.md P1 dead-end pattern). The ArcGIS endpoint publishes
+        # the same Lancaster County / Lincoln residential new-construction
+        # data with a 53-field schema covering address + dates + classcode
+        # + value. No contractor field — wired as a no-contractor city
+        # per V362 Part C; the city page renders the "no contractor data
+        # available" notice from V362 Part A. Probe 2026-04-26: newest
+        # SD_APP_DD 2026-04-10 (16 days fresh).
+        "platform": "arcgis",
+        "endpoint": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/0/query",
+        "dataset_id": "Residential_New_Construction_Permits_0",
+        "description": "Lincoln NE Residential New Construction Permits (ArcGIS MapServer)",
         "field_map": {
-            "permit_number": "permit_number",
-            "permit_type": "permit_type",
-            "address": "address",
-            "filing_date": "filing_date",
-            "status": "status",
-            "description": "description",
+            "permit_number": "PermNo",
+            "permit_type": "ClassCode",
+            "address": "Address",
+            "filing_date": "SD_APP_DD",
+            "estimated_cost": "Value",
+            "num_units": "Units",
+            "description": "ClassDesc",
         },
-        "date_field": "filing_date",
+        "date_field": "SD_APP_DD",
+        "date_format": "date",
         "limit": 2000,
-        "active": True,  # V42: Accela LINCOLN confirmed live. Activated.
+        "active": True,  # V42 Accela activated; V363 migrated to ArcGIS for fresh data + no-contractor wiring.
         "notes": "V39: Fabricated Socrata (data.lincoln.ne.gov) replaced with live Accela LINCOLN. Modules: Building, LTU, Planning. Building module is target.",
     },
 
