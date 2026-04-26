@@ -25,15 +25,13 @@ services:
     name: permitgrab
     runtime: python
     buildCommand: find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; pip install -r requirements.txt
-    # V414 (CODE_V365b PHASE B Part 4): tuned gunicorn — 2 workers x 2 threads
-    # (down from 2x4 — fewer concurrent handlers per worker reduces peak
-    # memory under load), --preload (master shares app code to workers via
-    # copy-on-write — saves memory; safe now that WORKER_MODE skips the
-    # daemon thread spawn that --preload would otherwise pre-fire),
-    # --max-requests 500 + --max-requests-jitter 50 (worker recycle to
-    # head off memory leaks; jitter prevents stampede), --graceful-timeout
-    # 30 (clean shutdown).
-    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 120 --graceful-timeout 30 --max-requests 500 --max-requests-jitter 50 --preload
+    # V416: 1 worker x 4 threads — server.py is 18K lines, 2 workers
+    # exceeded the 512MB Render limit even with WORKER_MODE=true (521MB
+    # baseline → OOM-kill loop → 502s). 1 worker + 4 threads keeps the
+    # same 4 concurrent handlers in a single process. --preload still
+    # saves memory (master forks one worker via COW). --max-requests 500
+    # recycles the worker to prevent leaks.
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --graceful-timeout 30 --max-requests 500 --max-requests-jitter 50 --preload
     healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION
