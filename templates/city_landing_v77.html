@@ -843,6 +843,24 @@ body {
     color: #1e3a8a;
     font-size: 20px;
 }
+
+/* V360 (CODE_V360 Bug 4): collapsible accordion for below-fold sections.
+   Trade Breakdown, Construction Activity, and Nearby Cities are wrapped
+   in these — collapsed by default to keep the page short, expandable
+   when the user wants to see them. */
+.pg-accordion { border: 1px solid var(--gray-200); border-radius: 8px; margin: 16px 32px; max-width: 1200px; }
+.pg-accordion-header {
+  padding: 16px 20px; cursor: pointer; display: flex;
+  justify-content: space-between; align-items: center;
+  font-weight: 600; font-size: 16px; background: var(--gray-50);
+  border-radius: 8px;
+}
+.pg-accordion-header:hover { background: var(--gray-100); }
+.pg-accordion-header::after { content: '+'; font-size: 20px; color: var(--gray-500); }
+.pg-accordion-header.open::after { content: '-'; }
+.pg-accordion-body { display: none; padding: 16px 20px; }
+.pg-accordion-body.open { display: block; }
+@media (min-width: 1264px) { .pg-accordion { margin-left: auto; margin-right: auto; } }
 </style>
 </head>
 <body>
@@ -1442,16 +1460,13 @@ function v328ApplyFilter(val) {
      alongside the card grid. No JS dependency. Bar width = share of this
      city's permits. Useful for roofers/electricians/solar cos to see which
      trades dominate a market at a glance. -->
+{# V360 (CODE_V360 Bug 4): Permit Types wrapped in collapsible accordion. #}
 {% if permit_types %}
 {% set _pt_sorted = permit_types.items() | list | sort(attribute=1, reverse=True) %}
 {% set _pt_total = permit_types.values() | list | sum %}
-<section class="section" style="background: white; max-width: none; padding-left: 32px; padding-right: 32px;">
-  <div style="max-width: 1200px; margin: 0 auto;">
-    <div class="section-header">
-      <h2>Permit Types in {{ city_name }}</h2>
-      <p>Breakdown of {{ "{:,}".format(_pt_total) }} building permits by category</p>
-    </div>
-
+<div class="pg-accordion">
+  <div class="pg-accordion-header">Permit Types in {{ city_name }} — {{ "{:,}".format(_pt_total) }} permits by category</div>
+  <div class="pg-accordion-body">
     <div class="permit-type-chart">
       {% for ptype, count in _pt_sorted[:10] %}
       {% set _pct = (count / _pt_total * 100) if _pt_total else 0 %}
@@ -1468,19 +1483,18 @@ function v328ApplyFilter(val) {
       {% endfor %}
     </div>
   </div>
-</section>
+</div>
 {% endif %}
 
-<!-- CONTRACTOR CONTEXT -->
-<section class="section">
-  <div class="section-header">
-    <h2>Construction Activity in {{ city_name }}</h2>
+{# V360 (CODE_V360 Bug 4): Construction Activity blurb wrapped in accordion. #}
+<div class="pg-accordion">
+  <div class="pg-accordion-header">Construction Activity in {{ city_name }}</div>
+  <div class="pg-accordion-body">
+    <div class="contractor-context">
+      <p>New building permits in {{ city_name }}, {{ state_name }} indicate upcoming construction projects. Contractors can identify subcontracting opportunities by monitoring recently issued permits for residential renovations, commercial buildouts, and new construction. Early outreach to permit holders often results in higher close rates before projects go to competitive bid.</p>
+    </div>
   </div>
-
-  <div class="contractor-context">
-    <p>New building permits in {{ city_name }}, {{ state_name }} indicate upcoming construction projects. Contractors can identify subcontracting opportunities by monitoring recently issued permits for residential renovations, commercial buildouts, and new construction. Early outreach to permit holders often results in higher close rates before projects go to competitive bid.</p>
-  </div>
-</section>
+</div>
 
 <!-- V156: SEO CONTENT SECTIONS -->
 <section class="section" style="background: white; max-width: none; padding-left: 32px; padding-right: 32px;">
@@ -1527,20 +1541,12 @@ function v328ApplyFilter(val) {
 </section>
 {% endif %}
 
-<!-- NEARBY CITIES -->
+{# V360 (CODE_V360 Bug 4): Nearby Cities wrapped in collapsible accordion. #}
 {% if nearby_cities %}
-<section class="section" style="background: var(--gray-100); max-width: none; padding-left: 32px; padding-right: 32px;">
-  <div style="max-width: 1200px; margin: 0 auto;">
-    <div class="section-header">
-      <h2>Nearby {{ state_name }} Cities</h2>
-      <p>Explore building permits in other {{ state_name }} cities</p>
-    </div>
-
+<div class="pg-accordion">
+  <div class="pg-accordion-header">Nearby {{ state_name }} Cities — explore building permits in other {{ state_name }} cities</div>
+  <div class="pg-accordion-body">
     <div class="nearby-cities-grid">
-      {# V223 T3: hide the permit count when it's 0. Advertising "0
-         permits" on every nearby-city tile made the whole grid look
-         empty even when the current city's page was full. Show a real
-         count when we have one, otherwise "View →". #}
       {% for city in nearby_cities %}
       {# V360 (CODE_V360 Bug 3): get_prod_cities() returns dicts keyed
          `name` / `slug` / `permit_count`, not `city` / `city_slug` /
@@ -1557,7 +1563,7 @@ function v328ApplyFilter(val) {
       {% endfor %}
     </div>
   </div>
-</section>
+</div>
 {% endif %}
 
 <!-- STATE LINK -->
@@ -2005,6 +2011,16 @@ if (window.location.search) {
   const btn = document.getElementById('btn-save-search');
   if (btn) btn.style.display = 'inline-flex';
 }
+
+// V360 (CODE_V360 Bug 4): collapsible accordion handler. Click the header
+// to toggle the body. Used for Permit Types / Construction Activity /
+// Nearby Cities to keep the page short by default.
+document.querySelectorAll('.pg-accordion-header').forEach(function(h) {
+  h.addEventListener('click', function() {
+    this.classList.toggle('open');
+    this.nextElementSibling.classList.toggle('open');
+  });
+});
 </script>
 </body>
 </html>
