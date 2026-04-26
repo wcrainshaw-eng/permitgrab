@@ -1438,7 +1438,14 @@ footer a:hover { color: white; }
       <a href="/browse" style="display: inline-block; background: var(--accent); color: white; font-size: 17px; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Go to Dashboard &rarr;</a>
       <a href="/my-leads" style="display: inline-block; background: rgba(255,255,255,0.1); color: white; font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 8px; text-decoration: none; border: 1px solid rgba(255,255,255,0.25);">My Leads</a>
       {% else %}
-      <a href="/pricing" style="display: inline-block; background: var(--accent); color: white; font-size: 17px; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Start Your Free Trial &rarr;</a>
+      {# V397 (CODE_V286 grind): the highest-traffic CTA on the site
+         (cold Google Ads visitors land on this hero) was routing to
+         /pricing — same V375 broken-funnel pattern. Cold visitor
+         clicks "Start Your Free Trial," the natural expectation is
+         to land in the trial, not in another marketing page asking
+         them to choose. /start-checkout takes them straight to
+         /signup→Stripe Checkout via V375's unified entrypoint. #}
+      <a href="/start-checkout?plan=pro" style="display: inline-block; background: var(--accent); color: white; font-size: 17px; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Start Your Free Trial &rarr;</a>
       <a href="/browse" style="display: inline-block; background: rgba(255,255,255,0.1); color: white; font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 8px; text-decoration: none; border: 1px solid rgba(255,255,255,0.25);">Browse Live Permits</a>
       {% endif %}
     </div>
@@ -2432,8 +2439,8 @@ function renderPermits() {
         </div>
         <div class="lock-overlay">
           ${currentUser
-            ? '<a href="/pricing">Upgrade to Pro for full contact info →</a>'
-            : '<a href="/signup">Sign up free to see contacts →</a>'}
+            ? '<a href="/start-checkout?plan=pro">Upgrade to Pro for full contact info →</a>'
+            : '<a href="/start-checkout?plan=pro">Sign up free to see contacts →</a>'}
         </div>`}
       </div>
     `;

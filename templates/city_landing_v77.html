@@ -1315,7 +1315,7 @@ function v328ApplyFilter(val) {
           {% if contractors_enriched > 0 %}
             <strong>{{ contractors_enriched }} of {{ top_contractors|length }}</strong> have verified phone numbers below.
           {% else %}
-            Contact info is being verified — check back soon or <a href="/pricing">subscribe to unlock full contacts</a>.
+            Contact info is being verified — check back soon or <a href="/start-checkout?plan=pro">subscribe to unlock full contacts</a>.
           {% endif %}
         {% endif %}
       </p>
@@ -1739,7 +1739,7 @@ function v328ApplyFilter(val) {
           } else if (logged) {
             phoneHtml = '<span style="color: var(--gray-400);">No phone on file</span>';
           } else {
-            phoneHtml = '<span class="phone-masked">📞 ●●●-●●●-●●●●</span><a class="unlock-link" href="/pricing">Unlock with Pro →</a>';
+            phoneHtml = '<span class="phone-masked">📞 ●●●-●●●-●●●●</span><a class="unlock-link" href="/start-checkout?plan=pro">Unlock with Pro →</a>';
           }
           // V367 (CODE_V363 Part C): contractor name links to full
           // dossier when we have the profile id; falls back to plain
@@ -1881,7 +1881,7 @@ async function v254Reveal(ev, el) {
       _v254RevealState = Object.assign({}, state, { credits_remaining: d.credits_remaining });
       _v254UpdateNavCounter();
     } else if (r.status === 402) {
-      el.outerHTML = '<a href="/pricing" class="gate-reveal-btn" style="background:#dc2626;">⚠ Out of reveals · Upgrade</a>';
+      el.outerHTML = '<a href="/start-checkout?plan=pro" class="gate-reveal-btn" style="background:#dc2626;">⚠ Out of reveals · Upgrade</a>';
     } else {
       el.innerHTML = original;
     }
