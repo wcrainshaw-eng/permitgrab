@@ -9716,7 +9716,7 @@ def admin_daemon_health():
             import psutil as _psutil
             _proc = _psutil.Process(os.getpid())
             memory_mb = round(_proc.memory_info().rss / 1024 / 1024, 1)
-            memory_percent = round(memory_mb / 512 * 100, 1)
+            memory_percent = round(memory_mb / 2048 * 100, 1)
         except Exception:
             # psutil missing or permission denied — don't fail the probe.
             pass
@@ -9731,7 +9731,7 @@ def admin_daemon_health():
             'top_error_cities': top_errors,
             'memory_mb': memory_mb,
             'memory_percent': memory_percent,
-            'memory_limit_mb': 512,
+            'memory_limit_mb': 2048,
         }
         if self_healed:
             payload['self_heal_triggered'] = True

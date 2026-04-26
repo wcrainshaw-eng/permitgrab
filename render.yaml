@@ -8,11 +8,12 @@
 # The persistent disk is kept for backwards compatibility during migration.
 #
 # V414/V415 (CODE_V365b): split daemon into a separate Background Worker
-# service so the web process gets the full 512MB Render limit instead of
-# sharing it with collector + enrichment + email scheduler threads. The
-# web process was OOM-killing at ~768MB / 150% of the limit, causing
-# intermittent 502s. Worker uses its own 512MB; communication is via the
-# shared PostgreSQL DB.
+# service so the web process gets dedicated memory instead of sharing it
+# with collector + enrichment + email scheduler threads.
+# V418 (2026-04-26): web service is on Render Standard plan (2GB RAM) —
+# the historical "512MB" comments below are stale. The Dockerfile CMD
+# is what actually runs (this startCommand is ignored when a Dockerfile
+# is present); see Dockerfile for the live gunicorn config.
 
 databases:
   - name: permitgrab-db
@@ -25,12 +26,14 @@ services:
     name: permitgrab
     runtime: python
     buildCommand: find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; pip install -r requirements.txt
-    # V416: 1 worker x 4 threads — server.py is 18K lines, 2 workers
-    # exceeded the 512MB Render limit even with WORKER_MODE=true (521MB
-    # baseline → OOM-kill loop → 502s). 1 worker + 4 threads keeps the
-    # same 4 concurrent handlers in a single process. --preload still
-    # saves memory (master forks one worker via COW). --max-requests 500
-    # recycles the worker to prevent leaks.
+    # V416: 1 worker x 4 threads. (Original rationale: 2 workers exceeded
+    # the legacy 512MB plan even with WORKER_MODE=true.) V418 (2026-04-26):
+    # web service has been on Standard plan (2GB RAM) — 1 worker is now
+    # kept for daemon-thread locality (the _collector_started flag is
+    # process-local; two workers would race the daemon spawn). --preload
+    # still saves memory (master forks one worker via COW). --max-requests
+    # 500 recycles the worker to prevent leaks. NOTE: this startCommand is
+    # IGNORED when a Dockerfile is present — see Dockerfile for live config.
     startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --graceful-timeout 30 --max-requests 500 --max-requests-jitter 50 --preload
     healthCheckPath: /healthz
     envVars:
@@ -55,9 +58,12 @@ services:
       sizeGB: 1
 
   # V415 (CODE_V365b PHASE B Part 3): standalone background worker service.
-  # Runs the collector + enrichment + email scheduler outside the web
-  # process so the web server gets the full 512MB. Communicates with the
-  # web service only through the shared PostgreSQL DB. ~$7/mo Starter plan.
+  # Runs the collector + enrichment + email scheduler outside the web process
+  # so the web server has dedicated memory. Communicates with the web service
+  # only through the shared PostgreSQL DB. (V418 note: web is on Standard plan
+  # = 2GB RAM. This worker service is currently NOT deployed — daemon runs
+  # in-process in the web service via WORKER_MODE=false. Kept here as a
+  # ready-to-enable failsafe.)
   - type: worker
     name: permitgrab-worker
     runtime: python
