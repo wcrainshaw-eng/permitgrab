@@ -9720,7 +9720,7 @@ def api_address_detail():
             return prof_cache[key]
         try:
             cp = conn.execute("""
-                SELECT business_name, phone, trade_category,
+                SELECT id, business_name, phone, trade_category,
                        total_permits, source_city_key
                 FROM contractor_profiles
                 WHERE source_city_key = ? AND business_name = ?
@@ -9731,6 +9731,10 @@ def api_address_detail():
         out = None
         if cp:
             out = {
+                # V367 (CODE_V363 Part C): expose profile id so the
+                # expandable detail card can link the contractor name
+                # to /contractor/<id> for the full dossier view.
+                'profile_id': cp['id'],
                 'business_name': cp['business_name'],
                 'phone': cp['phone'] if logged_in else None,
                 'trade_category': cp['trade_category'],

@@ -1741,7 +1741,16 @@ function v328ApplyFilter(val) {
           } else {
             phoneHtml = '<span class="phone-masked">📞 ●●●-●●●-●●●●</span><a class="unlock-link" href="/pricing">Unlock with Pro →</a>';
           }
-          out.push('<div class="contractor">' + _escape(p.contractor.business_name) + ' &middot; ' + phoneHtml);
+          // V367 (CODE_V363 Part C): contractor name links to full
+          // dossier when we have the profile id; falls back to plain
+          // text when only the raw permit name is available.
+          var nameHtml;
+          if (p.contractor.profile_id) {
+            nameHtml = '<a href="/contractor/' + p.contractor.profile_id + '" style="color: var(--accent-dark, #ea580c); text-decoration: none; border-bottom: 1px dotted;">' + _escape(p.contractor.business_name) + '</a>';
+          } else {
+            nameHtml = _escape(p.contractor.business_name);
+          }
+          out.push('<div class="contractor">' + nameHtml + ' &middot; ' + phoneHtml);
           if (p.contractor.total_permits) {
             out.push(' <span style="color: var(--gray-500); font-size: 12px;">(' + p.contractor.total_permits + ' permits)</span>');
           }
