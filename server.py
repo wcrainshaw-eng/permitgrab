@@ -13171,6 +13171,13 @@ def api_register():
         return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
 
     # Log in the user
+    # V377 (CODE_V363 P0 follow-up): mark the session permanent so it
+    # survives until PERMANENT_SESSION_LIFETIME (Flask default 31 days)
+    # instead of expiring whenever the browser closes. The directive
+    # reported "user gets randomly logged out between page loads (nav
+    # flips between 'Wes Crainshaw' and 'Log In / Sign Up')" — that's
+    # the transient-session pattern. Mirrored on /api/login below.
+    session.permanent = True
     session['user_email'] = email
 
     # Track signup event
@@ -13229,6 +13236,8 @@ def api_login():
         return jsonify({'error': 'Invalid email or password'}), 401
 
     # Log in the user
+    # V377: permanent session — see /api/register for full reasoning.
+    session.permanent = True
     session['user_email'] = email
 
     # V12.53: Update last_login_at timestamp
