@@ -2515,15 +2515,15 @@ def admin_dashboard():
     except Exception:
         pass
 
-    # ad-ready buckets — reuse city-health internal logic
-    top_slugs = [
-        'new-york-city','los-angeles','chicago','houston','phoenix',
-        'philadelphia','dallas','austin','san-antonio','san-diego',
-        'nashville','seattle','san-francisco','fort-worth','columbus',
-        'denver','memphis','new-orleans','milwaukee','san-jose',
-    ]
-    placeholders = ','.join('?' * len(top_slugs))
-    health_rows = conn.execute(f"""
+    # V369 (loop /CODE_V286 grind): ad-ready computation used a hardcoded
+    # top-20 slug list (e.g. "chicago", "phoenix", "san-jose") that didn't
+    # match the prod_cities canonical slugs ("chicago-il", "phoenix-az",
+    # "san-jose-ca") AND missed actual ad-ready cities like Miami-Dade,
+    # Henderson, Anaheim, Cleveland, Buffalo, and Orlando-FL — leaving the
+    # admin dashboard reporting a count well below ground truth. Compute
+    # against every active city with >= 100 permits instead so the bucket
+    # tracks the real shape of the product.
+    health_rows = conn.execute("""
         SELECT pc.city_slug, pc.state, pc.status,
                COALESCE(p.cnt, 0) as permits, p.newest as newest_permit,
                COALESCE(v.cnt, 0) as violations,
@@ -2545,8 +2545,8 @@ def admin_dashboard():
                             THEN 1 ELSE 0 END) enriched
             FROM contractor_profiles GROUP BY source_city_key
         ) cp ON cp.source_city_key = pc.city_slug
-        WHERE pc.city_slug IN ({placeholders})
-    """, top_slugs).fetchall()
+        WHERE pc.status = 'active' AND COALESCE(p.cnt, 0) >= 100
+    """).fetchall()
 
     from datetime import datetime as _dt
     today = _dt.utcnow().date()
