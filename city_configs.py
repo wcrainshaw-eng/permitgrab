@@ -1610,7 +1610,15 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V35: Deactivated â old dataset (2gkz-7z4f) stale since Jan 2026. mesa_new is now active with fresh data from citydata.mesaaz.gov
+        # V406 (loop): deactivated. data.mesaaz.gov 2gkz-7z4f has only an "applicant"
+        # field (individuals like "MEGAN TRUJILLO") and NO contractor_name field at all.
+        # The V12-era field_map mapped contact_name to a non-existent "contractor_name"
+        # column on this dataset. Real Mesa contractor data lives at mesa_new
+        # (citydata.mesaaz.gov dzpk-hxfb) which has 154K records fresh through 2026-04-24
+        # with a contractor_name field of real businesses ("THORNTON PLUMBING" etc.).
+        # Both configs use slug "mesa" so they were writing to the same prod_cities row;
+        # deactivating this one keeps mesa_new as the canonical Mesa source.
+        "active": False,
         "notes": "V35: DEACTIVATED â old data.mesaaz.gov dataset stale (last issued_date Jan 2026). Replaced by mesa_new (citydata.mesaaz.gov/dzpk-hxfb) which has daily-fresh data.",
     },
 
@@ -2174,6 +2182,12 @@ CITY_REGISTRY = {
         "endpoint": "https://citydata.mesaaz.gov/resource/dzpk-hxfb.json",
         "dataset_id": "dzpk-hxfb",
         "description": "City of Mesa Building Permits",
+        # V406 (loop): same V321-trap variant as Sacramento V404 + Phoenix
+        # V405 — config had contact_name -> "contractor_name" but never set
+        # the canonical contractor_name -> "contractor_name". V180 runtime
+        # fallback was bridging. Verified 2026-04-26 via WebFetch:
+        # 154,218 records, max opened_date 2026-04-24 (fresh), contractor_name
+        # populated with real businesses ("THORNTON PLUMBING" etc.).
         "field_map": {
             "permit_number": "permit_number",
             "address": "property_address",
@@ -2182,6 +2196,7 @@ CITY_REGISTRY = {
             "estimated_cost": "total_fee_assessed",
             "filing_date": "opened_date",
             "description": "description_of_work",
+            "contractor_name": "contractor_name",
             "contact_name": "contractor_name",
             "contractor_email": "contractor_email",
             "contractor_license": "contractor_license",
