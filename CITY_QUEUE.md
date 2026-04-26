@@ -14,7 +14,9 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Virginia Beach VA: ArcGIS Hub, dataset_id: 15292e05..., contractor_field: contractor_name. Researched 2026-04-25. **V361 wiring probe 2026-04-26: dataset_id is truncated; can't be resolved as-is. Socrata federated search returned only Maryland Beach Buffer datasets. Need full ArcGIS Hub URL or feature service URL to wire.**
 - Tulsa OK: Socrata, resource_id: okc-permits, contractor_field: primary_contractor. NOTE: was in Dead Ends (V339 only found StoryMap via ArcGIS search — Socrata dataset found via manual research). Researched 2026-04-25. **V361 wiring probe 2026-04-26: "okc-permits" prefix suggests Oklahoma City not Tulsa. Socrata federated search for "tulsa permits" returned 0 results. Likely a copy/paste error — confirm whether the dataset is actually OKC-wide or Tulsa-specific.**
 - Omaha NE: CivicData, resource_id: blds-data, contractor_field: contractor_license. NOTE: was in Dead Ends (V340 found 0 ArcGIS results — CivicData platform not searched). Researched 2026-04-25. **V361 wiring probe 2026-04-26: "CivicData" platform isn't in our supported list (we handle socrata/arcgis/carto/ckan/accela). Need a concrete REST endpoint URL to wire — e.g. https://opendata-omaha.opendata.civicdata.com/resource/blds-data.json or similar.**
-- Salt Lake City UT: Socrata, resource_id: 5gsj-w587, contractor_field: contractor_name. Researched 2026-04-25. **V361 wiring probe 2026-04-26: resource_id 5gsj-w587 returns 404 on opendata.utah.gov + data.slc.gov; Socrata federated catalog returns 0 results. Need correct host domain or alternate resource_id.**
+- Salt Lake City UT: Socrata, resource_id: 5gsj-w587, contractor_field: contractor_name. Researched 2026-04-25. **V361 wiring probe 2026-04-26: resource_id 5gsj-w587 returns 404 on opendata.utah.gov + data.slc.gov; Socrata federated catalog returns 0 results. Need correct host domain or alternate resource_id.** **V362 wiring probe with corrected id 3eji-gn2j: dataset exists on opendata.utah.gov but applicant_name is INDIVIDUAL names (Andrew Carey, Rebecca Delis) not businesses; newest record 2023-10-26 (18 months stale). Fails both freshness + contractor rules.**
+- Virginia Beach VA: V362 wiring probe 2026-04-26 — found at services2.arcgis.com/CyVvlIiUfRBmMQuu Building_Permits/0. Schema has PermitNumber/Type/ApplicationDat/IssueDate/address/GPIN but ZERO contractor/applicant/business fields. Newest ApplicationDat 2026-03-13 (44 days stale, just past the <30 day rule). Candidate for no-contractor wiring once freshness improves; mark as Part-C-eligible.
+- Tulsa OK: V362 wiring probe 2026-04-26 — gis2-cityoftulsa.opendata.arcgis.com Hub returns federated cross-org results (Naperville, Leon County, Durham), no Tulsa-specific permit dataset. Tulsa doesn't publish on this Hub.
 
 ## Ready to Wire (NO contractor field — address/owner data only)
 <!-- These cities have working permit APIs with addresses and dates but NO contractor name field.
@@ -42,6 +44,16 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Atlanta GA: ArcGIS Hub building permits + code enforcement. Previous probe (V341) got ECONNREFUSED + TLS cert invalid — may have been fixed since. Worth a re-probe.
 - New Orleans LA: Socrata open data portal, has "Code Enforcement Active Pipeline." Permit contractor field unconfirmed.
 - Detroit MI: ArcGIS-based, tracks blighted properties + permits. Previous probe said "not a Socrata portal" but ArcGIS may work. Worth a re-probe.
+- Pittsburgh PA: WPRDC (data.wprdc.org) CKAN + ArcGIS Hub (pghgishub-pittsburghpa.opendata.arcgis.com). PLI Permits dataset back to 2019. Contractor field unconfirmed. OKFN census lists as having open permit data.
+- Montgomery County MD: OKFN census entry exists. Open data portal likely has permits. Worth checking.
+
+## Research Resources
+<!-- Use these to find endpoints for any queued city -->
+<!-- OKFN US City Open Data Census: http://us-cities.survey.okfn.org/dataset/construction-permits.html -->
+<!-- Socrata Open Data Network: https://www.opendatanetwork.com/ -->
+<!-- ArcGIS Hub Search: https://hub.arcgis.com/ -->
+<!-- Accela CivicData: https://www.civicdata.com/ -->
+<!-- Data.gov catalog: https://catalog.data.gov/dataset/?tags=permits -->
 
 
 ## Dead Ends (skip forever)

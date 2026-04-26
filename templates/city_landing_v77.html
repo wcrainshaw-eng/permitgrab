@@ -1288,6 +1288,19 @@ function v328ApplyFilter(val) {
 {% endif %}
 
 <!-- V182 PR2 + V204-3: TOP CONTRACTORS -->
+{# V362 (CODE_V362 Part A): cities whose permit feed lacks a contractor
+   field still ship valuable address+date+permit_type+owner data. Show a
+   short "no contractor data" notice in place of the Top Contractors
+   section so the page doesn't look broken; the unified permits table,
+   property-owner section, and violations stay visible. #}
+{% if not (top_contractors or new_week_only) %}
+<div style="margin: 32px 32px; padding: 24px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; text-align: center; max-width: 1200px; margin-left: auto; margin-right: auto;">
+  <p style="color: var(--gray-500); font-size: 14px; margin: 0;">
+    No contractor lead data available for {{ city_name }}. The city's permit feed publishes addresses and project values but doesn't expose contractor names.
+    Property-owner and permit details are still available below.
+  </p>
+</div>
+{% endif %}
 {% if top_contractors or new_week_only %}
 {% set contractors_enriched = top_contractors | selectattr('phone') | list | length %}
 <section class="contractors-section">
