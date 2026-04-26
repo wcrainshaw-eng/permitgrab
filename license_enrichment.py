@@ -417,9 +417,14 @@ STATE_CONFIGS = {
         ],
         # prod_cities FL slugs we care about. Match is city-scoped to
         # avoid pulling in a Miami contractor for a St Petersburg profile.
+        # V410 (loop): dropped "inverness" from this list — the only
+        # Inverness in CITY_REGISTRY is a CA filter on Marin County
+        # (Inverness, CA in West Marin), not Inverness FL. FL DBPR
+        # phones could never match CA contractor profiles, so the slug
+        # was just wasting cycles and adding a confusing entry.
         'city_slugs': ['miami-dade-county', 'saint-petersburg', 'cape-coral',
                        'orlando-fl', 'fort-lauderdale', 'tallahassee',
-                       'miami', 'inverness', 'tampa', 'jacksonville',
+                       'miami', 'tampa', 'jacksonville',
                        'hialeah', 'hollywood-fl', 'pembroke-pines',
                        'coral-springs', 'gainesville', 'pompano-beach',
                        'west-palm-beach', 'clearwater', 'lakeland',
