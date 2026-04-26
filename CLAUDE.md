@@ -539,22 +539,19 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
 8. **Fix immediately, don't just report.** If you find a bug, fix it in the same PR.
 9. **MapServer queries MUST include returnGeometry=false.**
 10. **The daemon must be restarted after every deploy** via POST /api/admin/start-collectors.
-11. **Auto-merge your own PRs.** You are the reviewer, the merger, and the deployer. After `gh pr create`, immediately squash-merge with `gh pr merge --squash --delete-branch`. Never leave a PR open waiting for someone to click a button. If a merge conflicts, rebase and retry — don't stop.
-12. **Check CITY_QUEUE.md first.** Before researching any new city, check if
+11. **City expansion is QUEUE-ONLY.** Never probe or research new cities on your own. Only wire cities listed in CITY_QUEUE.md "Ready to Wire" section (Wes populates this). Max 3 cities per autonomous cycle, 10-minute cap per city. If wiring fails after 10 minutes, log it as a dead end and move on. Never search ArcGIS Hub, Socrata Discovery, or Google for new cities — that's Wes's job.
+12. **Enrichment before expansion.** Always run ALL enrichment imports (FL DBPR, MN DLI, NY DOL, WA L&I, CA CSLB) before wiring any new cities. Enriching existing cities toward ad-ready is higher ROI than adding new ones.
+13. **Auto-merge your own PRs.** You are the reviewer, the merger, and the deployer. After `gh pr create`, immediately squash-merge with `gh pr merge --squash --delete-branch`. Never leave a PR open waiting for someone to click a button. If a merge conflicts, rebase and retry — don't stop.
+14. **Check CITY_QUEUE.md first.** Before researching any new city, check if
     it's already in the queue as "Ready to Wire" — if so, skip research and
     just wire the config. If it's in "Dead Ends" — skip it entirely.
-13. **Batch dead-end logging.** Do NOT make a separate commit for each dead-end
+15. **Batch dead-end logging.** Do NOT make a separate commit for each dead-end
     city. Accumulate dead-ends during a work session and log them in ONE batch
     commit to DEAD_ENDS.md at the end. Never spend more than 60 seconds
     documenting a dead end.
-14. **Never ship untested infrastructure.** New dependencies (Sentry, monitoring
+16. **Never ship untested infrastructure.** New dependencies (Sentry, monitoring
     packages, etc.) MUST use guarded imports (try/except) and be tested locally
     before deploying. The V287 Sentry incident wasted 45 minutes and 3 commits.
-15. **City expansion is PAUSED.** The top 200 US cities by population have been
-    investigated. CITY_QUEUE.md "Ready to Wire" is nearly empty. Do NOT spend
-    ANY time probing new cities unless Wes explicitly adds them to CITY_QUEUE.md
-    "Ready to Wire" section. If you finish all other work, run enrichment imports
-    or data quality audits — never city hunting.
 
 ---
 
@@ -581,85 +578,73 @@ Always empty the fast track before starting slow track work.
 
 ### THE LOOP (run continuously, never exit)
 
-#### Phase 1: KEEP THE LIGHTS ON (every session)
-1. Health check → fix anything broken
-2. Visual UAT → `npm run test:uat` → fix any failures
-3. Data quality audit → fix garbage, stale data, regressions
-4. Daemon check → restart if stopped, investigate if erroring
+### 1. HEALTH CHECK (every cycle)
+Hit /api/admin/health, verify daemon_running + status:healthy. Restart
+collectors via POST /api/admin/start-collectors if daemon stopped.
 
-#### Phase 2: GROW THE DATA (every session)
-5. Phone enrichment → check near-miss cities, trigger imports if needed
-6. **CITY EXPANSION (PAUSED — DO NOT RUN)** — Top 200 US cities have been
-   investigated; 60+ cities are confirmed dead ends in CITY_QUEUE.md. Do NOT
-   probe new cities. If "Ready to Wire" has entries, wire those ONLY. Otherwise
-   skip this phase entirely. Redirect time to: enrichment imports (re-run FL
-   DBPR, MN DLI, NY DOL, WA L&I, CA CSLB), data quality audits, property owner
-   pipeline (Phase 8).
-7. Violation expansion → find sources for cities that have profiles but no violations
-8. Backfill any cities with <6 months of data
+### 2. DATA QUALITY AUDIT (every cycle)
+Run garbage-profile and stale-city queries. Fix anything found before
+moving on. Visual UAT (npm run test:uat) after every template change.
 
-#### Phase 3: MAKE THE PRODUCT BETTER (every session)
-9. SEO with real data → update 1-2 city pages with fresh DB numbers
-10. Fix any UI/UX issues found during visual UAT
-11. Check for template bugs → test rendering of different city page states
-12. Performance → check page load times, optimize if >3s
+### 3. FL DBPR FIX (until resolved — P0)
+The FL DBPR import is the #1 unblocked phone-enrichment lever. SSH in,
+inspect actual myfloridalicense.com CSV column positions, update
+STATE_CONFIGS['FL'] applicant_columns + licensee_columns to match.
+Unlocks 6+ FL cities (Miami-Dade, Orlando, Tampa, Hialeah, St Pete,
+Cape Coral, Fort Lauderdale, Jacksonville). Until fixed, FL DBPR
+imports run but match 0 records.
 
-#### Phase 4: COMPETITIVE INTELLIGENCE (weekly)
-13. Research competitors and build features they have that we don't:
+### 4. ENRICHMENT IMPORTS (every cycle — highest ROI)
+Run ALL state license imports every cycle. This is the fastest path to ad-ready.
+- FL DBPR: `POST /api/admin/license-import {"state":"FL"}` — unlocks 6+ FL cities
+- MN DLI: re-run for Minneapolis
+- NY DOL: re-run for Buffalo + NYC
+- WA L&I: re-run for Seattle
+- CA CSLB: re-run for San Jose + Anaheim
+- DDG web search enrichment: trigger for any city with >100 profiles but <50 phones
+After each import, verify phone counts increased. If FL DBPR still fails, debug it — this is the #1 blocker.
 
-**Known competitors to monitor:**
-- BuildZoom (buildzoom.com) — contractor profiles, project history, ratings
-- ConstructConnect (constructconnect.com) — permit data + project leads
-- Dodge Construction Network — commercial project leads
-- PermitUsNow — permit expediting but also has data
-- Canopy (canopy.com) — permit analytics for real estate
-- Reonomy — commercial property data with permits
+### 5. TEMPLATE & BUG FIXES (check for instruction files)
+- Check for CODE_V*.txt instruction files in the repo root
+- Process them in version order (e.g., CODE_V360_UAT_BUGS.txt before V361)
+- After fixing, run UAT to verify
 
-**What to check:**
-- What data do they show on city/contractor pages that we don't?
-- Do they have filters we're missing? (by trade, date range, permit value)
-- Do they show permit VALUES (dollar amounts)? We should too where available.
-- Do they have maps? Project timelines? Contractor ratings?
-- What SEO keywords are they ranking for that we should target?
+### 6. CITY EXPANSION (queue-driven — CITY_QUEUE.md only)
+Check CITY_QUEUE.md "Ready to Wire" section. If entries exist:
+- Wire up to 3 cities per cycle
+- 10-minute hard cap per city — if it takes longer, log as dead end and move on
+- Follow the standard pipeline: add config → deploy → backfill → verify
+- After wiring, move the entry from "Ready to Wire" to the appropriate section
+If "Ready to Wire" is empty, SKIP this phase entirely. Do NOT research new cities.
+Wes populates the queue — your job is to wire what's there.
 
-**How to research (via SSH):**
-```bash
-ssh -T $RENDER_SSH 'curl -s "https://buildzoom.com/contractor/..." | head -200'
-```
-Parse their HTML to see what data fields they display. Then check if we have
-that data in our permits/profiles tables — if yes, add it to our pages.
+### 7. VIOLATION EXPANSION (ongoing)
+- For each city that has profiles but no violations, search for ArcGIS/Socrata code enforcement data
+- Test, configure, deploy
 
-#### Phase 5: BUILD NEW FEATURES (when Phases 1-4 are green)
-14. Feature ideas to implement (pick the highest-impact one):
+### 8. SEO IMPROVEMENT (weekly)
+- Query DB for real city stats
+- Update city page content with real numbers
+- Fix any technical SEO issues (canonicals, H1s, meta descriptions)
+- Check that new pages are being added to sitemap
 
-**Tier 1 — High impact, definitely doable:**
-- [ ] Permit value display — many permits have dollar amounts in the data, show them
-- [ ] Date range filter — let users filter by last 30/60/90/180 days
-- [ ] Trade category filter — filter contractors by electrical/plumbing/general/etc
-- [ ] Contractor detail pages — /contractor/{id} with permit history, phone, violations
-- [ ] CSV export — let paying users download their lead list as CSV
-- [ ] Email alerts — "New permits filed in [city] this week" digest emails
-- [ ] Violation cross-reference — show which contractors have code violations
+### 9. UAT (after every change)
+- Run the full UAT checklist above
+- Verify no regressions
 
-**Tier 2 — Medium impact, needs research:**
-- [ ] Permit value trends — "Average permit value in Chicago up 12% this quarter"
-- [ ] Contractor growth signals — "This contractor pulled 3x more permits this month"
-- [ ] Geographic clustering — show permit activity by zip code or neighborhood
-- [ ] Competitor comparison pages — "PermitGrab vs BuildZoom: more data, better price"
+### 10. PROPERTY OWNER PIPELINE (V276+)
+- Check property_owners table has data for all 5 ad-ready cities
+- For cities with assessor sources, verify monthly refresh is running
+- Check address matching rates — should be >50% for each city
+- Verify property owner section appears on city pages
+- Check permit_alerts table for new signups
 
-**Tier 3 — Future, needs new data:**
-- [ ] Property owner data (from county assessor records)
-- [ ] Contractor reviews/ratings aggregation
-- [ ] Project photos from permit inspections
-- [ ] Insurance/bonding status from state databases
-
-**Before building any feature:**
-1. Check if the data for it already exists in our DB
-2. Design the feature (template changes, new routes, queries needed)
-3. Build it on a branch
-4. Run visual UAT to make sure it doesn't break existing pages
-5. Merge and deploy
-6. Run visual UAT again post-deploy
+### 11. SEO CITY PLAYBOOK (V285+, after every deploy)
+- Run the tier query from CODE_V285_SEO_CITY_PLAYBOOK.txt
+- Check if any city crossed a gate (COLLECTING → PROFILES → ENRICHED → OWNERS → AD_READY)
+- Run the corresponding SEO actions for cities that crossed a gate
+- For top 5 ad cities, ALWAYS verify full treatment is in place (title, H1, meta, JSON-LD, FAQ, data content)
+- Priority order: ad cities first, then near-ready (San Jose, DC, Minneapolis), then top 100 by population
 
 ### WHEN YOU HIT A WALL
 If you can't make progress on one phase, SKIP IT and move to the next phase.
