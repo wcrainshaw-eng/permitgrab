@@ -18,6 +18,10 @@ PUBLIC_ROUTES = [
     '/leaderboard/chicago-il',      # V252 F6 public contractor leaderboard
     # V252 F7 trade-first URL — should 301 → /permits/chicago-il/<trade>
     '/solar/chicago-il',
+    # V375 (CODE_V363 P0) trial-CTA entrypoint. Anon hits this and
+    # gets bounced to /signup; we just need to confirm it doesn't 500
+    # on the redirect path.
+    '/start-checkout?plan=pro',
 ]
 
 @pytest.mark.parametrize('path', PUBLIC_ROUTES)
@@ -122,6 +126,47 @@ def test_pricing_advertises_trial(client):
     assert r.status_code == 200
     assert b'14 days free' in r.data or b'14-day' in r.data.lower() \
         or b'free trial' in r.data.lower()
+
+
+def test_start_checkout_anon_redirects_to_signup_with_next(client):
+    """V375 (CODE_V363 P0): /start-checkout for an anonymous visitor
+    must 302 to /signup with both ?plan= and ?next= preserved so the
+    user lands at Stripe Checkout after creating their account.
+
+    This was the conversion-funnel fix — before V375 the trial CTA
+    silently dumped logged-in users on the homepage and burned ad
+    spend at $3/click with zero conversions. Lock the redirect target
+    so a future template tweak can't quietly re-break it."""
+    r = client.get('/start-checkout?plan=pro', follow_redirects=False)
+    assert r.status_code in (301, 302, 303), \
+        f'/start-checkout?plan=pro should redirect, got {r.status_code}'
+    location = r.headers.get('Location', '')
+    assert location.startswith('/signup'), \
+        f'/start-checkout (anon) should redirect to /signup, got {location}'
+    assert 'plan=pro' in location, \
+        f'/start-checkout (anon) signup redirect must preserve plan, got {location}'
+    assert 'next=' in location and 'start-checkout' in location, \
+        f'/start-checkout (anon) signup redirect must preserve next= back to checkout, got {location}'
+
+
+def test_start_checkout_invalid_plan_falls_back_to_pro(client):
+    """V375 hardening: an unknown plan slug should not 500 — it should
+    coerce to 'pro' and continue the redirect chain. Anyone who edits
+    the plan list later shouldn't be able to introduce a 500 on a
+    cold visitor's first click."""
+    r = client.get('/start-checkout?plan=bogus_plan', follow_redirects=False)
+    assert r.status_code in (301, 302, 303)
+    location = r.headers.get('Location', '')
+    assert 'plan=pro' in location, \
+        f'unknown plan should coerce to pro, got {location}'
+
+
+# NOTE: a logged-in /signup?plan=pro test was attempted but the local
+# SQLite test DB schema doesn't carry every users column the prod
+# Postgres model has, so find_user_by_email blows up on the fake
+# session. The anon redirect tests above cover the conversion-path
+# regression-guard; the logged-in branch is exercised manually via
+# the V375 PR + visual UAT.
 
 
 def test_pricing_single_tier(client):
