@@ -421,6 +421,18 @@ def get_connection():
         _local.conn.execute("PRAGMA synchronous=NORMAL")  # good durability, better perf
         _local.conn.execute("PRAGMA cache_size=-8000")  # 8MB cache (conservative for 2GB box)
         _local.conn.execute("PRAGMA busy_timeout=60000")  # wait up to 60s for locks (V35: startup cleanup takes time)
+        # V398 (CODE_V364 Part 5.4): temp tables + mmap for query speed.
+        # temp_store=MEMORY keeps GROUP BY / ORDER BY working sets in RAM
+        # instead of spilling to disk. mmap_size=256MB lets sqlite read
+        # pages directly from the OS page cache without copying through
+        # heap — major win on city-page aggregate queries against the
+        # 1.7GB DB. The OS will only commit RAM as pages are touched, so
+        # this doesn't pre-allocate against the 512MB Render limit.
+        try:
+            _local.conn.execute("PRAGMA temp_store=MEMORY")
+            _local.conn.execute("PRAGMA mmap_size=268435456")  # 256MB
+        except Exception:
+            pass
     return _local.conn
 
 
@@ -933,8 +945,25 @@ def init_db():
         -- before sorting.
         CREATE INDEX IF NOT EXISTS idx_violations_city_date
             ON violations(city, state, violation_date DESC);
+        -- V398 (CODE_V364 Part 5.3): the V366 homepage city-directory
+        -- query and the V369 admin ad-ready computation both
+        -- "COUNT(*) FROM violations WHERE source_city_key = pc.city_slug"
+        -- against this column (added in some versions, may not exist on
+        -- older schema). Index it directly so the directory render +
+        -- ad-ready dashboard don't full-scan the violations table per
+        -- city. Wrapped at runtime so older schema (no source_city_key
+        -- column) doesn't blow up the migration.
     """)
     conn.commit()
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_violations_source_city_key "
+            "ON violations(source_city_key)"
+        )
+        conn.commit()
+    except Exception as _e:
+        # source_city_key column may not exist on older schemas — fine.
+        pass
 
     # V359 HOTFIX: V356 added a property_owners CREATE TABLE here with a
     # `property_address` column, but the canonical V279 migration in

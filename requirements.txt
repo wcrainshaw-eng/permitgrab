@@ -12,6 +12,7 @@ psycopg2-binary==2.9.9
 pytz==2024.1
 beautifulsoup4==4.12.3
 psutil>=5.9
+flask-compress>=1.14
 # duckduckgo-search removed — causes build failures on Render, search done locally instead
 # V229 B1: removed V227's httpx/selectolax/tenacity/pybreaker too — they
 # only supported enrichment_engine.py which was never imported by server.py
