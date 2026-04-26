@@ -178,6 +178,11 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Saint Paul MN (loop re-probe 2026-04-26): information.stpaul.gov ArcGIS Hub DCAT only has "Approved Building Permits Dashboard" modified 2022-02-08 (~4 years stale). Other items (Vacant Buildings, Ethos Criminal) frozen 2022-2023. Confirmed dead — V315/V317 stale-finding stands.
 - Fremont CA (loop re-probe 2026-04-26): fremont-ca-open-data-cofgis.hub.arcgis.com DCAT items "Permits" and "Tree Permits" both modified 2022 (~3 years stale). "Development Activity" FeatureServer modified 2023-06-23. No live building-permit feed. Confirms V290 dead.
 - Plano TX (loop re-probe 2026-04-26): data-planogis.opendata.arcgis.com Hub DCAT returns 500, search returns 404 — Hub is misconfigured. Confirmed dead via this path; V290 stale-finding stands.
+- Worcester MA (loop re-probe 2026-04-26): existing config maps contractor_name → Contractor_Name but newest Permit_License_Issued_Date is 2025-09-09 (~7 months stale). Does have real businesses (Window World of Boston, RHODE ISLAND BLOWN-IN CELLULOSE INSULATION INC.) mixed with individuals. V315 win has gone stale — Worcester moved past freshness gate.
+- Fayetteville AR (loop re-probe 2026-04-26): data-fayetteville-ar.opendata.arcgis.com Hub DCAT has only Master Address File + City Owned Taxed Parcels. No permits dataset. Dead.
+- Tulsa OK (loop V362 re-probe 2026-04-26): gis-cityoftulsa hub DCAT returns 500; gis2-cityoftulsa hub has only "Working In Neighborhoods (Nuisances)" (no FeatureServer URL exposed) and zero permit datasets. V362 dead-finding stands.
+- Long Beach CA (loop re-probe 2026-04-26): no Long Beach-specific Hub DCAT path responding; loop search misdirected to Fort Worth's services5.arcgis.com tenant (CFW_*). Long Beach permits not exposed publicly. V258 dead-finding stands.
+- Fort Worth TX (loop V363 Part B re-probe 2026-04-26): ALREADY WIRED at "fort_worth" → CFW_Open_Data_Development_Permits_View/FeatureServer/0 (V23). Schema has Owner_Full_Name + Full_Street_Address + File_Date + Use_Type + JobValue but NO contractor field. 5,862 records with File_Date > 2026-04-01 (very fresh). V362 no-contractor template fallback applies. No change needed.
 
 ## License-Enrichment Opportunities (separate platform — needs new collector path)
 <!-- Sources that ENRICH existing-city contractor profiles with license validation /
