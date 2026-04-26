@@ -16302,24 +16302,39 @@ CITY_REGISTRY = {
         "slug": "cincinnati-oh",
         "lat": 39.103,
         "lon": -84.512,
-        "platform": "accela",
-        "agency_code": "CINCINNATI",
-        "_accela_city_key": "cincinnati_oh",
-        "endpoint": "https://aca-prod.accela.com/CINCINNATI/Cap/CapHome.aspx?module=Building&TabName=Building",
-        "description": "Building Permits via Accela (pop. 309k)",
-        "date_field": "Date",
+        # V384 (loop): migrated from Accela HTML scraper (dead per
+        # CLAUDE.md P1 — no contractor column in the Cincinnati grid)
+        # to Socrata thvx-5mem (Building Combo Permits with Plan Review).
+        # Probed 2026-04-26: newest date_issued = 2026-04-24 (FRESH,
+        # 2 days). Schema: number_key, comp_type_desc, sub_type_desc,
+        # location, desc_of_work, date_issued, data_status. NO
+        # contractor field — V362's no-contractor template fallback
+        # handles missing contractor section. Existing 2,240 Accela
+        # permits stay attributed to slug "cincinnati-oh"; new daemon
+        # cycles will INSERT OR REPLACE them with Socrata data once
+        # permit_number formats align (Accela "Record Number" vs
+        # Socrata "number_key" like "2026P03837" — different keys, so
+        # in practice the Socrata records will land alongside as new
+        # rows, and the Accela rows will go stale and be ignored).
+        "platform": "socrata",
+        "endpoint": "https://data.cincinnati-oh.gov/resource/thvx-5mem.json",
+        "dataset_id": "thvx-5mem",
+        "description": "Building Combo Permits with Plan Review (Socrata)",
         "field_map": {
-            "permit_number": "Record Number",
-            "permit_type": "Record Type",
-            "address": "Address",
-            "description": "Description",
-            "issued_date": "Date",
-            "date": "Date",
-            "status": "Status",
+            "permit_number": "number_key",
+            "permit_type": "comp_type_desc",
+            "work_type": "sub_type_desc",
+            "address": "location",
+            "filing_date": "date_issued",
+            "issued_date": "date_issued",
+            "status": "data_status",
+            "description": "desc_of_work",
         },
+        "date_field": "date_issued",
+        "date_format": "string",
         "limit": 2000,
         "active": True,
-        "notes": "V72: Cincinnati OH Accela",
+        "notes": "V384 (loop): migrated Cincinnati Accela → Socrata thvx-5mem (no-contractor city, V362 template handles it).",
     },
 
     # V72: NC cities with Accela
