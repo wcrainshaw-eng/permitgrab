@@ -478,7 +478,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <li><span class="check">&#10003;</span> CSV export (all cities)</li>
         </ul>
 
-        <a href="/signup?plan=pro&next=/pricing?plan=pro" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
+        {# V375 (CODE_V363 P0): was "/signup?plan=pro&next=..." which
+           ignored the plan/next params for logged-in users (they got
+           302'd to homepage and lost). /start-checkout handles both
+           auth states: logged-out → signup → checkout, logged-in →
+           Stripe Checkout directly. #}
+        <a href="/start-checkout?plan=pro" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
         <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free, no credit card required</p>
       </div>
 

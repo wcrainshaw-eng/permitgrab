@@ -1840,7 +1840,11 @@ footer a:hover { color: white; }
           <li>CSV export (all cities)</li>
           <li>Priority support</li>
         </ul>
-        <a href="/signup?plan=pro" class="pricing-btn primary">Start Free Trial</a>
+        {# V375 (CODE_V363 P0): /start-checkout handles signup→checkout
+           for logged-out users and creates a Stripe session inline for
+           logged-in free users. /signup?plan=pro alone was dropping
+           every logged-in conversion to the homepage. #}
+        <a href="/start-checkout?plan=pro" class="pricing-btn primary">Start Free Trial</a>
       </div>
     </div>
     <p style="text-align: center; margin-top: 20px; font-size: 14px; color: var(--gray-600);">

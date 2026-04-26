@@ -11817,12 +11817,94 @@ def pricing_page():
 
 @app.route('/signup')
 def signup_page():
-    """Render the Sign Up page."""
-    # Redirect if already logged in
-    if get_current_user():
+    """Render the Sign Up page.
+
+    V375 (CODE_V363 P0): when a logged-in user lands on /signup with
+    ?plan=<slug>, route them straight into Stripe checkout — they
+    already have an account, the only thing left is to charge them.
+    Before this fix, "Start Free Trial" on /pricing → /signup?plan=pro
+    just redirected logged-in users to "/" (homepage), losing every
+    conversion. Google Ads was burning $3/click for this dead end.
+    """
+    user = get_current_user()
+    if user:
+        plan = (request.args.get('plan') or '').strip().lower()
+        if plan:
+            # Forward to the unified checkout entrypoint, which handles
+            # already-paid users + creates a Stripe Checkout session.
+            return redirect(f'/start-checkout?plan={plan}')
         return redirect('/')
     footer_cities = get_cities_with_data()
     return render_template('signup.html', footer_cities=footer_cities)
+
+
+@app.route('/start-checkout')
+def start_checkout():
+    """V375 (CODE_V363 P0): unified entrypoint for the "Start Free Trial"
+    button so it works the same for logged-out and logged-in visitors.
+
+    - Logged-out: redirect to /signup?plan=<plan>&next=/start-checkout?plan=<plan>
+      so the user creates an account first, then comes back here.
+    - Logged-in already-paid: redirect to /dashboard with a friendly note.
+    - Logged-in free: create a Stripe Checkout session and 302 to its URL.
+
+    Falls back to /pricing on Stripe configuration errors so the user
+    never lands on a broken page.
+    """
+    plan = (request.args.get('plan') or 'pro').strip().lower()
+    if plan not in ('starter', 'pro', 'enterprise'):
+        plan = 'pro'
+
+    user = get_current_user()
+    if not user:
+        from urllib.parse import quote
+        next_url = quote(f'/start-checkout?plan={plan}', safe='')
+        return redirect(f'/signup?plan={plan}&next={next_url}')
+
+    # Already paid — send them to the product they're paying for.
+    if is_pro(user):
+        return redirect('/dashboard?already_subscribed=1')
+
+    # Logged-in free user — create the Stripe session inline.
+    if not STRIPE_SECRET_KEY:
+        # Stripe not configured — fall back to mailto so we at least
+        # capture a sales lead instead of a 500.
+        return redirect(
+            'mailto:wcrainshaw@gmail.com?subject=PermitGrab+'
+            f'{plan.title()}+Signup'
+        )
+
+    per_plan_price = {
+        'starter': os.environ.get('STRIPE_PRICE_STARTER', ''),
+        'pro': os.environ.get('STRIPE_PRICE_PRO', '') or STRIPE_PRICE_ID,
+        'enterprise': os.environ.get('STRIPE_PRICE_ENTERPRISE', ''),
+    }
+    price_id = per_plan_price.get(plan) or STRIPE_PRICE_ID
+    if not price_id:
+        return redirect('/pricing?checkout=not_configured')
+
+    stripe.api_key = STRIPE_SECRET_KEY
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='subscription',
+            success_url=f'{SITE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{SITE_URL}/pricing?payment=cancelled',
+            customer_email=(user.get('email') if isinstance(user, dict)
+                            else getattr(user, 'email', None)),
+            metadata={'plan': f'{plan}_monthly', 'billing_period': 'monthly'},
+            allow_promotion_codes=True,
+            subscription_data={'trial_period_days': 14},
+        )
+        analytics.track_event('checkout_started', event_data={
+            'plan': f'{plan}_monthly', 'billing': 'monthly',
+            'source': 'start-checkout',
+        })
+        return redirect(checkout_session.url, code=303)
+    except stripe.error.StripeError as e:
+        print(f'[V375] Stripe checkout create failed: {e}', flush=True)
+        return redirect('/pricing?checkout=stripe_error')
 
 
 @app.route('/login')
