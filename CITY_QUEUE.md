@@ -156,6 +156,26 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Rochester NY (loop probed 2026-04-26): data.cityofrochester.gov DataROC DCAT feed surveyed — only matching dataset is "Review" (Community Gardens with permits), modified 2022-07-14. No building/code-enforcement/violation datasets. Permits + code data live behind the closed BuildingBlocks tool + Civics property-management portal (no public API). Dead.
 - Yonkers NY (loop probed 2026-04-26): only public ArcGIS asset is "Yonkers GIS Data Viewer" web map (item ac9ad150392742a8babc1145b7ed3df3) last modified 2013-07-17 (12 years stale). No active feature service exposed for permits. Dead.
 - Akron OH (loop probed 2026-04-26): agis.akronohio.gov/server/rest/services lists 9 MapServers covering water, CSO notifications, AMI meters, recycling, tree-keeper — NO permit, building, or code-enforcement service. Permits behind their Plan Review portal HTML. Dead.
+- Mobile AL (loop probed 2026-04-26): open-government-cityofmobile.hub.arcgis.com DCAT feed only has "Buildings" (footprints — polygons, not permits) and "ROW Permitting" (right-of-way / sidewalk / driveway). No building-permit feed. Dead.
+- Modesto CA: already V341 dead (re-confirmed 2026-04-26 — eTRAKiT HTML portal only).
+
+## License-Enrichment Opportunities (separate platform — needs new collector path)
+<!-- Sources that ENRICH existing-city contractor profiles with license validation /
+     license number / license type, but require a different ingestion path than the
+     existing STATE_CONFIGS-based license_enrichment.py. -->
+- Pittsburgh WPRDC — "Licensed Businesses, Contractors & Trades" (loop probed 2026-04-26):
+  data.wprdc.org CKAN datastore, three resources: Business Licenses
+  (e88c10d5-541d-417f-aef6-25cc5637aeb1), Licensed Contractors
+  (7e195511-5219-4d16-84f7-f34a2aedf5b4), Trade Licenses
+  (51470435-a36f-4385-aee2-1c4766214a9a). 5,467 contractor records, fresh through
+  2026-04-23. Schema: license_number / license_type_name / business_name /
+  license_state (active/expired) / initial_issue_date / most_recent_issue_date /
+  expiration_date. NO phone / email / address. Value: name-matching to validate
+  Pittsburgh contractor licensure + populate license_number on contractor_profiles
+  (matches CA CSLB pattern). Won't add phones (PA still DDG-only). Wiring needs
+  new license_enrichment.py path — existing code expects Socrata/CSV; this is CKAN
+  datastore_search. City-scoped (city_slugs=['pittsburgh']) under STATE_CONFIGS['PA']
+  with a new fetch fn. Defer to focused PR.
 
 ## Monitoring for New Cities
 
