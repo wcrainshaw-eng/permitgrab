@@ -936,31 +936,16 @@ def init_db():
     """)
     conn.commit()
 
-    # V356 (CODE_V351 Part 3): property_owners table for the second
-    # revenue stream (solar / insurance / home-warranty leads). Distinct
-    # from contractor_profiles because the keying concept is different —
-    # owners are tied to a parcel/address rather than a permit-by-permit
-    # business name. Backfilled from existing permit owner_name fields
-    # (NYC + Miami-Dade) plus county-assessor pulls (Phoenix/Maricopa
-    # is the first wired source).
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS property_owners (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source_city_key TEXT NOT NULL,
-            parcel_id TEXT,
-            owner_name TEXT,
-            property_address TEXT,
-            owner_mailing_address TEXT,
-            assessed_value REAL,
-            data_source TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_po_city ON property_owners(source_city_key);
-        CREATE INDEX IF NOT EXISTS idx_po_parcel ON property_owners(parcel_id);
-        CREATE INDEX IF NOT EXISTS idx_po_address ON property_owners(property_address);
-    """)
-    conn.commit()
+    # V359 HOTFIX: V356 added a property_owners CREATE TABLE here with a
+    # `property_address` column, but the canonical V279 migration in
+    # server.py:413 uses `address` (NOT NULL) plus city/state/zip/source/
+    # last_updated and a UNIQUE INDEX on (address, owner_name, source).
+    # Two CREATE TABLE IF NOT EXISTS blocks with different schemas means
+    # whichever runs first wins, and the UNIQUE INDEX targeting `address`
+    # crashed on the V356 schema with "no such column: address" — which
+    # killed the whole @app.before_request migration chain and caused the
+    # secondary "no such table: contractor_profiles" failure. Removed the
+    # V356 block entirely; server.py V279 block is the single source.
 
     # V229 addendum J2: stripe webhook idempotency table. Was being
     # created inline inside stripe_webhook() on every call, which took a

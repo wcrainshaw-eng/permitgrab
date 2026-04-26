@@ -426,13 +426,18 @@ def _migrate_create_sources_table():
             ON property_owners(address);
         CREATE INDEX IF NOT EXISTS idx_property_owners_parcel
             ON property_owners(parcel_id);
-        -- V278: unique index needed for INSERT OR IGNORE dedup in the
-        -- permit-owner extraction route. (address, owner_name, source)
-        -- allows the same address to have both a permit-record owner
-        -- row and an assessor-record owner row once Phase 2 lands.
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_property_owners_unique
-            ON property_owners(address, owner_name, source);
     ''')
+    # V359 HOTFIX: V278's UNIQUE INDEX on (address, owner_name, source) used
+    # to live inside the executescript above, which made any column-mismatch
+    # crash atomic — taking down the whole @app.before_request migration
+    # chain and triggering "no such table: contractor_profiles" downstream.
+    # Wrapping it in try/except so a stale schema or already-existing
+    # mismatched index doesn't kill subsequent migrations.
+    try:
+        conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_property_owners_unique
+            ON property_owners(address, owner_name, source)""")
+    except Exception as _po_idx_err:
+        print(f"[V359 HOTFIX] property_owners unique index skipped: {_po_idx_err}", flush=True)
 
     # V163: Drop dead tables
     # V182: Removed 'contractor_contacts' and 'enrichment_log' — now live (contractor intelligence).
@@ -2941,10 +2946,13 @@ def admin_backfill_property_owners():
     owner_name field already present on permits for cities whose feeds
     expose it (NYC, Miami-Dade today; more as field_maps add owner_name).
 
+    V359 HOTFIX: aligned to V279 canonical schema (column names `address`
+    and `source`, not `property_address`/`data_source` which V356 had wrong).
+
     Body or query param: city (optional). When unset, runs across all
-    cities that have any permit with a non-empty owner_name. Idempotent
-    via INSERT OR IGNORE on (source_city_key, owner_name, property_address)
-    — re-running adds new rows but doesn't dedupe existing ones.
+    cities that have any permit with a non-empty owner_name. Dedup via
+    the V278 UNIQUE INDEX on (address, owner_name, source); INSERT OR
+    IGNORE skips collisions silently.
     """
     valid, error = check_admin_key()
     if not valid:
@@ -2955,21 +2963,21 @@ def admin_backfill_property_owners():
         conn = permitdb.get_connection()
         if city_slug:
             sql = """
-                INSERT INTO property_owners (source_city_key, owner_name,
-                                             property_address, data_source)
-                SELECT DISTINCT source_city_key, owner_name, address, 'permit_record'
+                INSERT OR IGNORE INTO property_owners (address, owner_name, source)
+                SELECT DISTINCT address, owner_name, 'permit_record'
                 FROM permits
                 WHERE source_city_key = ?
                   AND owner_name IS NOT NULL AND owner_name != ''
+                  AND address IS NOT NULL AND address != ''
             """
             cursor = conn.execute(sql, (city_slug,))
         else:
             sql = """
-                INSERT INTO property_owners (source_city_key, owner_name,
-                                             property_address, data_source)
-                SELECT DISTINCT source_city_key, owner_name, address, 'permit_record'
+                INSERT OR IGNORE INTO property_owners (address, owner_name, source)
+                SELECT DISTINCT address, owner_name, 'permit_record'
                 FROM permits
                 WHERE owner_name IS NOT NULL AND owner_name != ''
+                  AND address IS NOT NULL AND address != ''
             """
             cursor = conn.execute(sql)
         rows = cursor.rowcount
@@ -14676,6 +14684,12 @@ def _get_top_contractors_for_city(city_slug, limit=25, new_this_week_only=False)
         if len(real_name_rows) >= 10:
             return real_name_rows
         return real_name_rows + [r for r in out if r.get('is_license_number')]
+    except Exception as e:
+        # V359 HOTFIX: defensive net so a contractor_profiles schema
+        # mismatch (or missing-table-on-fresh-CI scenario) doesn't 500
+        # the entire city page render.
+        print(f"[V359] _get_top_contractors_for_city({city_slug}) failed: {e}", flush=True)
+        return []
     finally:
         conn.close()
 
