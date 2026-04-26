@@ -1035,11 +1035,21 @@ CITY_REGISTRY = {
         "endpoint": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query",
         "dataset_id": "Planning_Permit_1",
         "description": "City of Phoenix Planning Permits",
+        # V405 (loop): same V321-trap variant as Sacramento V404 — config
+        # mapped contact_name to "PROFESS_NAME" but never set
+        # contractor_name. The V180 runtime fallback (contractor = contact
+        # when missing) papered over the gap, which is why Phoenix
+        # already has 1,080 phones in CLAUDE.md ad-ready set. Adding
+        # explicit contractor_name → PROFESS_NAME so the field is
+        # extracted by name and not via the fallback. PROFESS_NAME has
+        # real businesses — verified 2026-04-26: "AIRPARK SIGNS %
+        # GRAPHICS", "RICOR INC". Newest PER_ENT_DATE today.
         "field_map": {
             "permit_number": "PER_NUM",
             "permit_type": "PER_TYPE_DESC",
             "work_type": "SCOPE_DESC",
             "address": "STREET_FULL_NAME",
+            "contractor_name": "PROFESS_NAME",
             "contact_name": "PROFESS_NAME",
             "filing_date": "PER_ENT_DATE",
             "status": "PERMIT_STAT",
