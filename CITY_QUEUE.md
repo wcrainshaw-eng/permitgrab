@@ -40,12 +40,27 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
      (stuck commercials 2018-2021) to TLC_OverlayPermitsActiveTrends_D_WM/2
      (Single Family Last 1 Year, updated nightly). Real ContractorPhone inline.
      FL DBPR import will lift license-only contractors. -->
-- Louisville KY: ArcGIS Hub, has building permits + Property Maintenance Inspections API. Contractor field unconfirmed. Top-30 city.
+- Louisville KY: ArcGIS Hub louisville-metro-opendata-lojic.hub.arcgis.com. Permits: Active Construction Permits + Historical All Permits. Violations: Building Code Permit Enforcement Cases + Property Maintenance Inspection Violations (30-day rolling, daily updates). Contractor field unconfirmed. Top-30 city. BLITZ 2026-04-26.
 - Atlanta GA: ArcGIS Hub building permits + code enforcement. Previous probe (V341) got ECONNREFUSED + TLS cert invalid — may have been fixed since. Worth a re-probe.
 - New Orleans LA: Socrata open data portal, has "Code Enforcement Active Pipeline." Permit contractor field unconfirmed.
 - Detroit MI: ArcGIS-based, tracks blighted properties + permits. Previous probe said "not a Socrata portal" but ArcGIS may work. Worth a re-probe.
-- Pittsburgh PA: WPRDC (data.wprdc.org) CKAN + ArcGIS Hub (pghgishub-pittsburghpa.opendata.arcgis.com). PLI Permits dataset back to 2019. Contractor field unconfirmed. OKFN census lists as having open permit data.
+- Pittsburgh PA: WPRDC CKAN data.wprdc.org. Permits: pli-permits (2019+). Violations: pittsburgh-pli-violations-report (PLI/DOMI/ES, 2015-present, daily). ALSO has "Licensed Businesses, Contractors & Trades" dataset — potential contractor name source! OKFN census confirms open permit data. BLITZ 2026-04-26.
 - Montgomery County MD: OKFN census entry exists. Open data portal likely has permits. Worth checking.
+- Norfolk VA: Socrata data.norfolk.gov. Permits: fahm-yuh4 (daily updates). Violations: mxtv-99gh (Neighborhood Quality Code Enforcement Cases) + agip-sqwc (Violations). Previous dead-end entry was ArcGIS-only probe — Socrata not checked. Contractor field unconfirmed — need SSH test. BLITZ 2026-04-26.
+- Cincinnati OH: Socrata data.cincinnati-oh.gov. Permits: thvx-5mem (Building Permits Combo, 2014+, daily refresh). Violations: cncm-znd6 (Code Enforcement, daily refresh). Contractor field unconfirmed. BLITZ 2026-04-26.
+- Kansas City MO: Socrata data.kcmo.org. Permits: building permits dashboard (resource ID TBD). Violations: mnjv-uy2z (Code Violations). Previous dead-end said "11 months stale" — re-check freshness, may have been refreshed since. BLITZ 2026-04-26.
+- Richmond VA: Socrata data.richmondgov.com. Permits: on portal (resource ID TBD). Violations: needs investigation. Contractor field unconfirmed. BLITZ 2026-04-26.
+- Chattanooga TN: Socrata chattadata.org. Permits: 764y-vxm2 (All Permit Data, BLDS format). Violations: TBD — search chattadata.org for code enforcement. Contractor field unconfirmed. BLITZ 2026-04-26.
+- Syracuse NY: ArcGIS data-syr.opendata.arcgis.com. Permits: on portal. Violations: Code Violations dataset (2cc4e180fc6540fbb4fc6fafde311d7b). Contractor field unconfirmed. BLITZ 2026-04-26.
+- Lexington KY: CivicData civicdata.com/organization/lexington-ky + ArcGIS data.lexingtonky.gov. Permits: CivicData building permits + AgencyCounter. Violations: TBD. Accela portal at aca-prod.accela.com/LEXKY. Contractor field unconfirmed. BLITZ 2026-04-26.
+- Fort Worth TX: Socrata data.fortworthtexas.gov. Permits: qy5k-jz7m (building permits). Violations: spnu-bq4u (Code Violations, updated 3x daily!). Previously marked dead-end for "no contractor field" — re-check; even without contractor, viable as no-contractor city. BLITZ 2026-04-26.
+- Milwaukee WI: CKAN data.milwaukee.gov. Permits: buildingpermits dataset (monthly CSV). Violations: Accela aca-prod.accela.com/MILWAUKEE enforcement. Previously investigated — zero profiles. Re-check with CKAN endpoint. BLITZ 2026-04-26.
+- St Louis MO: Own portal stlouis-mo.gov/data. Permits: building permits via API/Web Service. Violations: not found in initial search. Contractor field unconfirmed. BLITZ 2026-04-26.
+- Boise ID: ArcGIS city-of-boise.opendata.arcgis.com. Permits: New Residential Permits dataset. Violations: TBD. Contractor field unconfirmed. BLITZ 2026-04-26.
+- Corpus Christi TX: ArcGIS Hub gis-corpus.opendata.arcgis.com. Permits: may have building permits under GIS datasets. Dynamic Portal for permit apps. Contractor field unconfirmed. BLITZ 2026-04-26.
+- Honolulu HI: Socrata data.honolulu.gov. Permits: 3fr8-2hnx (Building Permits, 2010-2016 — STALE, need to check for newer dataset). Violations: TBD. Previous dead-end entry was wrong ("no open data portal") — they have Socrata. BLITZ 2026-04-26.
+- Greensboro NC violations: Already wired for permits. Violations: Code Compliance All Violations dataset at data.greensboro-nc.gov (2011-present). Add violations config. BLITZ 2026-04-26.
+- Raleigh NC violations: Already wired for permits. Violations: check data-ral.opendata.arcgis.com Public Safety section for code enforcement. BLITZ 2026-04-26.
 
 ## Research Resources
 <!-- Use these to find endpoints for any queued city -->
@@ -61,7 +76,7 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Tempe AZ: no usable contractor field (V314 wasted)
 - Aurora CO: no contractor field in source
 - Boulder CO: no building permits feed, only ROW/parking permits
-- Honolulu HI: no open data portal for building permits
+- Honolulu HI: ACTUALLY HAS Socrata portal data.honolulu.gov with building permits (3fr8-2hnx) but data is 2010-2016 only — STALE. MOVED TO NEEDS INVESTIGATION to check for newer dataset.
 - Madison WI: no contractor field exposed
 - St Paul MN: stale endpoint
 - Lansing MI: no building permit API
@@ -77,7 +92,7 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Charlotte NC: no building permit datasets
 - Indianapolis IN: no permits in open data catalog
 - San Diego CA: all endpoints blocked (403 + ECONNREFUSED)
-- Kansas City MO: contractor field exists but data 11 months stale
+- Kansas City MO: contractor field exists but data 11 months stale — MOVED TO NEEDS INVESTIGATION for re-check (blitz 2026-04-26)
 - Atlanta GA: all endpoints broken (ECONNREFUSED, TLS cert invalid)
 - Detroit MI: not a Socrata portal
 - Memphis TN: Accela only, no contractor column in grid
@@ -97,7 +112,7 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Jacksonville FL: ArcGIS portal returns only Jacksonville OREGON UGB; data.coj.net not indexed in Socrata federated catalog (V339 probed 2026-04-25)
 - Reno NV: 0 ArcGIS Reno-specific results, only StoryMap reference (V340 probed 2026-04-25)
 - Toledo OH: ArcGIS results are for Toledo SPAIN, no Toledo OH building permit feed (V340 probed 2026-04-25)
-- Norfolk VA: 0 results in ArcGIS federated search (V340 probed 2026-04-25)
+- Norfolk VA: 0 results in ArcGIS federated search (V340 probed 2026-04-25) — MOVED TO NEEDS INVESTIGATION: Socrata portal data.norfolk.gov has permits (fahm-yuh4) + violations (mxtv-99gh). V340 only probed ArcGIS.
 - Riverside CA: only Riverside COUNTY permits surface (PLUSActivities_PD), no city-of-Riverside building permit feed (V340 probed 2026-04-25)
 - Glendale AZ: no AZ-specific result; Glendale CA has a permits-by-walkshed analytical layer but no permit-record feed (V340 probed 2026-04-25)
 - Lubbock TX: only a performance-metrics dashboard, no queryable feature service (V340 probed 2026-04-25)
@@ -126,6 +141,11 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Avondale AZ: 0 ArcGIS results (V346 probed 2026-04-25)
 - Scottsdale AZ: only a Web Map ("Development Activity - Building Permits: Issued & Completed"), no underlying feature service URL exposed in catalog (V346 probed 2026-04-25)
 - shovels.ai third-party datasets (V348 probed 2026-04-25): nationwide permit feeds at services5.arcgis.com/ygiShlCiglrHaijs/.../All_Permits_Started_during_4Q25 (965K permits) and per-trade nationwide feeds (electrical 220K, roofing 79K, new-construction 45K). LA-specific Esri Living Atlas dataset has gold schema (CONTRACTOR_NAME/PHONE/EMAIL/WEBSITE + APPLICANT_PHONE/EMAIL + OWNER_NAME/PHONE/EMAIL). DO NOT INGEST: shovels.ai is a paid SaaS competitor and ingesting their data raises ToS + competitive-IP concerns; the nationwide 4Q25 endpoint also returned 400 (likely access-restricted). Documented for awareness only — same logic as the no-state-portals rule (don't rely on data we don't control).
+- Colorado Springs CO: Accela portal only (aca-prod.accela.com/COSPRINGS), no open data API for building permits (blitz 2026-04-26)
+- Wichita KS: No open data portal, permits via MABCD portal only (no API), dead (blitz 2026-04-26)
+- Reno NV violations: No code violations API found, permits also dead (confirmed blitz 2026-04-26)
+- Anchorage AK: Open data policy exists but no specific building permits dataset confirmed on portal (blitz 2026-04-26)
+- Stockton CA: data.stocktonca.gov exists but permits appear Accela-only, no open data API (blitz 2026-04-26)
 - Redmond OR (V350 probed 2026-04-25): services2.arcgis.com B0h69gkZPiRSTUFu Accela_Permits/0 has 19 fields but NONE are contractor/applicant/owner/business — only TAXLOT, APP_NUMBER, STATUS, PERMIT_TYPE, ADDRESS, OPENED, DESCRIPTION, PROJECT_NAME. Dead despite the Accela_ prefix.
 
 ## Monitoring for New Cities
