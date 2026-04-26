@@ -98,6 +98,15 @@ app = Flask(__name__, static_folder='static', static_url_path='', template_folde
 # every gunicorn restart rotates the key and invalidates all logged-in
 # user sessions. Prod has this env var set; the warning is for dev + for
 # anyone who forks the repo without carrying over env config.
+# V414 (CODE_V365b PHASE B.2): WORKER_MODE flag — when set on the Render
+# web service, start_collectors() returns immediately so the web process
+# is HTTP-only. Daemon threads run in the separate worker.py service.
+# Default unset for backward compatibility (single-process deployments
+# + local dev still work).
+WORKER_MODE = os.environ.get('WORKER_MODE', '').lower() in ('1', 'true', 'yes')
+if WORKER_MODE:
+    print(f"[V414] WORKER_MODE=true — web process will not start collector daemons.", flush=True)
+
 _v229_fallback_key = os.environ.get('SECRET_KEY')
 if not _v229_fallback_key:
     _v229_fallback_key = secrets.token_hex(32)
@@ -18000,9 +18009,17 @@ def start_collectors():
     """Start background data collection threads. Safe to call multiple times.
 
     V66: Stagger thread starts to prevent connection pool stampede.
+    V414 (CODE_V365b PHASE A): when WORKER_MODE=true, skip entirely
+    — daemon threads are owned by the separate worker.py service.
     """
     global _collector_started
     if _collector_started:
+        return
+    # V414: respect WORKER_MODE — the web process should not own daemon
+    # threads when running alongside a Render Background Worker.
+    if WORKER_MODE:
+        print(f"[{datetime.now()}] V414: WORKER_MODE=true — daemon threads are handled by the background worker (worker.py). Web process is HTTP-only.", flush=True)
+        _collector_started = True  # mark "started" so health endpoint doesn't self-heal-loop
         return
     _collector_started = True
 
@@ -18029,12 +18046,14 @@ def start_collectors():
 
     print(f"[{datetime.now()}] V67: Starting background collectors with staggered init...")
 
-    # V67: Stagger each thread start by 30 seconds to avoid pool exhaustion (was 10s in V66)
-    # Initial collection thread
-    initial_thread = threading.Thread(target=run_initial_collection, name='initial_collection', daemon=True)
-    initial_thread.start()
-    print(f"[{datetime.now()}] V67: Initial collection thread started, waiting 30s...")
-    time.sleep(30)
+    # V414 (CODE_V365b PHASE A.2): SKIP initial_collection. It runs a one-shot
+    # full collection across every active city and is the biggest memory
+    # spike on startup — directly responsible for OOM kills landing the
+    # whole web process at 768MB / 150% of the 512MB Render limit.
+    # scheduled_collection picks up the same set of cities within ~30 min
+    # of starting, so we lose nothing meaningful by removing the kickoff.
+    # Re-enable only after the worker.py split is live.
+    print(f"[{datetime.now()}] V414: skipping run_initial_collection (memory relief — scheduled_collection picks up same set of cities in ~30 min)")
 
     # Scheduled daily collection thread
     collector_thread = threading.Thread(target=scheduled_collection, name='scheduled_collection', daemon=True)
