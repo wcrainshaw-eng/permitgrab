@@ -23,13 +23,13 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
      Still valuable for solar/investor buyers who want property owner info.
      Template should show "No contractor data available" message.
      Owner enrichment via county assessor matching makes these cities monetizable. -->
-- San Francisco CA: Socrata DataSF, has building permits SODA API. No contractor field but has address+date+permit_type.
-- Washington DC: ArcGIS Hub, has current-year permits. PERMIT_APPLICANT is individual names (not businesses) — still useful for address/owner matching.
-- Boston MA: Socrata (Analyze Boston), has building permits + code violations. Applicant is individual licensee names — still useful for address/owner.
-- Baltimore MD: Socrata (Open Baltimore), has SODA API for housing code + building citations. No contractor field but has address data.
-- Denver CO: Socrata open data portal, has construction permits with address data. No contractor field. No state licensing DB either.
-- Tucson AZ: ArcGIS gis.tucsonaz.gov PDSD_ResidentialBldg MapServer/85, 31-field schema with address+project data. No contractor/applicant field.
-- Lincoln NE: ArcGIS gis.lincoln.ne.gov Residential_New_Construction_Permits MS/0, 53 fields with address data. No contractor field.
+- San Francisco CA: Socrata DataSF, has building permits SODA API. No contractor field but has address+date+permit_type. **V363/V364 wiring probe 2026-04-26: data.sfgov.org/resource/i98e-djp9.json works; newest permit_creation_date 2025-09-15 (~7 months stale). Fails freshness rule.**
+- Washington DC: ArcGIS Hub, has current-year permits. PERMIT_APPLICANT is individual names (not businesses) — still useful for address/owner matching. **V364 probe 2026-04-26: opendata.dc.gov dataset URL 404; needs corrected feature service URL.**
+- Boston MA: Socrata (Analyze Boston), has building permits + code violations. Applicant is individual licensee names — still useful for address/owner. **V364 wiring confirmed 2026-04-26: ALREADY in CITY_REGISTRY at boston/CKAN/6ddcd912-32a0-43df-9908-63574f8c7e77 with correct field_map. CKAN endpoint reachable from local probe (newest issued_date 2026-04-24 — fresh!) but Render reports last_error="http_unknown" and 0 permits in DB despite last_collection 2026-04-26. Likely Render egress IP / CDN issue. Needs SSH-side debug.**
+- Baltimore MD: Socrata (Open Baltimore), has SODA API for housing code + building citations. No contractor field but has address data. **V364 probe 2026-04-26: data.baltimorecity.gov resource fauu-ji8n redirects to hub.arcgis.com/legacy — Baltimore has migrated off Socrata; needs new ArcGIS Hub URL.**
+- Denver CO: Socrata open data portal, has construction permits with address data. No contractor field. No state licensing DB either. **V364 probe 2026-04-26: data.denvergov.org redirects to denvergov.org/opendata — needs current resource path.**
+- Tucson AZ: ArcGIS gis.tucsonaz.gov PDSD_ResidentialBldg MapServer/85, 31-field schema with address+project data. No contractor/applicant field. **V363 confirmed 2026-04-26: ALREADY wired in CITY_REGISTRY at "tucson"/mapdata.tucsonaz.gov path with 2,751 permits already collected. Probe of gis.tucsonaz.gov path showed newest 2026-04-21 (5 days fresh). V362 Part A's no-contractor template fallback handles the missing contractor section.**
+- Lincoln NE: ArcGIS gis.lincoln.ne.gov Residential_New_Construction_Permits MS/0, 53 fields with address data. No contractor field. **V363 wired 2026-04-26 (PR #268): migrated from Accela HTML scraper to ArcGIS. Newest SD_APP_DD 2026-04-10 (16 days fresh). V362 Part A handles missing contractor section.**
 - Tempe AZ: has permit API (V314 confirmed data exists). No usable contractor field.
 - Madison WI: has permit API. No contractor field exposed.
 - Aurora CO: has permit API. No contractor field in source.
