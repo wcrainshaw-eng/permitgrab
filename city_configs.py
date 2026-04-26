@@ -3836,8 +3836,8 @@ CITY_REGISTRY = {
         },
         "date_field": "issue_date",
         "limit": 2000,
-        "active": True,  # V43: Activated â endpoint confirmed live. Has location_1 (address), valuation, owner.
-        "notes": "V43: Activated. Frederick MD via Maryland open data â confirmed working.",
+        "active": False,  # V400 (loop /CODE_V286 grind): deactivated -- xrz3-9xhj frozen at 2014-06-05 (12 years stale).
+        "notes": "V400 (2026-04-26): xrz3-9xhj frozen at 2014-06-05; V43 misread freshness. Endpoint returns 200 but publication stopped 2014; owner is the only party identifier (no contractor field).",
     },
 
     "college_station": {
