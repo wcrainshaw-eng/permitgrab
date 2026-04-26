@@ -799,8 +799,12 @@ body {
 }
 
 .pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* V366 (CODE_V363 Part F Fix 1): single Pro card was sitting in the
+     leftmost cell of a 3-column grid. Switch to flex+center so a single
+     card lands in the middle, while still wrapping if more are added. */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 24px;
 }
 
@@ -975,7 +979,7 @@ footer a:hover { color: white; }
 @media (max-width: 1024px) {
   .main-content { grid-template-columns: 1fr; }
   .sidebar { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .pricing-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+  .pricing-grid { max-width: 400px; margin: 0 auto; }
 }
 
 /* SITE FOOTER */
@@ -1561,6 +1565,63 @@ footer a:hover { color: white; }
     </p>
   </div>
 </section>
+
+{# V366 (CODE_V363 Part F): browseable city directory by state with
+   data-availability badges (P=Permits, C=Contractors, V=Violations,
+   O=Owner data). Renders only when cities_by_state is populated; falls
+   back to nothing if the helper returned empty (e.g. exception). #}
+{% if cities_by_state %}
+<section class="state-directory" style="padding: 48px 24px; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <h2 style="font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 8px;">
+      Browse Permit Data by State
+    </h2>
+    <p style="font-size: 14px; color: #6b7280; margin-bottom: 24px;">
+      Each city shows badges for the data we publish — permits, contractors, violations, owner records.
+    </p>
+    <div class="state-directory-legend" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; font-size: 12px; color: #4b5563;">
+      <span><span class="pg-badge pg-badge-on">P</span> Permits</span>
+      <span><span class="pg-badge pg-badge-on">C</span> Contractors</span>
+      <span><span class="pg-badge pg-badge-on">V</span> Violations</span>
+      <span><span class="pg-badge pg-badge-on">O</span> Owner records</span>
+      <span><span class="pg-badge pg-badge-off">&mdash;</span> not yet available</span>
+    </div>
+    <div class="state-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px;">
+      {% for state, cities in cities_by_state.items() %}
+      <div class="state-column">
+        <h3 style="font-size: 14px; font-weight: 700; color: #111827; margin: 0 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">{{ state }}</h3>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+          {% for city in cities[:25] %}
+          <li style="padding: 3px 0;">
+            <a href="/permits/{{ city.slug }}" style="color: #2563eb; text-decoration: none;">{{ city.name }}</a>
+            <span class="pg-badge pg-badge-{% if city.permit_count > 0 %}on{% else %}off{% endif %}" title="{{ city.permit_count }} permits">P</span>
+            <span class="pg-badge pg-badge-{% if city.profile_count > 0 %}on{% else %}off{% endif %}" title="{{ city.profile_count }} contractors">C</span>
+            <span class="pg-badge pg-badge-{% if city.violation_count > 0 %}on{% else %}off{% endif %}" title="{{ city.violation_count }} violations">V</span>
+            <span class="pg-badge pg-badge-{% if city.owner_count > 0 %}on{% else %}off{% endif %}" title="{{ city.owner_count }} owner records">O</span>
+            {% if city.phone_count > 0 %}
+              <small style="color: #6b7280;">— {{ city.phone_count }} phones</small>
+            {% endif %}
+          </li>
+          {% endfor %}
+          {% if cities|length > 25 %}
+          <li style="padding: 4px 0; font-size: 12px; color: #6b7280;">+ {{ cities|length - 25 }} more</li>
+          {% endif %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<style>
+  .pg-badge { display: inline-block; padding: 0 5px; border-radius: 3px;
+              font-size: 10px; font-weight: 700; line-height: 16px;
+              margin-left: 2px; vertical-align: middle; min-width: 12px;
+              text-align: center; }
+  .pg-badge-on { background: #22c55e; color: white; }
+  .pg-badge-off { background: #e5e7eb; color: #9ca3af; }
+</style>
+{% endif %}
 
 <!-- FILTERS -->
 {# V224 T1: hide the filter bar and permit grid on the marketing homepage
