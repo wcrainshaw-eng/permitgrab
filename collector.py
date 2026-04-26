@@ -3788,11 +3788,80 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             print(f"    [V166] Limiting to {MAX_CITIES_PER_CYCLE}/{len(individual_cities)} cities this cycle")
             individual_cities = individual_cities[:MAX_CITIES_PER_CYCLE]
 
+        # V417: port V413 circuit breaker + V399/V414 memory guard from
+        # collect_v122 into the prod_cities path. Production scheduled_collection
+        # calls collect_refresh → _collect_all_inner (this function), NOT
+        # collect_v122. Without these protections here, the V414 PHASE A memory
+        # relief is inactive in the path that actually runs in production.
+        circuit_open = set()
+        try:
+            _cb_conn = permitdb.get_connection()
+            _cb_rows = _cb_conn.execute("""
+                SELECT city_slug
+                FROM (
+                  SELECT city_slug, status,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY city_slug
+                      ORDER BY run_started_at DESC
+                    ) as rn
+                  FROM scraper_runs
+                  WHERE run_started_at > datetime('now', '-1 hour')
+                    AND city_slug IS NOT NULL
+                )
+                WHERE rn <= 3 AND status = 'error'
+                GROUP BY city_slug
+                HAVING COUNT(*) >= 3
+            """).fetchall()
+            circuit_open = {r[0] for r in _cb_rows}
+            if circuit_open:
+                print(f"    [V417] circuit breaker open for {len(circuit_open)} cities (3+ errors last hour): {sorted(circuit_open)[:10]}", flush=True)
+        except Exception as _cb_e:
+            print(f"    [V417] circuit-breaker query skipped (non-fatal): {_cb_e}", flush=True)
+            circuit_open = set()
+
+        try:
+            import psutil as _psutil
+            _proc = _psutil.Process(os.getpid())
+        except Exception:
+            _proc = None
+        _MEM_BAIL_MB = 350
+        _MEM_HARD_ABORT_MB = 450
+        _cycle_bailed = False
+
         for city_info in individual_cities:
             source_id = city_info.get('source_id')
             city_name = city_info.get('name')
             state = city_info.get('state')
             city_slug = city_info.get('slug')
+
+            # V417: skip cities the circuit breaker tripped on
+            if city_slug in circuit_open or source_id in circuit_open:
+                continue
+
+            # V417: between-city memory check + gc
+            if _proc is not None:
+                try:
+                    _mem_mb = _proc.memory_info().rss / 1024 / 1024
+                    if _mem_mb >= _MEM_HARD_ABORT_MB:
+                        try:
+                            import gc as _gc_abort
+                            _gc_abort.collect()
+                        except Exception:
+                            pass
+                        print(f"    [V417] HARD ABORT: memory {_mem_mb:.0f}MB >= {_MEM_HARD_ABORT_MB}MB — bailing prod_cities loop immediately", flush=True)
+                        _cycle_bailed = True
+                        break
+                    if _mem_mb >= _MEM_BAIL_MB:
+                        print(f"    [V417] cycle bail: memory {_mem_mb:.0f}MB >= {_MEM_BAIL_MB}MB cap — skipping remainder of cycle, will resume next pass", flush=True)
+                        _cycle_bailed = True
+                        break
+                except Exception:
+                    pass
+            try:
+                import gc as _gc
+                _gc.collect()
+            except Exception:
+                pass
 
             # Get config from CITY_REGISTRY
             config = _get_source_config(source_id)
@@ -3908,8 +3977,45 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             missed_cities.append((city_key, cfg))
 
         if missed_cities:
+            # V417: also cap Phase 3 + apply same memory guard
+            if _cycle_bailed:
+                print(f"\n  [V417] Skipping Phase 3 catch-all — Phase 2 already bailed on memory")
+                missed_cities = []
+            elif len(missed_cities) > MAX_CITIES_PER_CYCLE:
+                print(f"\n  [V417] Phase 3 capped at {MAX_CITIES_PER_CYCLE}/{len(missed_cities)} cities")
+                missed_cities = missed_cities[:MAX_CITIES_PER_CYCLE]
+
+        if missed_cities:
             print(f"\n  [V59] Phase 3: Catch-all for {len(missed_cities)} missed CITY_REGISTRY cities")
             for city_key, cfg in missed_cities:
+                # V417: skip cities the circuit breaker tripped on
+                if city_key in circuit_open:
+                    continue
+                # V417: between-city memory check
+                if _proc is not None:
+                    try:
+                        _mem_mb = _proc.memory_info().rss / 1024 / 1024
+                        if _mem_mb >= _MEM_HARD_ABORT_MB:
+                            try:
+                                import gc as _gc_abort3
+                                _gc_abort3.collect()
+                            except Exception:
+                                pass
+                            print(f"    [V417] Phase 3 HARD ABORT: memory {_mem_mb:.0f}MB >= {_MEM_HARD_ABORT_MB}MB", flush=True)
+                            _cycle_bailed = True
+                            break
+                        if _mem_mb >= _MEM_BAIL_MB:
+                            print(f"    [V417] Phase 3 cycle bail: memory {_mem_mb:.0f}MB >= {_MEM_BAIL_MB}MB cap", flush=True)
+                            _cycle_bailed = True
+                            break
+                    except Exception:
+                        pass
+                try:
+                    import gc as _gc3
+                    _gc3.collect()
+                except Exception:
+                    pass
+
                 city_name = cfg.get('city_name', city_key)
                 state = cfg.get('state', '')
                 start_time = time.time()
