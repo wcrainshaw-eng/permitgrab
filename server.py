@@ -17125,6 +17125,15 @@ Disallow: /logout
 Disallow: /reset-password
 Disallow: /login
 Disallow: /signup
+# V383 (loop /CODE_V286 grind): disallow transient checkout-flow URLs.
+# /start-checkout 303-redirects to a Stripe URL or back to /pricing —
+# nothing for Google to index, and indexing the redirect dilutes
+# crawl budget that should go to city pages. /success is the
+# post-payment confirmation already noindex'd via meta tag, but
+# robots disallow makes the rule canonical.
+Disallow: /start-checkout
+Disallow: /success
+Disallow: /pricing?
 
 # Crawl-delay for polite crawling
 Crawl-delay: 1
