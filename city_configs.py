@@ -2303,8 +2303,11 @@ CITY_REGISTRY = {
         },
         "date_field": "applied",
         "limit": 2000,
-        "active": True,  # V43: Activated â endpoint confirmed live with data. Has address, permit, type, cost.
-        "notes": "V43: Activated. Framingham MA Socrata â confirmed working.",
+        # V403 (loop): deactivated. data.framinghamma.gov 2vzw-yean newest applied 2020-06-30 (~6 years stale)
+        # AND the source has no contractor / applicant / business field at all (only address + cost + description).
+        # Even fresh data could not produce contractor_profiles.
+        "active": False,
+        "notes": "V403 (2026-04-26): deactivated. 2vzw-yean stale 2020-06-30 + no contractor field.",
     },
 
     "parker": {
@@ -3830,8 +3833,14 @@ CITY_REGISTRY = {
         },
         "date_field": "application_date",
         "limit": 2000,
-        "active": True,  # V43: Activated â endpoint confirmed live. Has permit_address, 32 fields. Pop 238K.
-        "notes": "V43: Activated. Norfolk VA Socrata â 97K+ records with full address and inspection data.",
+        # V403 (loop): deactivated. norfolk_new is a duplicate of norfolk_va (line ~15400).
+        # Same fahm-yuh4 endpoint but with the V26-era broken field_map (ftpuser, permit_address,
+        # permit_application_date, etc.) that V385 fixed on norfolk_va. Two configs pointing at
+        # the same source with different slugs is a V321-trap variant: norfolk_new wrote permits
+        # to slug "norfolk" with NULL contractor + NULL most fields, while norfolk_va writes to
+        # slug "norfolk-va" with correct fields. Keeping only norfolk_va active.
+        "active": False,
+        "notes": "V403 (2026-04-26): deactivated as duplicate of norfolk_va - broken V26 field map; norfolk_va has the V385 fix.",
     },
 
     "frederick": {
