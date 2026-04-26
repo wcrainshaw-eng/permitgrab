@@ -3169,6 +3169,42 @@ def collect_v122(days_back=7, include_scrapers=True):
         total_found = 0
         total_inserted = 0
         cities_collected = 0
+        # V413 (CODE_V364 Part 6.3): circuit breaker on collection. If
+        # a city's API has errored on its last 3 consecutive scraper_runs
+        # within the last hour, skip the city for this cycle. Stops the
+        # daemon from burning time + memory hammering broken endpoints
+        # like Boston's "http_unknown" or any city whose source went
+        # down mid-day. The 1-hour window means a recovered city
+        # re-enters the loop on the next cycle once the most recent
+        # error ages out. State is DB-driven (scraper_runs) so worker
+        # restarts don't reset the breaker.
+        circuit_open = set()
+        try:
+            cb_rows = conn.execute("""
+                SELECT city_slug
+                FROM (
+                  SELECT city_slug, status,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY city_slug
+                      ORDER BY run_started_at DESC
+                    ) as rn
+                  FROM scraper_runs
+                  WHERE run_started_at > datetime('now', '-1 hour')
+                    AND city_slug IS NOT NULL
+                )
+                WHERE rn <= 3 AND status = 'error'
+                GROUP BY city_slug
+                HAVING COUNT(*) >= 3
+            """).fetchall()
+            circuit_open = {r[0] for r in cb_rows}
+            if circuit_open:
+                print(f"[V413] circuit breaker open for {len(circuit_open)} cities (3+ errors last hour): {sorted(circuit_open)[:10]}", flush=True)
+        except Exception as _cb_e:
+            # Window function unsupported (older sqlite < 3.25) or other
+            # query error — don't fail collection over the breaker.
+            print(f"[V413] circuit-breaker query skipped (non-fatal): {_cb_e}", flush=True)
+            circuit_open = set()
+
         # V399 (CODE_V364 Part 4.2): memory guard — bail out of the
         # collection cycle mid-stream if we're approaching the Render
         # 512MB limit. The cycle iterates ~98 active cities; if even one
@@ -3185,6 +3221,12 @@ def collect_v122(days_back=7, include_scrapers=True):
         _cycle_bailed = False
 
         for row in rows:
+            # V413 (CODE_V364 Part 6.3): skip cities the circuit breaker
+            # has tripped on. State was computed at cycle start from
+            # scraper_runs.
+            _row_slug = row[0]
+            if _row_slug in circuit_open:
+                continue
             # V399: between-city memory check + gc to release any normalized
             # records / API response buffers from the previous iteration.
             if _proc is not None:
