@@ -106,6 +106,20 @@ if not _v229_fallback_key:
           "restart. Set SECRET_KEY on Render to persist sessions.", flush=True)
 app.secret_key = _v229_fallback_key
 
+# V398 (CODE_V364 Part 5.1): gzip-compress responses larger than 500 bytes.
+# Per the directive: "Typically reduces HTML/JSON response size by 60-70%."
+# That's a lot of bytes off Render's 512MB-shared bandwidth + faster TTFB
+# for cold ad-click visitors on slow connections. Wrapped in try/except so
+# the dep is a soft requirement — if Flask-Compress isn't installed yet
+# the app still boots normally, just without compression.
+try:
+    from flask_compress import Compress  # noqa: E402
+    Compress(app)
+    print("[V398] flask-compress enabled (gzip on responses >500 bytes)", flush=True)
+except ImportError:
+    print("[V398] flask-compress not installed — responses will not be gzipped. "
+          "Add 'flask-compress' to requirements.txt to enable.", flush=True)
+
 # V68: WSGI middleware to bypass ALL Flask processing for /api/health
 # This ensures health checks ALWAYS return 200, even during pool exhaustion
 class HealthCheckMiddleware:
@@ -9644,6 +9658,24 @@ def admin_daemon_health():
                 pass
 
         status_code = 200 if is_healthy else 503
+        # V398 (CODE_V364 Part 4.5): memory monitoring on the health probe.
+        # The directive's P0 root-cause hypothesis was OOM kill: "the
+        # daemon thread + Flask web server + import jobs all share one
+        # process. During collection cycles or enrichment imports, memory
+        # spikes above 512MB → Render kills the process → 502." Reporting
+        # actual memory usage every minute (Render's probe cadence) gives
+        # us the trend data to confirm or rule that out without SSH.
+        memory_mb = None
+        memory_percent = None
+        try:
+            import psutil as _psutil
+            _proc = _psutil.Process(os.getpid())
+            memory_mb = round(_proc.memory_info().rss / 1024 / 1024, 1)
+            memory_percent = round(memory_mb / 512 * 100, 1)
+        except Exception:
+            # psutil missing or permission denied — don't fail the probe.
+            pass
+
         payload = {
             'status': 'healthy' if is_healthy else 'unhealthy',
             'daemon_running': daemon_running,
@@ -9652,6 +9684,9 @@ def admin_daemon_health():
             'errors_last_24h': errors_24h,
             'fresh_city_count': fresh,
             'top_error_cities': top_errors,
+            'memory_mb': memory_mb,
+            'memory_percent': memory_percent,
+            'memory_limit_mb': 512,
         }
         if self_healed:
             payload['self_heal_triggered'] = True
