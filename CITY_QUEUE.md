@@ -158,6 +158,14 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Akron OH (loop probed 2026-04-26): agis.akronohio.gov/server/rest/services lists 9 MapServers covering water, CSO notifications, AMI meters, recycling, tree-keeper — NO permit, building, or code-enforcement service. Permits behind their Plan Review portal HTML. Dead.
 - Mobile AL (loop probed 2026-04-26): open-government-cityofmobile.hub.arcgis.com DCAT feed only has "Buildings" (footprints — polygons, not permits) and "ROW Permitting" (right-of-way / sidewalk / driveway). No building-permit feed. Dead.
 - Modesto CA: already V341 dead (re-confirmed 2026-04-26 — eTRAKiT HTML portal only).
+- Chattanooga TN (loop V363 re-probe 2026-04-26): chattadata.org/resource/764y-vxm2.json returns Pantheon "No site detected" error — site is decommissioned/misconfigured. Dead (V363 directive endpoint is gone).
+- Kansas City MO ntw8-aacc (loop V363 re-probe 2026-04-26): newest record 2025-05-08 — ~12 months stale. Confirms V258 dead-end. Has real businesses ("Midwest Elevator", "KONE INC") but freshness gate fails. Dead.
+- Lexington KY (loop V363 re-probe 2026-04-26): data.lexingtonky.gov DCAT feed has 9 datasets — watersheds, greenways, zoning, traffic, parks — none for permits / building / code. Dead.
+- Boise ID (loop V363 re-probe 2026-04-26): opendata.cityofboise.org DCAT has "Boise Zoning Activities" + "Development Tracker Open Data" — both planning/zoning applications, NOT building permits. No contractor field. Dead for our use case.
+- Honolulu HI 4vab-c87q (loop V363 re-probe 2026-04-26): "Building Permits Jan 1, 2005 through June 30, 2025" last_updated 2025-08-12 — frozen at June 2025. Dataset has explicit cutoff date. Dead.
+- Richmond VA (loop V363 re-probe 2026-04-26): data.richmondgov.com federated catalog returns 0 Richmond-specific datasets (only Chicago/Calgary/Seattle/etc results). Portal isn't publishing permits via Socrata API. Dead via this path.
+- Cincinnati OH thvx-5mem (loop V363 re-probe 2026-04-26): ACTUALLY FRESH — newest date_issued 2026-04-24. NO contractor field. WIRED IN V384 (Accela → Socrata migration). Joins no-contractor cohort.
+- Norfolk VA fahm-yuh4 (loop V363 re-probe 2026-04-26): ACTUALLY FRESH — newest application_date 2026-04-22. NO contractor field. EXISTING V26 config had 5 wrong field names (ftpuser/permit_address/etc). FIELD_MAP FIXED IN V385.
 
 ## License-Enrichment Opportunities (separate platform — needs new collector path)
 <!-- Sources that ENRICH existing-city contractor profiles with license validation /
