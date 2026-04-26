@@ -9583,6 +9583,35 @@ def admin_daemon_health():
         errors_24h = conn.execute("SELECT COUNT(*) FROM scraper_runs WHERE run_started_at > datetime('now', '-24 hours') AND status = 'error'").fetchone()[0]
         # Fresh cities
         fresh = conn.execute("SELECT COUNT(DISTINCT city) FROM permits WHERE date >= date('now', '-7 days') AND date <= date('now')").fetchone()[0]
+        # V396 (loop /CODE_V286 grind): include top-5 cities with the most
+        # collection errors in the last 24h. The directive's P0 flagged
+        # "errors_last_24h: 38, which is high" — but the prior payload
+        # reported only the count. Wes had no way to know which cities
+        # were burning that error budget without a follow-up SQL. Adding
+        # the top-N breakdown so triage is one curl away.
+        top_errors = []
+        try:
+            err_rows = conn.execute("""
+                SELECT city_slug, COUNT(*) as n,
+                       MAX(error_message) as last_err
+                FROM scraper_runs
+                WHERE run_started_at > datetime('now', '-24 hours')
+                  AND status = 'error'
+                  AND city_slug IS NOT NULL
+                GROUP BY city_slug
+                ORDER BY n DESC
+                LIMIT 5
+            """).fetchall()
+            for r in err_rows:
+                top_errors.append({
+                    'city_slug': r[0],
+                    'errors': r[1],
+                    'last_error': (r[2] or '')[:120],
+                })
+        except Exception:
+            # scraper_runs schema variant or transient db lock — don't
+            # fail the health probe over diagnostics.
+            top_errors = []
         # V256 self-heal trigger: minutes since last collection (if we can parse it)
         stale_minutes = None
         if last_coll_at:
@@ -9622,6 +9651,7 @@ def admin_daemon_health():
             'collections_last_24h': colls_24h,
             'errors_last_24h': errors_24h,
             'fresh_city_count': fresh,
+            'top_error_cities': top_errors,
         }
         if self_healed:
             payload['self_heal_triggered'] = True
