@@ -3,7 +3,7 @@ PermitGrab Background Worker — V365b
 
 Runs the collector daemon, enrichment, and email scheduler as a standalone
 process, separate from the gunicorn web server. This eliminates memory
-pressure on the web process (which was causing 502s at 768MB/512MB limit).
+pressure on the web process. Standard plan has 2GB RAM.
 
 Deployed as a Render Background Worker service (~$7/mo Starter plan).
 Communicates with the web process only via the shared PostgreSQL database.
@@ -29,8 +29,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-MEMORY_LIMIT_MB = 450       # Skip cycles if above this
-MEMORY_CRITICAL_MB = 500    # Abort + force GC if above this
+MEMORY_LIMIT_MB = 1600      # Skip cycles if above this (2GB Standard plan)
+MEMORY_CRITICAL_MB = 1800   # Abort + force GC if above this
 HEARTBEAT_INTERVAL = 300    # Log memory every 5 minutes
 DATA_DIR = '/var/data' if os.path.isdir('/var/data') else os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'data')
