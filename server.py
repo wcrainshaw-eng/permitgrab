@@ -2561,6 +2561,11 @@ def admin_dashboard():
     from datetime import datetime as _dt
     today = _dt.utcnow().date()
     yes, close, no_list = [], [], []
+    # V374 (loop /CODE_V286 grind): collect per-city gap diagnostics so the
+    # dashboard can answer "why is city X in 'close' instead of 'yes'?"
+    # without a follow-up query. Each row is (slug, gaps[]) where gaps
+    # are short labels like 'phones', 'violations', 'stale', 'profiles'.
+    gap_diagnostics = {}
     for r in health_rows:
         slug = r['city_slug']
         if r['status'] != 'active':
@@ -2573,15 +2578,32 @@ def admin_dashboard():
                 age = (today - _dt.strptime(newest, '%Y-%m-%d').date()).days
             except Exception:
                 age = None
+        gaps = []
+        if r['profiles'] <= 100:
+            gaps.append('profiles')
+        if r['phones'] <= 50:
+            gaps.append('phones')
+        if r['violations'] <= 0:
+            gaps.append('violations')
+        if age is None or age >= 7:
+            gaps.append('stale')
         # V373: ad-ready definition matches CLAUDE.md North Star.
-        if (r['permits'] > 100 and age is not None and age < 7
-                and r['violations'] > 0 and r['profiles'] > 100
-                and r['phones'] > 50):
+        if r['permits'] > 100 and not gaps:
             yes.append(slug)
         elif r['permits'] > 100 and age is not None and age < 14:
             close.append(slug)
+            gap_diagnostics[slug] = {
+                'profiles': r['profiles'], 'phones': r['phones'],
+                'violations': r['violations'],
+                'newest_permit': newest, 'age_days': age, 'gaps': gaps,
+            }
         else:
             no_list.append(slug)
+            gap_diagnostics[slug] = {
+                'profiles': r['profiles'], 'phones': r['phones'],
+                'violations': r['violations'],
+                'newest_permit': newest, 'age_days': age, 'gaps': gaps,
+            }
 
     return jsonify({
         'generated_at': _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -2590,6 +2612,9 @@ def admin_dashboard():
             'yes': yes,
             'close': close,
             'no': no_list,
+            # V374: per-city gap detail for close + no buckets so the
+            # admin can see at a glance which lever to pull next.
+            'gaps': gap_diagnostics,
         },
         'recent_collections': recent_collections,
         'recent_enrichments': recent_enrichments,
