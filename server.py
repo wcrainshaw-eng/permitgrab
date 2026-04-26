@@ -15949,6 +15949,14 @@ def state_city_landing(state_slug, city_slug):
     # the CITY_SEO_CONFIG path. LA was showing a bare "Los Angeles"
     # title while NYC had ", NY" — inconsistent and hurts the
     # "<city> <state> building permits" search match.
+    # V382 (loop /CODE_V286 grind): the previous map covered only 5 of
+    # the 13 ad-ready cities (CLAUDE.md North Star). 8 cities — the ones
+    # most likely to convert ad clicks because they have phones AND
+    # violations AND fresh permits — were falling through to the
+    # generic "Browse recent building permits in {city}" snippet that
+    # tells Google nothing distinctive about the page. Filled in
+    # Phoenix, Miami-Dade, Henderson, Anaheim, Cleveland, San Jose,
+    # Buffalo, Nashville, Orlando.
     _SEO_TITLES = {
         ('New York City', 'NY'): 'New York City, NY Building Permits & Contractor Leads — Daily Updates | PermitGrab',
         ('Los Angeles', 'CA'): 'Los Angeles, CA Building Permits & Contractor Leads | PermitGrab',
@@ -15960,6 +15968,15 @@ def state_city_landing(state_slug, city_slug):
         ('Washington', 'DC'): 'Washington, DC Building Permits & Contractor Leads | PermitGrab',
         ('Little Rock', 'AR'): 'Little Rock, AR Building Permits & Contractor Leads | PermitGrab',
         ('Cape Coral', 'FL'): 'Cape Coral, FL Building Permits & Contractor Leads | PermitGrab',
+        ('Phoenix', 'AZ'): 'Phoenix, AZ Building Permits & Contractor Leads — Daily Updates | PermitGrab',
+        ('Miami-Dade County', 'FL'): 'Miami-Dade Building Permits & Contractor Leads — Daily Updates | PermitGrab',
+        ('Henderson', 'NV'): 'Henderson, NV Building Permits & Contractor Leads | PermitGrab',
+        ('Anaheim', 'CA'): 'Anaheim, CA Building Permits & Contractor Leads | PermitGrab',
+        ('Cleveland', 'OH'): 'Cleveland, OH Building Permits & Contractor Leads | PermitGrab',
+        ('San Jose', 'CA'): 'San Jose, CA Building Permits & Contractor Leads | PermitGrab',
+        ('Buffalo', 'NY'): 'Buffalo, NY Building Permits & Contractor Leads | PermitGrab',
+        ('Nashville', 'TN'): 'Nashville, TN Building Permits & Contractor Leads | PermitGrab',
+        ('Orlando', 'FL'): 'Orlando, FL Building Permits & Contractor Leads | PermitGrab',
     }
     _SEO_METAS = {
         ('New York City', 'NY'): f'Track {_pc}+ NYC building permits updated daily. Find DOB permits, code violations, and contractor leads by address. 14-day free trial.',
@@ -15972,6 +15989,15 @@ def state_city_landing(state_slug, city_slug):
         ('Washington', 'DC'): f'Search {_pc}+ DC building permits updated daily. Find construction projects and contractor leads in the DMV area.',
         ('Little Rock', 'AR'): f'Track {_pc}+ Little Rock building permits. Find new construction projects and code enforcement leads updated daily.',
         ('Cape Coral', 'FL'): f'Search {_pc}+ Cape Coral FL building permits. Track new construction projects and find contractor leads daily.',
+        ('Phoenix', 'AZ'): f'Track {_pc}+ Phoenix building permits, code violations, and contractor leads. Find new construction and remodels updated daily. 14-day free trial.',
+        ('Miami-Dade County', 'FL'): f'Search {_pc}+ Miami-Dade building permits. Find permits with phone numbers, code violations, and property owner data. 14-day free trial.',
+        ('Henderson', 'NV'): f'Track {_pc}+ Henderson NV building permits with contractor phone numbers inline. Find new construction and renovations daily.',
+        ('Anaheim', 'CA'): f'Track {_pc}+ Anaheim building permits with contractor phone numbers, code enforcement cases, and CSLB-licensed contractors.',
+        ('Cleveland', 'OH'): f'Search {_pc}+ Cleveland building permits. Find new construction, code violations, and contractor leads updated daily.',
+        ('San Jose', 'CA'): f'Track {_pc}+ San Jose building permits, code violations, and CSLB-licensed contractors with phone numbers.',
+        ('Buffalo', 'NY'): f'Track {_pc}+ Buffalo NY building permits and contractor leads. Phone numbers from NY DOL license database. Updated daily.',
+        ('Nashville', 'TN'): f'Search {_pc}+ Nashville building permits and contractor leads. Find new construction and remodel projects updated daily.',
+        ('Orlando', 'FL'): f'Track {_pc}+ Orlando FL building permits, code violations, and FL DBPR-licensed contractors with phone numbers.',
     }
     _key = (city_name, city_state)
     meta_title = _SEO_TITLES.get(_key, f"{display_name}, {state_name} Building Permits | PermitGrab")
