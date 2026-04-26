@@ -3169,8 +3169,38 @@ def collect_v122(days_back=7, include_scrapers=True):
         total_found = 0
         total_inserted = 0
         cities_collected = 0
+        # V399 (CODE_V364 Part 4.2): memory guard — bail out of the
+        # collection cycle mid-stream if we're approaching the Render
+        # 512MB limit. The cycle iterates ~98 active cities; if even one
+        # in the middle returns a giant payload (NYC/Chicago/Miami-Dade
+        # each can be 50K+ records) we can spike past the limit and the
+        # gunicorn master kills the worker → 502 cascade. Better to stop
+        # cleanly, log how far we got, and pick up next cycle.
+        try:
+            import psutil as _psutil
+            _proc = _psutil.Process(os.getpid())
+        except Exception:
+            _proc = None
+        _MEM_BAIL_MB = 400  # leaves ~110MB headroom for the web worker
+        _cycle_bailed = False
 
         for row in rows:
+            # V399: between-city memory check + gc to release any normalized
+            # records / API response buffers from the previous iteration.
+            if _proc is not None:
+                try:
+                    _mem_mb = _proc.memory_info().rss / 1024 / 1024
+                    if _mem_mb >= _MEM_BAIL_MB:
+                        print(f"[V399] cycle bail: memory {_mem_mb:.0f}MB >= {_MEM_BAIL_MB}MB cap — skipping remainder of cycle, will resume next pass", flush=True)
+                        _cycle_bailed = True
+                        break
+                except Exception:
+                    pass
+            try:
+                import gc as _gc
+                _gc.collect()
+            except Exception:
+                pass
             slug = row[0]
             city_name, state, platform = row[1], row[2], row[3]
             endpoint, dataset_id = row[4], row[5]
