@@ -1590,59 +1590,67 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] [V183] Startup refresh error (non-fatal): {e}", flush=True)
 
-    # V146: Safe auto-start daemon — runs start_collectors in background thread
-    # so it doesn't block gunicorn worker (start_collectors sleeps 120s+)
-    import threading as _th
-    def _v146_safe_autostart():
-        import time as _t
-        _t.sleep(10)  # V183: Reverted to 10s — profile refresh now runs in _deferred_startup before threads spawn
+    # V365b: Skip ALL background threads when WORKER_MODE is on.
+    # The background worker (worker.py) handles collection, enrichment,
+    # maintenance, and email scheduling in its own process with its own
+    # 512MB memory budget.
+    if WORKER_MODE:
+        print(f"[{datetime.now()}] V365b: WORKER_MODE=true — skipping daemon threads "
+              f"(handled by background worker process)", flush=True)
+    else:
+        # V146: Safe auto-start daemon — runs start_collectors in background thread
+        # so it doesn't block gunicorn worker (start_collectors sleeps 120s+)
+        import threading as _th
+        def _v146_safe_autostart():
+            import time as _t
+            _t.sleep(10)  # V183: Reverted to 10s — profile refresh now runs in _deferred_startup before threads spawn
+            try:
+                print(f"[{datetime.now()}] V146: Auto-starting collectors (background)...", flush=True)
+                start_collectors()  # This takes 120s+ but runs in THIS thread, not blocking gunicorn
+                print(f"[{datetime.now()}] V146: Collectors auto-started OK", flush=True)
+            except Exception as _e:
+                print(f"[{datetime.now()}] V146: Auto-start failed: {_e}", flush=True)
+        _th.Thread(target=_v146_safe_autostart, daemon=True, name='v146_autostart').start()
+        print(f"[{datetime.now()}] V146: Daemon auto-start scheduled (background thread)")
+
+        # V106: Phase B — Heavy maintenance in background thread
+        # Server is ready to serve requests while this runs
+        def _run_background_maintenance():
+            try:
+                print(f"[{datetime.now()}] [V106] Background maintenance starting...")
+                from db import relink_orphaned_permits
+                from collector import (update_total_permits_from_actual, update_all_city_health,
+                                       activate_bulk_covered_cities, cleanup_balance_of_entries,
+                                       cleanup_source_id_mismatches, pause_tiny_no_endpoint_cities)
+
+                # V109b: One-time cleanup of V108 pipeline damage
+                _cleanup_v108_pipeline_damage()
+
+                relink_orphaned_permits()
+                update_total_permits_from_actual()
+                activate_bulk_covered_cities()
+                cleanup_balance_of_entries()
+                cleanup_source_id_mismatches()
+                pause_tiny_no_endpoint_cities()
+                update_all_city_health()
+
+                print(f"[{datetime.now()}] [V109b] Background maintenance complete")
+            except Exception as e:
+                print(f"[{datetime.now()}] [V106] Background maintenance error: {e}")
+                import traceback
+                traceback.print_exc()
+
+        maintenance_thread = threading.Thread(target=_run_background_maintenance, name='v106_maintenance', daemon=True)
+        maintenance_thread.start()
+        print(f"[{datetime.now()}] [V106] Background maintenance thread started — server ready to serve")
+
+        # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
         try:
-            print(f"[{datetime.now()}] V146: Auto-starting collectors (background)...", flush=True)
-            start_collectors()  # This takes 120s+ but runs in THIS thread, not blocking gunicorn
-            print(f"[{datetime.now()}] V146: Collectors auto-started OK", flush=True)
-        except Exception as _e:
-            print(f"[{datetime.now()}] V146: Auto-start failed: {_e}", flush=True)
-    _th.Thread(target=_v146_safe_autostart, daemon=True, name='v146_autostart').start()
-    print(f"[{datetime.now()}] V146: Daemon auto-start scheduled (background thread)")
-
-    # V106: Phase B — Heavy maintenance in background thread
-    # Server is ready to serve requests while this runs
-    def _run_background_maintenance():
-        try:
-            print(f"[{datetime.now()}] [V106] Background maintenance starting...")
-            from db import relink_orphaned_permits
-            from collector import (update_total_permits_from_actual, update_all_city_health,
-                                   activate_bulk_covered_cities, cleanup_balance_of_entries,
-                                   cleanup_source_id_mismatches, pause_tiny_no_endpoint_cities)
-
-            # V109b: One-time cleanup of V108 pipeline damage
-            _cleanup_v108_pipeline_damage()
-
-            relink_orphaned_permits()
-            update_total_permits_from_actual()
-            activate_bulk_covered_cities()
-            cleanup_balance_of_entries()
-            cleanup_source_id_mismatches()
-            pause_tiny_no_endpoint_cities()
-            update_all_city_health()
-
-            print(f"[{datetime.now()}] [V109b] Background maintenance complete")
+            email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
+            email_thread.start()
+            print(f"[{datetime.now()}] V93: Email scheduler thread started automatically")
         except Exception as e:
-            print(f"[{datetime.now()}] [V106] Background maintenance error: {e}")
-            import traceback
-            traceback.print_exc()
-
-    maintenance_thread = threading.Thread(target=_run_background_maintenance, name='v106_maintenance', daemon=True)
-    maintenance_thread.start()
-    print(f"[{datetime.now()}] [V106] Background maintenance thread started — server ready to serve")
-
-    # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
-    try:
-        email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
-        email_thread.start()
-        print(f"[{datetime.now()}] V93: Email scheduler thread started automatically")
-    except Exception as e:
-        print(f"[{datetime.now()}] [ERROR] Email scheduler failed to start: {e}")
+            print(f"[{datetime.now()}] [ERROR] Email scheduler failed to start: {e}")
 
 
 # V13.1: Jinja filter for human-readable date formatting
@@ -2945,6 +2953,15 @@ def admin_start_collectors():
     valid, error = check_admin_key()
     if not valid:
         return error
+
+    # V365b: In WORKER_MODE, daemon threads run in the background worker process
+    if WORKER_MODE:
+        return jsonify({
+            'status': 'worker_mode',
+            'message': 'WORKER_MODE=true — daemon threads run in the background worker '
+                       'process (worker.py). Restart the permitgrab-worker service on '
+                       'Render to restart collection.'
+        }), 200
 
     global _collectors_manually_started
 
@@ -9658,13 +9675,20 @@ def admin_daemon_health():
                 pass
         conn.close()
 
-        daemon_running = _collector_started
-        is_healthy = daemon_running and colls_24h > 0
+        # V365b: In WORKER_MODE the daemon runs in a separate process.
+        # daemon_running (in-process flag) will be False, but that's expected.
+        # Health is determined by recent collection_log activity instead.
+        if WORKER_MODE:
+            daemon_running = True  # assume worker is running if we got collections
+            is_healthy = colls_24h > 0
+        else:
+            daemon_running = _collector_started
+            is_healthy = daemon_running and colls_24h > 0
         self_healed = False
 
-        # V256: self-heal if daemon is down + no recent activity. Run in a
-        # background thread so this endpoint stays snappy for Render's probe.
-        if not daemon_running and (stale_minutes is None or stale_minutes > 15):
+        # V256: self-heal if daemon is down + no recent activity.
+        # V365b: Skip self-heal in WORKER_MODE — worker handles its own lifecycle.
+        if not WORKER_MODE and not daemon_running and (stale_minutes is None or stale_minutes > 15):
             try:
                 import threading as _th
                 def _selfheal():
