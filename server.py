@@ -10996,9 +10996,16 @@ def intel_dashboard():
         return redirect('/pricing?next=/intel')
     conn = permitdb.get_connection()
 
-    # Seed with the confirmed ad-ready set + any cities the user has in their digest
-    ad_ready = ['chicago-il', 'new-york-city', 'phoenix-az', 'miami-dade-county',
-                'orlando-fl', 'san-jose', 'san-antonio-tx']
+    # V369 (loop /CODE_V286 grind): seed list was 7 slugs, missing 6 of
+    # the 13 ad-ready cities per CLAUDE.md (los-angeles, henderson, anaheim,
+    # cleveland-oh, buffalo-ny, nashville-tn). Keeping this aligned with the
+    # admin dashboard's dynamic ad-ready computation surfaces the right
+    # cards for Pro subscribers landing on /intel without a digest set.
+    ad_ready = [
+        'san-antonio-tx', 'miami-dade-county', 'chicago-il', 'phoenix-az',
+        'new-york-city', 'los-angeles', 'henderson', 'anaheim', 'cleveland-oh',
+        'san-jose', 'buffalo-ny', 'nashville-tn', 'orlando-fl',
+    ]
     # user.to_dict() already parses digest_cities into a list; handle both.
     dc = user.get('digest_cities') or []
     if isinstance(dc, str):
