@@ -2485,6 +2485,12 @@ def admin_dashboard():
         return error
 
     conn = permitdb.get_connection()
+    # V411 (loop /CODE_V286 grind): ALSO break out absolute phone count
+    # at the system-level totals. The existing enrichment_pct mixes
+    # phone OR website — same misalignment V373 caught on the per-city
+    # ad-ready threshold. Phones are the revenue signal; tracking the
+    # raw phone count + phones_pct (phones / profiles) gives Wes the
+    # number that matters for the $149/mo lead product.
     totals = conn.execute("""
         SELECT
           (SELECT COUNT(*) FROM permits) as permits,
@@ -2493,6 +2499,8 @@ def admin_dashboard():
           (SELECT COUNT(*) FROM contractor_profiles
              WHERE (phone IS NOT NULL AND phone != '')
                 OR (website IS NOT NULL AND website != '')) as enriched,
+          (SELECT COUNT(*) FROM contractor_profiles
+             WHERE phone IS NOT NULL AND phone != '') as phones,
           (SELECT COUNT(*) FROM prod_cities WHERE status = 'active') as active_cities,
           (SELECT COUNT(*) FROM prod_cities WHERE status = 'paused') as paused_cities
     """).fetchone()
@@ -2501,8 +2509,12 @@ def admin_dashboard():
         totals_dict['enrichment_pct'] = round(
             100.0 * (totals_dict.get('enriched') or 0) / totals_dict['profiles'], 1
         )
+        totals_dict['phones_pct'] = round(
+            100.0 * (totals_dict.get('phones') or 0) / totals_dict['profiles'], 1
+        )
     else:
         totals_dict['enrichment_pct'] = 0
+        totals_dict['phones_pct'] = 0
 
     # recent collections (last 15)
     recent_collections = []
