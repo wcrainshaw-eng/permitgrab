@@ -181,7 +181,7 @@ def base_template(content, preheader="", show_upgrade_cta=False, unsubscribe_tok
           <div style="font-size:14px;color:#92400e;margin-bottom:8px;">
             <strong>Unlock full contractor contact info, CSV export, and more</strong>
           </div>
-          <a href="{SITE_URL}/pricing" style="display:inline-block;padding:10px 24px;background:#f97316;color:white;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Start Free Professional Trial</a>
+          <a href="{SITE_URL}/start-checkout?plan=pro" style="display:inline-block;padding:10px 24px;background:#f97316;color:white;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Start Free Professional Trial</a>
         </div>'''
 
     unsubscribe_link = ""
@@ -267,7 +267,7 @@ def send_welcome_free(user):
         <p style="margin:0;font-size:14px;color:#92400e;">
           <strong>Want full contractor contact info?</strong><br>
           Start a free 14-day Professional trial — no credit card required.
-          <a href="{SITE_URL}/pricing" style="color:#ea580c;font-weight:600;">Upgrade now →</a>
+          <a href="{SITE_URL}/start-checkout?plan=pro" style="color:#ea580c;font-weight:600;">Upgrade now →</a>
         </p>
       </div>
     </div>'''
@@ -571,7 +571,7 @@ def build_digest_html(user, permits, snapshot=None, is_pro=False, active_cities=
         else:
             contact_section = '''
             <div style="font-size:12px;color:#9ca3af;font-style:italic;background:#f3f4f6;padding:8px;border-radius:4px;margin-top:8px;">
-              🔒 Contact info hidden — <a href="''' + SITE_URL + '''/pricing" style="color:#f97316;">Upgrade to Pro</a>
+              🔒 Contact info hidden — <a href="''' + SITE_URL + '''/start-checkout?plan=pro" style="color:#f97316;">Upgrade to Pro</a>
             </div>'''
 
         # V30: Build clickable link to city page
@@ -856,13 +856,13 @@ def send_trial_expired(user):
       </div>
 
       <div style="text-align:center;margin-bottom:16px;">
-        <a href="{SITE_URL}/pricing" style="display:inline-block;padding:14px 32px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+        <a href="{SITE_URL}/start-checkout?plan=pro" style="display:inline-block;padding:14px 32px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
           Reactivate Professional — $149/mo
         </a>
       </div>
 
       <p style="text-align:center;font-size:14px;color:#6b7280;">
-        Or save with annual billing: <a href="{SITE_URL}/pricing" style="color:#2563eb;">$129/mo →</a>
+        Or save with annual billing: <a href="{SITE_URL}/pricing#annual" style="color:#2563eb;">$129/mo →</a>
       </p>
     </div>'''
 
