@@ -125,7 +125,12 @@ body {
     <div class="feature-icon">{{ icon }}</div>
     <h1>{{ heading }}</h1>
     <p>{{ description }}</p>
-    <a href="/pricing" class="btn">Upgrade to Pro</a>
+    {# V392: "Upgrade to Pro" was bouncing through /pricing for a
+       second decision step (read pricing → click trial → fill form).
+       The user already hit a feature gate — they know what they want.
+       Send them straight into the checkout flow which honors the
+       same 14-day-free-trial Stripe session as the pricing button. #}
+    <a href="/start-checkout?plan=pro" class="btn">Start 14-day Free Trial</a>
     <a href="/" class="back-link">Back to Home</a>
   </div>
 </div>
