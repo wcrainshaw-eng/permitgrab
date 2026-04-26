@@ -15245,23 +15245,12 @@ def city_landing_inner(city_slug):
     stalled_permits = []
     zip_heatmap = []
 
-    # V357 (CODE_V351 Part 3 Step 4): property_owners section. Pulls up to
-    # 20 rows for cities that have any data (NYC + Miami-Dade from
-    # owner_name backfill, plus assessor-collected counties like Maricopa).
-    # Empty list when no rows exist so the template hides the section.
-    property_owners_rows = []
-    try:
-        _poconn = permitdb.get_connection()
-        property_owners_rows = [dict(r) for r in _poconn.execute("""
-            SELECT property_address, owner_name, assessed_value, owner_mailing_address
-            FROM property_owners
-            WHERE source_city_key = ?
-              AND owner_name IS NOT NULL AND owner_name != ''
-            ORDER BY rowid DESC
-            LIMIT 20
-        """, (city_slug,)).fetchall()]
-    except Exception as e:
-        print(f"[V357] property_owners query failed for {city_slug}: {e}", flush=True)
+    # V358 HOTFIX: V357 added a property_owners_rows query and passed it
+    # as property_owners= to render_template, but the existing V284
+    # _get_property_owners() call at the render site was already passing
+    # property_owners=. Duplicate kwargs are a parse error → server.py
+    # failed to import → 502 across the whole site. Removed both the
+    # V357 query and the V357 kwarg; V284's helper handles the section.
 
     # V226 T10: compute freshness age in days so the template can bucket
     # the badge into fresh / aging / stale. None when we don't have a date.
@@ -15503,7 +15492,6 @@ def city_landing_inner(city_slug):
         state_name=state_name,  # V14.0: For display
         city_blog_url=city_blog_url,  # V14.0: City guide link
         top_trades=top_trades,  # V14.0: Trade page links
-        property_owners=property_owners_rows,  # V357 (CODE_V351 Part 3 Step 4)
         data_freshness=city_freshness,  # V18: stale indicator
         newest_permit_date=newest_permit_date,  # V18: for "last updated" display
         # V175: Additional vars expected by city_landing_v77.html
