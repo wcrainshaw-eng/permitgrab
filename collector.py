@@ -3156,16 +3156,29 @@ def collect_v122(days_back=7, include_scrapers=True):
     try:
         conn = permitdb.get_connection()
 
-        # Read active cities from the cities table — sorted by population DESC
+        # V414 (CODE_V365b PHASE A.3): cap at 50 cities per cycle. Site
+        # was OOM-killed at 768MB collecting all ~107 active cities in
+        # one pass. With 50/cycle and a ~30 min cadence, all cities are
+        # still touched within ~70 min. Order by:
+        #   1. last_collected_at ASC NULLS FIRST (oldest first → freshest
+        #      data flows for cities that have been waiting longest)
+        #   2. population DESC (tiebreaker — bigger cities first within
+        #      same staleness bucket)
+        # The previous straight population DESC order meant tail cities
+        # were re-collected each cycle (waste) while every cycle paid
+        # the NYC + Chicago + Miami-Dade memory tax up front.
         rows = conn.execute("""
             SELECT city_slug, city, state, platform, endpoint, dataset_id,
                    date_field, field_map, scraper_config
             FROM cities
             WHERE status = 'active' AND platform IS NOT NULL AND endpoint IS NOT NULL
-            ORDER BY population DESC
+            ORDER BY
+              COALESCE(last_collected_at, '1970-01-01') ASC,
+              population DESC
+            LIMIT 50
         """).fetchall()
 
-        print(f"[V122] Collecting from {len(rows)} active cities", flush=True)
+        print(f"[V122] Collecting from {len(rows)} active cities (capped at 50/cycle for memory)", flush=True)
         total_found = 0
         total_inserted = 0
         cities_collected = 0
@@ -3217,7 +3230,15 @@ def collect_v122(days_back=7, include_scrapers=True):
             _proc = _psutil.Process(os.getpid())
         except Exception:
             _proc = None
-        _MEM_BAIL_MB = 400  # leaves ~110MB headroom for the web worker
+        # V414 (CODE_V365b PHASE A.1): tightened from 400MB to 350MB.
+        # Site was crashing at 768MB / 150% of 512MB limit despite the
+        # V399 guard, meaning a single big-city fetch can blow past the
+        # check between gc.collect() calls. Lower threshold gives more
+        # headroom for the web worker (which shares the 512MB process)
+        # plus a 450MB hard-abort below in case a fetch starts at 350MB
+        # and explodes mid-normalize.
+        _MEM_BAIL_MB = 350
+        _MEM_HARD_ABORT_MB = 450  # immediate abort, no further retries this cycle
         _cycle_bailed = False
 
         for row in rows:
@@ -3227,11 +3248,25 @@ def collect_v122(days_back=7, include_scrapers=True):
             _row_slug = row[0]
             if _row_slug in circuit_open:
                 continue
-            # V399: between-city memory check + gc to release any normalized
-            # records / API response buffers from the previous iteration.
+            # V399 + V414 (CODE_V365b PHASE A.1): between-city memory
+            # check + gc to release any normalized records / API response
+            # buffers from the previous iteration.
+            #   - >= 350MB → soft bail (skip rest of cycle, scheduled
+            #     loop resumes after sleep window)
+            #   - >= 450MB → HARD ABORT (force gc, log loud, break loop;
+            #     same end state but loud signal in Render logs)
             if _proc is not None:
                 try:
                     _mem_mb = _proc.memory_info().rss / 1024 / 1024
+                    if _mem_mb >= _MEM_HARD_ABORT_MB:
+                        try:
+                            import gc as _gc_abort
+                            _gc_abort.collect()
+                        except Exception:
+                            pass
+                        print(f"[V414] HARD ABORT: memory {_mem_mb:.0f}MB >= {_MEM_HARD_ABORT_MB}MB — gunicorn will OOM-kill us; bailing immediately", flush=True)
+                        _cycle_bailed = True
+                        break
                     if _mem_mb >= _MEM_BAIL_MB:
                         print(f"[V399] cycle bail: memory {_mem_mb:.0f}MB >= {_MEM_BAIL_MB}MB cap — skipping remainder of cycle, will resume next pass", flush=True)
                         _cycle_bailed = True
