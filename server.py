@@ -2523,12 +2523,20 @@ def admin_dashboard():
     # admin dashboard reporting a count well below ground truth. Compute
     # against every active city with >= 100 permits instead so the bucket
     # tracks the real shape of the product.
+    # V373 (loop /CODE_V286 grind): also break out absolute phone count.
+    # CLAUDE.md defines ad-ready as profiles>100 AND phones>50 AND
+    # violations>0 — the previous threshold (`pct > 40` on enrichment_rate
+    # of phone-OR-website) hid cities with hundreds of phones but a long
+    # zero-phone tail bringing pct under 40, and let through cities where
+    # the only "enrichment" was a website link with zero phones to call.
+    # Phones are the revenue signal; threshold matches CLAUDE.md.
     health_rows = conn.execute("""
         SELECT pc.city_slug, pc.state, pc.status,
                COALESCE(p.cnt, 0) as permits, p.newest as newest_permit,
                COALESCE(v.cnt, 0) as violations,
                COALESCE(cp.cnt, 0) as profiles,
-               COALESCE(cp.enriched, 0) as enriched
+               COALESCE(cp.enriched, 0) as enriched,
+               COALESCE(cp.phones, 0) as phones
         FROM prod_cities pc
         LEFT JOIN (
             SELECT source_city_key, COUNT(*) cnt,
@@ -2542,7 +2550,9 @@ def admin_dashboard():
             SELECT source_city_key, COUNT(*) cnt,
                    SUM(CASE WHEN (phone IS NOT NULL AND phone != '')
                              OR (website IS NOT NULL AND website != '')
-                            THEN 1 ELSE 0 END) enriched
+                            THEN 1 ELSE 0 END) enriched,
+                   SUM(CASE WHEN phone IS NOT NULL AND phone != ''
+                            THEN 1 ELSE 0 END) phones
             FROM contractor_profiles GROUP BY source_city_key
         ) cp ON cp.source_city_key = pc.city_slug
         WHERE pc.status = 'active' AND COALESCE(p.cnt, 0) >= 100
@@ -2563,10 +2573,10 @@ def admin_dashboard():
                 age = (today - _dt.strptime(newest, '%Y-%m-%d').date()).days
             except Exception:
                 age = None
-        pct = 0
-        if r['profiles']:
-            pct = 100.0 * r['enriched'] / r['profiles']
-        if r['permits'] > 100 and age is not None and age < 7 and r['violations'] > 0 and pct > 40:
+        # V373: ad-ready definition matches CLAUDE.md North Star.
+        if (r['permits'] > 100 and age is not None and age < 7
+                and r['violations'] > 0 and r['profiles'] > 100
+                and r['phones'] > 50):
             yes.append(slug)
         elif r['permits'] > 100 and age is not None and age < 14:
             close.append(slug)
