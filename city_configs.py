@@ -871,6 +871,17 @@ CITY_REGISTRY = {
             "zip": "ZIP",
             "parcel": "Parcel",
             "subdivision_lot": "Subdivision_Lot",
+            # V407 (loop): same V321-trap variant as Sacramento V404 +
+            # Phoenix V405 + Mesa V406. Contact is the canonical party
+            # field on this Nashville feed and has REAL businesses
+            # ("WHITING-TURNER CONTRACTING CO", "MUSIC CITY ELECTRICAL
+            # ENGINEERING LLC", "BISON DEVELOPMENTS LLC" verified
+            # 2026-04-25 via WebFetch on Building_Permits_Issued_2).
+            # Old config only had contact_name → "Contact"; V180 runtime
+            # fallback was producing the 73 ad-ready phones we see in
+            # CLAUDE.md, but the canonical contractor_name path was
+            # never extracted by name. Adding it directly.
+            "contractor_name": "Contact",
             "contact_name": "Contact",
             "filing_date": "Date_Entered",
             "issue_date": "Date_Issued",
