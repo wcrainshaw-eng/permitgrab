@@ -2114,8 +2114,12 @@ CITY_REGISTRY = {
         },
         "date_field": "issued_date",
         "limit": 2000,
-        "active": True,  # V43: Activated â endpoint confirmed live with extremely fresh data (Mar 30 2026). Full field map with address, zip, city.
-        "notes": "V43: Activated. Marin County Socrata â daily-fresh data, full address fields.",
+        # V402 (loop): deactivated. data.marincounty.gov mkbn-caye newest issued_date is 2025-08-06 (~8 months stale).
+        # Source has no contractor name field anyway (only contractor_address, mostly empty) so even fresh
+        # data would not produce contractor_profiles. Inverness CA filter at line 14425 uses the same
+        # endpoint with city_town=INVERNESS - leaving that one alone for now since it is independently configured.
+        "active": False,
+        "notes": "V402 (2026-04-26): deactivated. mkbn-caye stale (2025-08-06) + no contractor field.",
     },
 
     "gainesville": {
@@ -3720,8 +3724,11 @@ CITY_REGISTRY = {
         },
         "date_field": "permitdate",
         "limit": 2000,
-        "active": True,  # V43: Activated â endpoint confirmed live. Has situs address, contractor, value.
-        "notes": "V43: Activated. Summit County UT Socrata â confirmed working.",
+        # V402 (loop): deactivated. opendata.utah.gov rtmz-aq9t newest permitdate is 2017-12-29 (8+ years stale).
+        # V43 misread freshness as Frederick V400 did. Contractor field has real businesses ("Whipple Plumbing", "Superior Water and Air", "Home Depot USA")
+        # but the dataset stopped being updated after 2017.
+        "active": False,
+        "notes": "V402 (2026-04-26): deactivated. rtmz-aq9t frozen at 2017-12-29 (8+ yrs stale). V43 misread freshness.",
     },
 
     "west_hollywood": {
