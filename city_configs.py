@@ -1823,7 +1823,17 @@ CITY_REGISTRY = {
             "description": "Name",
             "status": "Status",
             "estimated_cost": "JobValue",
-            "contractor_name": "Contact",
+            # V401 (loop /CODE_V286 grind): V321-trap fix. "Contact" is
+            # EMPTY across every record (esriFieldTypeString with 30-char
+            # max, never populated). Real business names live in
+            # Owner_TRAKiT — verified 2026-04-30 via WebFetch:
+            # "ASPEN GREY COMMERCIAL PROPERTIES LLC", "WYNDSOR VIEW
+            # TOWNHOMES, LLC". V43 wired contractor_name → Contact based
+            # on the field name, not the data; result was NULL contractor
+            # on every Lynchburg permit. Same pattern as Cape Coral V395.
+            "contractor_name": "Owner_TRAKiT",
+            "owner_name": "Owner_TRAKiT",
+            "contact_name": "Contact",
         },
         "date_field": "StartDate",
         "date_format": "none",
