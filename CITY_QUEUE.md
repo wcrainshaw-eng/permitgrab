@@ -147,6 +147,9 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Anchorage AK: Open data policy exists but no specific building permits dataset confirmed on portal (blitz 2026-04-26)
 - Stockton CA: data.stocktonca.gov exists but permits appear Accela-only, no open data API (blitz 2026-04-26)
 - Redmond OR (V350 probed 2026-04-25): services2.arcgis.com B0h69gkZPiRSTUFu Accela_Permits/0 has 19 fields but NONE are contractor/applicant/owner/business — only TAXLOT, APP_NUMBER, STATUS, PERMIT_TYPE, ADDRESS, OPENED, DESCRIPTION, PROJECT_NAME. Dead despite the Accela_ prefix.
+- Albuquerque NM (V368 probed 2026-04-26): coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/FeatureServer/0 has GOLD-LIKE schema — Owner + Applicant + Contractor fields populated with real businesses ("C&L HANDY LLC", "BRADBURY STAMM CONSTRUCTION INC."). BUT newest DateIssued is 2024-04-12 (~2 years stale); count of records with DateIssued >= 2026-01-01 = 0. Dataset frozen at April 2024 — fails freshness rule. Could be revived if City of Albuquerque resumes publishing.
+- Bakersfield CA (V368 probed 2026-04-26): bakersfielddatalibrary-cob.opendata.arcgis.com Hub has no permit datasets in DCAT feed; gis.bakersfieldcity.us/webmaps/rest/services has only a Cadastre service — Planning folder has "MakingDowntown" only (story-map). Permits live behind Click2Gov HTML portal at bakeweb.ci.bakersfield.ca.us/Click2GovBP. No public REST API. Dead.
+- Augusta GA (V368 probed 2026-04-26): geohub-augustagis.opendata.arcgis.com DCAT feed has 42 datasets (transit, planning case lookups, electoral, zoning, parcels, fire/crime) but NONE for permits, construction, or code. Dead.
 
 ## Monitoring for New Cities
 
