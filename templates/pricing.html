@@ -443,6 +443,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 {% include 'partials/nav.html' %}
 
+{# V379 (CODE_V363 P0 follow-up): give users feedback when they land
+   here from a cancelled Stripe checkout or a not-yet-configured plan.
+   Otherwise the page looks identical to the first visit and the user
+   assumes the click did nothing. #}
+{% if request.args.get('payment') == 'cancelled' or request.args.get('checkout') == 'cancelled' %}
+<div style="max-width: 800px; margin: 16px auto 0; padding: 12px 16px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 8px; font-size: 14px; text-align: center;">
+  Checkout cancelled. Your card wasn't charged. <a href="/start-checkout?plan=pro" style="color: #92400e; font-weight: 600; text-decoration: underline;">Start your free trial →</a>
+</div>
+{% elif request.args.get('checkout') == 'stripe_error' %}
+<div style="max-width: 800px; margin: 16px auto 0; padding: 12px 16px; background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; border-radius: 8px; font-size: 14px; text-align: center;">
+  We hit a snag connecting to Stripe. Please try again, or email <a href="mailto:wcrainshaw@gmail.com" style="color: #991b1b; font-weight: 600; text-decoration: underline;">wcrainshaw@gmail.com</a> and we'll get you set up.
+</div>
+{% elif request.args.get('checkout') == 'not_configured' %}
+<div style="max-width: 800px; margin: 16px auto 0; padding: 12px 16px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 8px; font-size: 14px; text-align: center;">
+  Payments launching soon. Email <a href="mailto:wcrainshaw@gmail.com" style="color: #92400e; font-weight: 600; text-decoration: underline;">wcrainshaw@gmail.com</a> to get on the early-access list.
+</div>
+{% endif %}
+
 <section class="hero">
   <h1>Simple, Transparent Pricing</h1>
   <p>Get the leads your competitors don't know about yet.</p>
