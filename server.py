@@ -5001,22 +5001,68 @@ def export_csv(city_slug):
     query += " ORDER BY filing_date DESC LIMIT ?"
     params.append(limit)
 
-    rows = conn.execute(query, params).fetchall()
+    # V366 (CODE_V363 Part E): stream CSV + JOIN contractor_profiles for phone
+    # and property_owners for owner_mailing_address. Subscribers pay $149/mo for
+    # actionable contact info, not just addresses.
+    cursor = conn.execute(query, params)
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['date', 'permit_number', 'address', 'type', 'description',
-                     'value', 'trade', 'contractor_name', 'owner_name', 'status'])
-    for r in rows:
-        writer.writerow([
-            r['filing_date'] or r['date'], r['permit_number'], r['address'],
-            r['permit_type'], (r['description'] or '')[:200],
-            r['estimated_cost'], r['trade_category'],
-            r['contractor_name'] or r['contact_name'], r['owner_name'], r['status'],
-        ])
+    # Build a phone/trade lookup for this city's contractor profiles up-front.
+    # source_city_key on profiles is the slug (hyphen format), and we match
+    # case-insensitively on business_name vs permit.contractor_name.
+    profile_rows = conn.execute(
+        "SELECT business_name, phone, trade_category FROM contractor_profiles "
+        "WHERE source_city_key = ?", (city_slug,)
+    ).fetchall()
+    profile_lookup = {}
+    for pr in profile_rows:
+        bn = (pr['business_name'] or '').strip().lower()
+        if bn and bn not in profile_lookup:
+            profile_lookup[bn] = (pr['phone'] or '', pr['trade_category'] or '')
+
+    # Owner lookup keyed by normalized address. property_owners.address is
+    # uppercase per V279 schema; permits.address may not be — normalize both.
+    owner_rows = conn.execute(
+        "SELECT address, owner_name, owner_mailing_address FROM property_owners "
+        "WHERE city = ? OR city IS NULL OR city = ''",
+        ((prod_city['city'] or '').strip(),)
+    ).fetchall()
+    owner_lookup = {}
+    for orow in owner_rows:
+        addr = (orow['address'] or '').strip().upper()
+        if addr and addr not in owner_lookup:
+            owner_lookup[addr] = (orow['owner_name'] or '', orow['owner_mailing_address'] or '')
+
+    header = [
+        'date', 'permit_number', 'address', 'type', 'description', 'value',
+        'trade', 'contractor_name', 'contractor_phone',
+        'owner_name', 'owner_mailing_address', 'status',
+    ]
+
+    def generate():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(header)
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+        for r in cursor:
+            cname = r['contractor_name'] or r['contact_name'] or ''
+            phone, trade = profile_lookup.get(cname.strip().lower(), ('', ''))
+            trade = trade or (r['trade_category'] or '')
+            addr_norm = (r['address'] or '').strip().upper()
+            o_name, o_mail = owner_lookup.get(addr_norm, ('', ''))
+            # Permit table also has owner_name as fallback
+            o_name = o_name or (r['owner_name'] or '')
+            w.writerow([
+                r['filing_date'] or r['date'], r['permit_number'], r['address'],
+                r['permit_type'], (r['description'] or '')[:200],
+                r['estimated_cost'], trade, cname, phone,
+                o_name, o_mail, r['status'],
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
 
     return Response(
-        output.getvalue(),
+        generate(),
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename="{city_slug}-permits.csv"'}
     )
@@ -8308,6 +8354,67 @@ def load_stats():
 _CITIES_WITH_DATA_CACHE = {'expires_at': 0, 'value': None}
 _CITIES_WITH_DATA_TTL = 300
 
+# V366 (CODE_V363 Part F): homepage city-directory grouped by state with
+# data-availability badges (P=Permits, C=Contractors, V=Violations, O=Owners).
+# 5-min cache keeps the homepage fast; the daemon updates underlying counts
+# once per cycle so 5 min of staleness is fine.
+_CITY_DIRECTORY_CACHE = {'expires_at': 0, 'value': None}
+_CITY_DIRECTORY_TTL = 300
+
+
+def get_city_directory_stats():
+    """Return cities grouped by state with badge counts for homepage directory.
+
+    Returns dict[state] = list of dicts:
+      {slug, name, permit_count, profile_count, phone_count,
+       violation_count, owner_count}
+    States are sorted alphabetically; cities within a state by permit_count desc.
+    """
+    import time as _t
+    _now = _t.time()
+    _cached = _CITY_DIRECTORY_CACHE
+    if _cached['value'] is not None and _now < _cached['expires_at']:
+        return _cached['value']
+
+    grouped = {}
+    try:
+        conn = permitdb.get_connection()
+        rows = conn.execute("""
+            SELECT pc.city_slug, pc.city, pc.state, pc.total_permits,
+              (SELECT COUNT(*) FROM contractor_profiles cp
+                 WHERE cp.source_city_key = pc.city_slug) as profile_count,
+              (SELECT COUNT(*) FROM contractor_profiles cp
+                 WHERE cp.source_city_key = pc.city_slug
+                   AND cp.phone IS NOT NULL AND cp.phone != '') as phone_count,
+              (SELECT COUNT(*) FROM violations v
+                 WHERE v.source_city_key = pc.city_slug) as violation_count,
+              (SELECT COUNT(*) FROM property_owners po
+                 WHERE po.city = pc.city) as owner_count
+            FROM prod_cities pc
+            WHERE pc.status = 'active' AND pc.total_permits > 0
+            ORDER BY pc.state, pc.total_permits DESC
+        """).fetchall()
+        for r in rows:
+            state = r['state'] or '?'
+            grouped.setdefault(state, []).append({
+                'slug': r['city_slug'],
+                'name': r['city'],
+                'permit_count': r['total_permits'] or 0,
+                'profile_count': r['profile_count'] or 0,
+                'phone_count': r['phone_count'] or 0,
+                'violation_count': r['violation_count'] or 0,
+                'owner_count': r['owner_count'] or 0,
+            })
+    except Exception as e:
+        print(f"[V366] city directory query failed: {e}")
+        # Defensive: return whatever we have rather than 500 the homepage.
+        grouped = {}
+
+    grouped = dict(sorted(grouped.items()))
+    _CITY_DIRECTORY_CACHE['value'] = grouped
+    _CITY_DIRECTORY_CACHE['expires_at'] = _now + _CITY_DIRECTORY_TTL
+    return grouped
+
 
 def get_cities_with_data():
     """V15/V34: Get cities with VERIFIED data, sorted by permit volume.
@@ -9201,10 +9308,14 @@ def index():
         'high_value_count': stats.get('high_value_count', 0),
     }
 
+    # V366 (CODE_V363 Part F): browseable city directory grouped by state.
+    cities_by_state = get_city_directory_stats()
+
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
                           city_count=city_count, state_count=state_count,
                           all_dropdown_cities=all_dropdown_cities,
+                          cities_by_state=cities_by_state,
                           initial_stats=initial_stats,
                           # V224 T1: hide the sticky filter bar and the 50-card
                           # permit grid on the homepage itself — they're from
