@@ -1140,12 +1140,22 @@ CITY_REGISTRY = {
         "endpoint": "https://services5.arcgis.com/54falWtcpty3V47Z/arcgis/rest/services/BldgPermitIssued_CurrentYear/FeatureServer/0/query",
         "dataset_id": "BldgPermitIssued_CurrentYear",
         "description": "Issued Building Permits Current Year",
+        # V404 (loop): V321-trap variant — config mapped contact_name to
+        # "Contractor" but never set contractor_name. The V180 runtime
+        # fallback (contractor = contact when missing) keeps this working
+        # but obscures the canonical mapping; Sacramento should use
+        # contractor_name directly so the field is extracted by name. The
+        # Contractor field IS 100% real businesses — verified 2026-03-22
+        # records: "B & BROTHERS ROOFING INC", "AMERICAN HOME ENERGY
+        # SAVERS INC", "THE CINNAMON KINGDOM LLC". CSLB enrichment will
+        # lift phones on the next CA license import.
         "field_map": {
             "permit_number": "Application",
             "permit_type": "Type",
             "work_type": "Sub_Type",
             "address": "Address",
             "zip": "ZIP",
+            "contractor_name": "Contractor",
             "contact_name": "Contractor",
             "filing_date": "Status_Date",
             "status": "Current_Status",
