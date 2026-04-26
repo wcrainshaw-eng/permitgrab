@@ -1,21 +1,47 @@
 # City Queue — Pre-Vetted Cities for Fast Onboarding
 
 Check this file BEFORE researching any new city. "Ready to Wire" cities
-have confirmed endpoints with contractor names — just add the config.
-"Dead Ends" cities should never be investigated again.
+have confirmed endpoints — just add the config. Cities WITHOUT contractor
+data are STILL VIABLE: solar companies want owner/address data from permits.
+Show "No contractor data available" on the city page when contractor_name
+is absent. "Dead Ends" are cities with NO working permit API at all.
 
 ## Ready to Wire (confirmed endpoint + contractor field)
-<!-- Add cities here after SSH-testing confirms contractor_name field works -->
 <!-- Format: - CityName ST: platform resource_id, contractor_field: fieldname, tested: date -->
 - Greensboro NC: arcgis MapServer gis.greensboro-nc.gov OpenData_HRES_DS/2 BI_Permits — was already in CITY_REGISTRY as key "greensboro" but field_map mapped Contractor→contact_name (typo) and zip→Zoning (wrong). V342 fixed both. V340's duplicate "greensboro_nc" entry was reverted.
 - Asheville NC: ALREADY correctly wired at "asheville_nc" → slug "asheville". Endpoint gis.ashevillenc.gov AccelaPermitsView/2 fresh through 2026-05-26 with real businesses (8MSOLAR LLC, LEDFORD ELECTRIC, AMERICAN AIR HEATING & COOLING). 64,383 records, 1,719 already collected. Uses contact_name slot but V180 fallback handles it. NC has no bulk state license DB so phones are DDG-only.
+- Raleigh NC: Socrata, resource_id: building-permits, contractor_field: contractor_company_name. Researched 2026-04-25. **V361 wiring probe 2026-04-26: "raleigh" already in CITY_REGISTRY at services.arcgis.com/v400IkDOw1ad7Yad ArcGIS (180-day window) with rich contractor fields. Socrata federated search for "raleigh building permits" returned 0 results. The existing ArcGIS endpoint is the canonical one — re-confirm intent or provide an alternate Socrata host/resource id.**
+- Virginia Beach VA: ArcGIS Hub, dataset_id: 15292e05..., contractor_field: contractor_name. Researched 2026-04-25. **V361 wiring probe 2026-04-26: dataset_id is truncated; can't be resolved as-is. Socrata federated search returned only Maryland Beach Buffer datasets. Need full ArcGIS Hub URL or feature service URL to wire.**
+- Tulsa OK: Socrata, resource_id: okc-permits, contractor_field: primary_contractor. NOTE: was in Dead Ends (V339 only found StoryMap via ArcGIS search — Socrata dataset found via manual research). Researched 2026-04-25. **V361 wiring probe 2026-04-26: "okc-permits" prefix suggests Oklahoma City not Tulsa. Socrata federated search for "tulsa permits" returned 0 results. Likely a copy/paste error — confirm whether the dataset is actually OKC-wide or Tulsa-specific.**
+- Omaha NE: CivicData, resource_id: blds-data, contractor_field: contractor_license. NOTE: was in Dead Ends (V340 found 0 ArcGIS results — CivicData platform not searched). Researched 2026-04-25. **V361 wiring probe 2026-04-26: "CivicData" platform isn't in our supported list (we handle socrata/arcgis/carto/ckan/accela). Need a concrete REST endpoint URL to wire — e.g. https://opendata-omaha.opendata.civicdata.com/resource/blds-data.json or similar.**
+- Salt Lake City UT: Socrata, resource_id: 5gsj-w587, contractor_field: contractor_name. Researched 2026-04-25. **V361 wiring probe 2026-04-26: resource_id 5gsj-w587 returns 404 on opendata.utah.gov + data.slc.gov; Socrata federated catalog returns 0 results. Need correct host domain or alternate resource_id.**
+
+## Ready to Wire (NO contractor field — address/owner data only)
+<!-- These cities have working permit APIs with addresses and dates but NO contractor name field.
+     Still valuable for solar/investor buyers who want property owner info.
+     Template should show "No contractor data available" message.
+     Owner enrichment via county assessor matching makes these cities monetizable. -->
+- San Francisco CA: Socrata DataSF, has building permits SODA API. No contractor field but has address+date+permit_type.
+- Washington DC: ArcGIS Hub, has current-year permits. PERMIT_APPLICANT is individual names (not businesses) — still useful for address/owner matching.
+- Boston MA: Socrata (Analyze Boston), has building permits + code violations. Applicant is individual licensee names — still useful for address/owner.
+- Baltimore MD: Socrata (Open Baltimore), has SODA API for housing code + building citations. No contractor field but has address data.
+- Denver CO: Socrata open data portal, has construction permits with address data. No contractor field. No state licensing DB either.
+- Tucson AZ: ArcGIS gis.tucsonaz.gov PDSD_ResidentialBldg MapServer/85, 31-field schema with address+project data. No contractor/applicant field.
+- Lincoln NE: ArcGIS gis.lincoln.ne.gov Residential_New_Construction_Permits MS/0, 53 fields with address data. No contractor field.
+- Tempe AZ: has permit API (V314 confirmed data exists). No usable contractor field.
+- Madison WI: has permit API. No contractor field exposed.
+- Aurora CO: has permit API. No contractor field in source.
 
 ## Needs Investigation (promising but unverified)
-<!-- Cities with known open data portals but contractor field unconfirmed -->
+<!-- Cities with known open data portals but endpoint not yet SSH-tested -->
 <!-- Tallahassee resolved in V343: switched endpoint from TLC_OverlayPermitsActive_D_WM/0
      (stuck commercials 2018-2021) to TLC_OverlayPermitsActiveTrends_D_WM/2
      (Single Family Last 1 Year, updated nightly). Real ContractorPhone inline.
      FL DBPR import will lift license-only contractors. -->
+- Louisville KY: ArcGIS Hub, has building permits + Property Maintenance Inspections API. Contractor field unconfirmed. Top-30 city.
+- Atlanta GA: ArcGIS Hub building permits + code enforcement. Previous probe (V341) got ECONNREFUSED + TLS cert invalid — may have been fixed since. Worth a re-probe.
+- New Orleans LA: Socrata open data portal, has "Code Enforcement Active Pipeline." Permit contractor field unconfirmed.
+- Detroit MI: ArcGIS-based, tracks blighted properties + permits. Previous probe said "not a Socrata portal" but ArcGIS may work. Worth a re-probe.
 
 
 ## Dead Ends (skip forever)
@@ -54,8 +80,8 @@ have confirmed endpoints with contractor names — just add the config.
 - Tucson AZ: gis.tucsonaz.gov PDSD_ResidentialBldg MapServer/85 — 31-field schema has zero contractor/applicant/business field; only PROJECTNAME and DESCRIPTION (V339 probed 2026-04-25)
 - El Paso TX: ArcGIS portal returns mining permits + traffic permits; no building-permit feature service surfaces a contractor field (V339 probed 2026-04-25)
 - Lincoln NE: gis.lincoln.ne.gov Residential_New_Construction_Permits MS/0 has 53 fields but none contain contractor/applicant/business/builder data (V339 probed 2026-04-25)
-- Tulsa OK: ArcGIS search returns only a StoryMap citing 2023-2024 permits, no queryable feature service (V339 probed 2026-04-25)
-- Omaha NE: ArcGIS search returns 0 building-permit feature services for Omaha or Douglas County NE (V339 probed 2026-04-25)
+- Tulsa OK: MOVED TO READY TO WIRE — Socrata dataset found (okc-permits, primary_contractor). V339 only searched ArcGIS.
+- Omaha NE: MOVED TO READY TO WIRE — CivicData dataset found (blds-data, contractor_license). V340 only searched ArcGIS.
 - Jacksonville FL: ArcGIS portal returns only Jacksonville OREGON UGB; data.coj.net not indexed in Socrata federated catalog (V339 probed 2026-04-25)
 - Reno NV: 0 ArcGIS Reno-specific results, only StoryMap reference (V340 probed 2026-04-25)
 - Toledo OH: ArcGIS results are for Toledo SPAIN, no Toledo OH building permit feed (V340 probed 2026-04-25)
