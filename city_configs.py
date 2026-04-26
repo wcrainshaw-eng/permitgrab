@@ -7702,8 +7702,22 @@ CITY_REGISTRY = {
             "estimated_cost": "permitvalue",
             "description": "permit_desc",
             "occupancy_type": "Occupancy_Type",
+            # V395 (loop /CODE_V286 grind): V321-trap fix. Cape Coral's
+            # "Contractor" field is INDIVIDUAL licensees (Scott Christensen,
+            # RICHARD CERATO II, CHRISTOPHER TEDESCO, KYLE GILLIANO);
+            # "Company_Name" is the actual business they pull permits for
+            # (Kin Home LLC, CAPE COOLING INC, AZTEC PLUMBING AND DRAINS,
+            # ETERNITY AIR CONDITIONING INC.). The V19 config mapped
+            # contractor_name → Contractor, so contractor_profiles ended up
+            # full of individual licensees — CLAUDE.md V258 noted the
+            # symptom: "Cape Coral contractor_name_raw is dominated by
+            # homeowner names, not business names." Swap so contractor_name
+            # picks up Company_Name; that gives the FL DBPR licensee-name
+            # matcher real businesses to match against — the lift Cape
+            # Coral needs to clear the phones>50 ad-ready bar (currently
+            # at 44 phones, needs 6 more).
             "company_name": "Company_Name",
-            "contractor_name": "Contractor",
+            "contractor_name": "Company_Name",
             "contract_type": "Contract_Type",
             "is_company": "iscompany",
             "ivr_number": "IVR_Number",
