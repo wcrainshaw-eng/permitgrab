@@ -15406,19 +15406,33 @@ CITY_REGISTRY = {
         "endpoint": "https://data.norfolk.gov/resource/fahm-yuh4.json",
         "dataset_id": "fahm-yuh4",
         "description": "Norfolk VA Permits and Inspections",
+        # V385 (loop): the V26 field_map had 5 fields wrong —
+        # "ftpuser" / "permit_address" / "permit_application_date" /
+        # "permit_status" / "permit_description" / "permit_project_cost"
+        # don't exist on fahm-yuh4. Real keys (probed 2026-04-26 via
+        # WebFetch with newest application_date 2026-04-22): permit_number,
+        # address, type, work_type, use_type, status, application_date,
+        # issue_date, project_cost, square_footage, gpin. NO contractor
+        # field — V362 no-contractor template handles it. Permits were
+        # being collected with every meaningful column NULL since V26.
         "field_map": {
-            "permit_number": "ftpuser",
-            "permit_type": "permit_type",
-            "description": "permit_description",
-            "status": "permit_status",
-            "filing_date": "permit_application_date",
-            "address": "permit_address",
-            "estimated_cost": "permit_project_cost",
+            "permit_number": "permit_number",
+            "permit_type": "type",
+            "work_type": "work_type",
+            "address": "address",
+            "status": "status",
+            "filing_date": "application_date",
+            "issued_date": "issue_date",
+            "estimated_cost": "project_cost",
+            "square_feet": "square_footage",
+            "description": "use_type",
+            "parcel": "gpin",
         },
         "date_field": "application_date",
+        "date_format": "string",
         "limit": 2000,
         "active": True,
-        "notes": "V26: Data provided via norfolk endpoint.",
+        "notes": "V385 (loop): field_map corrected — V26 had 5 fields pointing at non-existent keys. fahm-yuh4 fresh through 2026-04-22; no contractor field, V362 template fallback.",
     },
 
     # --- Dallas TX ---
