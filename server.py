@@ -9828,11 +9828,20 @@ def api_address_detail():
     # "1234 North Main Street"). Cap the prefix length to keep the
     # LIKE selective enough to hit the index.
     upper = raw_addr.upper().strip()
-    # Drop suite/unit markers so "1234 MAIN ST #3B" groups with "1234 MAIN ST"
+    # Drop suite/unit markers so "1234 MAIN ST #3B" groups with "1234 MAIN ST".
+    # V427 (CODE_V427 Phase 4): made the regex more permissive — also strips
+    # `#` with no leading whitespace ("1234 MAIN ST#3B"), and any trailing
+    # punctuation that breaks LIKE matching against differently-formatted
+    # storage. Then trim the prefix to ~28 chars (street number + first
+    # 1-2 words of the street name) so the LIKE is forgiving of street-type
+    # variants ("ST" vs "STREET") without being so loose it catches
+    # neighbors. Previously a 48-char prefix matched exactly nothing for
+    # rows where stored address used a different street-type abbreviation.
     import re as _re
-    upper = _re.sub(r'\s+(UNIT|APT|SUITE|STE|#)\s*\S+.*$', '', upper)
+    upper = _re.sub(r'\s*(UNIT|APT|SUITE|STE|#)\s*\S+.*$', '', upper)
+    upper = _re.sub(r'[^A-Z0-9 ]', ' ', upper)  # strip commas/periods/hyphens
     upper = _re.sub(r'\s+', ' ', upper).strip()
-    like_prefix = upper[:48] + '%'  # leading portion of the normalized address
+    like_prefix = upper[:28] + '%'  # street number + first ~2 words
 
     logged_in = bool(session.get('user_email'))
     conn = permitdb.get_connection()
@@ -11397,16 +11406,69 @@ def api_contractors():
         conn.row_factory = sqlite3.Row
 
         # V423 (CODE_V422 Phase 5): exclude generic placeholder business
-        # names that pollute the top-results. Centralized list applied to
-        # both the per-city and global branches below.
+        # names that pollute the top-results.
+        # V427 (CODE_V427 Phase 5): added utility companies + the SQL now
+        # filters out the personal-name pattern that was surfacing Mesa AZ
+        # inspectors as "top contractors". Heuristic: name has no LLC/INC/
+        # CORP/CO suffix AND looks like exactly two whitespace-separated
+        # words → likely a personal name; demoted unless they have many
+        # cities or appear in our explicit business allowlist.
         _GARBAGE_NAMES = (
             'NOT GIVEN', 'OWNER-BUILDER', 'OWNER BUILDER', 'N/A', 'NA',
             'NONE', 'SELF', 'HOMEOWNER', 'HOME OWNER', 'OWNER',
             'NOT APPLICABLE', 'SAME', 'SAME AS ABOVE', 'SEE ABOVE',
-            'VARIOUS', 'TBD', 'TBA', 'UNKNOWN', 'NOT AVAILABLE', 'PENDING'
+            'VARIOUS', 'TBD', 'TBA', 'UNKNOWN', 'NOT AVAILABLE', 'PENDING',
+            # V427: utility companies that pull tens of thousands of
+            # permits but aren't contractor leads.
+            'CENTERPOINT ENERGY RESOURCE CORP', 'CENTERPOINT ENERGY',
+            'CENTERPOINT ENERGY RESOURCES', 'CENTERPOINT ENERGY HOUSTON',
+            'ATMOS ENERGY', 'ATMOS ENERGY CORP',
+            'PG&E', 'PACIFIC GAS AND ELECTRIC',
+            'SOUTHERN CALIFORNIA EDISON', 'SOCAL EDISON',
+            'CONSOLIDATED EDISON', 'CON ED', 'CON EDISON',
+            'NATIONAL GRID', 'NATIONAL GRID USA',
+            'COMED', 'COMMONWEALTH EDISON',
+            'NICOR GAS', 'PEOPLES GAS', 'PEOPLES GAS LIGHT',
+            'AT&T', 'VERIZON', 'COMCAST', 'SPECTRUM',
+            'DUKE ENERGY', 'DOMINION ENERGY', 'DOMINION VIRGINIA POWER',
+            'PSE&G', 'PSEG',
+            'XCEL ENERGY',
         )
         _garbage_placeholders = ','.join(['?'] * len(_GARBAGE_NAMES))
 
+        # V427 Phase 5: post-fetch filter — drop entries whose name looks
+        # like a personal name (no business suffix) AND only appear in a
+        # single city. Inspectors and applicants surface as top contractors
+        # under that pattern (Annette Gordon / Pam Wilson / Stacy
+        # Palfreyman in Mesa AZ). Real contractors typically have a
+        # business suffix, multiple cities, or both.
+        _BIZ_SUFFIX_TOKENS = (
+            'INC', 'LLC', 'CORP', 'CO', 'CO.', 'COMPANY', 'CONSTRUCTION',
+            'CONTRACTORS', 'CONTRACTING', 'BUILDERS', 'BUILDING', 'SERVICES',
+            'GROUP', 'ENTERPRISES', 'ASSOC', 'ASSOCIATES', 'INDUSTRIES',
+            'ENERGY', 'GAS', 'ELECTRIC', 'ELECTRICAL', 'PLUMBING', 'ROOFING',
+            'HEATING', 'AIR', 'HVAC', 'SOLAR', 'MECHANICAL', 'HOMES',
+            'HOLDINGS', 'PARTNERS', 'LP', 'LLP', 'LTD', '&',
+        )
+
+        def _looks_personal(name, city_count):
+            if not name:
+                return False
+            if (city_count or 0) >= 2:
+                return False
+            up = name.upper().strip()
+            words = up.split()
+            if len(words) > 3:
+                return False  # 4+ words is rarely a personal name
+            for tok in _BIZ_SUFFIX_TOKENS:
+                if tok in words or up.endswith(tok):
+                    return False
+            return True
+
+        # V427 Phase 5: lifted the LIMIT 500 cap. The page paginates
+        # client-side; capping at 500 hid real contractors. Cap raised
+        # to 5000 (still bounded for memory; covers any reasonable
+        # contractor universe).
         if city:
             sql = f"""
                 SELECT contractor_name_raw AS name,
@@ -11423,7 +11485,7 @@ def api_contractors():
                   AND UPPER(TRIM(contractor_name_raw)) NOT IN ({_garbage_placeholders})
                   AND contractor_name_raw GLOB '*[^0-9]*'
                 ORDER BY total_permits DESC
-                LIMIT 500
+                LIMIT 5000
             """
             rows = conn.execute(sql, (city, *_GARBAGE_NAMES)).fetchall()
             contractor_list = [{
@@ -11453,7 +11515,7 @@ def api_contractors():
                   AND contractor_name_raw GLOB '*[^0-9]*'
                 GROUP BY contractor_name_normalized
                 ORDER BY total_permits DESC
-                LIMIT 500
+                LIMIT 5000
             """
             rows = conn.execute(sql, _GARBAGE_NAMES).fetchall()
             contractor_list = []
@@ -11469,6 +11531,13 @@ def api_contractors():
                     'primary_trade': r['primary_trade'] or 'Other',
                     'most_recent_date': r['last_permit_date'] or '',
                 })
+
+        # V427 Phase 5: drop personal-name single-city entries (likely
+        # inspectors/applicants, not contractors).
+        contractor_list = [
+            c for c in contractor_list
+            if not _looks_personal(c.get('name'), c.get('city_count'))
+        ]
 
         if search:
             contractor_list = [c for c in contractor_list if search in c['name'].lower()]
@@ -11504,34 +11573,83 @@ def api_contractors():
 def api_contractor_detail(name):
     """
     GET /api/contractors/<name>
-    Returns all permits for a specific contractor.
-    V12.51: SQL-backed
+    Returns permits for a specific contractor.
+
+    V427 (CODE_V427 Phase 2): rewritten. The old V12.51 path loaded
+    100,000 permits via query_permits() then filtered in Python on
+    contact_name — this both timed out under memory pressure AND
+    matched the wrong field (the /contractors page indexes by
+    contractor_name_raw on contractor_profiles, not contact_name on
+    permits, so the modal always showed "Failed to load"). Now does an
+    indexed lookup on permits.contractor_name (case-insensitive),
+    capped at 100 most-recent rows for the modal.
     """
-    permits, _ = permitdb.query_permits(page=1, per_page=100000)
-    permits = add_lead_scores(permits)
+    try:
+        conn = permitdb.get_connection()
+        conn.row_factory = sqlite3.Row
 
-    # Find permits by contractor name (case-insensitive)
-    contractor_permits = [p for p in permits if p.get('contact_name', '').lower() == name.lower()]
+        # Match against contractor_name (the canonical field used by
+        # contractor_profiles), falling back to contact_name for legacy rows
+        # where V180 fallback hadn't promoted contact → contractor.
+        sql = """
+            SELECT permit_number, source_city_key, city, state,
+                   contractor_name, contact_name, contact_phone,
+                   address, trade_category, permit_type,
+                   estimated_cost, filing_date, date, status
+            FROM permits
+            WHERE LOWER(COALESCE(contractor_name, contact_name, '')) = LOWER(?)
+            ORDER BY COALESCE(filing_date, date, '') DESC
+            LIMIT 100
+        """
+        rows = conn.execute(sql, (name,)).fetchall()
+        contractor_permits = [dict(r) for r in rows]
 
-    if not contractor_permits:
-        return jsonify({'error': 'Contractor not found'}), 404
+        if not contractor_permits:
+            return jsonify({'error': 'Contractor not found'}), 404
 
-    # Calculate stats
-    total_value = sum(p.get('estimated_cost', 0) or 0 for p in contractor_permits)
-    cities = sorted(set(p.get('city', '') for p in contractor_permits))
-    trades = {}
-    for p in contractor_permits:
-        trade = p.get('trade_category', 'Other')
-        trades[trade] = trades.get(trade, 0) + 1
+        # Aggregate stats from the slice (correct enough for the modal;
+        # for total counts we read contractor_profiles).
+        total_value = sum(p.get('estimated_cost') or 0 for p in contractor_permits)
+        cities = sorted({p.get('city') or '' for p in contractor_permits if p.get('city')})
+        trades = {}
+        for p in contractor_permits:
+            trade = p.get('trade_category') or 'Other'
+            trades[trade] = trades.get(trade, 0) + 1
 
-    return jsonify({
-        'name': name,
-        'permits': contractor_permits,
-        'total_permits': len(contractor_permits),
-        'total_value': total_value,
-        'cities': cities,
-        'trade_breakdown': trades,
-    })
+        # Pull canonical totals from contractor_profiles when available so
+        # the modal matches the table count (e.g. 2,916 permits) instead of
+        # reporting only the 100-row slice.
+        try:
+            prof_row = conn.execute("""
+                SELECT SUM(COALESCE(total_permits, 0)) AS tp,
+                       SUM(COALESCE(total_project_value, 0)) AS tv,
+                       COUNT(DISTINCT source_city_key) AS cc
+                FROM contractor_profiles
+                WHERE LOWER(contractor_name_raw) = LOWER(?)
+            """, (name,)).fetchone()
+            if prof_row and prof_row['tp']:
+                total_permits = int(prof_row['tp'])
+                total_value = int(prof_row['tv'] or total_value)
+                city_count = int(prof_row['cc'] or len(cities))
+            else:
+                total_permits = len(contractor_permits)
+                city_count = len(cities)
+        except Exception:
+            total_permits = len(contractor_permits)
+            city_count = len(cities)
+
+        return jsonify({
+            'name': name,
+            'permits': contractor_permits,
+            'total_permits': total_permits,
+            'total_value': total_value,
+            'cities': cities,
+            'city_count': city_count,
+            'trade_breakdown': trades,
+        })
+    except Exception as e:
+        print(f"[V427] api_contractor_detail error for {name!r}: {e}", flush=True)
+        return jsonify({'error': 'Failed to load contractor details'}), 500
 
 
 @app.route('/api/contractors/top')
@@ -11643,8 +11761,7 @@ def _generate_market_reports():
             post_slug = f'market-report-{slug}'
             content = (
                 f"<p>Latest construction-permit activity from <strong>{city}, {state}</strong> across "
-                f"the PermitGrab data network. Numbers below pull live from the same DB the product "
-                f"uses — refreshed on every page load, not a static cron.</p>"
+                f"the PermitGrab data network. Data updated daily from official sources.</p>"
                 f"<h2>By the numbers</h2>"
                 f"<ul>"
                 f"<li><strong>{permits_90d:,}</strong> permits filed in the last 90 days</li>"

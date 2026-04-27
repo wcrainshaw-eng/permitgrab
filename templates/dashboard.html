@@ -243,24 +243,29 @@ body {
   justify-content: center;
   gap: 48px;
   padding: 24px 32px;
-  border-top: 1px solid rgba(255,255,255,.1);
+  border-top: 1px solid #e5e7eb;
 }
 
 .stat-item {
   text-align: center;
 }
 
+/* V427 (CODE_V427 Phase 3): stat numbers + labels were styled for the
+   old dark hero (white text, white-50 labels). On the V365 white hero
+   the labels were nearly invisible — visitors saw four big blue
+   numbers with no context. */
 .stat-value {
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--accent);
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
 }
 
 .stat-label {
   font-size: 13px;
-  color: rgba(255,255,255,.5);
+  color: #6b7280;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   margin-top: 4px;
 }
 
@@ -1434,7 +1439,7 @@ footer a:hover { color: white; }
     <div class="trusted-badge">Official Data Sources</div>
     <div class="testimonial-item">
       <span class="testimonial-stars" style="color: var(--primary);">&#9679;</span>
-      <span class="testimonial-text">{{ ((city_count // 10) * 10) if city_count else 140 }}+ cities covered</span>
+      <span class="testimonial-text">{{ city_count | default(140) }}+ cities covered</span>
     </div>
     <div class="testimonial-item">
       <span class="testimonial-stars" style="color: var(--primary);">&#9679;</span>
@@ -2685,6 +2690,13 @@ function isWithinDays(dateStr, days) {
 // SIDEBAR
 // ===========================
 function renderSidebar() {
+  // V427 Phase 1: trade-breakdown + city-breakdown live inside the
+  // is_homepage=false sidebar. Homepage hides them, so the elements
+  // don't exist in the DOM. Early-return when both targets are missing.
+  const tradeEl = document.getElementById('trade-breakdown');
+  const cityEl = document.getElementById('city-breakdown');
+  if (!tradeEl && !cityEl) return;
+
   // Trade breakdown
   const tradeCounts = {};
   filteredPermits.forEach(p => {
@@ -2695,7 +2707,7 @@ function renderSidebar() {
 
   const colors = ['#2563eb', '#2563eb', '#16a34a', '#dc2626', '#8b5cf6', '#06b6d4', '#ec4899', '#eab308', '#64748b', '#14b8a6'];
 
-  document.getElementById('trade-breakdown').innerHTML = tradeEntries.map(([ trade, count ], i) => `
+  if (tradeEl) tradeEl.innerHTML = tradeEntries.map(([ trade, count ], i) => `
     <div class="trade-bar">
       <div class="trade-bar-label">${trade}</div>
       <div class="trade-bar-track">
@@ -2739,7 +2751,7 @@ function renderSidebar() {
   const cityEntries = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
   const maxCity = cityEntries.length > 0 ? cityEntries[0][1] : 1;
 
-  document.getElementById('city-breakdown').innerHTML = cityEntries.map(([ city, count ], i) => `
+  if (cityEl) cityEl.innerHTML = cityEntries.map(([ city, count ], i) => `
     <div class="trade-bar">
       <div class="trade-bar-label">${city}</div>
       <div class="trade-bar-track">
@@ -2756,6 +2768,8 @@ function renderSidebar() {
 function renderPagination() {
   const totalPages = Math.ceil(filteredPermits.length / perPage);
   const pag = document.getElementById('pagination');
+  // V427 Phase 1: pagination element is hidden on homepage
+  if (!pag) return;
 
   if (totalPages <= 1) { pag.innerHTML = ''; return; }
 
@@ -3204,6 +3218,9 @@ let allViolations = [];
 function renderViolationsSidebar() {
   const container = document.getElementById('violations-list');
   const widget = document.getElementById('violations-widget');
+  // V427 Phase 1: violations sidebar lives inside the dashboard sidebar,
+  // hidden on the homepage.
+  if (!container || !widget) return;
 
   // Filter to pre-leads only (no matching permit)
   const preLeads = allViolations.filter(v => v.is_pre_lead).slice(0, 5);
