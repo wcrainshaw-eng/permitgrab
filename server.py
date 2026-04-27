@@ -5624,22 +5624,48 @@ def admin_fix_property_owner_cities():
             ('New York', "source LIKE 'assessor:nyc_pluto%'"),
         ]
 
+        # V436 (CODE_V434 follow-on): set busy_timeout high so the
+        # UPDATE waits for concurrent assessor-import write locks
+        # instead of failing immediately with "database is locked".
+        try:
+            conn.execute("PRAGMA busy_timeout = 60000")
+        except Exception:
+            pass
+
+        import time as _time
         report = {}
         for target, where in rules:
             before = _count(target)
-            try:
-                cur = conn.execute(
-                    f"UPDATE property_owners SET city = ? WHERE {where}",
-                    (target,)
-                )
-                conn.commit()
+            updated = None
+            last_err = None
+            # V436: 5 retries with exponential backoff. Concurrent
+            # assessor imports hold write-locks for ~10-60s each;
+            # without the retry the UPDATE reliably fails.
+            for attempt in range(5):
+                try:
+                    cur = conn.execute(
+                        f"UPDATE property_owners SET city = ? WHERE {where}",
+                        (target,)
+                    )
+                    conn.commit()
+                    updated = cur.rowcount
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    msg = str(e).lower()
+                    if 'lock' in msg or 'busy' in msg:
+                        _time.sleep(2 * (2 ** attempt))  # 2,4,8,16,32s
+                        continue
+                    break
+            if last_err is not None:
+                report[target] = {'error': str(last_err)[:200], 'before': before}
+            else:
                 report[target] = {
                     'before': before,
                     'after': _count(target),
-                    'rows_updated': cur.rowcount,
+                    'rows_updated': updated,
                 }
-            except Exception as e:
-                report[target] = {'error': str(e)[:200]}
 
         return jsonify({'status': 'ok', 'rules_applied': len(rules), 'report': report})
     except Exception as e:
