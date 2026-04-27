@@ -114,6 +114,57 @@ ASSESSOR_SOURCES = {
         'state': 'DC',
         'source_tag': 'assessor:dc_vacant_blighted',
     },
+    'cook_chicago': {
+        # V429 (CODE_V428 Phase 1a): Cook County (Chicago + suburbs)
+        # Assessor Parcel Addresses on Socrata. Probed 2026-04-27:
+        # 3723-97qp returns owner_address_name + mail_address_full +
+        # prop_address_full per row. Latest year=2026 records present.
+        # Cook County covers ~1.86M parcels — Chicago is the bulk but
+        # ~all 5 N IL counties feed in via mail_address_state filter.
+        # Filter to year=current to keep page sets sane (~1 year of
+        # data is enough; the table is updated annually).
+        'platform': 'soda',
+        'service_description': 'Cook County Assessor — Parcel Addresses',
+        'endpoint': 'https://datacatalog.cookcountyil.gov/resource/3723-97qp.json',
+        # Some rows have owner_address_name='' (LLC properties only
+        # populate the entity name elsewhere). Skip those at insert
+        # time via _insert_batch's len(owner) >= 2 guard.
+        'where_clause': "owner_address_name IS NOT NULL AND prop_address_full IS NOT NULL",
+        'field_map': {
+            'owner_name': 'owner_address_name',
+            'address': 'prop_address_full',
+            'city': 'prop_address_city_name',
+            'zip': 'prop_address_zipcode_1',
+            'owner_mailing_address': 'mail_address_full',
+            'parcel_id': 'pin',
+        },
+        'state': 'IL',
+        'source_tag': 'assessor:cook_chicago',
+        'default_page_size': 5000,
+    },
+    'cuyahoga_cleveland': {
+        # V429 (CODE_V428 Phase 1e): Cuyahoga County (Cleveland) CAMA
+        # parcels. Probed 2026-04-27: layer 3 "AppraisalParcelView"
+        # has 35-field schema with parcel_owner / deeded_owner /
+        # mail_name / mail_addr_street / par_addr / par_addr_all /
+        # par_city / par_zip / parcel_id. CAMA = Computer-Assisted
+        # Mass Appraisal — the assessor's working copy with mailing
+        # info exposed.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Cuyahoga County Appraisal Parcels',
+        'endpoint': 'https://gis.cuyahogacounty.us/server/rest/services/CCGIS/Parcels_CAMA_Real_Property/MapServer/3',
+        'where_clause': 'parcel_owner IS NOT NULL',
+        'field_map': {
+            'owner_name': 'parcel_owner',
+            'address': 'par_addr_all',
+            'city': 'par_city',
+            'zip': 'par_zip',
+            'owner_mailing_address': 'mail_addr_street',
+            'parcel_id': 'parcel_id',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:cuyahoga_cleveland',
+    },
     'nyc_pluto': {
         # NYC Department of Planning PLUTO (Primary Land Use Tax Lot
         # Output). 858,644 lots — every tax lot in the 5 boroughs.
