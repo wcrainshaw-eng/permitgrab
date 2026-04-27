@@ -142,6 +142,57 @@ ASSESSOR_SOURCES = {
         'source_tag': 'assessor:cook_chicago',
         'default_page_size': 5000,
     },
+    'miami_dade': {
+        # V430 (CODE_V428 Phase 1b): Miami-Dade Property Appraiser parcels.
+        # Found via web research 2026-04-27 — the directive's MapServer
+        # URL (gisfs.miamidade.gov MD_PA_PropertySearch) is a stub
+        # service. The real PA data lives on Miami-Dade's AGOL org at
+        # services.arcgis.com/8Pc9XBTAsYuxx9Ny/PaParcelView_gdb.
+        # Schema (41 fields): TRUE_OWNER1/2/3, TRUE_SITE_ADDR/CITY/ZIP,
+        # TRUE_MAILING_ADDR1/CITY/STATE/ZIP, FOLIO, BUILDING_HEATED_AREA,
+        # YEAR_BUILT, BEDROOM_COUNT. Same AGOL org hosts the violations
+        # CCVIOL_gdb (CLAUDE.md). Covers all of Miami-Dade County
+        # including Hialeah → wires both cities at once.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Miami-Dade County Property Appraiser PaParcelView',
+        'endpoint': 'https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/PaParcelView_gdb/FeatureServer/0',
+        'where_clause': 'TRUE_OWNER1 IS NOT NULL',
+        'field_map': {
+            'owner_name': 'TRUE_OWNER1',
+            'address': 'TRUE_SITE_ADDR',
+            'city': 'TRUE_SITE_CITY',
+            'zip': 'TRUE_SITE_ZIP_CODE',
+            'owner_mailing_address': 'TRUE_MAILING_ADDR1',
+            'parcel_id': 'FOLIO',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:miami_dade',
+    },
+    'davidson_nashville': {
+        # V430 (CODE_V428 Phase 1d): Davidson County (Nashville) parcels.
+        # Found via web research 2026-04-27. The directive's URL
+        # (maps.nashville.gov Cadastral/Parcels_SP) is a State-Plane
+        # MapServer with empty fields list — the actual hosted feature
+        # service lives on AGOL at services2.arcgis.com/HdTo6HJqh92wn4D8.
+        # Schema (43 fields): Owner, OwnAddr1/2/3, OwnCity, OwnState,
+        # OwnZip, PropAddr, PropCity, PropZip, ParID, Acres, TotlAppr.
+        # Owner is the official Davidson County PA "Real Property"
+        # field; matches what padctn.org's search exposes.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Davidson County (Nashville) Parcels View',
+        'endpoint': 'https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Parcels_view/FeatureServer/0',
+        'where_clause': 'Owner IS NOT NULL',
+        'field_map': {
+            'owner_name': 'Owner',
+            'address': 'PropAddr',
+            'city': 'PropCity',
+            'zip': 'PropZip',
+            'owner_mailing_address': 'OwnAddr1',
+            'parcel_id': 'ParID',
+        },
+        'state': 'TN',
+        'source_tag': 'assessor:davidson_nashville',
+    },
     'cuyahoga_cleveland': {
         # V429 (CODE_V428 Phase 1e): Cuyahoga County (Cleveland) CAMA
         # parcels. Probed 2026-04-27: layer 3 "AppraisalParcelView"

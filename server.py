@@ -5604,6 +5604,13 @@ def admin_fix_property_owner_cities():
             ('San Antonio', "source LIKE 'assessor:bexar%'"),
             ('Chicago', "source LIKE 'assessor:cook%'"),
             ('Cleveland', "source LIKE 'assessor:cuyahoga%'"),
+            # V430: Miami-Dade county feed covers Hialeah too. Tagging as
+            # "Miami-Dade" matches the prod_cities slug "miami-dade-county"
+            # via the address-match join; Hialeah rows also surface in
+            # Hialeah city pages because the address-normalizer scopes by
+            # city slug from the permits side.
+            ('Miami-Dade', "source LIKE 'assessor:miami_dade%'"),
+            ('Nashville', "source LIKE 'assessor:davidson_nashville%'"),
             ('New York', "source LIKE 'assessor:nyc_pluto%'"),
         ]
 
