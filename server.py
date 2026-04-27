@@ -10031,11 +10031,14 @@ def api_address_detail():
     logged_in = bool(session.get('user_email'))
     conn = permitdb.get_connection()
 
-    # Permits at this address
+    # Permits at this address. V440 (CODE_V440 C2): the prior SELECT
+    # included `p.id`, which doesn't exist on permits — that silently
+    # raised, was swallowed by the bare except, and produced an empty
+    # detail card on every row click.
     permits = []
     try:
         rows = conn.execute("""
-            SELECT p.id, p.filing_date, p.issued_date, p.date, p.permit_type,
+            SELECT p.filing_date, p.issued_date, p.date, p.permit_type,
                    p.description, p.estimated_cost, p.permit_number, p.status,
                    p.contractor_name, p.contact_name, p.contact_phone,
                    p.trade_category, p.address, p.source_city_key
@@ -10046,6 +10049,7 @@ def api_address_detail():
             LIMIT 25
         """, (city_slug, like_prefix)).fetchall()
     except Exception as e:
+        print(f"[V440] address-detail permits query error: {e}", flush=True)
         rows = []
 
     # Cache contractor_profiles lookups by (business_name, source_city_key)
@@ -10085,7 +10089,6 @@ def api_address_detail():
     for r in rows or []:
         contractor_name = r['contractor_name'] or r['contact_name'] or ''
         permits.append({
-            'id': r['id'],
             'date': (r['filing_date'] or r['issued_date'] or r['date'] or '')[:10],
             'type': r['permit_type'] or '',
             'value': r['estimated_cost'],
