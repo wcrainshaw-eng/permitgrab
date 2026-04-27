@@ -206,6 +206,29 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'travis_austin': {
+        # V433e: Travis Central Appraisal District (Austin metro).
+        # Probed 2026-04-27: TCAD_Parcels_Dec_2025 on AGOL services1
+        # org HGcSYZ5bvjRswoCb. 42 fields including py_owner_name,
+        # situs_address (pre-concatenated street+city+zip), situs_num,
+        # situs_street, situs_zip, py_address (owner mailing), PROP_ID,
+        # market_value, appraised_val, assessed_val. Bonus over the
+        # V428 list — Austin has permits + violations already wired so
+        # this closes the owner gap and pushes Austin toward 5/5.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Travis Central Appraisal District Parcels (Dec 2025)',
+        'endpoint': 'https://services1.arcgis.com/HGcSYZ5bvjRswoCb/arcgis/rest/services/TCAD_Parcels_Dec_2025/FeatureServer/0',
+        'where_clause': "py_owner_name IS NOT NULL AND situs_address IS NOT NULL AND situs_address <> ''",
+        'field_map': {
+            'owner_name': 'py_owner_name',
+            'address': 'situs_address',
+            'zip': 'situs_zip',
+            'owner_mailing_address': 'py_address',
+            'parcel_id': 'PROP_ID',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:travis_austin',
+    },
     'clark_lasvegas': {
         # V433c (CODE_V428 follow-on): Clark County NV (Las Vegas +
         # Henderson + N Las Vegas + Boulder City + unincorporated CC).
