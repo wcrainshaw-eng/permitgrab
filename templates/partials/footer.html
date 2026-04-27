@@ -24,37 +24,22 @@ footer.site-footer .footer-bottom {
       <p>Real-time construction permit leads for contractors. Get the jobs before your competition.</p>
     </div>
 
-    <!-- V12.10: Show top cities by permit volume -->
+    <!-- V423 (CODE_V422 Phase 3): hardcoded ad-ready list. The dynamic
+         footer_cities ordering surfaced cities like Cleveland/Columbus/
+         Atlanta/Fort Worth that aren't ad-ready and (in Fort Worth's case)
+         have no contractor data. Static list is authoritative until we
+         add an explicit ad_ready flag to prod_cities. -->
     <div class="footer-links">
       <h4>Top Cities</h4>
-      {# V230 U3: exclude county/ambiguous entries from footer. "Shelby County"
-         and bare "Washington" look off next to Chicago/LA. The filter keeps
-         real city names and drops anything ending in " County" or a bare
-         state name. #}
-      {% if footer_cities %}
-      {% set _seen = [] %}
-      {% for city in footer_cities %}
-        {% if _seen|length < 8
-              and city.name
-              and ' County' not in city.name
-              and city.name not in ['Washington'] %}
-          <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
-          {% set _ = _seen.append(city.name) %}
-        {% endif %}
-      {% endfor %}
-      <a href="/cities" style="font-weight: 600;">Browse All Cities &rarr;</a>
-      {% else %}
-      {# V312 (CODE_V280b Bug 11): fallback list = the actual ad-ready cities,
-         not the LA / SF / Atlanta placeholders that 404 or show no contractor
-         data. Slugs verified against prod_cities. #}
       <a href="/permits/chicago-il">Chicago</a>
       <a href="/permits/new-york-city">New York City</a>
       <a href="/permits/phoenix-az">Phoenix</a>
       <a href="/permits/san-antonio-tx">San Antonio</a>
-      <a href="/permits/miami-dade-county">Miami-Dade</a>
+      <a href="/permits/miami-dade-county">Miami-Dade County</a>
       <a href="/permits/san-jose-ca">San Jose</a>
-      <a href="/permits/orlando-fl">Orlando</a>
-      {% endif %}
+      <a href="/permits/los-angeles">Los Angeles</a>
+      <a href="/permits/philadelphia">Philadelphia</a>
+      <a href="/cities" style="font-weight: 600;">Browse All Cities &rarr;</a>
     </div>
 
     <div class="footer-links">

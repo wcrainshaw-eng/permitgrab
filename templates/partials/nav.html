@@ -168,7 +168,15 @@
     <button class="mobile-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">☰</button>
 
     <div class="site-nav-links">
+      {# V423 (CODE_V422 Phase 4): unified nav across homepage + city pages.
+         Logged-out: Home | Cities | Contractors | Blog | Pricing | Get Alerts | Log In | Sign Up
+         Logged-in:  Dashboard | Cities | Contractors | Analytics | Pricing | Get Alerts | [user]
+         "Pro" badge removed from Analytics — it read as a separate product. #}
+      {% if user %}
+      <a href="/">Dashboard</a>
+      {% else %}
       <a href="/">Home</a>
+      {% endif %}
 
       <div class="nav-dropdown">
         <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
@@ -178,59 +186,43 @@
           <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
           {% endfor %}
           {% else %}
-          {# V247: fallback slugs verified against prod_cities on 2026-04-22.
-             Old fallback used bare city names ("new-york", "chicago") which
-             don't exist as active slugs and sent customers to dead pages. #}
+          {# V247: fallback slugs verified against prod_cities on 2026-04-22. #}
           <a href="/permits/chicago-il">Chicago</a>
           <a href="/permits/new-york-city">New York City</a>
           <a href="/permits/phoenix-az">Phoenix</a>
           <a href="/permits/san-antonio-tx">San Antonio</a>
-          <a href="/permits/miami-dade-county">Miami-Dade</a>
+          <a href="/permits/miami-dade-county">Miami-Dade County</a>
+          <a href="/permits/san-jose-ca">San Jose</a>
           <a href="/permits/los-angeles">Los Angeles</a>
-          <a href="/permits/san-jose">San Jose</a>
-          <a href="/permits/orlando-fl">Orlando</a>
-          <a href="/permits/cleveland-oh">Cleveland</a>
+          <a href="/permits/philadelphia">Philadelphia</a>
           {% endif %}
-          {# V333 (CODE_V321 Bug J): always-on link to the full city
-             directory regardless of which dropdown branch ran. #}
           <a href="/cities" style="border-top: 1px solid var(--gray-200); margin-top: 6px; padding-top: 10px; font-weight: 600;">Browse all cities →</a>
         </div>
       </div>
 
       <a href="/contractors">Contractors</a>
-      <a href="/blog">Blog</a>
-      <a href="/pricing">Pricing</a>
 
       {% if user %}
-      {# V254 Phase 1: free-tier reveal counter. Hidden for Pro
-         (credits_remaining suppressed by the JS when is_pro=true). #}
+      {# Logged-in: Analytics replaces Blog in the main row #}
+      <a href="/analytics">Analytics</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/get-alerts">Get Alerts</a>
+
       {% if not is_pro %}
       <span id="v254-nav-credits"
             style="display: none; font-size: 12px; background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 10px; font-weight: 600;"
             title="Free phone-reveal credits remaining this month">— reveals left</span>
       {% endif %}
-      {# V337 (CODE_V333 Bug I): top-level Get Alerts for logged-in users.
-         V333 placed it in the user dropdown but the directive specifies the
-         main nav row before Analytics — more visible for free users who are
-         the digest signup audience. #}
-      <a href="/get-alerts">Get Alerts</a>
-      {# V312 (CODE_V280b Bug 10): Early Intel hidden until the page actually
-         surfaces signals. Don't advertise empty features. #}
-      <a href="/analytics">Analytics <span style="font-size: 10px; background: #2563eb; padding: 2px 6px; border-radius: 10px; margin-left: 2px;">PRO</span></a>
 
       <div class="nav-dropdown">
         <button class="dropdown-toggle">{{ user.name or user.email.split('@')[0] }} <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
         <div class="dropdown-menu">
           <a href="/my-leads">My Leads</a>
-          {# V251 F23 internal-linking: surface /intel (F19) and
-             /saved-contractors (F15) from the nav so Pro users can find them. #}
           {% if is_pro %}
           <a href="/intel">Intel Dashboard</a>
           <a href="/saved-contractors">Saved Contractors</a>
           {% endif %}
           <a href="/account">Account</a>
-          {# V337 superseded V333's dropdown placement of Get Alerts —
-             promoted to the top-level nav row alongside Analytics. #}
           {% if is_pro %}
           <a href="/billing">Billing</a>
           {% endif %}
@@ -238,6 +230,8 @@
         </div>
       </div>
       {% else %}
+      <a href="/blog">Blog</a>
+      <a href="/pricing">Pricing</a>
       <a href="/get-alerts">Get Alerts</a>
       <a href="/login">Log In</a>
       <a href="/signup" class="nav-btn">Sign Up</a>

@@ -1376,49 +1376,13 @@ footer a:hover { color: white; }
 </head>
 <body>
 
+<!-- V423 (CODE_V422 Phase 4): unified site nav (was an embedded hero-nav).
+     The previous embedded nav had Dashboard/Analytics(Pro)/no-Blog while
+     city pages used partials/nav.html with Home/Blog/no-Analytics — same
+     auth state, two different nav rows. Now all pages share one source. -->
+{% include 'partials/nav.html' %}
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-top">
-    <div class="logo">Permit<span>Grab</span></div>
-    <div class="hamburger" id="hamburger-menu" onclick="toggleMobileNav()">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
-    <nav class="hero-nav" id="mobile-nav">
-      <a href="#dashboard">Dashboard</a>
-      <div class="nav-dropdown">
-        <a href="#" class="dropdown-toggle">Cities <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
-        <div class="dropdown-menu" id="cities-dropdown" style="max-height: 400px; overflow-y: auto; columns: 2; column-gap: 20px;">
-          {% for city in footer_cities[:20] %}
-          <a href="/permits/{{ city.slug }}">{{ city.name }}</a>
-          {% endfor %}
-          <a href="/cities" style="color: var(--accent); font-weight: 700; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; margin-top: 4px;">Browse All Cities &rarr;</a>
-        </div>
-      </div>
-      <a href="/contractors">Contractors</a>
-      {# V317 (CODE_V280b Bug 10): Early Intel hidden until the page actually
-         surfaces signals. dashboard.html nav was missed by V312's nav.html-only fix. #}
-      <a href="/analytics">Analytics <span style="font-size: 10px; background: var(--accent); padding: 2px 6px; border-radius: 10px; margin-left: 2px;">Pro</span></a>
-      <a href="/pricing">Pricing</a>
-      <a href="/get-alerts">Get Alerts</a>
-      <span id="auth-nav" style="display: flex; gap: 16px; align-items: center;">
-        <a href="/login">Log In</a>
-        <a href="/signup" class="btn-cta">Sign Up</a>
-      </span>
-      <span id="user-nav" style="display: none;">
-        <div class="nav-dropdown">
-          <a href="#" class="dropdown-toggle" id="user-dropdown-toggle"><span id="user-name">Account</span> <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="margin-left:4px;"><path d="M2 3.5L5 7L8 3.5H2Z"/></svg></a>
-          <div class="dropdown-menu" style="right: 0; left: auto;">
-            <a href="/my-leads">My Leads</a>
-            <a href="/account">Account</a>
-            <a href="/billing">Billing</a>
-            <a href="/logout">Log Out</a>
-          </div>
-        </div>
-      </span>
-    </nav>
-  </div>
   <div class="hero-content">
     <h1>Real-time permit intelligence for home service businesses</h1>
     <p>Track new building permits, find active contractors, and identify property owners across {{ city_count | default(260) }}+ cities. Updated daily from official sources.</p>
@@ -2013,7 +1977,8 @@ async function loadData() {
     }
   } catch (e) {
     console.error('Failed to load permits:', e);
-    document.getElementById('permits-list').innerHTML = '<div class="loading">Unable to connect to API. Please refresh.</div>';
+    const _pl = document.getElementById('permits-list');
+    if (_pl) _pl.innerHTML = '<div class="loading">Unable to connect to API. Please refresh.</div>';
     return;
   }
 
@@ -2028,8 +1993,11 @@ async function loadData() {
   applyFilters();
 
   // V12.59: Show results, hide loading indicator
-  document.getElementById('loading-indicator').style.display = 'none';
-  document.getElementById('results-text').style.display = '';
+  // V423: null guard — both elements are hidden on homepage (is_homepage=true)
+  const _li = document.getElementById('loading-indicator');
+  if (_li) _li.style.display = 'none';
+  const _rt = document.getElementById('results-text');
+  if (_rt) _rt.style.display = '';
 }
 
 function formatTimeAgo(dateStr) {
@@ -2312,12 +2280,17 @@ function updateResultsCount() {
 // ===========================
 function renderPermits() {
   const list = document.getElementById('permits-list');
+  // V423: null guard — homepage hides the permits list under is_homepage=true
+  // (line 1649). The other dashboard pipeline still calls renderPermits() on
+  // page load, so silently no-op when the container isn't in the DOM.
+  if (!list) return;
   const start = (currentPage - 1) * perPage;
   const pagePermits = filteredPermits.slice(start, start + perPage);
 
   if (pagePermits.length === 0) {
     list.innerHTML = '<div class="loading" style="color: var(--gray-400);">No permits match your filters. Try adjusting your criteria.</div>';
-    document.getElementById('pagination').innerHTML = '';
+    const pag = document.getElementById('pagination');
+    if (pag) pag.innerHTML = '';
     return;
   }
 
@@ -3020,18 +2993,24 @@ async function checkCurrentUser() {
 }
 
 function updateAuthUI() {
+  // V423 (CODE_V422 Phase 4): hero-nav was replaced with the partials/nav.html
+  // include, which renders auth state server-side via {% if user %}. The
+  // legacy auth-nav / user-nav / user-name elements no longer exist — null
+  // guards keep this function safe to call. Still useful as a hook for the
+  // alerts widget update below.
   const authNav = document.getElementById('auth-nav');
   const userNav = document.getElementById('user-nav');
   const userName = document.getElementById('user-name');
 
-  if (currentUser) {
-    authNav.style.display = 'none';
-    userNav.style.display = 'inline';
-    // Show name if available, otherwise email prefix
-    userName.textContent = currentUser.name || currentUser.email.split('@')[0];
-  } else {
-    authNav.style.display = 'inline';
-    userNav.style.display = 'none';
+  if (authNav && userNav) {
+    if (currentUser) {
+      authNav.style.display = 'none';
+      userNav.style.display = 'inline';
+      if (userName) userName.textContent = currentUser.name || currentUser.email.split('@')[0];
+    } else {
+      authNav.style.display = 'inline';
+      userNav.style.display = 'none';
+    }
   }
 
   // V8: Update alert sidebar widget
