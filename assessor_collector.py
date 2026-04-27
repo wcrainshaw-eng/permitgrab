@@ -206,6 +206,37 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'erie_buffalo': {
+        # V433f: Erie County NY (Buffalo metro). Probed 2026-04-27:
+        # NYS Office of Information Technology Services hosts a statewide
+        # tax-parcel layer at gisservices.its.ny.gov for the 38 of 62
+        # NYS counties that gave permission to share publicly. Erie is
+        # included with 370,424 parcels.
+        # Schema (75 fields) includes PRIMARY_OWNER, LOC_ST_NBR,
+        # LOC_STREET, LOC_ZIP, MUNI_NAME, MAIL_ADDR, MAIL_CITY,
+        # MAIL_STATE, MAIL_ZIP, SWIS_SBL_ID, PROP_CLASS.
+        # Filter to COUNTY_NAME='Erie' to scope just Buffalo + Erie metro.
+        # Same NYS endpoint can later be wired for Rochester (Monroe),
+        # Syracuse (Onondaga), Albany — separate source entries per
+        # county keeps dedup + tagging clean.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'NYS Tax Parcels Public — Erie County (Buffalo)',
+        'endpoint': 'https://gisservices.its.ny.gov/arcgis/rest/services/NYS_Tax_Parcels_Public/MapServer/1',
+        'where_clause': "COUNTY_NAME = 'Erie' AND PRIMARY_OWNER IS NOT NULL AND LOC_STREET IS NOT NULL",
+        'field_map': {
+            'owner_name': 'PRIMARY_OWNER',
+            # Concat LOC_ST_NBR + LOC_STREET ("123 Main St"). LOC_ST_NBR
+            # null on vacant rural land — V433b's _resolve filters out
+            # the empty string at concat time.
+            'address': ['LOC_ST_NBR', 'LOC_STREET'],
+            'city': 'MUNI_NAME',
+            'zip': 'LOC_ZIP',
+            'owner_mailing_address': 'MAIL_ADDR',
+            'parcel_id': 'SWIS_SBL_ID',
+        },
+        'state': 'NY',
+        'source_tag': 'assessor:erie_buffalo',
+    },
     'travis_austin': {
         # V433e: Travis Central Appraisal District (Austin metro).
         # Probed 2026-04-27: TCAD_Parcels_Dec_2025 on AGOL services1
