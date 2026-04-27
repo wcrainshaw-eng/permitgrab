@@ -313,7 +313,10 @@ ASSESSOR_SOURCES = {
         'platform': 'arcgis_mapserver',
         'service_description': 'Wake County (Raleigh) Parcels',
         'endpoint': 'https://maps.wakegov.com/arcgis/rest/services/Property/Parcels/FeatureServer/0',
-        'where_clause': "OWNER IS NOT NULL AND SITE_ADDRESS IS NOT NULL AND SITE_ADDRESS <> ''",
+        # V435b: dropped the SITE_ADDRESS <> '' filter — Wake's empty
+        # values are NULL not empty string, so the extra filter excluded
+        # ALL rows. Full-table count is ~435K with just IS NOT NULL.
+        'where_clause': "OWNER IS NOT NULL AND SITE_ADDRESS IS NOT NULL",
         'field_map': {
             'owner_name': 'OWNER',
             'address': 'SITE_ADDRESS',
