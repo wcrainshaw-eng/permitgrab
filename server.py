@@ -2966,13 +2966,41 @@ def admin_start_collectors():
     global _collectors_manually_started
 
     try:
-        if _collectors_manually_started:
-            return jsonify({'status': 'already_running', 'message': 'Collectors already started'}), 200
-
+        # V443 (P0 zombie-daemon fix): the previous flag-only check would
+        # return "already_running" forever once the daemon thread had been
+        # spawned, even if the thread later died silently. Combined with
+        # start_collectors()'s own one-way `_collector_started` flag, that
+        # left the daemon dead with no way to restart short of redeploy.
+        # Now: probe for a live `scheduled_collection` thread first; if
+        # absent, reset both flags so the spawn actually fires.
         import threading
+        live_daemon = any(
+            t.is_alive() and t.name == 'scheduled_collection'
+            for t in threading.enumerate()
+        )
+        force = request.args.get('force', '').lower() in ('1', 'true', 'yes')
+
+        if live_daemon and not force:
+            return jsonify({
+                'status': 'already_running',
+                'message': 'Collectors already started',
+                'daemon_thread_alive': True,
+            }), 200
+
+        if not live_daemon:
+            # Reset the one-way flags so the inner start_collectors() (and
+            # this endpoint's gate) will actually run the spawn path.
+            global _collector_started
+            _collector_started = False
+            _collectors_manually_started = False
+            print(
+                f"[{datetime.now()}] V443: scheduled_collection thread not alive; "
+                f"resetting flags and respawning",
+                flush=True,
+            )
 
         def _run_collectors():
-            print(f"[{datetime.now()}] V69: Manual start_collectors triggered via API")
+            print(f"[{datetime.now()}] V69/V443: Manual start_collectors triggered via API")
             start_collectors()
 
         t = threading.Thread(target=_run_collectors, daemon=True)
@@ -2981,7 +3009,8 @@ def admin_start_collectors():
 
         return jsonify({
             'status': 'started',
-            'message': 'Background collectors started in separate thread'
+            'message': 'Background collectors started in separate thread',
+            'reset_dead_daemon': not live_daemon,
         }), 200
 
     except Exception as e:
