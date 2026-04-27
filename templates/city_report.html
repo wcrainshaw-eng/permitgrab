@@ -13,10 +13,10 @@
 {% include 'partials/analytics.html' %}
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-:root { --primary:#2563eb; --accent:#f97316; --green:#16a34a; --gray-50:#f9fafb; --gray-200:#e5e7eb; --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827; }
+:root { --primary:#2563eb; --accent:#2563eb; --green:#16a34a; --gray-50:#f9fafb; --gray-200:#e5e7eb; --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); line-height: 1.55; }
 .sheet { max-width: 900px; margin: 24px auto; background: white; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.05); overflow: hidden; }
-.sheet-head { background: linear-gradient(135deg, #111827 0%, #1e3a5f 100%); color: white; padding: 40px 48px; }
+.sheet-head { background: #ffffff; color: var(--gray-900, #111827); padding: 40px 48px; }
 .sheet-head .label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.6); margin-bottom: 8px; }
 .sheet-head h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
 .sheet-head .sub { font-size: 15px; color: rgba(255,255,255,.75); margin-top: 6px; }
@@ -39,7 +39,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .contractor-row .meta { font-size: 12px; color: var(--gray-500); }
 .contractor-row .count { text-align: right; font-size: 13px; font-weight: 600; }
 .phone-gate { display: inline-block; padding: 4px 10px; background: var(--primary); color: white; border-radius: 999px; font-size: 11px; font-weight: 600; text-decoration: none; }
-.cta-footer { padding: 32px 48px; background: linear-gradient(135deg, #111827 0%, #1e3a5f 100%); color: white; text-align: center; }
+.cta-footer { padding: 32px 48px; background: #ffffff; color: var(--gray-900, #111827); text-align: center; }
 .cta-footer .brand { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 10px; }
 .cta-footer .hook { font-size: 18px; font-weight: 600; }
 .cta-footer a.btn { display: inline-block; margin-top: 16px; padding: 12px 32px; background: var(--accent); color: white !important; text-decoration: none; border-radius: 8px; font-weight: 700; }

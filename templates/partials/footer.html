@@ -1,3 +1,22 @@
+<style>
+/* V365 (CODE_V419 PART B): light footer override. Per-template .site-footer
+   styles previously set dark backgrounds — this block wins by document order. */
+footer.site-footer {
+  background: #f9fafb !important;
+  color: #4b5563 !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+footer.site-footer .footer-logo { color: #111827 !important; }
+footer.site-footer .footer-logo span { color: var(--primary, #2563eb) !important; }
+footer.site-footer .footer-brand p { color: #4b5563 !important; }
+footer.site-footer .footer-links h4 { color: #6b7280 !important; }
+footer.site-footer .footer-links a { color: #4b5563 !important; }
+footer.site-footer .footer-links a:hover { color: #111827 !important; }
+footer.site-footer .footer-bottom {
+  color: #6b7280 !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+</style>
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-brand">

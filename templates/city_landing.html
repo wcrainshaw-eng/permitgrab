@@ -166,9 +166,9 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
-  --primary-light: #dbeafe;
-  --accent: #f97316;
-  --accent-dark: #ea580c;
+  --primary-light: #eff6ff;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
   --green: #16a34a;
   --green-light: #dcfce7;
   --red: #dc2626;
@@ -308,10 +308,11 @@ body {
 
 /* HERO */
 .hero {
-  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
-  color: white;
+  background: #f8fafc;
+  color: var(--gray-900, #111827);
   padding: 60px 32px 80px;
   text-align: center;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .hero h1 {
@@ -628,7 +629,7 @@ body {
 /* V33: INLINE EMAIL CAPTURE */
 .inline-capture {
   background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
-  border: 2px solid #f97316;
+  border: 2px solid #2563eb;
   border-radius: 16px;
   padding: 40px 32px;
   max-width: 700px;
@@ -677,7 +678,7 @@ body {
   transition: all .2s;
 }
 .inline-capture-form button:hover {
-  background: #ea580c;
+  background: #1d4ed8;
   transform: translateY(-1px);
 }
 .inline-capture .capture-note {
@@ -797,7 +798,7 @@ body {
   white-space: nowrap;
   transition: background .2s;
 }
-.sticky-signup-bar .bar-form button:hover { background: #ea580c; }
+.sticky-signup-bar .bar-form button:hover { background: #1d4ed8; }
 .sticky-signup-bar .bar-close {
   background: none;
   border: none;

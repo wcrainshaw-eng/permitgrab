@@ -26,7 +26,7 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
-  --accent: #f97316;
+  --accent: #2563eb;
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -36,7 +36,7 @@
   --gray-900: #111827;
   --green: #16a34a;
   --blue: #2563eb;
-  --orange: #f97316;
+  --orange: #2563eb;
 }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-50); color: var(--gray-700); }
 
@@ -361,7 +361,7 @@ async function loadPermits() {
 
 function getMarkerColor(permit) {
   // High value = orange
-  if ((permit.estimated_cost || 0) >= 100000) return '#f97316';
+  if ((permit.estimated_cost || 0) >= 100000) return '#2563eb';
   // Commercial keywords = blue
   const desc = (permit.description || '').toLowerCase() + (permit.permit_type || '').toLowerCase();
   if (desc.includes('commercial') || desc.includes('office') || desc.includes('retail') || desc.includes('restaurant')) {
