@@ -5569,6 +5569,68 @@ def admin_extract_property_owners():
     return jsonify({'status': 'ok', 'lookback_days': lookback_days, 'results': results})
 
 
+@app.route('/api/admin/fix-property-owner-cities', methods=['POST'])
+def admin_fix_property_owner_cities():
+    """V429 (CODE_V428 Phase 4): retag misattributed property_owners
+    rows. The Maricopa County feed pulls Phoenix-metro suburb names
+    (TOLLESON, AVONDALE, GLENDALE) and the Bexar County feed pulls
+    San Antonio-metro suburb names (ELMENDORF) into the property's
+    own city field — but the city we want for matching against
+    permits.source_city_key is the parent metro slug.
+
+    This one-shot migration normalizes by `source` tag:
+      assessor:maricopa* → city='Phoenix' (covers TOLLESON, AVONDALE, etc.)
+      assessor:bexar*    → city='San Antonio' (covers ELMENDORF)
+    Plus fills the null-city rows whose source tag tells us the metro.
+
+    Idempotent — running multiple times just re-stamps the same value.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        # Track before/after counts per metro for the response payload.
+        def _count(city):
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM property_owners WHERE city = ?",
+                (city,)
+            ).fetchone()
+            return row[0] if not isinstance(row, dict) else row['c']
+
+        rules = [
+            # (target_city, where_clause)
+            ('Phoenix', "source LIKE 'assessor:maricopa%'"),
+            ('San Antonio', "source LIKE 'assessor:bexar%'"),
+            ('Chicago', "source LIKE 'assessor:cook%'"),
+            ('Cleveland', "source LIKE 'assessor:cuyahoga%'"),
+            ('New York', "source LIKE 'assessor:nyc_pluto%'"),
+        ]
+
+        report = {}
+        for target, where in rules:
+            before = _count(target)
+            try:
+                cur = conn.execute(
+                    f"UPDATE property_owners SET city = ? WHERE {where}",
+                    (target,)
+                )
+                conn.commit()
+                report[target] = {
+                    'before': before,
+                    'after': _count(target),
+                    'rows_updated': cur.rowcount,
+                }
+            except Exception as e:
+                report[target] = {'error': str(e)[:200]}
+
+        return jsonify({'status': 'ok', 'rules_applied': len(rules), 'report': report})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
+
+
 @app.route('/api/admin/collect-assessor-data', methods=['POST'])
 def admin_collect_assessor_data():
     """V279 (task doc V276 Phase 2): Collect property owner + address

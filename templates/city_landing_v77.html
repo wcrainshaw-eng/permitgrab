@@ -1103,12 +1103,20 @@ body {
   {% if recent_permits or permit_count > 0 %}
   <!-- V209-3: Trade filter tabs (client-side filtering of visible rows) -->
   {% if recent_permits %}
+  {# V429 (CODE_V428): build trade tabs from `unified_records` (the actual
+     table rows) instead of `recent_permits[:25]`. The two lists were
+     different — recent_permits is a separate slice that may not share
+     trade-category values with what's rendered in the table, so clicking
+     "Electrical" tried to match against rows whose data-trade was a
+     differently-cased / differently-formatted string. Sourcing both the
+     tabs and the row data-attrs from the same `unified_records` means
+     they're always in lockstep. #}
   <div class="trade-tabs" data-tabs-for="permits-tbody">
     <button data-trade="" class="active">All</button>
     {% set seen_trades = [] %}
-    {% for p in recent_permits[:25] %}
-      {% if p.trade_category and p.trade_category not in seen_trades %}
-        {% set _ = seen_trades.append(p.trade_category) %}
+    {% for r in unified_records %}
+      {% if r.trade_category and r.trade_category not in seen_trades and r.record_type == 'permit' %}
+        {% set _ = seen_trades.append(r.trade_category) %}
       {% endif %}
     {% endfor %}
     {% for t in seen_trades[:6] %}
