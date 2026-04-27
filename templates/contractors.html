@@ -599,7 +599,10 @@ tr:hover td {
 let allContractors = [];
 let currentPage = 1;
 const perPage = 50;
-let sortBy = 'total_permits';
+// V442 P2 (CODE_V442): default sort is most-recent-active so users see
+// fresh contractors first instead of stale ones with high lifetime
+// permit counts (e.g. "Annette Gordon" last active 2025-07-15).
+let sortBy = 'most_recent_date';
 let sortOrder = 'desc';
 
 async function loadContractors() {
@@ -709,7 +712,7 @@ async function showContractor(name) {
     document.getElementById('modal-permits-list').innerHTML = data.permits.slice(0, 20).map(p => `
       <div class="permit-item">
         <div class="address">${escapeHtml(p.address)}</div>
-        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost && p.estimated_cost !== 50000000 ? (p.estimated_cost >= 1000000 ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M' : '$' + p.estimated_cost.toLocaleString()) : '<span style="color: #9ca3af; font-style: italic;">Not listed on permit</span>'}</div>
+        <div class="meta">${p.city}, ${p.state} | ${p.trade_category} | ${p.filing_date || '—'} | ${p.estimated_cost && p.estimated_cost !== 50000000 ? (p.estimated_cost >= 1000000 ? '$' + (p.estimated_cost / 1000000).toFixed(1) + 'M' : '$' + p.estimated_cost.toLocaleString()) : '<span style="color: #d1d5db;">—</span>'}</div>
       </div>
     `).join('') || '<div style="color: var(--gray-400);">No permits found</div>';
 
@@ -770,9 +773,12 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// V12.20: Format large values as $X.XM or $X.XB, show "Not listed on permit" for missing
+// V12.20: Format large values as $X.XM or $X.XB.
+// V442 P2 (CODE_V442): "Not listed on permit" was repeated on most rows
+// and added noise. Replaced with a quiet "—" so the column is still
+// visually present without shouting on every empty cell.
 function formatValue(value) {
-  if (!value) return '<span style="color: #9ca3af; font-style: italic;">Not listed on permit</span>';
+  if (!value) return '<span style="color: #d1d5db;">—</span>';
   if (value >= 1000000000) {
     return '$' + (value / 1000000000).toFixed(1) + 'B';
   } else if (value >= 1000000) {
