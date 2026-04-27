@@ -206,6 +206,29 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'lee_capecoral': {
+        # V433l: Lee County FL Property Appraiser. Probed 2026-04-27:
+        # services2.arcgis.com/LvWGAAhHwbCJ2GMP/.../Lee_County_Parcels/
+        # FeatureServer/0. 125 fields. Owner fields prefixed O_:
+        # O_NAME (owner), O_OTHERS (joint owner), O_CAREOF (c/o),
+        # O_ADDR1, O_CITY, O_STATE, O_ZIP (mailing). Site address
+        # pre-concatenated as SITEADDR; STRAP is parcel ID.
+        # Cape Coral permits already wired (CLAUDE.md V395 etc).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Lee County FL Property Appraiser Parcels',
+        'endpoint': 'https://services2.arcgis.com/LvWGAAhHwbCJ2GMP/arcgis/rest/services/Lee_County_Parcels/FeatureServer/0',
+        'where_clause': "O_NAME IS NOT NULL AND SITEADDR IS NOT NULL AND SITEADDR <> ''",
+        'field_map': {
+            'owner_name': 'O_NAME',
+            'address': 'SITEADDR',
+            'city': 'SITECITY',
+            'zip': 'SITEZIP',
+            'owner_mailing_address': 'O_ADDR1',
+            'parcel_id': 'STRAP',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:lee_capecoral',
+    },
     'broward_ftlauderdale': {
         # V433k: Broward County FL Property Appraiser. Probed 2026-04-27:
         # services.arcgis.com/JMAJrTsHNLrSsWf5/.../PARCEL_POLY_BCPA_TAXROLL/
