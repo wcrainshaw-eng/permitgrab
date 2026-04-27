@@ -206,6 +206,30 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'hennepin_minneapolis': {
+        # V433b (CODE_V428 follow-on): Hennepin County (Minneapolis +
+        # Bloomington + Edina). Probed 2026-04-27: HennepinData/
+        # LAND_PROPERTY/MapServer/1 has 122 fields including OWNER_NM,
+        # TAXPAYER_NM, HOUSE_NO, STREET_NM, ZIP_CD, PID_TEXT,
+        # MAILING_MUNIC_NM. 443,560 parcels with owner names. Address
+        # is split across HOUSE_NO + STREET_NM — leverages V433b's
+        # list-concat support in field_map.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Hennepin County (Minneapolis) Parcels',
+        'endpoint': 'https://gis.hennepin.us/arcgis/rest/services/HennepinData/LAND_PROPERTY/MapServer/1',
+        'where_clause': "OWNER_NM IS NOT NULL AND STREET_NM IS NOT NULL",
+        'field_map': {
+            'owner_name': 'OWNER_NM',
+            # Concat HOUSE_NO + STREET_NM into one address string.
+            'address': ['HOUSE_NO', 'STREET_NM'],
+            'city': 'MUNIC_NM',
+            'zip': 'ZIP_CD',
+            'owner_mailing_address': 'TAXPAYER_NM',
+            'parcel_id': 'PID_TEXT',
+        },
+        'state': 'MN',
+        'source_tag': 'assessor:hennepin_minneapolis',
+    },
     'philadelphia_opa': {
         # V433 (CODE_V428 Phase 1g): Philadelphia Office of Property
         # Assessment via Carto SQL. Probed 2026-04-27: 583,562 parcels
@@ -461,7 +485,19 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
     field_map = cfg['field_map']
     # Build outFields param from the source field names so we only
     # pull the columns we actually need over the wire.
-    out_fields = ','.join(v for v in field_map.values() if v)
+    # V433b: field_map values can be either a string (single source field)
+    # or a list of strings (concat with spaces — used for assessors that
+    # don't expose a pre-concatenated address, e.g. Hennepin's HOUSE_NO +
+    # STREET_NM split). Flatten for the outFields query string.
+    _flat_fields = []
+    for v in field_map.values():
+        if not v:
+            continue
+        if isinstance(v, list):
+            _flat_fields.extend(v)
+        else:
+            _flat_fields.append(v)
+    out_fields = ','.join(_flat_fields)
     page_size = page_size or cfg.get('default_page_size') or DEFAULT_PAGE_SIZE
     offset = start_offset
     total_fetched = 0
@@ -507,17 +543,29 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
         if not features:
             break
 
+        def _resolve(attrs, src):
+            """V433b: resolve a field_map value to a string. If src is a
+            list, concat the individual attrs with single spaces (filtering
+            None/empty); else attrs.get directly."""
+            if src is None:
+                return None
+            if isinstance(src, list):
+                parts = [str(attrs.get(k)).strip() for k in src
+                         if attrs.get(k) is not None and str(attrs.get(k)).strip()]
+                return ' '.join(parts) if parts else None
+            return attrs.get(src)
+
         rows = []
         for feat in features:
             attrs = feat.get('attributes', {}) or {}
             # Remap source field names → property_owners column names.
             rows.append({
-                'owner_name': attrs.get(field_map.get('owner_name')),
-                'address': attrs.get(field_map.get('address')),
-                'city': attrs.get(field_map.get('city')),
-                'zip': attrs.get(field_map.get('zip')),
-                'owner_mailing_address': attrs.get(field_map.get('owner_mailing_address')),
-                'parcel_id': attrs.get(field_map.get('parcel_id')),
+                'owner_name': _resolve(attrs, field_map.get('owner_name')),
+                'address': _resolve(attrs, field_map.get('address')),
+                'city': _resolve(attrs, field_map.get('city')),
+                'zip': _resolve(attrs, field_map.get('zip')),
+                'owner_mailing_address': _resolve(attrs, field_map.get('owner_mailing_address')),
+                'parcel_id': _resolve(attrs, field_map.get('parcel_id')),
             })
 
         inserted = _insert_batch(rows, cfg['source_tag'], cfg['state'])
