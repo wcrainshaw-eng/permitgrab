@@ -10330,11 +10330,21 @@ def api_stats():
 
 @app.route('/api/filters')
 def api_filters():
-    """GET /api/filters - Available filter options (V12.51: SQL-backed)."""
+    """GET /api/filters - Available filter options (V12.51: SQL-backed).
+
+    V442 P1 (CODE_V442): the city list previously read DISTINCT city from
+    permits, but a few misconfigured collectors (Pierce County WA among
+    them) wrote addresses into permits.city — e.g. "11712 Houston Rd East".
+    The garbage entries flooded the analytics dropdown and blocked the
+    V440 preferred-city default match. Read from prod_cities instead so
+    only real, active city names show up.
+    """
     conn = permitdb.get_connection()
 
     cities = [r[0] for r in conn.execute(
-        "SELECT DISTINCT city FROM permits WHERE city IS NOT NULL AND city != '' ORDER BY city"
+        "SELECT DISTINCT city FROM prod_cities "
+        "WHERE city IS NOT NULL AND city != '' AND status = 'active' "
+        "ORDER BY city"
     ).fetchall()]
 
     trades = [r[0] for r in conn.execute(
