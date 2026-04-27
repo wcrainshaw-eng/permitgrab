@@ -206,6 +206,26 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'onondaga_syracuse': {
+        # V433g: Onondaga County NY (Syracuse). Same NYS statewide
+        # endpoint as Erie/Buffalo (V433f); only the COUNTY_NAME filter
+        # changes. Probed 2026-04-27: 181,884 parcels with PRIMARY_OWNER.
+        # Schema identical to erie_buffalo so the field_map mirrors it.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'NYS Tax Parcels Public — Onondaga County (Syracuse)',
+        'endpoint': 'https://gisservices.its.ny.gov/arcgis/rest/services/NYS_Tax_Parcels_Public/MapServer/1',
+        'where_clause': "COUNTY_NAME = 'Onondaga' AND PRIMARY_OWNER IS NOT NULL AND LOC_STREET IS NOT NULL",
+        'field_map': {
+            'owner_name': 'PRIMARY_OWNER',
+            'address': ['LOC_ST_NBR', 'LOC_STREET'],
+            'city': 'MUNI_NAME',
+            'zip': 'LOC_ZIP',
+            'owner_mailing_address': 'MAIL_ADDR',
+            'parcel_id': 'SWIS_SBL_ID',
+        },
+        'state': 'NY',
+        'source_tag': 'assessor:onondaga_syracuse',
+    },
     'erie_buffalo': {
         # V433f: Erie County NY (Buffalo metro). Probed 2026-04-27:
         # NYS Office of Information Technology Services hosts a statewide
