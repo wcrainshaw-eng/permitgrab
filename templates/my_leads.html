@@ -633,7 +633,7 @@ function renderLeadCard(lead) {
             ${lifecyclePill}
             ${p.address || 'Unknown Address'}
           </h3>
-          <p>${p.city || ''}, ${p.state || ''} ${p.zip || ''}</p>
+          <p>${[p.city, p.state, p.zip].filter(Boolean).join(' ').trim() || ''}</p>
         </div>
         <div class="lead-score">
           <span class="score-badge ${quality}">${qualityIcon} ${score} pts</span>
