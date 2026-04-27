@@ -206,6 +206,32 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'hillsborough_tampa': {
+        # V433n: Hillsborough County FL (Tampa). Probed 2026-04-27:
+        # arcgis.tampagov.net/.../Parcels/TaxParcel/FeatureServer/0.
+        # Tampa hosts the Hillsborough County PA data on their own
+        # ArcGIS server. 46 fields with OWNER, ADDR_1+CITY+STATE+ZIP
+        # (mailing), SITE_ADDR+SITE_CITY+SITE_ZIP (site), FOLIO+PIN+
+        # STRAP (parcel IDs), JUST/LAND/BLDG/ASD_VAL/TAX_VAL.
+        # Tampa permits are dead per CLAUDE.md (Accela no contractor
+        # column) — wiring Tampa owners now positions the city to
+        # activate the moment the Accela parser fix from CLAUDE.md
+        # P1 ships.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Hillsborough County FL (Tampa) Tax Parcels',
+        'endpoint': 'https://arcgis.tampagov.net/arcgis/rest/services/Parcels/TaxParcel/FeatureServer/0',
+        'where_clause': "OWNER IS NOT NULL AND SITE_ADDR IS NOT NULL AND SITE_ADDR <> ''",
+        'field_map': {
+            'owner_name': 'OWNER',
+            'address': 'SITE_ADDR',
+            'city': 'SITE_CITY',
+            'zip': 'SITE_ZIP',
+            'owner_mailing_address': 'ADDR_1',
+            'parcel_id': 'FOLIO',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:hillsborough_tampa',
+    },
     'multnomah_portland': {
         # V433m: Portland OR (Multnomah County / BDS Property database).
         # Probed 2026-04-27: portlandmaps.com/arcgis/rest/services/Public/
