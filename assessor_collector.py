@@ -206,6 +206,28 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'wake_raleigh': {
+        # V433j: Wake County NC (Raleigh + Cary metro). Probed 2026-04-27:
+        # maps.wakegov.com/.../Property/Parcels/FeatureServer/0. 59 fields
+        # with OWNER, SITE_ADDRESS (pre-concatenated), STNUM, STNAME,
+        # STYPE, CITY, ADDR1/2/3 (owner mailing), PIN_NUM, REID,
+        # BLDG_VAL, LAND_VAL, TOTAL_VALUE_ASSD. Source CITY field
+        # populated per-row so retag rule preserves Raleigh / Cary /
+        # Apex / Wake Forest distinction.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Wake County (Raleigh) Parcels',
+        'endpoint': 'https://maps.wakegov.com/arcgis/rest/services/Property/Parcels/FeatureServer/0',
+        'where_clause': "OWNER IS NOT NULL AND SITE_ADDRESS IS NOT NULL AND SITE_ADDRESS <> ''",
+        'field_map': {
+            'owner_name': 'OWNER',
+            'address': 'SITE_ADDRESS',
+            'city': 'CITY',
+            'owner_mailing_address': 'ADDR1',
+            'parcel_id': 'PIN_NUM',
+        },
+        'state': 'NC',
+        'source_tag': 'assessor:wake_raleigh',
+    },
     'hamilton_cincinnati': {
         # V433i: Hamilton County OH (Cincinnati). Probed 2026-04-27:
         # cagisonline.hamilton-co.org/arcgis/rest/services/Hamilton/
