@@ -29,6 +29,7 @@ zero and volume is unlimited. 30 attempts per cycle × hourly =
 """
 
 import html
+import os
 import re
 import time
 import urllib.parse
@@ -37,6 +38,15 @@ from datetime import datetime
 import requests
 
 import db as permitdb
+
+
+def _enrichment_disabled():
+    """V439: emergency kill switch. Set DISABLE_ENRICHMENT=1 in Render
+    env vars to stop all DDG searches when the worker is overloaded.
+    DDG enrichment + concurrent assessor imports + retag = SQLite write
+    contention that wedged prod for 60+ min on 2026-04-27.
+    """
+    return os.environ.get('DISABLE_ENRICHMENT') == '1'
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +222,8 @@ class FreeEnrichmentEngine:
 
     def enrich_one(self, name, city, state):
         """Try methods in order; return first (phone, website) with content."""
+        if _enrichment_disabled():
+            return None, None
         for method in (self.search_ddg, self.search_domain_guess):
             try:
                 phone, website = method(name, city or '', state or '')
@@ -302,6 +314,9 @@ def enrich_batch(limit=PER_CYCLE_DEFAULT, min_delay=MIN_DELAY_SEC):
 
     No API key required. Logs one line per contractor attempted.
     """
+    if _enrichment_disabled():
+        print(f"[{datetime.now()}] [V439] enrich_batch: DISABLE_ENRICHMENT=1, skipping cycle")
+        return {'enriched': 0, 'not_found': 0, 'errors': 0, 'seen': 0, 'disabled': True}
     conn = permitdb.get_connection()
     rows = _select_pending(conn, limit)
     if not rows:
