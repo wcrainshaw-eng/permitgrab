@@ -421,6 +421,14 @@ def get_connection():
         _local.conn.execute("PRAGMA synchronous=NORMAL")  # good durability, better perf
         _local.conn.execute("PRAGMA cache_size=-8000")  # 8MB cache (conservative for 2GB box)
         _local.conn.execute("PRAGMA busy_timeout=60000")  # wait up to 60s for locks (V35: startup cleanup takes time)
+        # V445 (P0 root-cause): WAL ballooned to 3.4 GB on 2026-04-27 because
+        # long-running reader transactions kept blocking checkpoints. The
+        # deferred_startup commit() then took minutes per call, jamming the
+        # whole daemon-spawn chain. journal_size_limit caps the WAL file size
+        # after each successful checkpoint; wal_autocheckpoint stays at the
+        # default 1000 pages but is set explicitly to surface the intent.
+        _local.conn.execute("PRAGMA wal_autocheckpoint=1000")
+        _local.conn.execute("PRAGMA journal_size_limit=67108864")  # 64MB cap after checkpoint
         # V398 (CODE_V364 Part 5.4): temp tables + mmap for query speed.
         # temp_store=MEMORY keeps GROUP BY / ORDER BY working sets in RAM
         # instead of spilling to disk. mmap_size=256MB lets sqlite read
