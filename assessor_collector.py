@@ -206,6 +206,30 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'broward_ftlauderdale': {
+        # V433k: Broward County FL Property Appraiser. Probed 2026-04-27:
+        # services.arcgis.com/JMAJrTsHNLrSsWf5/.../PARCEL_POLY_BCPA_TAXROLL/
+        # FeatureServer/0. 227 fields including NAME_LINE_1 (owner),
+        # NAME_LINE_2 (joint owner), ADDRESS_LINE_1+CITY+STATE+ZIP (owner
+        # mailing), SITUS_STREET_NUMBER+DIRECTION+NAME+TYPE+UNIT+SITUS_CITY+
+        # SITUS_ZIP_CODE (site address), FOLIO (parcel ID), JUST_LAND_VALUE,
+        # JUST_BUILDING_VALUE.
+        # Fort Lauderdale permits already wired (CLAUDE.md V326 noted).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Broward County FL Property Appraiser Tax Roll',
+        'endpoint': 'https://services.arcgis.com/JMAJrTsHNLrSsWf5/arcgis/rest/services/PARCEL_POLY_BCPA_TAXROLL/FeatureServer/0',
+        'where_clause': "NAME_LINE_1 IS NOT NULL AND SITUS_STREET_NAME IS NOT NULL",
+        'field_map': {
+            'owner_name': 'NAME_LINE_1',
+            'address': ['SITUS_STREET_NUMBER', 'SITUS_STREET_DIRECTION', 'SITUS_STREET_NAME', 'SITUS_STREET_TYPE'],
+            'city': 'SITUS_CITY',
+            'zip': 'SITUS_ZIP_CODE',
+            'owner_mailing_address': 'ADDRESS_LINE_1',
+            'parcel_id': 'FOLIO',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:broward_ftlauderdale',
+    },
     'wake_raleigh': {
         # V433j: Wake County NC (Raleigh + Cary metro). Probed 2026-04-27:
         # maps.wakegov.com/.../Property/Parcels/FeatureServer/0. 59 fields
