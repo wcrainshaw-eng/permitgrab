@@ -15,8 +15,8 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
-  --accent: #f97316;
-  --accent-dark: #ea580c;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -33,8 +33,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .breadcrumbs { background: var(--gray-100); padding: 12px 32px; font-size: 13px; }
 .breadcrumbs a { color: var(--gray-500); text-decoration: none; }
 .breadcrumbs a:hover { color: var(--primary); }
-.hero { background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
-        color: white; padding: 32px; }
+.hero { background: #ffffff;
+        color: var(--gray-900, #111827); padding: 32px; }
 .hero-inner { max-width: 1200px; margin: 0 auto; }
 .hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
 .hero .sub { font-size: 15px; color: rgba(255,255,255,.75); }
@@ -86,8 +86,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .permit-table tr:last-child td { border-bottom: none; }
 
 .gate-cta { display: flex; flex-direction: column; align-items: center; gap: 12px;
-            padding: 28px; margin: 20px 0; background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
-            color: white; border-radius: var(--radius-lg); text-align: center; }
+            padding: 28px; margin: 20px 0; background: #ffffff;
+            color: var(--gray-900, #111827); border-radius: var(--radius-lg); text-align: center; }
 .gate-cta h3 { font-size: 20px; color: white; margin: 0; }
 .gate-cta p { color: rgba(255,255,255,.8); margin: 0; font-size: 14px; }
 .gate-cta .cta-btn { display: inline-block; padding: 14px 32px; background: var(--accent);

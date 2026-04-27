@@ -58,7 +58,7 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
-  --accent: #f97316;
+  --accent: #2563eb;
   --green: #16a34a;
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
@@ -84,8 +84,8 @@ body {
 
 /* Header */
 .header {
-  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
-  color: white;
+  background: #ffffff;
+  color: var(--gray-900, #111827);
   padding: 16px 32px;
 }
 
@@ -635,7 +635,7 @@ function renderTable(data) {
       '<div style="max-width: 500px; margin: 0 auto;">' +
       '<h3 style="color: #374151; margin-bottom: 12px;">Contractor Intelligence is building...</h3>' +
       '<p style="color: #6b7280; line-height: 1.6; margin-bottom: 16px;">We\'re analyzing permit data across 290+ cities to identify active contractors and their project history. This feature populates as more data is collected.</p>' +
-      '<p style="margin-bottom: 0;"><a href="/cities" style="color: #f97316; font-weight: 600; text-decoration: none;">Browse permits by city →</a></p>' +
+      '<p style="margin-bottom: 0;"><a href="/cities" style="color: #2563eb; font-weight: 600; text-decoration: none;">Browse permits by city →</a></p>' +
       '</div></td></tr>';
     document.getElementById('pagination').innerHTML = '';
     return;

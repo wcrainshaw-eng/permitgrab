@@ -1,7 +1,8 @@
 <!-- V12.10: Enhanced mobile hamburger menu -->
 <style>
 .site-nav {
-  background: linear-gradient(135deg, var(--gray-900, #111827) 0%, #1e3a5f 100%);
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
   padding: 0 32px;
   position: relative;
 }
@@ -16,11 +17,11 @@
 .site-nav .logo {
   font-size: 22px;
   font-weight: 700;
-  color: white;
+  color: var(--gray-900, #111827);
   text-decoration: none;
   letter-spacing: -0.5px;
 }
-.site-nav .logo span { color: var(--accent, #f97316); }
+.site-nav .logo span { color: var(--primary, #2563eb); }
 .site-nav-links {
   display: flex;
   gap: 24px;
@@ -28,12 +29,12 @@
 }
 .site-nav-links > a,
 .site-nav-links > .nav-dropdown > .dropdown-toggle {
-  color: rgba(255,255,255,.7);
+  color: #374151;
   text-decoration: none;
   font-size: 14px;
   transition: color .2s;
 }
-.site-nav-links > a:hover { color: white; }
+.site-nav-links > a:hover { color: #111827; }
 .site-nav .nav-dropdown {
   position: relative;
 }
@@ -41,14 +42,14 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: rgba(255,255,255,.7);
+  color: #374151;
   font-size: 14px;
   cursor: pointer;
   background: none;
   border: none;
   padding: 0;
 }
-.site-nav .dropdown-toggle:hover { color: white; }
+.site-nav .dropdown-toggle:hover { color: #111827; }
 .site-nav .dropdown-menu {
   display: none;
   position: absolute;
@@ -76,7 +77,7 @@
   color: var(--primary, #2563eb);
 }
 .site-nav .nav-btn {
-  background: var(--accent, #f97316);
+  background: var(--primary, #2563eb);
   color: white !important;
   padding: 10px 24px;
   border-radius: 6px;
@@ -86,14 +87,14 @@
   transition: background .2s;
   margin-left: 24px;
 }
-.site-nav .nav-btn:hover { background: var(--accent-dark, #ea580c); }
+.site-nav .nav-btn:hover { background: var(--primary-dark, #1d4ed8); }
 
 /* Mobile hamburger toggle */
 .mobile-toggle {
   display: none;
   background: none;
   border: none;
-  color: white;
+  color: #111827;
   font-size: 28px;
   cursor: pointer;
   padding: 8px;
@@ -110,22 +111,22 @@
     top: 64px;
     left: 0;
     right: 0;
-    background: linear-gradient(135deg, var(--gray-900, #111827) 0%, #1e3a5f 100%);
+    background: #ffffff;
     flex-direction: column;
     padding: 16px 24px 24px;
     gap: 0;
     z-index: 999;
-    border-top: 1px solid rgba(255,255,255,.1);
-    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
   }
   .site-nav.mobile-open .site-nav-links { display: flex; }
   .site-nav-links > a,
   .site-nav-links > .nav-dropdown {
     padding: 14px 0;
-    border-bottom: 1px solid rgba(255,255,255,.08);
+    border-bottom: 1px solid #f1f5f9;
     width: 100%;
   }
-  .site-nav-links > a { color: white; font-size: 16px; }
+  .site-nav-links > a { color: #111827; font-size: 16px; }
   .site-nav-links > a:last-child { border-bottom: none; }
   .site-nav .nav-btn {
     margin-top: 16px;
@@ -135,26 +136,26 @@
   }
   /* Mobile dropdowns expand inline */
   .site-nav .nav-dropdown .dropdown-toggle {
-    color: white;
+    color: #111827;
     font-size: 16px;
     width: 100%;
     justify-content: space-between;
   }
   .site-nav .dropdown-menu {
     position: static;
-    background: rgba(255,255,255,.05);
+    background: #f9fafb;
     box-shadow: none;
     border-radius: 0;
     margin: 8px 0 0 0;
     padding: 0;
   }
   .site-nav .dropdown-menu a {
-    color: rgba(255,255,255,.7);
+    color: #374151;
     padding: 12px 16px;
   }
   .site-nav .dropdown-menu a:hover {
-    background: rgba(255,255,255,.1);
-    color: white;
+    background: #f1f5f9;
+    color: #111827;
   }
   .site-nav .nav-dropdown.dropdown-open .dropdown-menu { display: block; }
 }
@@ -215,7 +216,7 @@
       <a href="/get-alerts">Get Alerts</a>
       {# V312 (CODE_V280b Bug 10): Early Intel hidden until the page actually
          surfaces signals. Don't advertise empty features. #}
-      <a href="/analytics">Analytics <span style="font-size: 10px; background: #f97316; padding: 2px 6px; border-radius: 10px; margin-left: 2px;">PRO</span></a>
+      <a href="/analytics">Analytics <span style="font-size: 10px; background: #2563eb; padding: 2px 6px; border-radius: 10px; margin-left: 2px;">PRO</span></a>
 
       <div class="nav-dropdown">
         <button class="dropdown-toggle">{{ user.name or user.email.split('@')[0] }} <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>

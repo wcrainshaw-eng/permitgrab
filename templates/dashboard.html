@@ -71,9 +71,9 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
-  --primary-light: #dbeafe;
-  --accent: #f97316;
-  --accent-dark: #ea580c;
+  --primary-light: #eff6ff;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
   --green: #16a34a;
   --green-light: #dcfce7;
   --red: #dc2626;
@@ -107,8 +107,8 @@ body {
 
 /* HEADER / HERO */
 .hero {
-  background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
-  color: white;
+  background: #ffffff;
+  color: var(--gray-900, #111827);
   padding: 0;
 }
 
@@ -136,13 +136,13 @@ body {
 }
 
 .hero-nav a {
-  color: rgba(255,255,255,.7);
+  color: #374151;
   text-decoration: none;
   font-size: 14px;
   transition: color .2s;
 }
 
-.hero-nav a:hover { color: white; }
+.hero-nav a:hover { color: #111827; }
 
 /* Hamburger - hidden on desktop */
 .hamburger { display: none; }
@@ -232,7 +232,7 @@ body {
 
 .hero-content p {
   font-size: 18px;
-  color: rgba(255,255,255,.7);
+  color: #4b5563;
   max-width: 680px;
   margin: 0 auto 32px;
 }
@@ -527,7 +527,7 @@ body {
 
 .lead-score-badge.warm {
   background: #fff7ed;
-  color: #ea580c;
+  color: #1d4ed8;
 }
 
 .lead-score-badge.standard {
@@ -545,14 +545,8 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  background: #16a34a;
   color: white;
-  animation: pulse-subtle 2s ease-in-out infinite;
-}
-
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.85; }
 }
 
 .value-high { color: var(--red); }
@@ -1426,8 +1420,8 @@ footer a:hover { color: white; }
     </nav>
   </div>
   <div class="hero-content">
-    <h1>Building Permit Data for <span>Contractors</span></h1>
-    <p>Track building permits across {{ city_count | default(260) }}+ US cities. Find new construction, renovation, and remodeling permits daily. Be the first contractor to call.</p>
+    <h1>Real-time permit intelligence for home service businesses</h1>
+    <p>Track new building permits, find active contractors, and identify property owners across {{ city_count | default(260) }}+ cities. Updated daily from official sources.</p>
     {# V224 T6: prominent hero CTAs — the nav "Sign Up" is too easy to
        miss on a cold Google Ads click. #}
     {# V308 (CODE_V280b Bug 2): hero CTA splits on auth. Pro user seeing
@@ -1435,8 +1429,8 @@ footer a:hover { color: white; }
        broken; give them a path back into the product instead. #}
     <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
       {% if user %}
-      <a href="/browse" style="display: inline-block; background: var(--accent); color: white; font-size: 17px; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Go to Dashboard &rarr;</a>
-      <a href="/my-leads" style="display: inline-block; background: rgba(255,255,255,0.1); color: white; font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 8px; text-decoration: none; border: 1px solid rgba(255,255,255,0.25);">My Leads</a>
+      <a href="/browse" style="display: inline-block; background: #2563eb; color: white; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Go to Dashboard</a>
+      <a href="/my-leads" style="display: inline-block; background: transparent; color: #2563eb; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 8px; text-decoration: none; border: 1.5px solid #2563eb;">My Leads</a>
       {% else %}
       {# V397 (CODE_V286 grind): the highest-traffic CTA on the site
          (cold Google Ads visitors land on this hero) was routing to
@@ -1445,8 +1439,8 @@ footer a:hover { color: white; }
          to land in the trial, not in another marketing page asking
          them to choose. /start-checkout takes them straight to
          /signup→Stripe Checkout via V375's unified entrypoint. #}
-      <a href="/start-checkout?plan=pro" style="display: inline-block; background: var(--accent); color: white; font-size: 17px; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none;">Start Your Free Trial &rarr;</a>
-      <a href="/browse" style="display: inline-block; background: rgba(255,255,255,0.1); color: white; font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 8px; text-decoration: none; border: 1px solid rgba(255,255,255,0.25);">Browse Live Permits</a>
+      <a href="/start-checkout?plan=pro" style="display: inline-block; background: #2563eb; color: white; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Start Free Trial</a>
+      <a href="/browse" style="display: inline-block; background: transparent; color: #2563eb; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 8px; text-decoration: none; border: 1.5px solid #2563eb;">Browse Live Permits</a>
       {% endif %}
     </div>
   </div>
@@ -1728,12 +1722,12 @@ footer a:hover { color: white; }
 <div class="main-content">
   <div>
     <!-- V8: Upgrade banner for free users -->
-    <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; justify-content: space-between; align-items: center;">
+    <div id="free-user-banner" style="display:none; background: linear-gradient(135deg, #f8fafc, #2563eb); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; justify-content: space-between; align-items: center;">
       <div>
         <strong>You're viewing <span id="banner-total">{{ "{:,}".format(initial_stats.total_permits | default(0)) }}</span>+ leads</strong>
         <span style="opacity: 0.8; margin-left: 8px;">Upgrade to Pro to unlock phone numbers, Analytics, and unlimited exports.</span>
       </div>
-      <a href="/pricing" style="background: #f97316; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap;">See Plans →</a>
+      <a href="/pricing" style="background: #2563eb; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap;">See Plans →</a>
     </div>
     <div class="permits-list" id="permits-list">
       <div class="loading">
@@ -2726,7 +2720,7 @@ function renderSidebar() {
   const tradeEntries = Object.entries(tradeCounts).sort((a, b) => b[1] - a[1]);
   const maxTrade = tradeEntries.length > 0 ? tradeEntries[0][1] : 1;
 
-  const colors = ['#2563eb', '#f97316', '#16a34a', '#dc2626', '#8b5cf6', '#06b6d4', '#ec4899', '#eab308', '#64748b', '#14b8a6'];
+  const colors = ['#2563eb', '#2563eb', '#16a34a', '#dc2626', '#8b5cf6', '#06b6d4', '#ec4899', '#eab308', '#64748b', '#14b8a6'];
 
   document.getElementById('trade-breakdown').innerHTML = tradeEntries.map(([ trade, count ], i) => `
     <div class="trade-bar">
