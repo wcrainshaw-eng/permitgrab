@@ -1543,7 +1543,13 @@ CITY_REGISTRY = {
     "louisville": {
         "name": "Louisville",
         "state": "KY",
-        "slug": "louisville",
+        # V420 (CODE_V419 loop hunt): slug fixed from "louisville" to "louisville-ky".
+        # The bare "louisville" slug was being normalized downstream into
+        # "louisville-co" (Colorado), splitting 4,362 KY permits + 576 contractors
+        # under the wrong city. Hyphenated state suffix forces correct routing.
+        # Existing data under "louisville-co" remains an orphan needing manual
+        # relink — flag for follow-up.
+        "slug": "louisville-ky",
         "lat": 38.252,
         "lon": -85.76,
         "platform": "arcgis",
@@ -16859,6 +16865,11 @@ CITY_REGISTRY = {
     },
 
     # V72: Kentucky cities with Accela
+    # V420 DEACTIVATED: slug collides with the live ArcGIS "louisville" entry
+    # which now uses slug "louisville-ky". Accela is a known dead-end pattern
+    # (HTML grid, no contractor column) — the ArcGIS Active_Construction_Permits
+    # endpoint at services1.arcgis.com/79kfd2K6fskCAkyg has CONTRACTOR populated
+    # and is the canonical source for Louisville KY going forward.
     "louisville_ky": {
         "name": "Louisville",
         "state": "KY",
@@ -16881,8 +16892,8 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
-        "active": True,
-        "notes": "V72: Louisville KY Accela - largest city in KY",
+        "active": False,
+        "notes": "V72/V420: Accela dead-end + slug collision — superseded by ArcGIS 'louisville' config.",
     },
 
     # V72: Massachusetts cities with Accela
@@ -34495,6 +34506,10 @@ CITY_REGISTRY = {
         "notes": "V73: New ArcGIS county. Pop ~1.15M.",
     },
 
+    # V420 DEACTIVATED: stale endpoint (Louisville_Metro_KY_Active_Permits
+    # has no recent issued data) + minimal field_map (no contractor extraction).
+    # The canonical Louisville KY config is the top-level "louisville" entry
+    # which points at Active_Construction_Permits with full CONTRACTOR mapping.
     "louisville_ky_arcgis": {
         "name": "Louisville",
         "state": "KY",
@@ -34512,8 +34527,8 @@ CITY_REGISTRY = {
             "status": "STATUS",
         },
         "limit": 2000,
-        "active": True,
-        "notes": "V73: New ArcGIS city. Pop ~622K.",
+        "active": False,
+        "notes": "V73/V420: superseded by canonical 'louisville' entry (Active_Construction_Permits) with full contractor mapping.",
     },
 
     "durham_nc_arcgis": {
