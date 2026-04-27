@@ -5614,6 +5614,7 @@ def admin_fix_property_owner_cities():
             ('Philadelphia', "source LIKE 'assessor:philadelphia_opa%'"),
             ('Minneapolis', "source LIKE 'assessor:hennepin_minneapolis%'"),
             ('Austin', "source LIKE 'assessor:travis_austin%'"),
+            ('Cincinnati', "source LIKE 'assessor:hamilton_cincinnati%'"),
             # erie_buffalo intentionally NOT retagged — source MUNI_NAME
             # is populated per-row (Buffalo, Cheektowaga, Lackawanna,
             # Tonawanda, Akron, etc.) and should flow through verbatim

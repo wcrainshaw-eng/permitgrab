@@ -206,6 +206,34 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'hamilton_cincinnati': {
+        # V433i: Hamilton County OH (Cincinnati). Probed 2026-04-27:
+        # cagisonline.hamilton-co.org/arcgis/rest/services/Hamilton/
+        # HCE_Parcels_With_Auditor_Data/MapServer/0. 67 fields joining
+        # the County Engineer's parcel fabric with the Auditor's
+        # AUDREAL view. Field names are dotted (CAGIS.AUDREAL_VW.OWNNM1)
+        # — ArcGIS handles those in outFields= as long as the source
+        # publishes the join.
+        # Cincinnati permits already wired (V417) with NO contractor
+        # field. Adding owner data activates Cincinnati as a no-
+        # contractor city per the V362 Part A template pattern.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Hamilton County (Cincinnati) Parcels with Auditor Data',
+        'endpoint': 'https://cagisonline.hamilton-co.org/arcgis/rest/services/Hamilton/HCE_Parcels_With_Auditor_Data/MapServer/0',
+        'where_clause': "CAGIS.AUDREAL_VW.OWNER48 IS NOT NULL AND CAGIS.AUDREAL_VW.ADDRST IS NOT NULL",
+        'field_map': {
+            'owner_name': 'CAGIS.AUDREAL_VW.OWNER48',
+            # Concat house number + street + suffix (ADDRST + ADDRSF
+            # = "MAIN" + "ST"). _resolve filters empties.
+            'address': ['CAGIS.AUDREAL_VW.ADDRNO', 'CAGIS.AUDREAL_VW.ADDRST', 'CAGIS.AUDREAL_VW.ADDRSF'],
+            'city': 'CAGIS.AUDREAL_VW.MLTOWN',
+            'zip': 'CAGIS.AUDREAL_VW.OWNADZIP',
+            'owner_mailing_address': 'CAGIS.AUDREAL_VW.OWNAD1',
+            'parcel_id': 'CAGIS.AUDREAL_VW.PARCEL',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:hamilton_cincinnati',
+    },
     'onondaga_syracuse': {
         # V433g: Onondaga County NY (Syracuse). Same NYS statewide
         # endpoint as Erie/Buffalo (V433f); only the COUNTY_NAME filter
