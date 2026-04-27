@@ -206,6 +206,31 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'philadelphia_opa': {
+        # V433 (CODE_V428 Phase 1g): Philadelphia Office of Property
+        # Assessment via Carto SQL. Probed 2026-04-27: 583,562 parcels
+        # with owner_1 + location populated. Schema (82 fields) includes
+        # owner_1, owner_2, mailing_street, mailing_zip, mailing_city_state,
+        # location (site address), parcel_number. Same hosting platform
+        # as Philadelphia permits (phl.carto.com), so wires alongside
+        # the existing 'philadelphia' permits config in CITY_REGISTRY.
+        'platform': 'carto',
+        'service_description': 'Philadelphia OPA Properties',
+        'endpoint': 'https://phl.carto.com/api/v2/sql',
+        'table_name': 'opa_properties_public',
+        'where_clause': 'owner_1 IS NOT NULL AND location IS NOT NULL',
+        'order_by': 'cartodb_id',
+        'field_map': {
+            'owner_name': 'owner_1',
+            'address': 'location',
+            'zip': 'mailing_zip',
+            'owner_mailing_address': 'mailing_street',
+            'parcel_id': 'parcel_number',
+        },
+        'state': 'PA',
+        'source_tag': 'assessor:philadelphia_opa',
+        'default_page_size': 1000,
+    },
     'cuyahoga_cleveland': {
         # V429 (CODE_V428 Phase 1e): Cuyahoga County (Cleveland) CAMA
         # parcels. Probed 2026-04-27: layer 3 "AppraisalParcelView"
@@ -272,6 +297,34 @@ def _fetch_arcgis_page(endpoint, where, offset, page_size, out_fields):
     if data.get('error'):
         raise RuntimeError(f"ArcGIS error: {data['error']}")
     return data.get('features', [])
+
+
+def _fetch_carto_page(endpoint, where, offset, page_size, out_fields, table_name=None, order_by='cartodb_id'):
+    """V433 (CODE_V428 Phase 1g): Carto SQL API page fetch.
+
+    Philadelphia OPA + a few other muni assessor portals expose
+    parcels via the Carto SQL endpoint (phl.carto.com/api/v2/sql).
+    Different shape than SODA: takes a SQL string with explicit
+    `LIMIT N OFFSET K`, returns `{"rows": [...]}`. Wraps each row
+    under 'attributes' so the downstream `collect()` loop can share
+    the row-mapping code with arcgis_mapserver/soda paths.
+    """
+    if not table_name:
+        raise ValueError("carto platform requires table_name")
+    sql = (
+        f"SELECT {out_fields} FROM {table_name} "
+        f"WHERE {where} "
+        f"ORDER BY {order_by} ASC "
+        f"LIMIT {page_size} OFFSET {offset}"
+    )
+    params = {'q': sql, 'format': 'json'}
+    resp = SESSION.get(endpoint, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict) and data.get('error'):
+        raise RuntimeError(f"Carto error: {data['error']}")
+    rows = data.get('rows') or []
+    return [{'attributes': r} for r in rows]
 
 
 def _fetch_soda_page(endpoint, where, offset, page_size, out_fields):
@@ -402,7 +455,7 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
     if not cfg:
         raise ValueError(f"Unknown assessor source: {source_key}")
     platform = cfg['platform']
-    if platform not in ('arcgis_mapserver', 'soda'):
+    if platform not in ('arcgis_mapserver', 'soda', 'carto'):
         raise NotImplementedError(f"Platform {platform} not wired yet")
 
     field_map = cfg['field_map']
@@ -426,6 +479,13 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
                 features = _fetch_arcgis_page(
                     cfg['endpoint'], cfg['where_clause'],
                     offset, this_page, out_fields
+                )
+            elif platform == 'carto':
+                features = _fetch_carto_page(
+                    cfg['endpoint'], cfg['where_clause'],
+                    offset, this_page, out_fields,
+                    table_name=cfg.get('table_name'),
+                    order_by=cfg.get('order_by', 'cartodb_id'),
                 )
             else:  # soda
                 features = _fetch_soda_page(
