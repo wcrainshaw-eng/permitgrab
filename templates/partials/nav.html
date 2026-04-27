@@ -172,11 +172,9 @@
          Logged-out: Home | Cities | Contractors | Blog | Pricing | Get Alerts | Log In | Sign Up
          Logged-in:  Dashboard | Cities | Contractors | Analytics | Pricing | Get Alerts | [user]
          "Pro" badge removed from Analytics — it read as a separate product. #}
-      {% if user %}
-      <a href="/">Dashboard</a>
-      {% else %}
+      {# V440 M2: "Dashboard" was misleading — / renders the homepage,
+         not a real dashboard. Renamed to "Home" for both states. #}
       <a href="/">Home</a>
-      {% endif %}
 
       <div class="nav-dropdown">
         <button class="dropdown-toggle">Cities <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
