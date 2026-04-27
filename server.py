@@ -5611,6 +5611,7 @@ def admin_fix_property_owner_cities():
             # city slug from the permits side.
             ('Miami-Dade', "source LIKE 'assessor:miami_dade%'"),
             ('Nashville', "source LIKE 'assessor:davidson_nashville%'"),
+            ('Philadelphia', "source LIKE 'assessor:philadelphia_opa%'"),
             ('New York', "source LIKE 'assessor:nyc_pluto%'"),
         ]
 
