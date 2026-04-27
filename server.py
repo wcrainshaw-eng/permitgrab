@@ -9181,6 +9181,66 @@ def analytics_before_request():
 
 
 @app.after_request
+def add_cache_headers(response):
+    """V428 (CODE_V427b Phase 12): HTTP caching headers.
+
+    City pages (/permits/*) take 1-1.5s of server-side rendering on every
+    request because Cloudflare marks them DYNAMIC without a Cache-Control
+    header. Adding public caching directives lets Cloudflare serve most
+    requests from edge cache, dropping TTFB to <50ms for cache hits and
+    eliminating the deploy-time 502 windows for returning visitors.
+
+    Logged-in users get `private` caching only — never `public` — so
+    session-tied redirects (homepage → /onboarding, /pricing → upgrade
+    flows) can never be cached and served to a different visitor.
+    """
+    try:
+        # Skip non-success responses (errors, redirects, auth-required)
+        if response.status_code >= 400 or response.status_code in (301, 302):
+            return response
+        # If Cache-Control was set explicitly upstream, leave it alone
+        if response.headers.get('Cache-Control'):
+            return response
+
+        path = request.path or ''
+        logged_in = 'user_email' in session
+
+        # Logged-in users: never set public cache (would leak personalized
+        # responses if a CDN ignores Vary: Cookie). private + max-age 0
+        # forces revalidation but allows browser-history navigation.
+        if logged_in:
+            response.headers['Cache-Control'] = 'private, max-age=0, must-revalidate'
+            return response
+
+        # Anonymous users: route-specific public caching.
+        if path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'no-store'
+        elif path.startswith('/permits/'):
+            response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=3600'
+        elif path == '/sitemap.xml' or path.startswith('/sitemap-'):
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+        elif path == '/cities':
+            response.headers['Cache-Control'] = 'public, max-age=1800, s-maxage=86400'
+        elif path.startswith('/blog'):
+            response.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=86400'
+        elif path in ('/about', '/contact', '/privacy', '/terms'):
+            response.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=86400'
+        elif path.startswith('/report/'):
+            response.headers['Cache-Control'] = 'public, max-age=900, s-maxage=3600'
+        elif path == '/contractors':
+            response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=3600'
+        elif path == '/':
+            # Homepage redirects logged-in users; the logged_in-skip above
+            # already covers that. For anon, short cache OK.
+            response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=1800'
+        # Don't cache /pricing, /signup, /login — they may redirect or
+        # show form errors. Falling through means default browser handling.
+    except Exception:
+        pass
+    return response
+
+
+@app.after_request
 def analytics_track_page_view(response):
     """Track page views for all successful page loads."""
     try:

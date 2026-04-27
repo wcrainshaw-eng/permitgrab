@@ -82,12 +82,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   color: white;
 }
 .btn-primary:hover { background: #1d4ed8; transform: translateY(-2px); }
+/* V428 (CODE_V427b Phase 11): was white border + white text designed for
+   the old dark hero. After V365's white background that was an invisible
+   ghost button. Now matches the homepage's secondary CTA: blue outline +
+   blue text. */
 .btn-outline {
   background: transparent;
-  border: 2px solid rgba(255,255,255,.3);
-  color: white;
+  border: 1.5px solid #2563eb;
+  color: #2563eb;
 }
-.btn-outline:hover { border-color: white; background: rgba(255,255,255,.1); }
+.btn-outline:hover { background: #eff6ff; }
 
 /* SUGGESTIONS SECTION */
 .suggestions-section {
