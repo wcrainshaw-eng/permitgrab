@@ -206,6 +206,29 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'multnomah_portland': {
+        # V433m: Portland OR (Multnomah County / BDS Property database).
+        # Probed 2026-04-27: portlandmaps.com/arcgis/rest/services/Public/
+        # BDS_Property/FeatureServer/0. 48 fields with OWNER_NAME,
+        # OWNER_MAILING_ADDRESS, ADDRESS_SITUS (pre-concatenated),
+        # PROPERTY_ID, PROPERTY_ID_MULTNOMAH_COUNTY, BDS_PROPERTY_STATUS.
+        # Portland permits already wired but the CUSTOMER field on
+        # BDS_Permit/22 is numeric license IDs, not contractor names —
+        # owner data activates Portland as a no-contractor city per
+        # the V362 Part A template pattern.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Portland OR BDS Property',
+        'endpoint': 'https://www.portlandmaps.com/arcgis/rest/services/Public/BDS_Property/FeatureServer/0',
+        'where_clause': "OWNER_NAME IS NOT NULL AND ADDRESS_SITUS IS NOT NULL AND ADDRESS_SITUS <> ''",
+        'field_map': {
+            'owner_name': 'OWNER_NAME',
+            'address': 'ADDRESS_SITUS',
+            'owner_mailing_address': 'OWNER_MAILING_ADDRESS',
+            'parcel_id': 'PROPERTY_ID_MULTNOMAH_COUNTY',
+        },
+        'state': 'OR',
+        'source_tag': 'assessor:multnomah_portland',
+    },
     'lee_capecoral': {
         # V433l: Lee County FL Property Appraiser. Probed 2026-04-27:
         # services2.arcgis.com/LvWGAAhHwbCJ2GMP/.../Lee_County_Parcels/
