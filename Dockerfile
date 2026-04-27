@@ -17,4 +17,4 @@ EXPOSE 5000
 # local; two workers would spawn two daemon threads) and added threads=4
 # so the admin dashboard / JSON endpoints stay responsive while a
 # force-collect or enrich call is in flight on the single worker.
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120 --graceful-timeout 30 --max-requests 500 --max-requests-jitter 50 --preload server:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120 --graceful-timeout 30 --max-requests 500 --max-requests-jitter 50 server:app"]
