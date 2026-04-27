@@ -11396,8 +11396,19 @@ def api_contractors():
         conn = permitdb.get_connection()
         conn.row_factory = sqlite3.Row
 
+        # V423 (CODE_V422 Phase 5): exclude generic placeholder business
+        # names that pollute the top-results. Centralized list applied to
+        # both the per-city and global branches below.
+        _GARBAGE_NAMES = (
+            'NOT GIVEN', 'OWNER-BUILDER', 'OWNER BUILDER', 'N/A', 'NA',
+            'NONE', 'SELF', 'HOMEOWNER', 'HOME OWNER', 'OWNER',
+            'NOT APPLICABLE', 'SAME', 'SAME AS ABOVE', 'SEE ABOVE',
+            'VARIOUS', 'TBD', 'TBA', 'UNKNOWN', 'NOT AVAILABLE', 'PENDING'
+        )
+        _garbage_placeholders = ','.join(['?'] * len(_GARBAGE_NAMES))
+
         if city:
-            sql = """
+            sql = f"""
                 SELECT contractor_name_raw AS name,
                        primary_trade,
                        COALESCE(total_permits, 0) AS total_permits,
@@ -11409,10 +11420,12 @@ def api_contractors():
                   AND contractor_name_raw IS NOT NULL
                   AND contractor_name_raw != ''
                   AND LENGTH(contractor_name_raw) >= 3
+                  AND UPPER(TRIM(contractor_name_raw)) NOT IN ({_garbage_placeholders})
+                  AND contractor_name_raw GLOB '*[^0-9]*'
                 ORDER BY total_permits DESC
                 LIMIT 500
             """
-            rows = conn.execute(sql, (city,)).fetchall()
+            rows = conn.execute(sql, (city, *_GARBAGE_NAMES)).fetchall()
             contractor_list = [{
                 'name': r['name'],
                 'total_permits': r['total_permits'] or 0,
@@ -11423,7 +11436,7 @@ def api_contractors():
                 'most_recent_date': r['last_permit_date'] or '',
             } for r in rows]
         else:
-            sql = """
+            sql = f"""
                 SELECT contractor_name_normalized AS norm,
                        MAX(contractor_name_raw) AS name,
                        SUM(COALESCE(total_permits, 0)) AS total_permits,
@@ -11436,11 +11449,13 @@ def api_contractors():
                 WHERE contractor_name_raw IS NOT NULL
                   AND contractor_name_raw != ''
                   AND LENGTH(contractor_name_raw) >= 3
+                  AND UPPER(TRIM(contractor_name_raw)) NOT IN ({_garbage_placeholders})
+                  AND contractor_name_raw GLOB '*[^0-9]*'
                 GROUP BY contractor_name_normalized
                 ORDER BY total_permits DESC
                 LIMIT 500
             """
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, _GARBAGE_NAMES).fetchall()
             contractor_list = []
             for r in rows:
                 cities = sorted({c.strip() for c in (r['city_blob'] or '').split('|')
@@ -15400,15 +15415,21 @@ def city_landing_inner(city_slug):
     # permits exist — the badge template hides itself in that case. Pull
     # MAX(filing_date) straight from the permits table as a fallback so
     # every city with any permit data shows an "Updated as of" line.
-    if permit_count > 0 and not newest_permit_date:
-        try:
-            # V338: read newest_date out of the cached stats payload instead
-            # of re-running a MAX(date) scan over the city's permit slice.
-            _max_row = (_stats_payload.get('newest_date'),) if _stats_payload.get('newest_date') else None
-            if _max_row and _max_row[0]:
-                newest_permit_date = _max_row[0]
-        except Exception:
-            pass
+    # V423 (CODE_V422 Phase 2): also override when prod_cities.newest_permit_date
+    # is OLDER than the actual MAX(date) from the cached stats payload.
+    # Chicago was showing "Archival data" because prod_cities was stale
+    # while real permits existed for 2026-04-24. The recount job updates
+    # prod_cities asynchronously, so the page can read a stale value
+    # between collection cycles. Prefer the stats payload's newest_date
+    # whenever it's newer than prod_cities.newest_permit_date.
+    _stats_newest = None
+    try:
+        _stats_newest = _stats_payload.get('newest_date') if _stats_payload else None
+    except Exception:
+        _stats_newest = None
+    if permit_count > 0 and _stats_newest:
+        if not newest_permit_date or _stats_newest[:10] > newest_permit_date[:10]:
+            newest_permit_date = _stats_newest
 
     # V223 T1: clean up literal "None" values in permit rows before the
     # Jinja2 template renders them. SQLite returns NULL for missing

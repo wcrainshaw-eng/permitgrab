@@ -897,11 +897,11 @@ body {
     <p class="subtitle">{{ "{:,}".format(permit_count) }} permits tracked{% if contractor_count %} &middot; {{ "{:,}".format(contractor_count) }} contractors{% endif %}{% if last_collection %} &middot; Updated {{ last_collection[:10] }}{% endif %}</p>
 
     <!-- PERMIT ACTIVITY SUMMARY -->
+    {# V423 (CODE_V422 Phase 6): removed the "Total Permits" summary card —
+       it duplicated the count already shown in the subtitle above
+       ("{permit_count} permits tracked · ..."). Date range + last updated
+       still surface metric value. #}
     <div class="summary-cards">
-      <div class="summary-card">
-        <div class="summary-card-value">{{ "{:,}".format(permit_count) }}</div>
-        <div class="summary-card-label">Total Permits</div>
-      </div>
       {% if earliest_date and latest_date %}
       <div class="summary-card">
         <div class="summary-card-value">{{ earliest_date[:4] if earliest_date else '---' }}-{{ latest_date[:4] if latest_date else '---' }}</div>
