@@ -279,17 +279,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
-<!-- NAV -->
-<nav class="nav-bar">
-  <a href="/" class="nav-logo">Permit<span>Grab</span></a>
-  <div>
-    <a href="/">Home</a>
-    <a href="/cities" style="color: var(--accent);">Cities</a>
-    <a href="/contractors">Contractors</a>
-    <a href="/blog">Blog</a>
-    <a href="/pricing">Pricing</a>
-  </div>
-</nav>
+<!-- V428 (CODE_V427b Phase 10): unified nav. The old custom .nav-bar
+     was missing Get Alerts / Log In / Sign Up and used the old dark
+     scheme. partials/nav.html is the single source of truth. -->
+{% include 'partials/nav.html' %}
 
 <!-- HERO -->
 <section class="cities-hero">
