@@ -686,10 +686,13 @@ async function showContractor(name) {
     const resp = await fetch(`/api/contractors/${encodeURIComponent(name)}`);
     const data = await resp.json();
 
-    document.getElementById('modal-permits').textContent = data.total_permits.toLocaleString();
+    document.getElementById('modal-permits').textContent = (data.total_permits || 0).toLocaleString();
     // V12.19: Format large values as $X.XM or $X.XB
-    document.getElementById('modal-value').textContent = formatValue(data.total_value);
-    document.getElementById('modal-cities').textContent = data.cities.length;
+    document.getElementById('modal-value').textContent = formatValue(data.total_value || 0);
+    // V427 Phase 2: prefer canonical city_count from contractor_profiles
+    // aggregation; fall back to slice length.
+    document.getElementById('modal-cities').textContent =
+      (data.city_count != null ? data.city_count : (data.cities ? data.cities.length : 0));
 
     // V8: Trade breakdown
     const tradeCounts = {};
