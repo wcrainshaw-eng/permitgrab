@@ -11384,7 +11384,7 @@ def intel_dashboard():
               (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-7 days')) as permits_7d,
               (SELECT COUNT(*) FROM permits WHERE prod_city_id=? AND COALESCE(filing_date,issued_date,date) >= date('now','-30 days')) as permits_30d,
               (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND is_active=1) as profiles,
-              (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND phone IS NOT NULL AND phone != '') as phones,
+              (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND is_active=1 AND phone IS NOT NULL AND phone != '') as phones,
               (SELECT COUNT(*) FROM violations WHERE prod_city_id=?) as violations,
               (SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key=? AND first_permit_date >= date('now','-7 days')) as new_contractors_7d
         """, (pid, pid, slug, slug, pid, slug)).fetchone()

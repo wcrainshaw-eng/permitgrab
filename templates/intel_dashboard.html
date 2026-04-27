@@ -46,7 +46,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   {% if cities %}
   <div class="grid">
     {% for c in cities %}
-    {% set pct = (100.0 * c.phones / c.profiles) if c.profiles else 0 %}
+    {# V440 M3: clamp at 100 — defense-in-depth in case phone vs profile
+       scopes drift apart again upstream. #}
+    {% set pct = [(100.0 * c.phones / c.profiles) if c.profiles else 0, 100] | min %}
     <a class="card" href="/permits/{{ c.slug }}">
       <h2>
         {{ c.name }}{% if c.state %}, {{ c.state }}{% endif %}
