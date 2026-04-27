@@ -174,16 +174,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  /* V442 P3: widened from 32px so 2-char state abbreviations
+     (AZ, CA) render comfortably; padding fallback for longer codes. */
+  min-width: 36px;
   height: 32px;
+  padding: 0 8px;
   border-radius: 6px;
   text-decoration: none;
   font-weight: 600;
   font-size: 13px;
   color: var(--gray-600);
+  background: #f8fafc;
+  border: 1px solid var(--gray-200);
   transition: all 0.15s;
 }
-.alpha-nav a:hover { background: var(--primary); color: #fff; }
+.alpha-nav a:hover { background: var(--primary, #2563eb); color: #fff; border-color: var(--primary, #2563eb); }
 
 .state-section {
   margin-bottom: 40px;
@@ -319,26 +324,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <h2>All Cities by State</h2>
   <p>{{ total_cities }} cities across {{ total_states }} states with active building permit data.</p>
 
-  <!-- Alphabet quick nav -->
-  <div class="alpha-nav">
-    {% set letters_used = [] %}
+  {# V442 P3 (CODE_V442): replaced first-letter alphabet nav with one
+     pill per state abbreviation. Each pill anchors directly to that
+     state's section below — much faster than scrolling A→Z to find FL. #}
+  <div class="alpha-nav state-pill-nav">
     {% for state_name, cities in sorted_states %}
-      {% set first = state_name[0]|upper %}
-      {% if first not in letters_used %}
-        {% if letters_used.append(first) %}{% endif %}
-        <a href="#state-{{ first }}">{{ first }}</a>
-      {% endif %}
+      <a href="#state-{{ state_name|lower }}">{{ state_name }}</a>
     {% endfor %}
   </div>
 
-  {% set current_letter = [None] %}
   {% for state_name, cities in sorted_states %}
-    {% set first = state_name[0]|upper %}
-    {% if first != current_letter[0] %}
-      {% if current_letter.append(first) %}{% endif %}
-      <div id="state-{{ first }}"></div>
-    {% endif %}
-    <div class="state-section" data-state="{{ state_name|lower }}">
+    <div class="state-section" id="state-{{ state_name|lower }}" data-state="{{ state_name|lower }}">
       <div class="state-header">
         <h3>{{ state_name }}</h3>
         <span class="state-count">{{ cities|length }} {{ 'city' if cities|length == 1 else 'cities' }}</span>
