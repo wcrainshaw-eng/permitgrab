@@ -131,18 +131,18 @@ ASSESSOR_SOURCES = {
         # V429 (CODE_V428 Phase 1a): Cook County (Chicago + suburbs)
         # Assessor Parcel Addresses on Socrata. Probed 2026-04-27:
         # 3723-97qp returns owner_address_name + mail_address_full +
-        # prop_address_full per row. Latest year=2026 records present.
-        # Cook County covers ~1.86M parcels — Chicago is the bulk but
-        # ~all 5 N IL counties feed in via mail_address_state filter.
-        # Filter to year=current to keep page sets sane (~1 year of
-        # data is enough; the table is updated annually).
+        # prop_address_full per row. ~1.86M parcels per year × 9 years
+        # of history (2017-2025) = ~16.8M total rows in the dataset.
+        # Filter to year=2025 (latest fully-published roll) so we pull
+        # one snapshot, not history. V432: explicit year filter prevents
+        # 9× over-fetching.
         'platform': 'soda',
         'service_description': 'Cook County Assessor — Parcel Addresses',
         'endpoint': 'https://datacatalog.cookcountyil.gov/resource/3723-97qp.json',
         # Some rows have owner_address_name='' (LLC properties only
         # populate the entity name elsewhere). Skip those at insert
         # time via _insert_batch's len(owner) >= 2 guard.
-        'where_clause': "owner_address_name IS NOT NULL AND prop_address_full IS NOT NULL",
+        'where_clause': "year = '2025' AND owner_address_name IS NOT NULL AND prop_address_full IS NOT NULL",
         'field_map': {
             'owner_name': 'owner_address_name',
             'address': 'prop_address_full',
