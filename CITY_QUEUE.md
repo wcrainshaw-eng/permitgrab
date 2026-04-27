@@ -6,6 +6,42 @@ data are STILL VIABLE: solar companies want owner/address data from permits.
 Show "No contractor data available" on the city page when contractor_name
 is absent. "Dead Ends" are cities with NO working permit API at all.
 
+## Property-Owner Sources Wired (V428–V433n, 2026-04-27)
+
+17 owner sources covering 23+ cities now in `assessor_collector.ASSESSOR_SOURCES`.
+Trigger via `POST /api/admin/collect-assessor-data {"source":"<key>"}`. After
+the import, run `POST /api/admin/fix-property-owner-cities` to retag rows
+where the source feed populates suburb names instead of the metro slug.
+
+| Source key | Metro / cities |
+|---|---|
+| nyc_pluto (pre-V428) | New York City |
+| maricopa | Phoenix (+ Mesa/Scottsdale/Tempe metro) |
+| cook_chicago | Chicago + Cook suburbs |
+| miami_dade | Miami-Dade + Hialeah |
+| davidson_nashville | Nashville |
+| cuyahoga_cleveland | Cleveland |
+| philadelphia_opa | Philadelphia (Carto SQL platform) |
+| hennepin_minneapolis | Minneapolis (concat-list address) |
+| bexar (pre-V428) | San Antonio |
+| clark_lasvegas | Las Vegas + Henderson |
+| travis_austin | Austin |
+| erie_buffalo | Buffalo |
+| onondaga_syracuse | Syracuse |
+| hamilton_cincinnati | Cincinnati |
+| wake_raleigh | Raleigh + Cary + Apex |
+| broward_ftlauderdale | Fort Lauderdale + Broward suburbs |
+| lee_capecoral | Cape Coral + Fort Myers |
+| multnomah_portland | Portland OR |
+| hillsborough_tampa | Tampa (parked — Tampa permits dead pending Accela parser fix) |
+| dc_vacant_blighted (pre-V428) | DC vacant/blighted properties |
+
+**Confirmed structurally suppressed** (no public owner data — would need
+commercial source like DataTree/FirstAmerican/ATTOM): all California metros
+(LA, OC/Anaheim, San Diego, San Francisco, San Jose), Pittsburgh PA
+(Allegheny classifies but doesn't name), Orlando FL (OCPA web-search only),
+Monroe NY/Rochester (not in NYS public dataset).
+
 ## Ready to Wire (confirmed endpoint + contractor field)
 <!-- Format: - CityName ST: platform resource_id, contractor_field: fieldname, tested: date -->
 - Greensboro NC: arcgis MapServer gis.greensboro-nc.gov OpenData_HRES_DS/2 BI_Permits — was already in CITY_REGISTRY as key "greensboro" but field_map mapped Contractor→contact_name (typo) and zip→Zoning (wrong). V342 fixed both. V340's duplicate "greensboro_nc" entry was reverted.
