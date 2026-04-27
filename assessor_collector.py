@@ -48,10 +48,23 @@ ASSESSOR_SOURCES = {
         # MAIL_ADDRESS / MAIL_ADDR1-2 / MAIL_CITY / MAIL_STATE /
         # MAIL_ZIP are public on MapServer/0 — task doc claimed these
         # needed an API key; live schema probe says otherwise.
+        #
+        # V432 (CODE_V428 Phase 1c): tightened where_clause from
+        # `OWNER_NAME IS NOT NULL` to also exclude empty PHYSICAL_ADDRESS.
+        # Probed 2026-04-27: PHYSICAL_ADDRESS is the literal empty string
+        # `""` (NOT NULL) for ~80% of rows in OBJECTID order — utility
+        # parcels (EL PASO NATURAL GAS) and city-owned land (AVONDALE
+        # CITY OF) where the assessor only has a mailing address.
+        # _insert_batch's `if not addr` guard then silently dropped
+        # those rows, so a 1000-row fetch yielded ~13 inserts and the
+        # admin call appeared "stuck at 13 records." Adding the
+        # `PHYSICAL_ADDRESS <> ''` filter pushes that filter into the
+        # ArcGIS query so each page yields ~80–95% inserts (proportional
+        # to true unique addresses left after dedup).
         'platform': 'arcgis_mapserver',
         'service_description': 'Maricopa County Assessor Parcels',
         'endpoint': 'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/Parcels/MapServer/0',
-        'where_clause': 'OWNER_NAME IS NOT NULL',
+        'where_clause': "OWNER_NAME IS NOT NULL AND PHYSICAL_ADDRESS IS NOT NULL AND PHYSICAL_ADDRESS <> ''",
         'field_map': {
             'owner_name': 'OWNER_NAME',
             'address': 'PHYSICAL_ADDRESS',
