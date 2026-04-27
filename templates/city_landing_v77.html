@@ -2011,15 +2011,24 @@ function v211Subscribe(ev) {
         if (!tbody) return;
         var countEl = document.getElementById('record-count-display');
         var totalRecords = countEl ? countEl.textContent.trim() : '';
+        // V435 (CODE_V434 Phase 3): case-insensitive + whitespace-tolerant
+        // comparison. V428b/V429 attempted to fix the trade-filter bug but
+        // it persisted because trade_category strings can vary in case
+        // ("Electrical" vs "ELECTRICAL") and whitespace (trailing spaces
+        // from the source feed) between the tab labels and row attrs.
+        // Normalizing both sides to trimmed-uppercase makes the match
+        // robust to that variation.
+        var norm = function(s) { return (s || '').trim().toUpperCase(); };
         tabs.addEventListener('click', function(ev) {
             var btn = ev.target.closest('button[data-trade]');
             if (!btn) return;
             tabs.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
-            var want = btn.getAttribute('data-trade') || '';
+            var wantRaw = btn.getAttribute('data-trade') || '';
+            var want = norm(wantRaw);
             var visible = 0;
             tbody.querySelectorAll('tr').forEach(function(row) {
-                var t = row.getAttribute('data-trade') || '';
+                var t = norm(row.getAttribute('data-trade'));
                 var show = !want || t === want;
                 row.style.display = show ? '' : 'none';
                 if (show) visible++;
@@ -2028,7 +2037,7 @@ function v211Subscribe(ev) {
                 if (!want) {
                     countEl.textContent = totalRecords;
                 } else {
-                    countEl.textContent = visible.toLocaleString() + ' / ' + totalRecords + ' (' + want + ')';
+                    countEl.textContent = visible.toLocaleString() + ' / ' + totalRecords + ' (' + wantRaw + ')';
                 }
             }
         });
