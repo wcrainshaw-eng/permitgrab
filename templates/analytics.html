@@ -632,6 +632,12 @@ async function loadCities() {
     // V312 (CODE_V280b Bug 9): default to a city with data instead of
     // "All Cities" — Chicago has the most permits across the network and
     // gives the user a chart-shaped experience on first load.
+    // V440 M1 (CODE_V440): the preferred-city loop sets select.value
+    // and calls loadAnalytics here. Previously a separate loadAnalytics()
+    // call ran immediately at page-init time before this code, with
+    // value="" → API returned All-Cities aggregate that rendered as
+    // dashes on first paint. Init now waits for loadCities to pick the
+    // default and fires loadAnalytics exactly once.
     var preferred = ['Chicago', 'New York', 'Phoenix', 'San Antonio', 'Miami-Dade County'];
     for (var i = 0; i < preferred.length; i++) {
       var match = Array.from(select.options).find(o => o.value === preferred[i]);
@@ -641,17 +647,27 @@ async function loadCities() {
         return;
       }
     }
+    // Fallback: if none of the preferred labels are in the dropdown,
+    // pick the first non-empty option (skip the "All Cities" placeholder).
+    for (var j = 0; j < select.options.length; j++) {
+      if (select.options[j].value) {
+        select.value = select.options[j].value;
+        loadAnalytics();
+        return;
+      }
+    }
+    loadAnalytics();
   } catch (e) {
     console.error('Failed to load cities:', e);
+    loadAnalytics();
   }
 }
 
 // City filter change
 document.getElementById('city-filter').addEventListener('change', loadAnalytics);
 
-// Init
+// Init — loadCities picks a default city and calls loadAnalytics once.
 loadCities();
-loadAnalytics();
 </script>
 
 {% include 'partials/footer.html' %}
