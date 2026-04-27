@@ -206,6 +206,34 @@ ASSESSOR_SOURCES = {
         'state': 'TN',
         'source_tag': 'assessor:davidson_nashville',
     },
+    'clark_lasvegas': {
+        # V433c (CODE_V428 follow-on): Clark County NV (Las Vegas +
+        # Henderson + N Las Vegas + Boulder City + unincorporated CC).
+        # Probed 2026-04-27: maps.clarkcountynv.gov/.../Accela/AccelaPoints/
+        # MapServer/0 = "Accela_XAPO_Parcel_OwnerEvents". 29-field schema
+        # includes ownerFullName, address, city, state, zip, mailAddress1,
+        # mailCity, parcelNumber, improvedValue, landValue. The "XAPO"
+        # name is Accela's "External API Output" — parcels keyed for
+        # permit/violation linkage. Earlier (V313 / today's V433b)
+        # probes of the Assessor folder + clarkcountygis Hub returned
+        # no owner data; the Accela XAPO layer is where it actually
+        # lives. Filter to primaryParcelFlag='Y' to get one row per
+        # parcel (the layer holds multiple owner events per parcel).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Clark County NV Accela XAPO Parcel Owner Events',
+        'endpoint': 'https://maps.clarkcountynv.gov/arcgis/rest/services/Accela/AccelaPoints/MapServer/0',
+        'where_clause': "ownerFullName IS NOT NULL AND address IS NOT NULL AND primaryParcelFlag = 'Y'",
+        'field_map': {
+            'owner_name': 'ownerFullName',
+            'address': 'address',
+            'city': 'city',
+            'zip': 'zip',
+            'owner_mailing_address': 'mailAddress1',
+            'parcel_id': 'parcelNumber',
+        },
+        'state': 'NV',
+        'source_tag': 'assessor:clark_lasvegas',
+    },
     'hennepin_minneapolis': {
         # V433b (CODE_V428 follow-on): Hennepin County (Minneapolis +
         # Bloomington + Edina). Probed 2026-04-27: HennepinData/
