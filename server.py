@@ -5589,6 +5589,17 @@ def admin_fix_property_owner_cities():
     if not valid:
         return error
     try:
+        # V437: optional `target` filter so a single rule fires per call.
+        # Avoids gunicorn 120s timeout when all 12 rules contend for the
+        # write lock under heavy concurrent assessor imports.
+        target_filter = (request.args.get('target') or '').strip()
+        if not target_filter and request.is_json:
+            try:
+                body = request.get_json(silent=True) or {}
+                target_filter = (body.get('target') or '').strip()
+            except Exception:
+                target_filter = ''
+
         conn = permitdb.get_connection()
         # Track before/after counts per metro for the response payload.
         def _count(city):
@@ -5624,6 +5635,14 @@ def admin_fix_property_owner_cities():
             ('New York', "source LIKE 'assessor:nyc_pluto%'"),
         ]
 
+        if target_filter:
+            rules = [(t, w) for (t, w) in rules if t.lower() == target_filter.lower()]
+            if not rules:
+                return jsonify({
+                    'status': 'error',
+                    'error': f'no rule for target={target_filter!r}'
+                }), 400
+
         # V436 (CODE_V434 follow-on): set busy_timeout high so the
         # UPDATE waits for concurrent assessor-import write locks
         # instead of failing immediately with "database is locked".
@@ -5638,10 +5657,11 @@ def admin_fix_property_owner_cities():
             before = _count(target)
             updated = None
             last_err = None
-            # V436: 5 retries with exponential backoff. Concurrent
-            # assessor imports hold write-locks for ~10-60s each;
-            # without the retry the UPDATE reliably fails.
-            for attempt in range(5):
+            # V437: 3 retries with shorter backoff (2,4,8s = 14s ladder)
+            # so a single-target call stays under gunicorn 120s. Combine
+            # with `?target=Phoenix`-style chunking to retag all rules
+            # without timing out under concurrent import write-lock load.
+            for attempt in range(3):
                 try:
                     cur = conn.execute(
                         f"UPDATE property_owners SET city = ? WHERE {where}",
@@ -5655,7 +5675,7 @@ def admin_fix_property_owner_cities():
                     last_err = e
                     msg = str(e).lower()
                     if 'lock' in msg or 'busy' in msg:
-                        _time.sleep(2 * (2 ** attempt))  # 2,4,8,16,32s
+                        _time.sleep(2 * (2 ** attempt))  # 2,4,8s
                         continue
                     break
             if last_err is not None:
