@@ -5613,6 +5613,7 @@ def admin_fix_property_owner_cities():
             ('Nashville', "source LIKE 'assessor:davidson_nashville%'"),
             ('Philadelphia', "source LIKE 'assessor:philadelphia_opa%'"),
             ('Minneapolis', "source LIKE 'assessor:hennepin_minneapolis%'"),
+            ('Austin', "source LIKE 'assessor:travis_austin%'"),
             ('New York', "source LIKE 'assessor:nyc_pluto%'"),
         ]
 
