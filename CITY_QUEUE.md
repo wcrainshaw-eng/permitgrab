@@ -80,7 +80,8 @@ is absent. "Dead Ends" are cities with NO working permit API at all.
 - Madison WI: no contractor field exposed
 - St Paul MN: stale endpoint
 - Lansing MI: no building permit API
-- Las Vegas NV violations: ECONNREFUSED on opendata portal
+- Las Vegas NV violations: ECONNREFUSED on opendata portal. **V431 re-probe 2026-04-27 per CODE_V428 Phase 2b: opendata.lasvegasnevada.gov returns DNS NXDOMAIN. The Socrata resource id u3ci-m9hj cannot be reached from Render egress. Same trap as the V313 finding in CLAUDE.md. → STAYS dead.**
+- San Antonio TX violations: **V431 probe 2026-04-27 per CODE_V428 Phase 2a: services.arcgis.com/g1fRTDLeMgspWrYp (the COSA AGOL org) lists 35+ services but none are building code violations — matches are all zoning/COVID/ZIP/law-enforcement (different domain). data-cos-gis.opendata.arcgis.com Hub search for "code violations" returns 0 hits. AGOL global search for COSA-owned violation services returns 0. The directive's "Planning and Development Code Violations" dataset is not surfacing on either path. → Defer pending a more specific URL or org id.**
 - Houston TX: XLSX only, no API
 - San Francisco CA: no contractor field in permit data
 - Seattle WA: no contractor field in Socrata dataset
