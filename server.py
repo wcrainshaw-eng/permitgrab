@@ -3017,6 +3017,54 @@ def admin_start_collectors():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/debug/threads', methods=['GET'])
+def admin_debug_threads():
+    """V444 (P0 daemon-stuck diagnostic): dump every Python thread's
+    name, alive state, and current stack frame. Read-only.
+
+    Pairs with the V443 zombie-respawn fix — V443 spawned the thread
+    correctly but it appears to be alive-yet-idle. This endpoint lets
+    us see what each thread is actually executing without needing
+    ptrace/py-spy access to the gunicorn worker.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    import threading as _th
+    import traceback as _tb
+    import sys as _sys
+
+    frames = _sys._current_frames()
+    threads = []
+    for t in _th.enumerate():
+        f = frames.get(t.ident)
+        if f is None:
+            stack = []
+        else:
+            stack = _tb.format_stack(f)[-12:]  # last 12 frames
+        threads.append({
+            'name': t.name,
+            'ident': t.ident,
+            'alive': t.is_alive(),
+            'daemon': t.daemon,
+            'stack': stack,
+        })
+    # Also surface flag state so we can confirm V443 reset
+    try:
+        from license_enrichment import IMPORT_IN_PROGRESS as _imp_flag
+        import_running = _imp_flag.is_set()
+    except Exception:
+        import_running = None
+    return jsonify({
+        'thread_count': len(threads),
+        'threads': threads,
+        '_collector_started': _collector_started,
+        '_collectors_manually_started': _collectors_manually_started,
+        '_startup_done': _startup_done,
+        'import_in_progress': import_running,
+    })
+
+
 @app.route('/api/admin/refresh-profiles', methods=['POST'])
 def admin_refresh_profiles():
     """V182: Rebuild contractor_profiles aggregates + emblem flags.
