@@ -11,9 +11,11 @@ A city is "ad-ready" when it has ALL THREE:
 2. **Phones** (>50 profiles with phone numbers)
 3. **Violations** (>0 code enforcement violation records)
 
-**Current state (2026-04-25, post-V326 merges + CA license import):**
-- **Ad-ready (13):** San Antonio (3,828), Miami-Dade (3,818), Chicago (3,498), Phoenix (1,080), **NYC (783 — restored via NY DOL re-import)**, **Los Angeles (591 — new this session via CA CSLB import)**, Henderson (362), Anaheim (242), Cleveland (147), San Jose (104), Buffalo (84), Nashville (73), Orlando (57)
-- **Periodic state license re-imports are the highest-leverage hidden lever.** CSLB/DBPR/DOL/DLI imports decay as new contractor profiles accumulate that haven't been name-matched. Re-running this session yielded LA +564 phones, NYC +317, Buffalo +16, Minneapolis +7, Hialeah +18 (FL). Schedule monthly state-import refresh in autonomous loop.
+**Current state (2026-04-26, post-V437 retag + 18 assessor-source imports):**
+- **Ad-ready (13):** Chicago (3,498), Miami-Dade (3,980), Phoenix (1,080), San Antonio (3,830), NYC (791), LA (591), Nashville (73), Cleveland (148), Henderson (362), Buffalo (85), Orlando (57), Anaheim (242), San Jose (112) — phones in parens; all 13 have >100 profiles + >50 phones + >0 violations
+- **Property owners pipeline live (~947K rows across 18 assessor sources).** Top owner counts: Miami-Dade 81K, Phoenix 79K, Broward 77K, Clark/LV 73K, Cook/Chicago 72K, Davidson/Nashville 71K, Cuyahoga/Cleveland 60K, Erie/Buffalo 59K, Travis/Austin 55K, Philadelphia 55K, Wake/Raleigh 54K, Onondaga/Syracuse 54K, Multnomah/Portland 54K, Hillsborough/Tampa 53K, Hennepin/Minneapolis 29K, NYC PLUTO 5K, Bexar/SA 5K, Lee/Cape Coral 4K
+- **Near-miss watch:** Philadelphia 1,345 profiles / 12 phones (PA has no bulk DB → DDG-only path); Minneapolis/Hialeah/Las Vegas all gated by violations (known dead-ends per below)
+- **Periodic state license re-imports are the highest-leverage hidden lever.** Re-running this session yielded LA +564 phones, NYC +317, Buffalo +16, Minneapolis +7, Hialeah +18 (FL). Schedule monthly state-import refresh in autonomous loop.
 - **Older snapshot below from 2026-04-23, post-V250 merges:**
 - **Ad-ready (6):** Chicago (3,494 phones), NYC (466), Phoenix (1,079), San Jose (95), Miami-Dade (245), **Orlando** (57 — new this cycle, FL DBPR 2nd-import lift)
 - **Near-miss — phones gap:** Cape Coral (44, need 6), Fort Lauderdale (22), Columbus (12), Buffalo (15)
