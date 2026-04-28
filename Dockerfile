@@ -27,4 +27,12 @@ EXPOSE 5000
 # 64MB by V445 and process memory tops out around 1.2GB / 2GB so
 # the recycle is no longer needed for leak protection at the old
 # rate.
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120 --graceful-timeout 30 --max-requests 5000 --max-requests-jitter 500 server:app"]
+# V452 (CODE_V448 follow-on): bumped --threads 4 → 12. After V450
+# unblocked the collector, city-page queries (slow ones in
+# city_trade_landing / _get_property_owners) saturated the 4-thread
+# pool every time more than 2-3 users hit a slow page concurrently.
+# Render's gateway returned 502 because /healthz had no thread to
+# serve. 12 threads gives headroom while we work on the slow queries
+# themselves; gthread workers are cheap (each is a Python thread, not
+# a process), and the gunicorn timeout=120 still bounds runaway calls.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 12 --timeout 120 --graceful-timeout 30 --max-requests 5000 --max-requests-jitter 500 server:app"]
