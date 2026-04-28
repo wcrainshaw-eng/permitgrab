@@ -10424,26 +10424,44 @@ def api_address_detail():
     except Exception:
         pass
 
-    # Property owner (optional — table may be empty for this city)
+    # V464 (CODE_V460 Phase 1): scope owner lookup to the same state and
+    # rank by exact-city → city-prefix → in-state. Prior query had no city
+    # filter at all, so a "100 MAIN ST" in another state could win on
+    # last_updated. Also handles the prod_cities.city ↔ property_owners.city
+    # mismatch (e.g. "Miami-Dade County" vs "Miami-Dade") without an alias map.
     owner = None
     try:
-        orow = conn.execute("""
-            SELECT owner_name, owner_mailing_address, parcel_id, source
-            FROM property_owners
-            WHERE UPPER(address) LIKE ?
-            ORDER BY last_updated DESC
-            LIMIT 1
-        """, (like_prefix,)).fetchone()
-        if orow:
-            owner = {
-                'owner_name': orow['owner_name'],
-                # Mailing address is sensitive → logged-in only.
-                'mailing_address': orow['owner_mailing_address'] if logged_in else None,
-                'parcel_id': orow['parcel_id'],
-                'source': orow['source'],
-            }
-    except Exception:
-        pass
+        pc_owner = conn.execute(
+            "SELECT city, state FROM prod_cities WHERE city_slug = ? LIMIT 1",
+            (city_slug,)
+        ).fetchone()
+        if pc_owner and pc_owner['state']:
+            _state = pc_owner['state']
+            _city_full = pc_owner['city'] or ''
+            _city_prefix = (_city_full + ' %') if _city_full else '% %'
+            orow = conn.execute("""
+                SELECT owner_name, owner_mailing_address, parcel_id, source, city
+                  FROM property_owners
+                 WHERE state = ?
+                   AND UPPER(address) LIKE ?
+                 ORDER BY
+                   CASE
+                     WHEN city = ?           THEN 0
+                     WHEN ? LIKE city || ' %' THEN 1
+                     ELSE 2
+                   END,
+                   last_updated DESC
+                 LIMIT 1
+            """, (_state, like_prefix, _city_full, _city_full)).fetchone()
+            if orow:
+                owner = {
+                    'owner_name': orow['owner_name'],
+                    'mailing_address': orow['owner_mailing_address'] if logged_in else None,
+                    'parcel_id': orow['parcel_id'],
+                    'source': orow['source'],
+                }
+    except Exception as _v464_err:
+        print(f"[V464] property_owners lookup error: {_v464_err}", flush=True)
 
     return jsonify({
         'address': upper,
