@@ -338,31 +338,55 @@ def cleanup_balance_of_entries():
 
 
 def _propagate_bulk_to_cities():
-    """V118: After bulk collection, update child cities' last_successful_collection."""
+    """V118: After bulk collection, update child cities' last_successful_collection.
+
+    V449 (P0 perf fix): the previous query used
+      lower(p.city) = lower(prod_cities.city) AND lower(p.state) = ...
+    which forced full-scan matching against 1.27M permits per active
+    city (2,232 active rows). On Render this query was holding the
+    collection_lock for 60–90 min EVERY cycle, blocking every later
+    step (collect_violations, staleness_check, etc.) until either it
+    finished or the worker recycled and killed the cycle.
+
+    Rewrote to use indexed prod_city_id directly. permits.prod_city_id
+    has 88% coverage and an index (idx_permits_prod_city). The 12%
+    without prod_city_id (the 145K rows where the FK was never set)
+    are excluded — they wouldn't have matched the lower() city/state
+    join cleanly anyway since those rows are typically the very ones
+    with mismatched name/state casing.
+    """
     conn = permitdb.get_connection()
     try:
-        updated = conn.execute("""
-            UPDATE prod_cities SET
-                last_successful_collection = (
-                    SELECT max(p.collected_at) FROM permits p
-                    WHERE lower(p.city) = lower(prod_cities.city)
-                    AND lower(p.state) = lower(prod_cities.state)
-                    AND p.collected_at > datetime('now', '-12 hours')
-                ),
-                health_status = 'collecting', data_freshness = 'fresh'
-            WHERE prod_cities.status = 'active'
-            AND EXISTS (
-                SELECT 1 FROM permits p
-                WHERE lower(p.city) = lower(prod_cities.city)
-                AND lower(p.state) = lower(prod_cities.state)
-                AND p.collected_at > datetime('now', '-12 hours')
-            )
-        """).rowcount
+        # First: collect the per-city max collected_at in one pass.
+        rows = conn.execute("""
+            SELECT prod_city_id, max(collected_at) AS latest
+            FROM permits
+            WHERE prod_city_id IS NOT NULL
+              AND collected_at > datetime('now', '-12 hours')
+            GROUP BY prod_city_id
+        """).fetchall()
+        if not rows:
+            return
+        # Apply with executemany — small list (only cities that had
+        # writes in the last 12h), so this is fast.
+        params = [
+            (r[1] if not isinstance(r, dict) else r['latest'],
+             r[0] if not isinstance(r, dict) else r['prod_city_id'])
+            for r in rows
+        ]
+        cur = conn.executemany("""
+            UPDATE prod_cities
+            SET last_successful_collection = ?,
+                health_status = 'collecting',
+                data_freshness = 'fresh'
+            WHERE id = ? AND status = 'active'
+        """, params)
         conn.commit()
+        updated = cur.rowcount if cur.rowcount is not None else len(params)
         if updated:
-            print(f"[V118] Propagated bulk collection to {updated} child cities", flush=True)
+            print(f"[V118/V449] Propagated bulk collection to {updated} child cities", flush=True)
     except Exception as e:
-        print(f"[V118] Propagation error: {e}", flush=True)
+        print(f"[V118/V449] Propagation error: {e}", flush=True)
 
 
 def update_all_city_health():
