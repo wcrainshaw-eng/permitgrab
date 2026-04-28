@@ -11670,9 +11670,9 @@ def api_contractors():
     timed out under the 512MB Render budget. Capped at 500 rows.
     """
     try:
-        city = request.args.get('city', '')
-    if city and city.lower() == 'all':
-        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter.strip()
+        city = request.args.get('city', '').strip()
+        if city.lower() == 'all':
+            city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
         search = request.args.get('search', '').strip().lower()
         # V447 P0: server-side default to most_recent_date so callers
         # that hit /api/contractors without ?sort_by also get fresh-first.
