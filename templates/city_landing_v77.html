@@ -1030,7 +1030,8 @@ body {
     <select id="f-trade" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
       <option value="">All Trades</option>
       {% for t in available_trades %}
-      <option value="{{ t }}"{% if filter_trade == t %} selected{% endif %}>{{ t }}</option>
+      {# V446 P0: case-insensitive match so URL `?trade=roofing` selects "Roofing" #}
+      <option value="{{ t }}"{% if filter_trade and filter_trade|lower == t|lower %} selected{% endif %}>{{ t }}</option>
       {% endfor %}
     </select>
     <select id="f-zip" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
