@@ -3261,16 +3261,17 @@ def collect_v122(days_back=7, include_scrapers=True):
         # headroom for the web worker (which shares the 512MB process)
         # plus a 450MB hard-abort below in case a fetch starts at 350MB
         # and explodes mid-normalize.
-        # V450 (P0): bumped from 350/450 to 1500/1750. The original
-        # thresholds were sized for the 512MB Render plan, but the
-        # web service has been on the 2GB Standard plan since V418.
-        # At idle the worker uses ~900–1100MB, so the old caps tripped
-        # _cycle_bailed=True on the FIRST city every cycle and Phase 2
-        # exited without collecting any per-city permits — that's why
-        # scraper_runs and permits had no fresh writes for days, even
-        # after the V448 max-requests bump and V449 propagate fix.
-        _MEM_BAIL_MB = 1500
-        _MEM_HARD_ABORT_MB = 1750  # immediate abort, no further retries this cycle
+        # V453 (CODE_V448 hot-path fix): V450 raised to 1500/1750 but
+        # observed live: worker climbed to 2831MB RSS, blowing the 2GB
+        # Render ceiling and 502'ing the site for hours. The bail check
+        # fires BETWEEN cities, but a single heavy upsert (some sources
+        # return 5K+ permits) can spike memory by 500MB+ within one
+        # city — so the bail at 1500MB lets the next city push past 2GB.
+        # Lowered to 1200/1400 to leave 600MB headroom for the worst
+        # single-city spike. Idle baseline is ~900–1100MB so this still
+        # lets the cycle make progress before bailing.
+        _MEM_BAIL_MB = 1200
+        _MEM_HARD_ABORT_MB = 1400  # immediate abort, no further retries this cycle
         _cycle_bailed = False
 
         for row in rows:
@@ -3856,16 +3857,17 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             _proc = _psutil.Process(os.getpid())
         except Exception:
             _proc = None
-        # V450 (P0): bumped from 350/450 to 1500/1750. The original
-        # thresholds were sized for the 512MB Render plan, but the
-        # web service has been on the 2GB Standard plan since V418.
-        # At idle the worker uses ~900–1100MB, so the old caps tripped
-        # _cycle_bailed=True on the FIRST city every cycle and Phase 2
-        # exited without collecting any per-city permits — that's why
-        # scraper_runs and permits had no fresh writes for days, even
-        # after the V448 max-requests bump and V449 propagate fix.
-        _MEM_BAIL_MB = 1500
-        _MEM_HARD_ABORT_MB = 1750
+        # V453 (CODE_V448 hot-path fix): V450 raised to 1500/1750 but
+        # observed live: worker climbed to 2831MB RSS, blowing the 2GB
+        # Render ceiling and 502'ing the site for hours. The bail check
+        # fires BETWEEN cities, but a single heavy upsert (some sources
+        # return 5K+ permits) can spike memory by 500MB+ within one
+        # city — so the bail at 1500MB lets the next city push past 2GB.
+        # Lowered to 1200/1400 to leave 600MB headroom for the worst
+        # single-city spike. Idle baseline is ~900–1100MB so this still
+        # lets the cycle make progress before bailing.
+        _MEM_BAIL_MB = 1200
+        _MEM_HARD_ABORT_MB = 1400
         _cycle_bailed = False
 
         for city_info in individual_cities:
