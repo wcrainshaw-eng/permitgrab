@@ -4296,37 +4296,51 @@ FRESHNESS_VERY_STALE_DAYS = 30
 def get_stale_cities():
     """V18: Get all cities with stale data (>14 days since newest permit).
 
-    Returns list of dicts with city info and staleness details.
+    V461: rewritten to use prod_city_id (idx_permits_prod_city_date) instead of
+    LOWER(p.city)=LOWER(pc.city) — that JOIN can't use any index and was
+    full-scanning permits once per active city, hanging the daemon for hours
+    and ballooning memory. The correlated subquery now hits one index range
+    per active city in milliseconds.
     """
+    from datetime import datetime
     conn = get_connection()
     cursor = conn.execute("""
-        SELECT pc.city, pc.state, pc.city_slug, pc.total_permits,
+        SELECT pc.id, pc.city, pc.state, pc.city_slug, pc.total_permits,
                pc.source_type, pc.source_id, pc.data_freshness, pc.stale_since,
-               MAX(p.filing_date) as newest_permit,
-               CAST(julianday('now') - julianday(MAX(p.filing_date)) AS INTEGER) as days_stale
-        FROM prod_cities pc
-        LEFT JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
-                            AND LOWER(p.state) = LOWER(pc.state)
-        WHERE pc.status = 'active'
-        GROUP BY pc.city, pc.state
-        HAVING days_stale > ? OR newest_permit IS NULL
-        ORDER BY days_stale DESC
-    """, (FRESHNESS_STALE_DAYS,))
+               (SELECT MAX(p.filing_date)
+                  FROM permits p
+                 WHERE p.prod_city_id = pc.id
+                   AND p.filing_date IS NOT NULL
+                   AND p.filing_date <> '') AS newest_permit
+          FROM prod_cities pc
+         WHERE pc.status = 'active'
+    """)
 
+    today = datetime.utcnow()
     results = []
     for row in cursor:
-        results.append({
-            'city': row['city'],
-            'state': row['state'],
-            'city_slug': row['city_slug'],
-            'total_permits': row['total_permits'] or 0,
-            'source_type': row['source_type'],
-            'source_id': row['source_id'],
-            'current_freshness': row['data_freshness'],
-            'stale_since': row['stale_since'],
-            'newest_permit': row['newest_permit'],
-            'days_stale': row['days_stale'] if row['newest_permit'] else None,
-        })
+        newest = row['newest_permit']
+        days_stale = None
+        if newest:
+            try:
+                days_stale = (today - datetime.strptime(newest[:10], '%Y-%m-%d')).days
+            except (ValueError, TypeError):
+                days_stale = None
+
+        if days_stale is None or days_stale > FRESHNESS_STALE_DAYS:
+            results.append({
+                'city': row['city'],
+                'state': row['state'],
+                'city_slug': row['city_slug'],
+                'total_permits': row['total_permits'] or 0,
+                'source_type': row['source_type'],
+                'source_id': row['source_id'],
+                'current_freshness': row['data_freshness'],
+                'stale_since': row['stale_since'],
+                'newest_permit': newest,
+                'days_stale': days_stale,
+            })
+    results.sort(key=lambda r: (r['days_stale'] is not None, r['days_stale'] or 0), reverse=True)
     return results
 
 

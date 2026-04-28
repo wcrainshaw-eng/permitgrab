@@ -4584,18 +4584,41 @@ def staleness_check():
         'paused_list': [],
     }
 
-    # Also check cities that were previously marked stale but now have fresh data
+    # V461: same prod_city_id index fix as get_stale_cities() in db.py.
+    # The prior LOWER(p.city)=LOWER(pc.city) JOIN was full-scanning permits
+    # per active city and hanging the daemon for hours.
+    from datetime import datetime as _v461_dt
     conn = permitdb.get_connection()
-    all_active = conn.execute("""
-        SELECT pc.city, pc.state, pc.city_slug, pc.data_freshness, pc.stale_since,
-               MAX(p.filing_date) as newest_permit,
-               CAST(julianday('now') - julianday(MAX(p.filing_date)) AS INTEGER) as days_stale
-        FROM prod_cities pc
-        LEFT JOIN permits p ON LOWER(p.city) = LOWER(pc.city)
-                            AND LOWER(p.state) = LOWER(pc.state)
-        WHERE pc.status = 'active'
-        GROUP BY pc.city, pc.state
+    raw_active = conn.execute("""
+        SELECT pc.id, pc.city, pc.state, pc.city_slug, pc.data_freshness, pc.stale_since,
+               (SELECT MAX(p.filing_date)
+                  FROM permits p
+                 WHERE p.prod_city_id = pc.id
+                   AND p.filing_date IS NOT NULL
+                   AND p.filing_date <> '') AS newest_permit
+          FROM prod_cities pc
+         WHERE pc.status = 'active'
     """).fetchall()
+
+    _v461_now = _v461_dt.utcnow()
+    all_active = []
+    for r in raw_active:
+        newest = r['newest_permit']
+        days = None
+        if newest:
+            try:
+                days = (_v461_now - _v461_dt.strptime(newest[:10], '%Y-%m-%d')).days
+            except (ValueError, TypeError):
+                days = None
+        all_active.append({
+            'city': r['city'],
+            'state': r['state'],
+            'city_slug': r['city_slug'],
+            'data_freshness': r['data_freshness'],
+            'stale_since': r['stale_since'],
+            'newest_permit': newest,
+            'days_stale': days,
+        })
 
     for row in all_active:
         stats['total_checked'] += 1
