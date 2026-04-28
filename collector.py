@@ -3816,7 +3816,15 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             individual_cities.append(c)
 
         # V166: Cap cities per cycle to prevent blocking gunicorn for 30+ minutes
-        MAX_CITIES_PER_CYCLE = 50
+        # V454 (P0): reduced from 50 to 15. With 50 cities the cumulative
+        # per-cycle memory pressure pushed the worker past the 2GB Render
+        # ceiling even with V453's bail thresholds, because the bail
+        # check only fires inside this loop — subsequent phases
+        # (violations + staleness + propagate) can't bail. Smaller cycle
+        # = lower peak. Cycle cadence rises proportionally; the worker
+        # max-requests=5000 + V448 keeps daemons alive long enough that
+        # all cities still get collected over a 1-2 hour window.
+        MAX_CITIES_PER_CYCLE = 15
         if len(individual_cities) > MAX_CITIES_PER_CYCLE:
             print(f"    [V166] Limiting to {MAX_CITIES_PER_CYCLE}/{len(individual_cities)} cities this cycle")
             individual_cities = individual_cities[:MAX_CITIES_PER_CYCLE]
