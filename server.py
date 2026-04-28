@@ -11759,6 +11759,11 @@ def api_contractors():
                   AND LENGTH(contractor_name_raw) >= 3
                   AND UPPER(TRIM(contractor_name_raw)) NOT IN ({_garbage_placeholders})
                   AND contractor_name_raw GLOB '*[^0-9]*'
+                  -- V446 P1: form-template scrape garbage from Sacramento County etc.
+                  AND contractor_name_raw NOT LIKE '%SELECT EDIT%'
+                  AND contractor_name_raw NOT LIKE '%ENTER NAME%'
+                  AND contractor_name_raw NOT LIKE '****%'
+                  AND contractor_name_raw NOT LIKE '%PHONE NUMBER%'
                 ORDER BY total_permits DESC
                 LIMIT 5000
             """
@@ -11788,6 +11793,11 @@ def api_contractors():
                   AND LENGTH(contractor_name_raw) >= 3
                   AND UPPER(TRIM(contractor_name_raw)) NOT IN ({_garbage_placeholders})
                   AND contractor_name_raw GLOB '*[^0-9]*'
+                  -- V446 P1: form-template scrape garbage from Sacramento County etc.
+                  AND contractor_name_raw NOT LIKE '%SELECT EDIT%'
+                  AND contractor_name_raw NOT LIKE '%ENTER NAME%'
+                  AND contractor_name_raw NOT LIKE '****%'
+                  AND contractor_name_raw NOT LIKE '%PHONE NUMBER%'
                 GROUP BY contractor_name_normalized
                 ORDER BY total_permits DESC
                 LIMIT 5000
@@ -17036,10 +17046,15 @@ def cities_browse():
         else:
             no_state.append(city)
 
-    # Sort states alphabetically, cities within each state by permit count
+    # Sort states alphabetically.
+    # V446 P2 (CODE_V446): cities within each state were sorted by permit
+    # count (descending). Users browse by scanning for their city name —
+    # alphabetical is the natural mental model. Switched to alphabetical
+    # by name (case-insensitive) so "Cape Coral" comes before "Hialeah"
+    # under FL even though Hialeah has more permits.
     sorted_states = sorted(states.items(), key=lambda x: x[0])
     for state_name, cities in sorted_states:
-        cities.sort(key=lambda c: c.get('permit_count', 0), reverse=True)
+        cities.sort(key=lambda c: (c.get('name') or '').lower())
 
     # Top cities across all states (for hero section)
     # V13.2: Increased from 12 to 20 for better coverage
