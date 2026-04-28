@@ -1583,6 +1583,63 @@ def _deferred_startup():
     except Exception:
         pass  # /var/data may not exist locally
 
+    # V462 (CODE_V459 task 3): generate one-time password reset link for Gomes
+    # Benjamim if they haven't set a password yet. Gomes paid 2026-04-27 but
+    # was provisioned with a temp password they were never told. The existing
+    # reset mechanism uses a JSON file (DATA_DIR/password_reset_tokens.json) —
+    # not a User column — so we write to that file directly.
+    try:
+        _gomes = User.query.filter_by(email='main@onpointgb.com').first()
+        if _gomes and not getattr(_gomes, 'last_login_at', None):
+            import secrets as _v462_secrets
+            _v462_existing = load_reset_tokens()
+            _v462_has = any(
+                v.get('email', '').lower() == 'main@onpointgb.com'
+                and not v.get('used', False)
+                and v.get('expires', '') > datetime.utcnow().isoformat()
+                for v in _v462_existing.values()
+            )
+            if not _v462_has:
+                _v462_token = _v462_secrets.token_urlsafe(32)
+                _v462_existing[_v462_token] = {
+                    'email': 'main@onpointgb.com',
+                    'expires': (datetime.utcnow() + timedelta(days=7)).isoformat(),
+                    'used': False,
+                }
+                save_reset_tokens(_v462_existing)
+                print(
+                    f"[AUTH] Gomes Benjamim reset link (valid 7 days): "
+                    f"https://permitgrab.com/reset-password/{_v462_token}",
+                    flush=True,
+                )
+            else:
+                print("[AUTH] Gomes already has unused reset token — not generating new one", flush=True)
+        elif _gomes:
+            print(
+                f"[AUTH] Gomes Benjamim has logged in already (last_login={_gomes.last_login_at}) — skipping reset link",
+                flush=True,
+            )
+        else:
+            print("[AUTH] Gomes user row not found — skipping reset link generation", flush=True)
+    except Exception as _gomes_err:
+        print(f"[AUTH] Gomes reset link generation skipped (non-fatal): {_gomes_err}", flush=True)
+
+    # V462 (CODE_V459 task 4): cleanup test users from prior verification runs.
+    # Limit to @example.com domain so real users are never touched.
+    try:
+        _deleted_test_users = User.query.filter(
+            User.email.like('%@example.com')
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        if _deleted_test_users:
+            print(f"[AUTH] V462 cleanup: removed {_deleted_test_users} @example.com test users", flush=True)
+    except Exception as _cleanup_err:
+        print(f"[AUTH] Test user cleanup skipped (non-fatal): {_cleanup_err}", flush=True)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
     # V183: Refresh contractor profiles + emblems BEFORE spawning background
     # threads. This is the only reliable write window — _deferred_startup runs
     # sequentially, and once maintenance/_v146_safe_autostart spawn, the SQLite
@@ -13568,6 +13625,16 @@ STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:5000')
 
+# V462 (CODE_V459 task 1): log Stripe config state at startup so deploys
+# can be debugged without leaking secret values. We only print presence,
+# never the secret itself.
+print(
+    f"[Stripe] config @ startup: SECRET_KEY={'set' if STRIPE_SECRET_KEY else 'NOT SET'} "
+    f"PRICE_ID={'set' if STRIPE_PRICE_ID else 'NOT SET'} "
+    f"WEBHOOK_SECRET={'set' if STRIPE_WEBHOOK_SECRET else 'NOT SET'}",
+    flush=True,
+)
+
 @app.route('/api/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     """Create a Stripe Checkout Session for the requested plan.
@@ -13683,27 +13750,45 @@ def checkout_success():
 
 @app.route('/api/stripe-webhook', methods=['POST'])
 def stripe_webhook():
-    """Handle Stripe webhook events."""
+    """Handle Stripe webhook events.
+
+    V462 (CODE_V459 task 1): hardened against malformed inputs that
+    previously raised uncaught exceptions in stripe.Webhook.construct_event
+    (None sig_header, empty body) and bubbled to a 503. We now validate
+    inputs explicitly, catch every exception class, and never let Stripe
+    see a 5xx after the event is decoded — Stripe disables endpoints
+    after 3 days of consecutive failures.
+    """
     payload = request.get_data(as_text=True)
     sig_header = request.headers.get('Stripe-Signature')
 
     if not STRIPE_SECRET_KEY:
+        print("[Stripe] STRIPE_SECRET_KEY not set — webhook cannot process", flush=True)
         return jsonify({'error': 'Stripe not configured'}), 500
+
+    if not payload:
+        return jsonify({'error': 'Empty payload'}), 400
 
     stripe.api_key = STRIPE_SECRET_KEY
 
     try:
         if STRIPE_WEBHOOK_SECRET:
+            if not sig_header:
+                return jsonify({'error': 'Missing Stripe-Signature header'}), 400
             event = stripe.Webhook.construct_event(
                 payload, sig_header, STRIPE_WEBHOOK_SECRET
             )
         else:
-            # For testing without webhook signature verification
             event = json.loads(payload)
     except ValueError:
         return jsonify({'error': 'Invalid payload'}), 400
     except stripe.error.SignatureVerificationError:
         return jsonify({'error': 'Invalid signature'}), 400
+    except Exception as _construct_err:
+        import traceback
+        traceback.print_exc()
+        print(f"[Stripe] event decode failed: {_construct_err}", flush=True)
+        return jsonify({'error': 'Decode failed', 'detail': str(_construct_err)}), 400
 
     event_type = event['type']
     event_id = event.get('id') or ''
@@ -13734,95 +13819,95 @@ def stripe_webhook():
             # to risk a duplicate email than 500 and let Stripe retry.
             print(f"[Stripe] idempotency check skipped (non-fatal): {_e}")
 
-    # V12.53: Handle all subscription lifecycle events
-    if event_type == 'checkout.session.completed':
-        # New subscription or upgrade
-        session_obj = event['data']['object']
-        customer_email = session_obj.get('customer_email') or session_obj.get('customer_details', {}).get('email')
-        plan = session_obj.get('metadata', {}).get('plan', 'professional')
+    # V462 (CODE_V459 task 1): wrap dispatch so a downstream provisioning
+    # exception (DB write fail, email send fail, etc.) still returns 200 to
+    # Stripe. The event_id is already persisted; we'd rather risk a missed
+    # side-effect than have Stripe disable the webhook after 3 failed retries.
+    try:
+        # V12.53: Handle all subscription lifecycle events
+        if event_type == 'checkout.session.completed':
+            session_obj = event['data']['object']
+            customer_email = session_obj.get('customer_email') or session_obj.get('customer_details', {}).get('email')
+            plan = session_obj.get('metadata', {}).get('plan', 'professional')
 
-        client_ref_id = session_obj.get('client_reference_id')
-        metadata_user_id = (session_obj.get('metadata') or {}).get('user_id')
-        user = None
-        for _uid_candidate in (client_ref_id, metadata_user_id):
-            if _uid_candidate:
-                try:
-                    user = User.query.get(int(_uid_candidate))
-                    if user:
-                        break
-                except (ValueError, TypeError):
-                    pass
-        if not user and customer_email:
-            user = find_user_by_email(customer_email)
+            client_ref_id = session_obj.get('client_reference_id')
+            metadata_user_id = (session_obj.get('metadata') or {}).get('user_id')
+            user = None
+            for _uid_candidate in (client_ref_id, metadata_user_id):
+                if _uid_candidate:
+                    try:
+                        user = User.query.get(int(_uid_candidate))
+                        if user:
+                            break
+                    except (ValueError, TypeError):
+                        pass
+            if not user and customer_email:
+                user = find_user_by_email(customer_email)
 
-        if user:
-            user.plan = 'pro'
-            user.stripe_customer_id = session_obj.get('customer')
-            user.subscription_id = session_obj.get('subscription')
-            user.trial_end_date = None
-            user.trial_started_at = None
-            db.session.commit()
-            print(f"[Stripe] User id={user.id} email={user.email} upgraded to {plan}")
-
-            try:
-                from email_alerts import send_payment_success
-                send_payment_success(user, plan)
-            except Exception as e:
-                print(f"[Stripe] Payment success email failed: {e}")
-
-            analytics.track_event('payment_success', event_data={
-                'plan': plan,
-                'stripe_customer_id': session_obj.get('customer')
-            }, user_id_override=user.email)
-
-    elif event_type == 'invoice.payment_failed':
-        # Payment failed
-        invoice = event['data']['object']
-        customer_email = invoice.get('customer_email')
-
-        if customer_email:
-            user = find_user_by_email(customer_email)
             if user:
-                print(f"[Stripe] Payment failed for {customer_email}")
+                user.plan = 'pro'
+                user.stripe_customer_id = session_obj.get('customer')
+                user.subscription_id = session_obj.get('subscription')
+                user.trial_end_date = None
+                user.trial_started_at = None
+                db.session.commit()
+                print(f"[Stripe] User id={user.id} email={user.email} upgraded to {plan}", flush=True)
+
                 try:
-                    from email_alerts import send_payment_failed
-                    send_payment_failed(user)
+                    from email_alerts import send_payment_success
+                    send_payment_success(user, plan)
                 except Exception as e:
-                    print(f"[Stripe] Payment failed email failed: {e}")
+                    print(f"[Stripe] Payment success email failed: {e}", flush=True)
 
-    elif event_type == 'invoice.payment_succeeded':
-        # Renewal payment succeeded
-        invoice = event['data']['object']
-        customer_email = invoice.get('customer_email')
-        # Only send renewal email if this is not the first payment
-        billing_reason = invoice.get('billing_reason')
+                analytics.track_event('payment_success', event_data={
+                    'plan': plan,
+                    'stripe_customer_id': session_obj.get('customer')
+                }, user_id_override=user.email)
 
-        if customer_email and billing_reason == 'subscription_cycle':
-            user = find_user_by_email(customer_email)
+        elif event_type == 'invoice.payment_failed':
+            invoice = event['data']['object']
+            customer_email = invoice.get('customer_email')
+            if customer_email:
+                user = find_user_by_email(customer_email)
+                if user:
+                    print(f"[Stripe] Payment failed for {customer_email}", flush=True)
+                    try:
+                        from email_alerts import send_payment_failed
+                        send_payment_failed(user)
+                    except Exception as e:
+                        print(f"[Stripe] Payment failed email failed: {e}", flush=True)
+
+        elif event_type == 'invoice.payment_succeeded':
+            invoice = event['data']['object']
+            customer_email = invoice.get('customer_email')
+            billing_reason = invoice.get('billing_reason')
+            if customer_email and billing_reason == 'subscription_cycle':
+                user = find_user_by_email(customer_email)
+                if user:
+                    print(f"[Stripe] Subscription renewed for {customer_email}", flush=True)
+                    try:
+                        from email_alerts import send_subscription_renewed
+                        send_subscription_renewed(user)
+                    except Exception as e:
+                        print(f"[Stripe] Renewal email failed: {e}", flush=True)
+
+        elif event_type == 'customer.subscription.deleted':
+            subscription = event['data']['object']
+            customer_id = subscription.get('customer')
+            user = User.query.filter_by(stripe_customer_id=customer_id).first()
             if user:
-                print(f"[Stripe] Subscription renewed for {customer_email}")
+                user.plan = 'free'
+                db.session.commit()
+                print(f"[Stripe] Subscription cancelled for {user.email}", flush=True)
                 try:
-                    from email_alerts import send_subscription_renewed
-                    send_subscription_renewed(user)
+                    from email_alerts import send_subscription_cancelled
+                    send_subscription_cancelled(user)
                 except Exception as e:
-                    print(f"[Stripe] Renewal email failed: {e}")
-
-    elif event_type == 'customer.subscription.deleted':
-        # Subscription cancelled
-        subscription = event['data']['object']
-        customer_id = subscription.get('customer')
-
-        # Find user by stripe_customer_id
-        user = User.query.filter_by(stripe_customer_id=customer_id).first()
-        if user:
-            user.plan = 'free'
-            db.session.commit()
-            print(f"[Stripe] Subscription cancelled for {user.email}")
-            try:
-                from email_alerts import send_subscription_cancelled
-                send_subscription_cancelled(user)
-            except Exception as e:
-                print(f"[Stripe] Cancellation email failed: {e}")
+                    print(f"[Stripe] Cancellation email failed: {e}", flush=True)
+    except Exception as _dispatch_err:
+        import traceback
+        traceback.print_exc()
+        print(f"[Stripe] dispatch exception (event {event_id} {event_type}): {_dispatch_err}", flush=True)
 
     return jsonify({'status': 'success'})
 
