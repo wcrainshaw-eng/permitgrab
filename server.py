@@ -10252,7 +10252,9 @@ def api_permits():
     FREEMIUM GATING: Non-Pro users see masked contact info on ALL permits.
     """
     # Parse filters — V174: accept both 'city' and 'city_slug' param names
-    city = request.args.get('city', '') or request.args.get('city_slug', '')
+    city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter or request.args.get('city_slug', '')
     trade = request.args.get('trade', '')
     value = request.args.get('value', '')
     status_filter = request.args.get('status', '')
@@ -10611,6 +10613,8 @@ def api_export():
 
     # V12.51: SQL-backed export
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     trade = request.args.get('trade', '')
     quality = request.args.get('quality', '')
 
@@ -11666,7 +11670,9 @@ def api_contractors():
     timed out under the 512MB Render budget. Capped at 500 rows.
     """
     try:
-        city = request.args.get('city', '').strip()
+        city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter.strip()
         search = request.args.get('search', '').strip().lower()
         # V447 P0: server-side default to most_recent_date so callers
         # that hit /api/contractors without ?sort_by also get fresh-first.
@@ -11972,6 +11978,8 @@ def api_top_contractors():
     V12.51: SQL-backed
     """
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     permits, _ = permitdb.query_permits(city=city or None, page=1, per_page=100000)
 
     limit = int(request.args.get('limit', 5))
@@ -12890,6 +12898,8 @@ def api_analytics_volume():
     filing_date to be non-null.
     """
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     weeks = int(request.args.get('weeks', 12))
 
     conn = permitdb.get_connection()
@@ -12972,6 +12982,8 @@ def api_analytics_trades():
     V12.51: Uses SQLite for efficient aggregation.
     """
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     conn = permitdb.get_connection()
 
     if city:
@@ -13011,6 +13023,8 @@ def api_analytics_values():
     V12.51: Uses SQLite for efficient aggregation.
     """
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     weeks = int(request.args.get('weeks', 12))
 
     conn = permitdb.get_connection()
@@ -13156,6 +13170,8 @@ def api_signals():
     signals = load_signals()
 
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     signal_type = request.args.get('type', '')
     status = request.args.get('status', '')
 
@@ -13242,6 +13258,8 @@ def api_signal_stats():
     signals = load_signals()
 
     city = request.args.get('city', '')
+    if city and city.lower() == 'all':
+        city = ''  # V451 (CODE_V448 Phase 4): treat ?city=all as no-filter
     if city:
         signals = [s for s in signals if s.get('city') == city]
 
