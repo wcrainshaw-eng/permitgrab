@@ -9983,6 +9983,70 @@ def admin_daemon_health():
             # psutil missing or permission denied — don't fail the probe.
             pass
 
+        # V456 (CODE_V455 Phase 2 + Phase 4): expose WAL size so we catch
+        # WAL-bloat regressions (V445 was 3.4GB) before they freeze the
+        # daemon, and surface auth/stripe metrics for the V455 directive.
+        wal_size_mb = None
+        try:
+            import os as _os_h
+            _wal_path = '/var/data/permitgrab.db-wal'
+            if _os_h.path.exists(_wal_path):
+                wal_size_mb = round(_os_h.path.getsize(_wal_path) / 1024 / 1024, 1)
+        except Exception:
+            pass
+
+        auth_metrics = None
+        stripe_metrics = None
+        try:
+            users_total = User.query.count()
+            users_pro = User.query.filter(User.plan.in_(('pro', 'professional', 'enterprise'))).count()
+            now_dt = datetime.utcnow()
+            users_trial_active = User.query.filter(
+                User.trial_end_date.isnot(None),
+                User.trial_end_date > now_dt,
+            ).count()
+            users_trial_expired = User.query.filter(
+                User.trial_end_date.isnot(None),
+                User.trial_end_date <= now_dt,
+            ).count()
+            last_signup_at = db.session.query(db.func.max(User.created_at)).scalar()
+            last_login_at = db.session.query(db.func.max(User.last_login_at)).scalar()
+            auth_metrics = {
+                'users_total': users_total,
+                'users_pro': users_pro,
+                'users_trial_active': users_trial_active,
+                'users_trial_expired': users_trial_expired,
+                'last_signup_at': last_signup_at.isoformat() if last_signup_at else None,
+                'last_login_at': last_login_at.isoformat() if last_login_at else None,
+            }
+        except Exception as _auth_e:
+            auth_metrics = {'error': str(_auth_e)[:120]}
+
+        try:
+            _sw_conn = permitdb.get_connection()
+            sw_total = _sw_conn.execute("SELECT COUNT(*) FROM stripe_webhook_events").fetchone()[0]
+            sw_24h = _sw_conn.execute(
+                "SELECT COUNT(*) FROM stripe_webhook_events WHERE received_at > datetime('now', '-1 day')"
+            ).fetchone()[0] if 'received_at' in [
+                c[1] for c in _sw_conn.execute("PRAGMA table_info(stripe_webhook_events)").fetchall()
+            ] else None
+            sw_last = None
+            try:
+                _last_row = _sw_conn.execute(
+                    "SELECT MAX(received_at) FROM stripe_webhook_events"
+                ).fetchone()
+                sw_last = _last_row[0] if _last_row else None
+            except Exception:
+                pass
+            stripe_metrics = {
+                'webhook_events_total': sw_total,
+                'webhook_events_24h': sw_24h,
+                'last_webhook_at': sw_last,
+                'webhook_healthy': bool(sw_total) or (auth_metrics and auth_metrics.get('users_pro', 0) == 0),
+            }
+        except Exception as _sw_e:
+            stripe_metrics = {'error': str(_sw_e)[:120]}
+
         payload = {
             'status': 'healthy' if is_healthy else 'unhealthy',
             'daemon_running': daemon_running,
@@ -9994,6 +10058,9 @@ def admin_daemon_health():
             'memory_mb': memory_mb,
             'memory_percent': memory_percent,
             'memory_limit_mb': 2048,
+            'wal_size_mb': wal_size_mb,
+            'auth': auth_metrics,
+            'stripe': stripe_metrics,
         }
         if self_healed:
             payload['self_heal_triggered'] = True
@@ -11743,6 +11810,10 @@ def api_contractors():
             'LLC', 'INC', 'CO', 'CORP', 'DBA', 'HVAC', 'AC', 'LP', 'LTD',
             'PC', 'PA', 'PLLC', 'LLP', 'USA', 'II', 'III', 'IV', 'NY',
             'NW', 'NE', 'SW', 'SE', 'US', 'AC/HEAT', 'A/C',
+            # V455 P3A (CODE_V455 Phase 3A): handle "(Usa)" → "(USA)" via
+            # parens-stripped variants (the str.title() upstream lowercases
+            # everything inside parens too).
+            '(USA)', '(LLC)', '(INC)', '(USA),', '(USA).',
         }
 
         def _smart_title(name):
@@ -18183,6 +18254,25 @@ def scheduled_collection():
         # V16: Track last successful collection run
         global _last_collection_run
         _last_collection_run = datetime.now()
+
+        # V456 (CODE_V455 Phase 2): truncate the WAL after every cycle so
+        # the V445 3.4GB WAL incident can't reoccur. PRAGMA wal_checkpoint
+        # (TRUNCATE) merges the WAL back into the main DB and shrinks the
+        # WAL file to 0. Will block briefly if any concurrent reader holds
+        # a snapshot, but daemon already runs at low contention vs the
+        # gthread workers, and the per-connection busy_timeout=60000 from
+        # db.py covers transient blocks.
+        try:
+            _wal_conn = permitdb.get_connection()
+            _wal_result = _wal_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+            if _wal_result:
+                print(
+                    f"[{datetime.now()}] V456: WAL checkpoint(TRUNCATE) "
+                    f"result={_wal_result}",
+                    flush=True,
+                )
+        except Exception as _wal_e:
+            print(f"[{datetime.now()}] V456: WAL checkpoint failed (non-fatal): {_wal_e}", flush=True)
 
         # V455 (CODE_V455 Phase 2): force worker recycle when memory has
         # accumulated past a safe ceiling. Python doesn't return freed
