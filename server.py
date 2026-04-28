@@ -13790,9 +13790,11 @@ def stripe_webhook():
         print(f"[Stripe] event decode failed: {_construct_err}", flush=True)
         return jsonify({'error': 'Decode failed', 'detail': str(_construct_err)}), 400
 
-    event_type = event['type']
-    event_id = event.get('id') or ''
-    print(f"[Stripe] Received event: {event_type} ({event_id})")
+    event_type = (event or {}).get('type') if isinstance(event, dict) else None
+    event_id = (event or {}).get('id', '') if isinstance(event, dict) else ''
+    if not event_type:
+        return jsonify({'error': 'Event missing type field'}), 400
+    print(f"[Stripe] Received event: {event_type} ({event_id})", flush=True)
 
     # V218 T5C: webhook idempotency. Stripe retries on delivery failure,
     # and the current handler would re-fire payment_success emails each
