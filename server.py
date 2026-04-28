@@ -12612,15 +12612,28 @@ def start_checkout():
 
     stripe.api_key = STRIPE_SECRET_KEY
     try:
+        # V460 (CODE_V456 Step 10): include client_reference_id and
+        # metadata.user_id so the Stripe webhook can map a paid checkout
+        # back to the local User row. Without this, the webhook handler
+        # falls back to email matching which fails when the user paid
+        # with a different email than the one on their account.
+        _user_id = (user.get('id') if isinstance(user, dict)
+                    else getattr(user, 'id', None))
+        _user_email = (user.get('email') if isinstance(user, dict)
+                       else getattr(user, 'email', None))
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{'price': price_id, 'quantity': 1}],
             mode='subscription',
             success_url=f'{SITE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}',
             cancel_url=f'{SITE_URL}/pricing?payment=cancelled',
-            customer_email=(user.get('email') if isinstance(user, dict)
-                            else getattr(user, 'email', None)),
-            metadata={'plan': f'{plan}_monthly', 'billing_period': 'monthly'},
+            customer_email=_user_email,
+            client_reference_id=str(_user_id) if _user_id else None,
+            metadata={
+                'plan': f'{plan}_monthly',
+                'billing_period': 'monthly',
+                'user_id': str(_user_id) if _user_id else '',
+            },
             allow_promotion_codes=True,
             subscription_data={'trial_period_days': 14},
         )
@@ -13574,6 +13587,13 @@ def create_checkout_session():
     customer_email = data.get('email')
     billing_period = data.get('billing_period', 'monthly')
 
+    _v460_user = get_current_user()
+    _v460_user_id = (_v460_user.get('id') if isinstance(_v460_user, dict)
+                     else getattr(_v460_user, 'id', None))
+    if not customer_email:
+        customer_email = (_v460_user.get('email') if isinstance(_v460_user, dict)
+                          else getattr(_v460_user, 'email', None))
+
     # V211-2: Graceful fallback — no Stripe keys means 'payments launching
     # soon' not 500 error. Let the pricing page JS direct to mailto.
     mailto_fallback = (
@@ -13631,9 +13651,11 @@ def create_checkout_session():
             success_url=f'{SITE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}',
             cancel_url=f'{SITE_URL}/pricing?payment=cancelled',
             customer_email=customer_email,
+            client_reference_id=str(_v460_user_id) if _v460_user_id else None,
             metadata={
                 'plan': plan_name,
                 'billing_period': billing_period,
+                'user_id': str(_v460_user_id) if _v460_user_id else '',
             },
             allow_promotion_codes=True,
             # V253 P2 #6: 14-day free trial on all paid plans. Pricing
@@ -13719,30 +13741,39 @@ def stripe_webhook():
         customer_email = session_obj.get('customer_email') or session_obj.get('customer_details', {}).get('email')
         plan = session_obj.get('metadata', {}).get('plan', 'professional')
 
-        if customer_email:
-            user = find_user_by_email(customer_email)
-            if user:
-                user.plan = 'pro'
-                user.stripe_customer_id = session_obj.get('customer')
-                user.subscription_id = session_obj.get('subscription')
-                # Clear trial fields since they're now a paying customer
-                user.trial_end_date = None
-                user.trial_started_at = None
-                db.session.commit()
-                print(f"[Stripe] User {customer_email} upgraded to {plan}")
-
-                # V12.53: Send payment success email
+        client_ref_id = session_obj.get('client_reference_id')
+        metadata_user_id = (session_obj.get('metadata') or {}).get('user_id')
+        user = None
+        for _uid_candidate in (client_ref_id, metadata_user_id):
+            if _uid_candidate:
                 try:
-                    from email_alerts import send_payment_success
-                    send_payment_success(user, plan)
-                except Exception as e:
-                    print(f"[Stripe] Payment success email failed: {e}")
+                    user = User.query.get(int(_uid_candidate))
+                    if user:
+                        break
+                except (ValueError, TypeError):
+                    pass
+        if not user and customer_email:
+            user = find_user_by_email(customer_email)
 
-            # Track payment success event
+        if user:
+            user.plan = 'pro'
+            user.stripe_customer_id = session_obj.get('customer')
+            user.subscription_id = session_obj.get('subscription')
+            user.trial_end_date = None
+            user.trial_started_at = None
+            db.session.commit()
+            print(f"[Stripe] User id={user.id} email={user.email} upgraded to {plan}")
+
+            try:
+                from email_alerts import send_payment_success
+                send_payment_success(user, plan)
+            except Exception as e:
+                print(f"[Stripe] Payment success email failed: {e}")
+
             analytics.track_event('payment_success', event_data={
                 'plan': plan,
                 'stripe_customer_id': session_obj.get('customer')
-            }, user_id_override=customer_email)
+            }, user_id_override=user.email)
 
     elif event_type == 'invoice.payment_failed':
         # Payment failed
