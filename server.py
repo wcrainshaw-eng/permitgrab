@@ -16115,19 +16115,39 @@ def city_landing_inner(city_slug):
 
     unified_records = []
     # V330: reuse counts the route already computed instead of re-running
-    # COUNT(*) on permits + violations. The 'all' filter previously did a
-    # SELECT (subquery_a) + (subquery_b) which on San Antonio scanned 60K+
-    # permits + 5K violations every page load (4.2s response time per
-    # post-deploy live UAT). permit_count is already populated above from
-    # prod_cities; violations_total comes from the V312 query a few blocks
-    # up. They're at most 30s stale because of how the route is built but
-    # pagination math doesn't need exact counts down to the row.
+    # COUNT(*) on permits + violations.
+    # V446 P0 (CODE_V446): unified_records previously ignored the V251 F2
+    # filter params (trade/days/zip/min_value), so the table always showed
+    # the full unfiltered set even when the summary said "Showing 4,959
+    # permits for Electrical". Applying the same filter clause as the
+    # summary count, plus case-insensitive trade matching so URL-cased
+    # values (?trade=roofing) work alongside dropdown-cased values.
+    _u_filter_sql = ""
+    _u_filter_args = []
+    if _filter_zip:
+        _u_filter_sql += " AND zip = ?"
+        _u_filter_args.append(_filter_zip)
+    if _filter_trade:
+        _u_filter_sql += " AND LOWER(trade_category) = LOWER(?)"
+        _u_filter_args.append(_filter_trade)
+    if _filter_days:
+        _u_filter_sql += (
+            f" AND COALESCE(filing_date, issued_date, date) "
+            f">= date('now', '-{_filter_days} days')"
+        )
+    if _filter_min_value:
+        _u_filter_sql += f" AND estimated_cost >= {_filter_min_value}"
+
     if _filter == 'permits':
-        total_records = permit_count or 0
+        total_records = (
+            filtered_permit_count if _filters_active else permit_count
+        ) or 0
     elif _filter == 'violations':
         total_records = violations_total or 0
     else:
-        total_records = (permit_count or 0) + (violations_total or 0)
+        total_records = (
+            (filtered_permit_count if _filters_active else permit_count) or 0
+        ) + (violations_total or 0)
     try:
         _uconn = permitdb.get_connection()
         if _filter == 'permits':
@@ -16139,7 +16159,7 @@ def city_landing_inner(city_slug):
                 'description': r['description'],
                 'contractor_name': r['contractor_name'],
                 'status': None,
-            } for r in _uconn.execute("""
+            } for r in _uconn.execute(f"""
                 SELECT COALESCE(filing_date, issued_date, date) AS record_date,
                        address,
                        permit_type AS type_label,
@@ -16148,9 +16168,10 @@ def city_landing_inner(city_slug):
                 FROM permits
                 WHERE source_city_key = ?
                   AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                  {_u_filter_sql}
                 ORDER BY record_date DESC
                 LIMIT ? OFFSET ?
-            """, (city_slug, _per_page, (_page - 1) * _per_page)).fetchall()]
+            """, (city_slug, *_u_filter_args, _per_page, (_page - 1) * _per_page)).fetchall()]
         elif _filter == 'violations':
             unified_records = [{
                 'record_type': 'violation',
@@ -16172,32 +16193,68 @@ def city_landing_inner(city_slug):
                 LIMIT ? OFFSET ?
             """, (filter_name, filter_state, _per_page, (_page - 1) * _per_page)).fetchall()]
         else:
-            unified_records = [dict(r) for r in _uconn.execute("""
-                SELECT 'permit' AS record_type,
-                       COALESCE(filing_date, issued_date, date) AS record_date,
-                       address,
-                       permit_type AS type_label,
-                       description,
-                       contractor_name,
-                       NULL AS status
-                FROM permits
-                WHERE source_city_key = ?
-                  AND COALESCE(filing_date, issued_date, date) IS NOT NULL
-                UNION ALL
-                SELECT 'violation' AS record_type,
-                       violation_date AS record_date,
-                       address,
-                       COALESCE(violation_type, '') AS type_label,
-                       violation_description AS description,
-                       NULL AS contractor_name,
-                       COALESCE(status, 'Open') AS status
-                FROM violations
-                WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?)
-                ORDER BY record_date DESC
-                LIMIT ? OFFSET ?
-            """, (city_slug, filter_name, filter_state, _per_page, (_page - 1) * _per_page)).fetchall()]
+            # V446 P0: filters apply to permits only. Violations don't have
+            # trade_category/zip/estimated_cost columns, so the violation half
+            # of the UNION stays unfiltered (it still respects the date filter
+            # via violation_date if present). When trade/zip/value are active,
+            # narrow the UNION to permits only — mixing filtered permits with
+            # all violations would inflate counts and surface unrelated rows.
+            _has_perm_only_filter = bool(_filter_zip or _filter_trade or _filter_min_value)
+            if _has_perm_only_filter:
+                unified_records = [dict(r) for r in _uconn.execute(f"""
+                    SELECT 'permit' AS record_type,
+                           COALESCE(filing_date, issued_date, date) AS record_date,
+                           address,
+                           permit_type AS type_label,
+                           description,
+                           contractor_name,
+                           NULL AS status
+                    FROM permits
+                    WHERE source_city_key = ?
+                      AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                      {_u_filter_sql}
+                    ORDER BY record_date DESC
+                    LIMIT ? OFFSET ?
+                """, (city_slug, *_u_filter_args, _per_page, (_page - 1) * _per_page)).fetchall()]
+                # Also collapse total_records to permits-only since violations
+                # are excluded from the visible page.
+                total_records = filtered_permit_count or 0
+            else:
+                # No permit-side filter (or only days, which applies to both).
+                _viol_date_sql = ""
+                if _filter_days:
+                    _viol_date_sql = (
+                        f" AND violation_date >= date('now', '-{_filter_days} days')"
+                    )
+                unified_records = [dict(r) for r in _uconn.execute(f"""
+                    SELECT 'permit' AS record_type,
+                           COALESCE(filing_date, issued_date, date) AS record_date,
+                           address,
+                           permit_type AS type_label,
+                           description,
+                           contractor_name,
+                           NULL AS status
+                    FROM permits
+                    WHERE source_city_key = ?
+                      AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                      {_u_filter_sql}
+                    UNION ALL
+                    SELECT 'violation' AS record_type,
+                           violation_date AS record_date,
+                           address,
+                           COALESCE(violation_type, '') AS type_label,
+                           violation_description AS description,
+                           NULL AS contractor_name,
+                           COALESCE(status, 'Open') AS status
+                    FROM violations
+                    WHERE UPPER(city)=UPPER(?) AND UPPER(state)=UPPER(?)
+                      {_viol_date_sql}
+                    ORDER BY record_date DESC
+                    LIMIT ? OFFSET ?
+                """, (city_slug, *_u_filter_args, filter_name, filter_state,
+                       _per_page, (_page - 1) * _per_page)).fetchall()]
     except Exception as e:
-        print(f"[V328 unified] query failed for {city_slug}: {e}", flush=True)
+        print(f"[V446 unified] query failed for {city_slug}: {e}", flush=True)
 
     # V332 (CODE_V321 Bug D): strip the redundant "PERMIT -" / "PERMIT –"
     # prefix that Chicago and a few other Accela-style sources put on
