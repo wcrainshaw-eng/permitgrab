@@ -278,8 +278,12 @@ TRADE_CATEGORIES = {
         "retrofit", "reinforc", "steel", "concrete"
     ],
     "Landscaping & Exterior": [
-        "landscape", "fence", "deck", "patio", "retaining wall",
-        "pool", "spa", "pergola", "awning", "carport", "garage"
+        # V456 (CODE_V455 Phase 3B): tightened keywords. Removed "garage",
+        # "carport", "deck", "patio" — those are typically standalone
+        # structures classified as General Construction or Addition,
+        # not landscaping. Kept truly outdoor-specific terms.
+        "landscape", "fence", "retaining wall",
+        "pool", "spa", "pergola", "awning",
     ],
 }
 
