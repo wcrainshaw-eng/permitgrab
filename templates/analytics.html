@@ -459,7 +459,13 @@ async function loadAnalytics() {
     document.getElementById('stat-top-trade').textContent = tradesData.trades[0].trade;
   }
 
-  document.getElementById('stat-contractors').textContent = contractorsData.top_contractors.length.toLocaleString();
+  // V447 P3: prefer the unsliced count so we don't always show the
+  // request limit (100). Falls back to top_contractors.length on older
+  // responses for one deploy cycle.
+  var _activeCount = (contractorsData.total_active_contractors != null)
+    ? contractorsData.total_active_contractors
+    : contractorsData.top_contractors.length;
+  document.getElementById('stat-contractors').textContent = _activeCount.toLocaleString();
 
   // Update trend badges
   updateTrendBadge('volume-trend-badge', volumeData.trend_direction, volumeData.trend_percentage);
