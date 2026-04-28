@@ -3261,8 +3261,16 @@ def collect_v122(days_back=7, include_scrapers=True):
         # headroom for the web worker (which shares the 512MB process)
         # plus a 450MB hard-abort below in case a fetch starts at 350MB
         # and explodes mid-normalize.
-        _MEM_BAIL_MB = 350
-        _MEM_HARD_ABORT_MB = 450  # immediate abort, no further retries this cycle
+        # V450 (P0): bumped from 350/450 to 1500/1750. The original
+        # thresholds were sized for the 512MB Render plan, but the
+        # web service has been on the 2GB Standard plan since V418.
+        # At idle the worker uses ~900–1100MB, so the old caps tripped
+        # _cycle_bailed=True on the FIRST city every cycle and Phase 2
+        # exited without collecting any per-city permits — that's why
+        # scraper_runs and permits had no fresh writes for days, even
+        # after the V448 max-requests bump and V449 propagate fix.
+        _MEM_BAIL_MB = 1500
+        _MEM_HARD_ABORT_MB = 1750  # immediate abort, no further retries this cycle
         _cycle_bailed = False
 
         for row in rows:
@@ -3848,8 +3856,16 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             _proc = _psutil.Process(os.getpid())
         except Exception:
             _proc = None
-        _MEM_BAIL_MB = 350
-        _MEM_HARD_ABORT_MB = 450
+        # V450 (P0): bumped from 350/450 to 1500/1750. The original
+        # thresholds were sized for the 512MB Render plan, but the
+        # web service has been on the 2GB Standard plan since V418.
+        # At idle the worker uses ~900–1100MB, so the old caps tripped
+        # _cycle_bailed=True on the FIRST city every cycle and Phase 2
+        # exited without collecting any per-city permits — that's why
+        # scraper_runs and permits had no fresh writes for days, even
+        # after the V448 max-requests bump and V449 propagate fix.
+        _MEM_BAIL_MB = 1500
+        _MEM_HARD_ABORT_MB = 1750
         _cycle_bailed = False
 
         for city_info in individual_cities:
