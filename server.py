@@ -17976,6 +17976,32 @@ def scheduled_collection():
             import traceback
             traceback.print_exc()
 
+        # V457 (CODE_V455 Phase 2 follow-on): mid-cycle memory check.
+        # V455's recycle-on-high-memory only fires AT cycle end, but
+        # heavy phases (refresh_contractor_profiles, collect_violations)
+        # can push RSS to 2GB+ DURING the cycle. Check between phases
+        # — if RSS > 1700MB, SIGTERM ourselves now so gunicorn drains
+        # and respawns before we OOM.
+        def _v457_mem_check(phase):
+            try:
+                import psutil as _ps, os as _ox, signal as _sg, gc as _gc457
+                _gc457.collect()
+                _rss = _ps.Process().memory_info().rss / 1024 / 1024
+                if _rss > 1700:
+                    print(
+                        f"[{datetime.now()}] V457: after {phase} RSS={_rss:.0f}MB > 1700MB — "
+                        f"SIGTERM self for recycle",
+                        flush=True,
+                    )
+                    _ox.kill(_ox.getpid(), _sg.SIGTERM)
+                    return True
+            except Exception:
+                pass
+            return False
+
+        if _v457_mem_check("collect_refresh"):
+            return
+
         # V229 D2: Prune old permits (keep last 365 days; was 90).
         # delete_old_permits also skips cities stale >30d so a dead-upstream
         # city doesn't get its entire history wiped by the daily prune.
@@ -17986,11 +18012,33 @@ def scheduled_collection():
         except Exception as e:
             print(f"[{datetime.now()}] Prune error: {e}")
 
+        # V457: gate the heaviest phase on memory headroom. If we're
+        # already at 1500MB+ before refresh_contractor_profiles starts,
+        # skip it this cycle — the next cycle (after worker recycles)
+        # will pick it up. Refresh isn't strictly required for collection.
+        try:
+            import psutil as _ps_pre
+            _rss_pre = _ps_pre.Process().memory_info().rss / 1024 / 1024
+            if _rss_pre > 1500:
+                print(
+                    f"[{datetime.now()}] V457: skipping refresh_contractor_profiles "
+                    f"(RSS={_rss_pre:.0f}MB > 1500MB pre-phase headroom)",
+                    flush=True,
+                )
+                raise StopIteration  # skip to except below
+        except StopIteration:
+            pass
+        except Exception:
+            pass
         # V183: Refresh contractor profiles from new permit data.
         # Runs BEFORE violations so that update_city_emblems (called at
         # end of collect_violations) reflects both new profiles AND
         # new violations in a single pass.
         try:
+            # V457 inline guard — skip if pre-phase memory was high
+            import psutil as _ps_g
+            if _ps_g.Process().memory_info().rss / 1024 / 1024 > 1500:
+                raise RuntimeError("v457_skip_profile_refresh")
             import time as _timer
             _t_prof = _timer.time()
             from contractor_profiles import refresh_contractor_profiles
