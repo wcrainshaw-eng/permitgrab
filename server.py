@@ -11668,7 +11668,10 @@ def api_contractors():
     try:
         city = request.args.get('city', '').strip()
         search = request.args.get('search', '').strip().lower()
-        sort_by = request.args.get('sort_by', 'total_permits')
+        # V447 P0: server-side default to most_recent_date so callers
+        # that hit /api/contractors without ?sort_by also get fresh-first.
+        # (Frontend already sends most_recent_date via V442 P2.)
+        sort_by = request.args.get('sort_by', 'most_recent_date')
         sort_order = request.args.get('sort_order', 'desc')
         try:
             page = max(1, int(request.args.get('page', 1) or 1))
@@ -11726,6 +11729,29 @@ def api_contractors():
             'HOLDINGS', 'PARTNERS', 'LP', 'LLP', 'LTD', '&',
         )
 
+        # V447 P2 (CODE_V447): smart title-case for contractor names.
+        # Many sources store names in ALL CAPS ("COLUMBUS/WORTHINGTON AIR").
+        # Plain str.title() lowercases LLC→Llc, INC→Inc, HVAC→Hvac. This
+        # keeps a small allowlist of business-suffix tokens uppercase.
+        _SMART_TITLE_KEEP_UPPER = {
+            'LLC', 'INC', 'CO', 'CORP', 'DBA', 'HVAC', 'AC', 'LP', 'LTD',
+            'PC', 'PA', 'PLLC', 'LLP', 'USA', 'II', 'III', 'IV', 'NY',
+            'NW', 'NE', 'SW', 'SE', 'US', 'AC/HEAT', 'A/C',
+        }
+
+        def _smart_title(name):
+            if not name:
+                return name
+            # If the name is already mixed-case, leave it alone — most data
+            # sources that preserve case do so deliberately.
+            if not name.isupper():
+                return name
+            words = name.title().split()
+            return ' '.join(
+                w.upper() if w.upper() in _SMART_TITLE_KEEP_UPPER else w
+                for w in words
+            )
+
         def _looks_personal(name, city_count):
             if not name:
                 return False
@@ -11769,7 +11795,7 @@ def api_contractors():
             """
             rows = conn.execute(sql, (city, *_GARBAGE_NAMES)).fetchall()
             contractor_list = [{
-                'name': r['name'],
+                'name': _smart_title(r['name']),
                 'total_permits': r['total_permits'] or 0,
                 'total_value': r['total_value'] or 0,
                 'cities': [f"{r['city']}, {r['state']}"] if r['city'] else [],
@@ -11808,7 +11834,7 @@ def api_contractors():
                 cities = sorted({c.strip() for c in (r['city_blob'] or '').split('|')
                                  if c and c.strip() and c.strip() != ', '})
                 contractor_list.append({
-                    'name': r['name'],
+                    'name': _smart_title(r['name']),
                     'total_permits': r['total_permits'] or 0,
                     'total_value': r['total_value'] or 0,
                     'cities': cities,
@@ -11984,8 +12010,13 @@ def api_top_contractors():
     # Sort by permit count
     top_list = sorted(contractors.values(), key=lambda x: x['permits'], reverse=True)[:limit]
 
+    # V447 P3 (CODE_V447): expose the unsliced count so /analytics can
+    # render "Active Contractors: 3,770" instead of always showing the
+    # request limit (100). Frontend uses top_contractors.length today,
+    # which capped Active Contractors at 100 forever.
     return jsonify({
         'top_contractors': top_list,
+        'total_active_contractors': len(contractors),
         'city': city or 'All Cities',
     })
 
