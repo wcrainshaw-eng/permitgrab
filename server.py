@@ -23,6 +23,17 @@ import uuid
 from datetime import datetime, timedelta
 import stripe
 from werkzeug.security import generate_password_hash, check_password_hash
+# V459 (CODE_V456): flask-login per directive. Imported here so the
+# rest of the module can reference current_user and login_user without
+# late imports. Initialization (LoginManager().init_app + user_loader)
+# happens after the User SQLAlchemy model is defined, below.
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user as _flask_login_user,
+    logout_user as _flask_logout_user,
+    current_user,
+)
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from city_configs import get_all_cities_info, get_city_count, get_city_by_slug, CITY_REGISTRY, TRADE_CATEGORIES, format_city_name
@@ -7557,8 +7568,14 @@ app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '')   # Facebook/M
 db = SQLAlchemy(app)
 
 
-class User(db.Model):
-    """User model for PostgreSQL storage (V7 - replaces JSON file)."""
+class User(UserMixin, db.Model):
+    """User model for PostgreSQL storage (V7 - replaces JSON file).
+
+    V459 (CODE_V456): added UserMixin so flask-login's current_user and
+    @login_required decorator work directly against this model. UserMixin
+    provides default is_authenticated/is_active/is_anonymous/get_id —
+    no overrides needed since SQLAlchemy already gives us .id.
+    """
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -7645,6 +7662,26 @@ class User(db.Model):
             return None
         delta = self.trial_end_date - datetime.utcnow()
         return max(0, delta.days)
+
+
+# V459 (CODE_V456): wire flask-login. Loader queries the User SQLAlchemy
+# model so flask-login's current_user / @login_required transparently
+# reflect the same session state the rest of the app already uses.
+# Cookie hardening matches Flask defaults + the directive's recommendations.
+login_manager = LoginManager()
+login_manager.login_view = 'login_page'
+login_manager.init_app(app)
+app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
+app.config.setdefault('SESSION_COOKIE_SECURE', os.environ.get('FLASK_ENV') != 'development')
+app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
+
+
+@login_manager.user_loader
+def _v459_load_user(user_id):
+    try:
+        return User.query.get(int(user_id))
+    except Exception:
+        return None
 
 
 class SavedSearch(db.Model):
@@ -13879,6 +13916,12 @@ def api_register():
     # the transient-session pattern. Mirrored on /api/login below.
     session.permanent = True
     session['user_email'] = email
+    # V459 (CODE_V456): also drive flask-login's session so current_user
+    # / @login_required see the logged-in state.
+    try:
+        _flask_login_user(new_user, remember=True)
+    except Exception as _li_e:
+        print(f"[V459] login_user failed (non-fatal): {_li_e}", flush=True)
 
     # Track signup event
     analytics.track_event('signup', event_data={'method': 'email', 'plan': new_user.plan})
@@ -13939,6 +13982,11 @@ def api_login():
     # V377: permanent session — see /api/register for full reasoning.
     session.permanent = True
     session['user_email'] = email
+    # V459 (CODE_V456): mirror into flask-login session.
+    try:
+        _flask_login_user(user, remember=True)
+    except Exception as _li_e:
+        print(f"[V459] login_user failed (non-fatal): {_li_e}", flush=True)
 
     # V12.53: Update last_login_at timestamp
     user.last_login_at = datetime.utcnow()
@@ -13961,7 +14009,17 @@ def api_login():
 def api_logout():
     """POST /api/logout - Log out the current user."""
     session.pop('user_email', None)
+    # V459 (CODE_V456): also clear flask-login state.
+    try:
+        _flask_logout_user()
+    except Exception:
+        pass
     return jsonify({'message': 'Logged out'})
+
+
+# V459 (CODE_V456): GET /logout already exists at server.py:17606 below;
+# augmenting that route is enough — flask-login's logout_user is invoked
+# alongside the existing session.clear() there.
 
 
 @app.route('/api/me')
@@ -17543,6 +17601,11 @@ def sitemap_blog():
 def logout_page():
     """Log out and redirect to homepage."""
     session.clear()
+    # V459 (CODE_V456): also clear flask-login state.
+    try:
+        _flask_logout_user()
+    except Exception:
+        pass
     return redirect('/')
 
 
