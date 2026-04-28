@@ -305,7 +305,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <div class="top-grid">
     {% for city in top_cities %}
     <a href="/permits/{{ city.slug }}" class="top-city-card">
-      <span class="top-city-name">{{ city.name }}</span>
+      {# V446 P2: title-case fixes ALL-CAPS imports like "ELGIN" → "Elgin" #}
+      <span class="top-city-name">{{ city.name|title }}</span>
       <span class="top-city-meta">{{ city.state }}</span>
       <span class="top-city-count">{{ "{:,}".format(city.permit_count) }} permits</span>
       {% if city.has_enrichment or city.has_violations %}
@@ -342,7 +343,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <div class="city-grid">
         {% for city in cities %}
         <a href="/permits/{{ city.slug }}" class="city-link" data-city="{{ city.name|lower }}">
-          <span>{{ city.name }}</span>
+          <span>{{ city.name|title }}</span>
           <span class="city-link-meta">
             <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
             {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles">C</span>{% endif %}
