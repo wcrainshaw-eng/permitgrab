@@ -18184,6 +18184,33 @@ def scheduled_collection():
         global _last_collection_run
         _last_collection_run = datetime.now()
 
+        # V455 (CODE_V455 Phase 2): force worker recycle when memory has
+        # accumulated past a safe ceiling. Python doesn't return freed
+        # memory to the OS easily, so cycles keep climbing the worker's
+        # RSS even though individual cities clean up. V450/V453/V454's
+        # bail thresholds only fire INSIDE Phase 2 of collect_refresh,
+        # not after violations + staleness + propagate. Hooking in here
+        # — at cycle end — catches the cumulative growth and asks
+        # gunicorn for a clean recycle BEFORE we OOM and Render kills us.
+        # SIGTERM to self triggers gunicorn's graceful_timeout flow:
+        # current requests drain, then master forks a fresh worker.
+        try:
+            import psutil as _psutil_v455
+            import os as _os_v455
+            import signal as _sig_v455
+            _rss_mb = _psutil_v455.Process().memory_info().rss / 1024 / 1024
+            if _rss_mb >= 1500:
+                print(
+                    f"[{datetime.now()}] V455: cycle done, RSS={_rss_mb:.0f}MB "
+                    f">= 1500MB ceiling — sending SIGTERM to self for clean "
+                    f"gunicorn recycle (master will respawn fresh worker)",
+                    flush=True,
+                )
+                _os_v455.kill(_os_v455.getpid(), _sig_v455.SIGTERM)
+                return  # daemon thread exits; new worker will respawn it
+        except Exception as _e_v455:
+            print(f"[{datetime.now()}] V455: recycle-on-high-memory check failed (non-fatal): {_e_v455}", flush=True)
+
         # V229 C1: dynamic cycle sleep. Was a flat time.sleep(3600) regardless
         # of how long the cycle took, so a 45-min cycle became a real 1h45m
         # interval. Target 30 min between cycle completions (minimum 5-min
