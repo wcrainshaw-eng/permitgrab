@@ -12426,13 +12426,148 @@ def blog_index():
                            footer_cities=footer_cities)
 
 
+def _v467_render_seo_blog_post(slug):
+    """V467 (CODE_V467 SEO blog posts): render one of the 5 ad-ready-city
+    SEO blog posts with live DB stats injected via render_template_string.
+    Returns a Flask response or None if the slug isn't an SEO post.
+    """
+    try:
+        from seo_blog_posts import SEO_BLOG_POSTS
+    except Exception as _imp_err:
+        print(f"[V467] SEO blog import failed: {_imp_err}", flush=True)
+        return None
+
+    post = SEO_BLOG_POSTS.get(slug)
+    if not post:
+        return None
+
+    city_slug = post['city_slug']
+    conn = permitdb.get_connection()
+
+    def _scalar(sql, params, key, default=0):
+        try:
+            row = conn.execute(sql, params).fetchone()
+            return row[key] if row and row[key] is not None else default
+        except Exception:
+            return default
+
+    permits_90d = _scalar(
+        "SELECT COUNT(*) as cnt FROM permits WHERE source_city_key = ? AND date > date('now', '-90 days')",
+        (city_slug,), 'cnt')
+    profiles = _scalar(
+        "SELECT COUNT(*) as cnt FROM contractor_profiles WHERE source_city_key = ?",
+        (city_slug,), 'cnt')
+    phones = _scalar(
+        "SELECT COUNT(*) as cnt FROM contractor_profiles WHERE source_city_key = ? AND phone IS NOT NULL AND phone != ''",
+        (city_slug,), 'cnt')
+
+    try:
+        top_permit_types = [dict(r) for r in conn.execute("""
+            SELECT permit_type, COUNT(*) as cnt FROM permits
+             WHERE source_city_key = ? AND date > date('now', '-90 days')
+               AND permit_type IS NOT NULL AND permit_type != ''
+             GROUP BY permit_type ORDER BY cnt DESC LIMIT 10
+        """, (city_slug,)).fetchall()]
+    except Exception:
+        top_permit_types = []
+
+    try:
+        top_contractors = [dict(r) for r in conn.execute("""
+            SELECT contractor_name as business_name, COUNT(*) as permits FROM permits
+             WHERE source_city_key = ? AND contractor_name IS NOT NULL AND contractor_name != ''
+               AND date > date('now', '-180 days')
+             GROUP BY contractor_name ORDER BY permits DESC LIMIT 15
+        """, (city_slug,)).fetchall()]
+    except Exception:
+        top_contractors = []
+
+    try:
+        trade_breakdown = [dict(r) for r in conn.execute("""
+            SELECT trade_category, COUNT(*) as cnt FROM contractor_profiles
+             WHERE source_city_key = ? AND trade_category IS NOT NULL AND trade_category != ''
+             GROUP BY trade_category ORDER BY cnt DESC LIMIT 10
+        """, (city_slug,)).fetchall()]
+    except Exception:
+        trade_breakdown = []
+
+    pc_row = None
+    try:
+        pc_row = conn.execute(
+            "SELECT id, city, state FROM prod_cities WHERE city_slug = ? LIMIT 1",
+            (city_slug,)
+        ).fetchone()
+    except Exception:
+        pass
+    violations_count = 0
+    if pc_row:
+        violations_count = _scalar(
+            "SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?",
+            (pc_row['id'],), 'cnt')
+
+    city_name_variants = {
+        'chicago-il': ['Chicago'],
+        'miami-dade-county': ['Miami-Dade'],
+        'san-antonio-tx': ['San Antonio'],
+        'phoenix-az': ['Phoenix'],
+        'new-york-city': ['New York City', 'New York'],
+    }
+    variants = city_name_variants.get(city_slug, [pc_row['city']] if pc_row else [])
+    owner_count = 0
+    for v in variants:
+        if v:
+            owner_count += _scalar(
+                "SELECT COUNT(*) as cnt FROM property_owners WHERE city = ?",
+                (v,), 'cnt')
+
+    newest = _scalar(
+        "SELECT MAX(date) as newest FROM permits WHERE source_city_key = ?",
+        (city_slug,), 'newest', default='') or 'recently'
+
+    stats = {
+        'permits_90d': permits_90d,
+        'profiles': profiles,
+        'phones': phones,
+        'violations': violations_count,
+        'owners': owner_count,
+        'top_permit_types': top_permit_types,
+        'top_contractors': top_contractors,
+        'trade_breakdown': trade_breakdown,
+        'newest_permit': newest,
+    }
+
+    # Render body with stats injected, then safe-pass to the shell template.
+    from flask import render_template_string
+    try:
+        body_html = render_template_string(
+            post['body_template'], stats=stats, post=post, city_slug=city_slug
+        )
+    except Exception as _body_err:
+        print(f"[V467] body render failed for {slug}: {_body_err}", flush=True)
+        body_html = '<p>Content temporarily unavailable.</p>'
+
+    seo_related = [(s, p) for s, p in SEO_BLOG_POSTS.items() if s != slug]
+    footer_cities = get_cities_with_data()
+    return render_template(
+        'blog_post_seo.html',
+        post=post, stats=stats, body_html=body_html, slug=slug,
+        city_slug=city_slug, seo_related=seo_related,
+        footer_cities=footer_cities,
+    )
+
+
 @app.route('/blog/<slug>')
 def blog_post(slug):
     """V79: Individual blog post page.
 
     V318 (CODE_V280b Bug 20): if slug starts with market-report-, regenerate
     the live report on the fly so the numbers stay fresh on every load.
+    V467: SEO blog posts for ad-ready cities — checked first, before the
+    legacy BLOG_POSTS list lookup.
     """
+    _seo = _v467_render_seo_blog_post(slug)
+    if _seo is not None:
+        return _seo
+
     if slug.startswith('market-report-'):
         for p in _generate_market_reports():
             if p['slug'] == slug:
@@ -17060,8 +17195,21 @@ def state_city_landing(state_slug, city_slug):
         city_name=city_name,
         city_state=city_state,
     )
+    # V467 (CODE_V467 internal linking): if this city has a matching SEO blog
+    # post, expose its slug so the template can render a "Read the report"
+    # CTA. Internal-link parity boosts both pages in search rankings.
+    _v467_blog_slugs = {
+        'chicago-il': 'chicago-building-permits-2026',
+        'miami-dade-county': 'miami-dade-solar-permits-2026',
+        'phoenix-az': 'phoenix-code-violations-2026',
+        'san-antonio-tx': 'san-antonio-building-permits-2026',
+        'new-york-city': 'nyc-building-violations-2026',
+    }
+    _v467_seo_blog_slug = _v467_blog_slugs.get(city_slug)
+
     return render_template('city_landing_v77.html',
         property_owners=_get_property_owners(display_name, city_state, limit=10),  # V284
+        seo_blog_slug=_v467_seo_blog_slug,
         city_name=display_name,
         city_slug=city_slug,
         state_abbrev=city_state,
@@ -17741,10 +17889,14 @@ def sitemap_trades():
 
 @app.route('/sitemap-blog.xml')
 def sitemap_blog():
-    """V79: Sitemap for blog posts — uses BLOG_POSTS data structure."""
+    """V79: Sitemap for blog posts — uses BLOG_POSTS data structure.
+
+    V467: also enumerates SEO_BLOG_POSTS (the 5 ad-ready-city long-form
+    articles) at higher priority + daily changefreq so Google re-crawls
+    them as the live numbers in the page change.
+    """
     urls = []
 
-    # Add blog index page
     urls.append({
         'loc': f"{SITE_URL}/blog",
         'changefreq': 'weekly',
@@ -17752,7 +17904,18 @@ def sitemap_blog():
         'lastmod': '2026-04-06'
     })
 
-    # Add all blog posts
+    try:
+        from seo_blog_posts import SEO_BLOG_POSTS
+        for _slug in SEO_BLOG_POSTS:
+            urls.append({
+                'loc': f"{SITE_URL}/blog/{_slug}",
+                'changefreq': 'daily',
+                'priority': '0.85',
+                'lastmod': '2026-04-28',
+            })
+    except Exception as _seo_err:
+        print(f"[V467] sitemap-blog SEO posts skipped: {_seo_err}", flush=True)
+
     for post in BLOG_POSTS:
         urls.append({
             'loc': f"{SITE_URL}/blog/{post['slug']}",
