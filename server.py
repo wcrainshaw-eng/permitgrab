@@ -12426,6 +12426,96 @@ def blog_index():
                            footer_cities=footer_cities)
 
 
+def _v469_render_faq_blog_post(slug):
+    """V469 (CODE_V467 FAQ blog posts): render one of the 6 buyer-segment
+    FAQ blog posts with global DB totals (cities/permits/profiles/phones/
+    violations/owners) injected. Different from the per-city SEO posts —
+    no city_slug, stats are aggregate.
+    """
+    try:
+        from faq_blog_posts import FAQ_BLOG_POSTS
+    except Exception as _imp_err:
+        print(f"[V469] FAQ blog import failed: {_imp_err}", flush=True)
+        return None
+
+    post = FAQ_BLOG_POSTS.get(slug)
+    if not post:
+        return None
+
+    conn = permitdb.get_connection()
+
+    def _scalar(sql, params=()):
+        try:
+            row = conn.execute(sql, params).fetchone()
+            v = row[0] if row else 0
+            return v if v is not None else 0
+        except Exception:
+            return 0
+
+    cities = _scalar(
+        "SELECT COUNT(DISTINCT source_city_key) FROM permits WHERE date > date('now','-180 days')")
+    permits = _scalar(
+        "SELECT COUNT(*) FROM permits WHERE date > date('now','-180 days')")
+    profiles = _scalar("SELECT COUNT(*) FROM contractor_profiles")
+    phones = _scalar(
+        "SELECT COUNT(*) FROM contractor_profiles WHERE phone IS NOT NULL AND phone != ''")
+    violations = _scalar("SELECT COUNT(*) FROM violations")
+    violation_cities = _scalar("SELECT COUNT(DISTINCT prod_city_id) FROM violations")
+    owners = _scalar("SELECT COUNT(*) FROM property_owners")
+    owner_cities = _scalar("SELECT COUNT(DISTINCT city) FROM property_owners")
+
+    stats = {
+        'cities': cities,
+        'permits': permits,
+        'profiles': profiles,
+        'phones': phones,
+        'violations': violations,
+        'violation_cities': violation_cities,
+        'owners': owners,
+        'owner_cities': owner_cities,
+        # Defaults for the shared template's grid + city-specific fields
+        'permits_90d': permits,
+        'top_permit_types': [],
+        'top_contractors': [],
+        'trade_breakdown': [],
+        'newest_permit': 'today',
+    }
+
+    from flask import render_template_string
+    try:
+        body_html = render_template_string(
+            post['body_html'], stats=stats, post=post
+        )
+        rendered_faqs = []
+        for f in post.get('faqs', []):
+            rendered_faqs.append({
+                'q': render_template_string(f['q'], stats=stats, post=post),
+                'a': render_template_string(f['a'], stats=stats, post=post),
+            })
+    except Exception as _body_err:
+        print(f"[V469] body render failed for {slug}: {_body_err}", flush=True)
+        body_html = '<p>Content temporarily unavailable.</p>'
+        rendered_faqs = []
+
+    # Pass post object with rendered_faqs so the template can use them
+    post_view = dict(post)
+    post_view['faqs'] = rendered_faqs
+
+    try:
+        from faq_blog_posts import FAQ_BLOG_POSTS as _ALL_FAQ
+        seo_related = [(s, p) for s, p in _ALL_FAQ.items() if s != slug]
+    except Exception:
+        seo_related = []
+
+    footer_cities = get_cities_with_data()
+    return render_template(
+        'blog_post_seo.html',
+        post=post_view, stats=stats, body_html=body_html, slug=slug,
+        city_slug=None, seo_related=seo_related,
+        footer_cities=footer_cities,
+    )
+
+
 def _v467_render_seo_blog_post(slug):
     """V467 (CODE_V467 SEO blog posts): render one of the 5 ad-ready-city
     SEO blog posts with live DB stats injected via render_template_string.
@@ -12567,6 +12657,10 @@ def blog_post(slug):
     _seo = _v467_render_seo_blog_post(slug)
     if _seo is not None:
         return _seo
+
+    _faq = _v469_render_faq_blog_post(slug)
+    if _faq is not None:
+        return _faq
 
     if slug.startswith('market-report-'):
         for p in _generate_market_reports():
@@ -17928,6 +18022,18 @@ def sitemap_blog():
             })
     except Exception as _seo_err:
         print(f"[V467] sitemap-blog SEO posts skipped: {_seo_err}", flush=True)
+
+    try:
+        from faq_blog_posts import FAQ_BLOG_POSTS
+        for _slug in FAQ_BLOG_POSTS:
+            urls.append({
+                'loc': f"{SITE_URL}/blog/{_slug}",
+                'changefreq': 'weekly',
+                'priority': '0.8',
+                'lastmod': '2026-04-29',
+            })
+    except Exception as _faq_err:
+        print(f"[V469] sitemap-blog FAQ posts skipped: {_faq_err}", flush=True)
 
     for post in BLOG_POSTS:
         urls.append({
