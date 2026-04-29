@@ -1646,17 +1646,22 @@ _V472_STATE_NAMES = {
 
 @city_pages_bp.route('/cities')
 def cities_browse():
-    """V17e: Dedicated browse page for all cities, organized by state.
+    """V17e + V472 + V473: Dedicated browse page for all cities, organized by state.
 
-    V472 (CODE_V472): three changes —
-      1. Section headers + jump-nav pills now show full state names,
-         sorted alphabetically by full name (Alabama, Alaska, Arizona…)
-         not by abbreviation.
-      2. Shows ALL cities from prod_cities (regardless of status / permit
-         count), so the page is a complete directory rather than only
-         cities currently collecting.
-      3. Adds an "O" badge for cities that have property_owners data,
-         alongside the existing C (contractors) and V (violations) badges.
+    V473 fixes the V472 bugs:
+      1. Filters prod_cities to status='active' (~2,200 collection-target
+         cities) instead of returning all 20,000+ rows. The 'paused' /
+         'pending' rows are mostly seeded-from-us_cities entries that
+         were never wired up — including them surfaced thousands of
+         "0 permits" cards on the directory.
+      2. Featured cards (hero section) require permits>=1000 AND
+         profiles>=50, so bulk-misattribution junk like "Lindley NY
+         40,966 permits / 0 profiles" no longer hijacks the top tier.
+      3. Owner ("O") badge detection now also parses
+         permit_record:<slug> entries in property_owners.source, on top
+         of the (city, state) tuple match — broader coverage.
+      4. Featured cards now show the full state name ("New York", "Texas")
+         to match the section headers and jump-nav pills below.
     """
     # Footer ranking still uses the curated public list (population /
     # permit-volume filter applied) so we don't surface low-quality
@@ -1664,38 +1669,67 @@ def cities_browse():
     footer_cities = get_cities_with_data()
 
     conn = permitdb.get_connection()
+    # V473 Bug 1: filter to status='active' so the page only lists
+    # cities the collector is actually wired up for.
     rows = conn.execute(
         "SELECT city, state, city_slug, total_permits, "
         "       has_enrichment, has_violations "
         "FROM prod_cities "
-        "WHERE city IS NOT NULL AND city != '' "
+        "WHERE status = 'active' "
+        "  AND city IS NOT NULL AND city != '' "
         "  AND state IS NOT NULL AND state != '' "
     ).fetchall()
-    owner_rows = conn.execute(
+    # V473 Bug 3: build owner-set from BOTH (city, state) tuples and
+    # permit_record:<slug> source entries. assessor:<county_key> rows
+    # already have city/state populated so they fall through the tuple
+    # match — only the permit_record path needs explicit slug parsing.
+    owner_tuple_rows = conn.execute(
         "SELECT DISTINCT LOWER(city) c, UPPER(state) s "
         "FROM property_owners "
         "WHERE city IS NOT NULL AND state IS NOT NULL"
     ).fetchall()
+    owner_slug_rows = conn.execute(
+        "SELECT DISTINCT source FROM property_owners "
+        "WHERE source LIKE 'permit_record:%'"
+    ).fetchall()
+    # V473 Bug 2: profile counts per city for the featured-card threshold.
+    profile_rows = conn.execute(
+        "SELECT source_city_key, COUNT(*) c FROM contractor_profiles "
+        "WHERE source_city_key IS NOT NULL "
+        "GROUP BY source_city_key"
+    ).fetchall()
     conn.close()
 
-    owner_set = {(r['c'], r['s']) for r in owner_rows}
+    owner_tuple_set = {(r['c'], r['s']) for r in owner_tuple_rows}
+    owner_slug_set = {
+        r['source'].split(':', 1)[1]
+        for r in owner_slug_rows
+        if r['source'] and ':' in r['source']
+    }
+    profile_counts = {r['source_city_key']: r['c'] for r in profile_rows}
 
     all_cities = []
     for r in rows:
         city = r['city']
         state = (r['state'] or '').upper()
+        slug = r['city_slug']
+        has_owners = (
+            (city.lower(), state) in owner_tuple_set
+            or slug in owner_slug_set
+        )
         all_cities.append({
             'name': city,
-            'slug': r['city_slug'],
+            'slug': slug,
             'state': state,
             'permit_count': r['total_permits'] or 0,
+            'profile_count': profile_counts.get(slug, 0),
             'has_enrichment': bool(r['has_enrichment']),
             'has_violations': bool(r['has_violations']),
-            'has_owners': (city.lower(), state) in owner_set,
+            'has_owners': has_owners,
         })
 
-    # Group by state abbreviation, sort by FULL state name (not abbr),
-    # then sort cities within each state alphabetically by name.
+    # Group by state abbreviation, sort by FULL state name, then sort
+    # cities alphabetically by name within each state.
     states = {}
     no_state = []
     for c in all_cities:
@@ -1712,9 +1746,13 @@ def cities_browse():
     for _abbr, cities in sorted_states:
         cities.sort(key=lambda c: (c.get('name') or '').lower())
 
-    # Top cities for the hero — only ones with real permit volume.
+    # V473 Bug 2: featured cards require permits>=1000 AND profiles>=50.
+    # That filters out bulk-misattribution junk (e.g. Lindley NY with
+    # 40K permits but 0 profiles, which is a state-aggregate row leaking
+    # into a tiny municipality).
     top_cities = sorted(
-        [c for c in all_cities if c['permit_count'] > 0],
+        [c for c in all_cities
+         if c['permit_count'] >= 1000 and c['profile_count'] >= 50],
         key=lambda c: -c['permit_count'],
     )[:20]
 

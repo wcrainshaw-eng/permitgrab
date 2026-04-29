@@ -312,12 +312,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <a href="/permits/{{ city.slug }}" class="top-city-card">
       {# V446 P2: title-case fixes ALL-CAPS imports like "ELGIN" → "Elgin" #}
       <span class="top-city-name">{{ city.name|title }}</span>
-      <span class="top-city-meta">{{ city.state }}</span>
+      {# V473 Bug 4: full state name to match section headers / jump-nav. #}
+      <span class="top-city-meta">{{ STATE_NAMES.get(city.state, city.state) }}</span>
       <span class="top-city-count">{{ "{:,}".format(city.permit_count) }} permits</span>
-      {% if city.has_enrichment or city.has_violations %}
+      {% if city.has_enrichment or city.has_violations or city.has_owners %}
       <span class="city-emblems">
         {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles available">Contractors</span>{% endif %}
         {% if city.has_violations %}<span class="city-emblem violations" title="Code violations available">Violations</span>{% endif %}
+        {% if city.has_owners %}<span class="city-emblem owners" title="Property owner data available">Owners</span>{% endif %}
       </span>
       {% endif %}
     </a>
