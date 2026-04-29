@@ -322,7 +322,17 @@ _schema_initialized = False
 
 @app.before_request
 def _migrate_create_sources_table():
-    """V145: Create sources + violations + enrichment tables. V164: Runs ONCE."""
+    """V145: Create sources + violations + enrichment tables. V164: Runs ONCE.
+
+    V471 PR2-prep: also runs Postgres schema init (was a module-level
+    `with app.app_context(): db.create_all()` block before — moved here
+    so module import does no DB I/O). Lock-guarded once-runner; safe to
+    call from every before_request, but only the first call does work.
+    """
+    # Postgres schema (db.create_all + ALTER TABLE migrations + V255
+    # consolidation). Idempotent and lock-guarded inside the function.
+    _init_postgres_schema()
+
     global _schema_initialized
     if _schema_initialized:
         return
@@ -1419,11 +1429,11 @@ def _migrate_create_sources_table():
     conn.close()
     print(f"[{datetime.now()}] V170: All tables created/verified")
 
-    # V229 addendum K1: daemon startup moved out of this before_request
-    # hook into a module-level spawn (see bottom of file). This hook now
-    # only runs schema migrations. Previously daemons wouldn't start at
-    # all if the first HTTP request missed the before_request chain
-    # (e.g. a healthcheck on a path that skipped it).
+    # V471 PR2-prep: daemon startup is THIS hook's job again. The
+    # module-level spawn at the bottom of server.py was removed because
+    # it raced blueprint imports against Python's import lock during
+    # worker re-fork (after V455 self-recycle), wedging the new worker.
+    # The lock-guarded spawner makes a re-call here a no-op.
     _ensure_deferred_startup_spawned()
 
 
@@ -7573,50 +7583,66 @@ def _v459_load_user(user_id):
         return None
 
 
-# Create tables on startup
-with app.app_context():
-    db.create_all()
+# V471 PR2-prep: Postgres schema init was a module-level
+# `with app.app_context(): db.create_all()` block. Moved into a deferred
+# function so module import does no DB I/O. The first request triggers
+# it via the before_request hook (lock-guarded once-runner).
+_POSTGRES_SCHEMA_INITIALIZED = False
+_POSTGRES_SCHEMA_LOCK = threading.Lock()
 
-    # V12.57: Auto-migrate missing columns — db.create_all() only creates new tables,
-    # it won't add columns to existing tables. This fixes the daily digest crash
-    # caused by users.watched_competitors not existing in Postgres.
-    migration_columns = [
-        ("watched_competitors", "TEXT DEFAULT '[]'"),
-        ("digest_cities", "TEXT DEFAULT '[]'"),
-        # V251 F4: per-user filter defaults for the daily digest.
-        ("digest_zip_filter", "VARCHAR(16)"),
-        ("digest_trade_filter", "VARCHAR(64)"),
-        # V254 Phase 1: free-tier phone-reveal credits. Default 10 matches
-        # the free-trial promise on the signup / pricing page.
-        ("reveal_credits", "INTEGER DEFAULT 10"),
-        ("revealed_profile_ids", "TEXT DEFAULT '[]'"),
-        ("email_verified", "BOOLEAN DEFAULT FALSE"),
-        ("email_verified_at", "TIMESTAMP"),
-        ("email_verification_token", "VARCHAR(64)"),
-        ("unsubscribe_token", "VARCHAR(64)"),
-        ("digest_active", "BOOLEAN DEFAULT TRUE"),
-        ("last_login_at", "TIMESTAMP"),
-        ("last_digest_sent_at", "TIMESTAMP"),
-        ("last_reengagement_sent_at", "TIMESTAMP"),
-        ("trial_started_at", "TIMESTAMP"),
-        ("trial_end_date", "TIMESTAMP"),
-        ("trial_midpoint_sent", "BOOLEAN DEFAULT FALSE"),
-        ("trial_ending_sent", "BOOLEAN DEFAULT FALSE"),
-        ("trial_expired_sent", "BOOLEAN DEFAULT FALSE"),
-        ("welcome_email_sent", "BOOLEAN DEFAULT FALSE"),
-    ]
-    try:
-        for col_name, col_type in migration_columns:
-            db.session.execute(db.text(
-                f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
-            ))
-        db.session.commit()
-        print("[Database] Tables created/verified, columns migrated")
-    except Exception as e:
-        db.session.rollback()
-        print(f"[Database] Tables created, migration warning: {e}")
+def _init_postgres_schema():
+    """Run db.create_all() + ALTER TABLE migrations + V255 source_city_key
+    consolidation. Idempotent and lock-guarded — safe to call from every
+    before_request, but only the first call does work."""
+    global _POSTGRES_SCHEMA_INITIALIZED
+    with _POSTGRES_SCHEMA_LOCK:
+        if _POSTGRES_SCHEMA_INITIALIZED:
+            return
+        _POSTGRES_SCHEMA_INITIALIZED = True
 
-    # V255 P0#2: consolidate source_city_key to canonical city_slug.
+    with app.app_context():
+        db.create_all()
+
+        # V12.57: Auto-migrate missing columns — db.create_all() only creates new tables,
+        # it won't add columns to existing tables. This fixes the daily digest crash
+        # caused by users.watched_competitors not existing in Postgres.
+        migration_columns = [
+            ("watched_competitors", "TEXT DEFAULT '[]'"),
+            ("digest_cities", "TEXT DEFAULT '[]'"),
+            # V251 F4: per-user filter defaults for the daily digest.
+            ("digest_zip_filter", "VARCHAR(16)"),
+            ("digest_trade_filter", "VARCHAR(64)"),
+            # V254 Phase 1: free-tier phone-reveal credits. Default 10 matches
+            # the free-trial promise on the signup / pricing page.
+            ("reveal_credits", "INTEGER DEFAULT 10"),
+            ("revealed_profile_ids", "TEXT DEFAULT '[]'"),
+            ("email_verified", "BOOLEAN DEFAULT FALSE"),
+            ("email_verified_at", "TIMESTAMP"),
+            ("email_verification_token", "VARCHAR(64)"),
+            ("unsubscribe_token", "VARCHAR(64)"),
+            ("digest_active", "BOOLEAN DEFAULT TRUE"),
+            ("last_login_at", "TIMESTAMP"),
+            ("last_digest_sent_at", "TIMESTAMP"),
+            ("last_reengagement_sent_at", "TIMESTAMP"),
+            ("trial_started_at", "TIMESTAMP"),
+            ("trial_end_date", "TIMESTAMP"),
+            ("trial_midpoint_sent", "BOOLEAN DEFAULT FALSE"),
+            ("trial_ending_sent", "BOOLEAN DEFAULT FALSE"),
+            ("trial_expired_sent", "BOOLEAN DEFAULT FALSE"),
+            ("welcome_email_sent", "BOOLEAN DEFAULT FALSE"),
+        ]
+        try:
+            for col_name, col_type in migration_columns:
+                db.session.execute(db.text(
+                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                ))
+            db.session.commit()
+            print("[Database] Tables created/verified, columns migrated")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[Database] Tables created, migration warning: {e}")
+
+        # V255 P0#2: consolidate source_city_key to canonical city_slug.
     # Authoritative rule: any permit whose prod_city_id matches a row in
     # prod_cities should carry that prod_city's city_slug. The collector
     # has historically passed source_id (various formats: "chicago",
@@ -18821,38 +18847,49 @@ def start_collectors():
 
     print(f"[{datetime.now()}] V67: All collector threads started (staggered over ~2 minutes).")
 
-# V12.12: Preload existing data from disk BEFORE starting collectors
-# This ensures stale data is served immediately rather than showing 0 permits
-preload_data_from_disk()
-
-# V229 addendum K1: single, lock-guarded spawner for _deferred_startup.
-# Called from the before_request hook AND from module import. This
-# guarantees daemon threads start even if no HTTP request arrives
-# through the before_request chain (e.g. healthcheck routes registered
-# before the hook, or edge cases around app.test_client). The
-# threading.Lock makes double-spawn impossible regardless of caller.
+# V229 addendum K1 / V471 PR2-prep: single, lock-guarded spawner for
+# _deferred_startup. Called only from the before_request hook now (the
+# module-level call here was the cause of the V471 PR2 worker-restart
+# deadlock — `from server import *` in blueprint modules raced the
+# daemon-thread spawn against Python's import lock, wedging the new
+# worker after V455 self-recycle). preload_data_from_disk() is also
+# deferred — it does file I/O that shouldn't run before the WSGI app
+# is ready to serve traffic.
 _DEFERRED_STARTUP_LOCK = threading.Lock()
 _DEFERRED_STARTUP_SPAWNED = False
+_PRELOAD_DONE = False
 
 def _ensure_deferred_startup_spawned():
-    global _DEFERRED_STARTUP_SPAWNED
+    """Spawn the _deferred_startup daemon thread exactly once.
+
+    V471 PR2-prep: also runs preload_data_from_disk() the first time, so
+    `from server import app` does no I/O and spawns no threads at module
+    import time. This decouples module load from worker startup, so the
+    worker can re-import server.py cleanly after a V455 self-recycle
+    even when blueprints do `from server import *`.
+    """
+    global _DEFERRED_STARTUP_SPAWNED, _PRELOAD_DONE
     with _DEFERRED_STARTUP_LOCK:
         if _DEFERRED_STARTUP_SPAWNED:
             return
         _DEFERRED_STARTUP_SPAWNED = True
+        if not _PRELOAD_DONE:
+            try:
+                preload_data_from_disk()
+            except Exception as _e:
+                print(f"[V471] preload_data_from_disk failed: {_e}", flush=True)
+            _PRELOAD_DONE = True
     threading.Thread(
         target=_deferred_startup, daemon=True, name='deferred_startup'
     ).start()
 
-# V229 addendum K1: kick daemons off at import time so they don't depend
-# on an HTTP request landing first.
-_ensure_deferred_startup_spawned()
-
-# V66: Removed module-level DB init — now deferred to first request via _deferred_startup()
-# This prevents connection pool exhaustion during gunicorn startup.
-# The sync_city_registry_to_prod(), sync_city_registry_to_prod_cities(), and
-# start_collectors() are all called from _deferred_startup() on first HTTP request.
-print(f"[{datetime.now()}] V70: Module loaded — Postgres pool DISABLED, SQLite only mode")
+# V66: Module-level DB init removed — now deferred to first request via
+# _deferred_startup(). V471 PR2-prep: daemon spawn + disk preload also
+# moved out of module body; both fire from the before_request hook on
+# the first HTTP request (already wired in this codebase). Local imports
+# (`python3 -c "from server import app"`) and worker fork-imports both
+# complete in <2s with zero side effects.
+print(f"[{datetime.now()}] V471: Module loaded — daemon spawn deferred to first request", flush=True)
 
 
 # ===========================
