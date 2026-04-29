@@ -226,10 +226,35 @@ class FreeEnrichmentEngine:
                 continue
         return None, None
 
+    # -- Phone-from-website fallback (V467) --------------------------------
+
+    def _phone_from_website(self, url):
+        """Fetch a contractor's website and parse the first plausible US
+        phone from it. Many DDG result snippets don't contain phone numbers
+        (they're truncated), but the destination page almost always does
+        in the header/footer. This is the V467 missing-link fix.
+        """
+        if not url or not url.startswith('http'):
+            return None
+        try:
+            r = self.session.get(url, timeout=10, allow_redirects=True)
+            if r.status_code >= 400:
+                return None
+            return self._parse_phone(r.text)
+        except Exception:
+            return None
+
     # -- Orchestration -----------------------------------------------------
 
     def enrich_one(self, name, city, state):
-        """Try methods in order; return first (phone, website) with content."""
+        """Try methods in order; return first (phone, website) with content.
+
+        V467: if search_ddg returned only a website, fetch it and try to
+        scrape the phone from the page header/footer. Pre-V467, every DDG
+        match returned (None, website) because the search-results page rarely
+        includes phone numbers verbatim. The destination contractor site
+        almost always does.
+        """
         if _enrichment_disabled():
             return None, None
         for method in (self.search_ddg, self.search_domain_guess):
@@ -238,6 +263,8 @@ class FreeEnrichmentEngine:
             except Exception as e:
                 print(f"[V210] method {method.__name__} error for {name}: {e}")
                 phone, website = None, None
+            if not phone and website:
+                phone = self._phone_from_website(website)
             if phone or website:
                 return phone, website
         return None, None
