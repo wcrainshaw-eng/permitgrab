@@ -1095,6 +1095,16 @@ body {
 
 <!-- RECENT PERMITS TABLE -->
 <section class="section">
+  {# V467 (CODE_V467): internal-link CTA pointing at the matching SEO blog
+     post. Only renders for the 5 ad-ready cities that have a long-form
+     report — server passes seo_blog_slug if there's a match. #}
+  {% if seo_blog_slug %}
+  <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+    <span style="font-size: 14px;">📊 <strong>Full Report:</strong> 2026 {{ city_name }} permits, contractors, violations & owner data</span>
+    <a href="/blog/{{ seo_blog_slug }}" style="background: #2563eb; color: white; padding: 6px 14px; border-radius: 5px; text-decoration: none; font-weight: 600; font-size: 13px;">Read report →</a>
+  </div>
+  {% endif %}
+
   <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
     <div>
       <h2>Recent Building Permits in {{ city_name }}</h2>
