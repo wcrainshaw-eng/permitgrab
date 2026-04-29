@@ -10,7 +10,50 @@ import os
 import re
 import time
 import tempfile
+import threading
 from datetime import datetime, timedelta
+
+
+# V471 PR4 / V470b Fix 2: 5-minute hard wall-clock timeout per city.
+# fetch_permits() already has HTTP-level timeouts (API_TIMEOUT_SECONDS,
+# SOCRATA_TIMEOUT, CSV_DOWNLOAD_TIMEOUT) on individual requests, but a
+# pagination loop, a slow JSON parse, or a runaway upsert can still
+# leave a city stuck. This thread+join pattern abandons the fetch if it
+# hasn't returned in 5 min — the daemon moves on, the worker stays alive.
+_CITY_FETCH_TIMEOUT_SECONDS = 300
+
+def _fetch_permits_with_timeout(city_key, days_back, timeout=_CITY_FETCH_TIMEOUT_SECONDS):
+    """Run fetch_permits() in a daemon thread and abandon it after `timeout`
+    seconds. Returns (raw, fetch_status). On timeout returns ([], 'timeout')
+    so the caller can log it the same way it logs other fetch_status values.
+
+    The orphaned thread will eventually unwind when the request layer
+    times out (since every requests.get/post() in the call chain has a
+    timeout), and it dies with the worker process anyway.
+    """
+    result = {'raw': None, 'status': None, 'error': None, 'done': False}
+
+    def _runner():
+        try:
+            result['raw'], result['status'] = fetch_permits(city_key, days_back)
+        except Exception as e:
+            result['error'] = e
+        finally:
+            result['done'] = True
+
+    t = threading.Thread(
+        target=_runner, daemon=True,
+        name=f'fetch_permits:{city_key}'
+    )
+    t.start()
+    t.join(timeout=timeout)
+    if not result['done']:
+        print(f"[V470b/Fix2] {city_key} fetch_permits exceeded {timeout}s wall-clock — abandoning",
+              flush=True)
+        return [], 'timeout'
+    if result['error']:
+        raise result['error']
+    return result['raw'], result['status']
 # V12.54: Import static lookups from city_configs, but city/bulk source functions from SQLite wrapper
 from city_configs import TRADE_CATEGORIES, PERMIT_VALUE_TIERS
 from city_source_db import (
@@ -3016,7 +3059,7 @@ def activate_pending_cities():
                 city_permits_dict, stats = collect_bulk_source(source_id, config, days_back=30)
                 permit_count = stats.get('total_normalized', 0)
             else:
-                raw, status = fetch_permits(source_id, days_back=30)
+                raw, status = _fetch_permits_with_timeout(source_id, days_back=30)
                 if raw:
                     for record in raw:
                         try:
@@ -3126,7 +3169,7 @@ def collect_single_city(city_slug, days_back=7):
     print(f"[V64] Collecting {city_slug} via {platform}...")
 
     try:
-        raw, fetch_status = fetch_permits(source_id, days_back)
+        raw, fetch_status = _fetch_permits_with_timeout(source_id, days_back)
 
         if fetch_status.startswith('skip'):
             return {
@@ -3346,7 +3389,7 @@ def collect_v122(days_back=7, include_scrapers=True):
 
             start_time = time.time()
             try:
-                raw, fetch_status = fetch_permits(slug, days_back)
+                raw, fetch_status = _fetch_permits_with_timeout(slug, days_back)
                 if fetch_status != 'success' or not raw:
                     # Log the run
                     duration_ms = int((time.time() - start_time) * 1000)
@@ -3610,7 +3653,7 @@ def collect_single_source(source_key, source_type='bulk'):
                 print(f"[ERROR] City not found: {source_key}")
                 return [], {"error": "source_not_found"}
 
-            raw, fetch_status = fetch_permits(source_key, days_back=365)
+            raw, fetch_status = _fetch_permits_with_timeout(source_key, days_back=365)
             for record in raw:
                 try:
                     normalized = normalize_permit(record, source_key)
@@ -3935,7 +3978,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
             try:
                 # V16: Individual city collection only (bulk already handled in Phase 1)
-                raw, fetch_status = fetch_permits(source_id, days_back)
+                raw, fetch_status = _fetch_permits_with_timeout(source_id, days_back)
                 city_permits = []
 
                 for record in raw:
@@ -4071,7 +4114,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 start_time = time.time()
 
                 try:
-                    raw, fetch_status = fetch_permits(city_key, days_back)
+                    raw, fetch_status = _fetch_permits_with_timeout(city_key, days_back)
                     city_permits = []
 
                     for record in raw:
@@ -4283,7 +4326,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
         start_time = time.time()  # V15: Track timing for scraper_runs
 
         try:
-            raw, fetch_status = fetch_permits(city_key, days_back)
+            raw, fetch_status = _fetch_permits_with_timeout(city_key, days_back)
             city_permits = []
 
             for record in raw:
