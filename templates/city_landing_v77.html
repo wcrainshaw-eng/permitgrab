@@ -1734,6 +1734,9 @@ function v328ApplyFilter(val) {
   .v310-detail-card .perm-row .contractor { font-weight: 600; color: var(--gray-800); }
   .v310-detail-card .perm-row .desc { color: var(--gray-600); margin-top: 4px; font-size: 13px; }
   .v310-detail-card .viol-row { padding: 10px 12px; margin-bottom: 6px; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 4px; }
+  .v310-detail-card .owner-section { padding: 12px 16px; margin-top: 16px; background: #f0f7ff; border-left: 3px solid #3b82f6; border-radius: 4px; }
+  .v310-detail-card .owner-section h4 { color: #1e40af; }
+  .v310-detail-card .owner-row { padding: 4px 0; }
   .v310-detail-card .phone-masked { color: var(--gray-400); font-family: monospace; }
   .v310-detail-card .phone-visible { color: var(--accent-dark, #1d4ed8); font-weight: 600; }
   .v310-detail-card .unlock-link { color: var(--accent, #2563eb); font-size: 12px; margin-left: 8px; text-decoration: none; }
@@ -1809,21 +1812,28 @@ function v328ApplyFilter(val) {
       out.push('</div>');
     }
 
-    // Property owner section
+    // V465 (CODE_V465 Phase 1): always render the Property Owner section
+    // header — even when the lookup returned null. Hiding the section made
+    // it indistinguishable from "the feature isn't built." The visible
+    // "not available" line proves the lookup ran and the assessor data
+    // simply doesn't cover this address.
+    out.push('<div class="section owner-section"><h4>🏠 Property owner</h4>');
     if (data.property && data.property.owner_name) {
-      out.push('<div class="section"><h4>🏠 Property Owner</h4>');
-      out.push('<div class="owner-card">');
-      out.push('<strong>' + _escape(data.property.owner_name) + '</strong>');
+      out.push('<div class="owner-row">');
+      out.push('<div class="owner-name" style="font-weight:600;font-size:15px;">' + _escape(data.property.owner_name) + '</div>');
       if (data.property.mailing_address) {
-        out.push('<div style="margin-top: 4px;">Mailing: ' + _escape(data.property.mailing_address) + '</div>');
+        out.push('<div class="owner-detail" style="color:#666;font-size:13px;margin-top:4px;">Mailing: ' + _escape(data.property.mailing_address) + '</div>');
       } else if (!logged) {
-        out.push('<div style="margin-top: 4px; color: var(--gray-500);">Mailing address <a href="/pricing">unlocks with Pro →</a></div>');
+        out.push('<div class="owner-detail" style="color:#666;font-size:13px;margin-top:4px;">Mailing address <a href="/pricing">unlocks with Pro →</a></div>');
       }
       if (data.property.parcel_id) {
-        out.push('<div style="font-size: 12px; color: var(--gray-500); margin-top: 4px;">Parcel ' + _escape(data.property.parcel_id) + '</div>');
+        out.push('<div class="owner-detail" style="color:#999;font-size:12px;margin-top:4px;">Parcel: ' + _escape(data.property.parcel_id) + '</div>');
       }
-      out.push('</div></div>');
+      out.push('</div>');
+    } else {
+      out.push('<div style="color:#888;font-size:13px;">Owner data not available for this address.</div>');
     }
+    out.push('</div>');
 
     out.push('</div>');
     return out.join('');

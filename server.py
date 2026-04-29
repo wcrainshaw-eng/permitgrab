@@ -10172,19 +10172,26 @@ def admin_daemon_health():
         try:
             _sw_conn = permitdb.get_connection()
             sw_total = _sw_conn.execute("SELECT COUNT(*) FROM stripe_webhook_events").fetchone()[0]
-            sw_24h = _sw_conn.execute(
-                "SELECT COUNT(*) FROM stripe_webhook_events WHERE received_at > datetime('now', '-1 day')"
-            ).fetchone()[0] if 'received_at' in [
-                c[1] for c in _sw_conn.execute("PRAGMA table_info(stripe_webhook_events)").fetchall()
-            ] else None
+            # V465 (CODE_V465 Phase 4): the actual column is processed_at —
+            # the original code probed for received_at and silently fell back
+            # to None on every health check. Fixed to use the real column name.
+            _ts_cols = {c[1] for c in _sw_conn.execute("PRAGMA table_info(stripe_webhook_events)").fetchall()}
+            _ts_col = 'processed_at' if 'processed_at' in _ts_cols else (
+                'received_at' if 'received_at' in _ts_cols else None
+            )
+            sw_24h = None
             sw_last = None
-            try:
-                _last_row = _sw_conn.execute(
-                    "SELECT MAX(received_at) FROM stripe_webhook_events"
-                ).fetchone()
-                sw_last = _last_row[0] if _last_row else None
-            except Exception:
-                pass
+            if _ts_col:
+                try:
+                    sw_24h = _sw_conn.execute(
+                        f"SELECT COUNT(*) FROM stripe_webhook_events WHERE {_ts_col} > datetime('now', '-1 day')"
+                    ).fetchone()[0]
+                    _last_row = _sw_conn.execute(
+                        f"SELECT MAX({_ts_col}) FROM stripe_webhook_events"
+                    ).fetchone()
+                    sw_last = _last_row[0] if _last_row else None
+                except Exception:
+                    pass
             stripe_metrics = {
                 'webhook_events_total': sw_total,
                 'webhook_events_24h': sw_24h,
@@ -10424,11 +10431,11 @@ def api_address_detail():
     except Exception:
         pass
 
-    # V464 (CODE_V460 Phase 1): scope owner lookup to the same state and
-    # rank by exact-city → city-prefix → in-state. Prior query had no city
-    # filter at all, so a "100 MAIN ST" in another state could win on
-    # last_updated. Also handles the prod_cities.city ↔ property_owners.city
-    # mismatch (e.g. "Miami-Dade County" vs "Miami-Dade") without an alias map.
+    # V465 (CODE_V465 Phase 1): three-pass owner match — exact → permit-LIKE-owner
+    # → owner-LIKE-permit. Many permit addresses include suite/apt suffixes
+    # ("7535 SW 88 ST 1860") while assessor records use the bare street form
+    # ("7535 SW 88 ST"). Bidirectional LIKE catches both directions.
+    # Always scoped by state with city-rank tiebreaker (the V464 contribution).
     owner = None
     try:
         pc_owner = conn.execute(
@@ -10438,30 +10445,54 @@ def api_address_detail():
         if pc_owner and pc_owner['state']:
             _state = pc_owner['state']
             _city_full = pc_owner['city'] or ''
-            _city_prefix = (_city_full + ' %') if _city_full else '% %'
-            orow = conn.execute("""
-                SELECT owner_name, owner_mailing_address, parcel_id, source, city
-                  FROM property_owners
-                 WHERE state = ?
-                   AND UPPER(address) LIKE ?
-                 ORDER BY
-                   CASE
-                     WHEN city = ?           THEN 0
-                     WHEN ? LIKE city || ' %' THEN 1
-                     ELSE 2
-                   END,
-                   last_updated DESC
-                 LIMIT 1
-            """, (_state, like_prefix, _city_full, _city_full)).fetchone()
+            _addr_clean = upper.strip()  # already normalized at line 10306-10319
+
+            def _v465_lookup(where_addr_clause, params):
+                return conn.execute(f"""
+                    SELECT owner_name, owner_mailing_address, parcel_id, source, city, address
+                      FROM property_owners
+                     WHERE state = ?
+                       AND {where_addr_clause}
+                     ORDER BY
+                       CASE
+                         WHEN city = ?           THEN 0
+                         WHEN ? LIKE city || ' %' THEN 1
+                         ELSE 2
+                       END,
+                       last_updated DESC
+                     LIMIT 1
+                """, params).fetchone()
+
+            # Pass 1: exact (after both sides upper+trim)
+            orow = _v465_lookup(
+                "UPPER(TRIM(address)) = ?",
+                (_state, _addr_clean, _city_full, _city_full),
+            )
+            # Pass 2: permit address LIKE owner-prefix (existing behavior; catches
+            # permit "7535 SW 88 ST" matching owner "7535 SW 88 ST"). like_prefix
+            # is upper[:28] + '%'.
+            if not orow:
+                orow = _v465_lookup(
+                    "UPPER(address) LIKE ?",
+                    (_state, like_prefix, _city_full, _city_full),
+                )
+            # Pass 3: reverse — permit address starts with the full owner address.
+            # Catches permit "7535 SW 88 ST 1860" matching owner "7535 SW 88 ST".
+            if not orow:
+                orow = _v465_lookup(
+                    "? LIKE UPPER(address) || ' %'",
+                    (_state, _addr_clean, _city_full, _city_full),
+                )
             if orow:
                 owner = {
                     'owner_name': orow['owner_name'],
                     'mailing_address': orow['owner_mailing_address'] if logged_in else None,
                     'parcel_id': orow['parcel_id'],
                     'source': orow['source'],
+                    'matched_address': orow['address'],
                 }
-    except Exception as _v464_err:
-        print(f"[V464] property_owners lookup error: {_v464_err}", flush=True)
+    except Exception as _v465_err:
+        print(f"[V465] property_owners lookup error: {_v465_err}", flush=True)
 
     return jsonify({
         'address': upper,
