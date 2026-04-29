@@ -1534,6 +1534,80 @@ def _backfill_sources_table():
     print(f"[{datetime.now()}] V145: Backfill — {total} total, {active} active, {unverified} unverified")
 
 
+def _v471_sync_city_registry_to_city_sources():
+    """V471 PR3: upsert every CITY_REGISTRY + BULK_SOURCES entry into the
+    city_sources table so the runtime config can move from a Python dict
+    to the DB. Idempotent — safe to call on every startup; uses INSERT OR
+    REPLACE so updates flow through too.
+
+    The Python CITY_REGISTRY remains the source of truth (in
+    city_registry_data.py) until a follow-up PR retires it; this sync
+    populates city_sources so downstream code (collector, scorecards,
+    admin endpoints) can switch over without a migration cliff.
+    """
+    try:
+        from city_registry_data import CITY_REGISTRY, BULK_SOURCES
+        conn = permitdb.get_connection()
+        upserted_city = 0
+        upserted_bulk = 0
+        for key, cfg in CITY_REGISTRY.items():
+            try:
+                conn.execute("""
+                    INSERT OR REPLACE INTO city_sources
+                    (source_key, name, state, platform, mode, endpoint,
+                     dataset_id, field_map, date_field, city_field,
+                     limit_per_page, status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """, (
+                    key,
+                    cfg.get('name', key),
+                    cfg.get('state', ''),
+                    cfg.get('platform', 'unknown'),
+                    'city',
+                    cfg.get('endpoint', ''),
+                    cfg.get('dataset_id') or '',
+                    json.dumps(cfg.get('field_map', {}), default=str),
+                    cfg.get('date_field') or 'date',
+                    cfg.get('city_field') or cfg.get('city_filter', {}).get('field') if isinstance(cfg.get('city_filter'), dict) else None,
+                    cfg.get('limit', 2000),
+                    'active' if cfg.get('active') else 'inactive',
+                ))
+                upserted_city += 1
+            except Exception as _e:
+                pass
+        for key, cfg in BULK_SOURCES.items():
+            try:
+                conn.execute("""
+                    INSERT OR REPLACE INTO city_sources
+                    (source_key, name, state, platform, mode, endpoint,
+                     dataset_id, field_map, date_field, city_field,
+                     limit_per_page, status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """, (
+                    key,
+                    cfg.get('name', key),
+                    cfg.get('state', ''),
+                    cfg.get('platform', 'unknown'),
+                    'bulk',
+                    cfg.get('endpoint', ''),
+                    cfg.get('dataset_id') or '',
+                    json.dumps(cfg.get('field_map', {}), default=str),
+                    cfg.get('date_field') or 'date',
+                    cfg.get('city_field'),
+                    cfg.get('limit', 2000),
+                    'active' if cfg.get('active') else 'inactive',
+                ))
+                upserted_bulk += 1
+            except Exception as _e:
+                pass
+        conn.commit()
+        conn.close()
+        print(f"[{datetime.now()}] V471 PR3: city_sources synced — "
+              f"{upserted_city} city + {upserted_bulk} bulk rows", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] V471 PR3: sync error (non-fatal): {e}", flush=True)
+
+
 def _deferred_startup():
     """V69: Mark startup done but DO NOT start any background threads.
     V93: Email scheduler is now auto-started (doesn't need Postgres).
@@ -1564,6 +1638,14 @@ def _deferred_startup():
         _backfill_sources_table()
     except Exception as e:
         print(f"[{datetime.now()}] V145: Sources backfill error (non-fatal): {e}")
+
+    # V471 PR3: sync CITY_REGISTRY + BULK_SOURCES into city_sources so the
+    # runtime config can move from a Python dict to the DB. Idempotent;
+    # uses INSERT OR REPLACE so updates flow through.
+    try:
+        _v471_sync_city_registry_to_city_sources()
+    except Exception as e:
+        print(f"[{datetime.now()}] V471 PR3: city_sources sync error (non-fatal): {e}")
 
     # V149: Bulk load cities into city_research pipeline
     try:
