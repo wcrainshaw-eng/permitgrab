@@ -16840,8 +16840,21 @@ def city_landing_inner(city_slug):
         except Exception as e:
             print(f"[V251 F2] filter dropdown query failed for {city_slug}: {e}", flush=True)
 
+    # V467 (CODE_V467 internal linking): single-segment city URLs (/permits/chicago-il)
+    # come through city_landing_inner. Pass seo_blog_slug here too so the
+    # "Read report →" CTA renders on these pages, not just the two-segment route.
+    _v467_blog_slugs = {
+        'chicago-il': 'chicago-building-permits-2026',
+        'miami-dade-county': 'miami-dade-solar-permits-2026',
+        'phoenix-az': 'phoenix-code-violations-2026',
+        'san-antonio-tx': 'san-antonio-building-permits-2026',
+        'new-york-city': 'nyc-building-violations-2026',
+    }
+    _v467_seo_blog_slug = _v467_blog_slugs.get(city_slug)
+
     return render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
+        seo_blog_slug=_v467_seo_blog_slug,
         city_name=config['name'],
         city_slug=city_slug,
         state_abbrev=current_state,  # V77 template expects state_abbrev, not city_state
