@@ -321,6 +321,18 @@ def refresh_contractor_profiles(city_slug: str = None, now_utc: datetime = None)
                       is_active, freq, best_phone, now_iso))
                 upserted += 1
 
+                # V470 (CODE_V470 Fix 2 batched-writes): Chicago has 8K+
+                # contractors; one big commit at end-of-city would hold
+                # the WAL exclusive write lock for several seconds while
+                # gthread workers handling /permits/* requests piled up
+                # waiting on read locks. Commit every 500 rows + brief
+                # GIL yield. Trades a longer total wall-clock for
+                # responsiveness during the cycle.
+                if upserted % 500 == 0:
+                    conn.commit()
+                    import time as _v470_time
+                    _v470_time.sleep(0.05)
+
             conn.commit()
             cities_processed += 1
             total_upserted += upserted
