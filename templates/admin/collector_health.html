@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Collector Health - PermitGrab Admin</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #1a1a2e; color: #e0e0e0; }
+        h1 { color: #00d4ff; }
+        h2 { color: #888; margin-top: 30px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
+        th, td { border: 1px solid #333; padding: 8px 12px; text-align: left; }
+        th { background: #252540; color: #00d4ff; }
+        tr:nth-child(even) { background: #1e1e35; }
+        .green { color: #00ff88; font-weight: bold; }
+        .yellow { color: #ffcc00; font-weight: bold; }
+        .red { color: #ff4444; font-weight: bold; }
+        .summary { display: flex; gap: 20px; margin-bottom: 30px; }
+        .summary-card { background: #252540; padding: 20px; border-radius: 8px; text-align: center; min-width: 120px; }
+        .summary-card .value { font-size: 32px; font-weight: bold; }
+        .summary-card .label { font-size: 14px; color: #888; }
+        a { color: #00d4ff; }
+        .back-link { margin-bottom: 20px; display: block; }
+    </style>
+</head>
+<body>
+    <a href="/admin" class="back-link">&larr; Back to Admin</a>
+    <h1>Collector Health Dashboard</h1>
+
+    <div class="summary">
+        <div class="summary-card">
+            <div class="value green">{{ green_count }}</div>
+            <div class="label">Healthy (0-2 days)</div>
+        </div>
+        <div class="summary-card">
+            <div class="value yellow">{{ yellow_count }}</div>
+            <div class="label">Warning (3-7 days)</div>
+        </div>
+        <div class="summary-card">
+            <div class="value red">{{ red_count }}</div>
+            <div class="label">Critical (7+ days)</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ health_data|length }}</div>
+            <div class="label">Total Cities</div>
+        </div>
+    </div>
+
+    {% if summary %}
+    <h2>Today's Collection Summary</h2>
+    <table>
+        <tr>
+            <th>Total Runs</th>
+            <th>Successful</th>
+            <th>Errors</th>
+            <th>No New Data</th>
+            <th>Permits Inserted</th>
+            <th>Avg Duration</th>
+        </tr>
+        <tr>
+            <td>{{ summary.total_runs or 0 }}</td>
+            <td class="green">{{ summary.successful or 0 }}</td>
+            <td class="red">{{ summary.errors or 0 }}</td>
+            <td>{{ summary.no_new_data or 0 }}</td>
+            <td>{{ summary.total_permits_inserted or 0 }}</td>
+            <td>{{ (summary.avg_duration_ms or 0)|int }}ms</td>
+        </tr>
+    </table>
+    {% endif %}
+
+    <h2>City Health Status</h2>
+    <table>
+        <tr>
+            <th>City</th>
+            <th>State</th>
+            <th>Status</th>
+            <th>Days Since Data</th>
+            <th>Total Permits</th>
+            <th>Failures</th>
+            <th>Last Error</th>
+        </tr>
+        {% for city in health_data %}
+        {% set color_class = (city.health_color or 'RED')|lower %}
+        <tr>
+            <td>{{ city.city or '' }}</td>
+            <td>{{ city.state or '' }}</td>
+            <td class="{{ color_class }}">{{ (city.status or '')|upper }}</td>
+            <td class="{{ color_class }}">{% if city.days_since_data is none %}Never{% else %}{{ city.days_since_data }}{% endif %}</td>
+            <td>{{ city.total_permits or 0 }}</td>
+            <td>{{ city.consecutive_failures or 0 }}</td>
+            <td>{{ (city.last_error or '')[:50] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Recent Collection Runs</h2>
+    <table>
+        <tr>
+            <th>Time</th>
+            <th>City</th>
+            <th>Status</th>
+            <th>Permits Found</th>
+            <th>Inserted</th>
+            <th>Duration</th>
+            <th>Error</th>
+        </tr>
+        {% for run in recent_runs %}
+        {% set status_class = 'green' if run.status == 'success' else ('yellow' if run.status == 'no_new' else 'red') %}
+        <tr>
+            <td>{{ run.run_started_at or '' }}</td>
+            <td>{{ run.city or '' }} {{ run.state or '' }}</td>
+            <td class="{{ status_class }}">{{ run.status or '' }}</td>
+            <td>{{ run.permits_found or 0 }}</td>
+            <td>{{ run.permits_inserted or 0 }}</td>
+            <td>{{ run.duration_ms or '' }}ms</td>
+            <td>{{ (run.error_message or '')[:30] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <p style="color: #666; margin-top: 40px;">
+        V15 Collector Redesign - prod_cities table
+    </p>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<p>San Antonio is one of the fastest-growing cities in Texas, and its construction market reflects that. With <strong>{{ '{:,}'.format(stats.profiles) }}</strong> active contractors pulling permits and <strong>{{ '{:,}'.format(stats.violations) }}</strong> open code violations, there's significant building activity — and significant opportunity.</p>
+
+<h2>Building Permits in San Antonio</h2>
+<p>Building permits are issued by the Development Services Department (DSD) at 1901 South Alamo. You can apply in person or through the online portal. For questions, call (210) 207-1111.</p>
+<p>New permit data — both applications submitted and permits issued — is available on the City's Open Data SA website. PermitGrab pulls this data automatically and organizes it by contractor, address, and permit type.</p>
+
+<h2>How to Find a Licensed Contractor in San Antonio</h2>
+<p>All contractors must register with the City of San Antonio before pulling permits. You can verify registration through the Contractors Connect Portal. For state-level verification of electrical and mechanical contractors, use the Texas Department of Licensing and Regulation (TDLR) Active License Data Search. For plumbing, check the Texas State Board of Plumbing Examiners (TSBPE).</p>
+<p>Check the monthly Canceled, Suspended, and Registration Appeals Report to avoid contractors with current sanctions.</p>
+<p>PermitGrab tracks <strong>{{ '{:,}'.format(stats.profiles) }}</strong> active contractors in San Antonio, with <strong>{{ '{:,}'.format(stats.phones) }}</strong> phone numbers. This isn't a static directory — it's updated daily based on actual permit filings, so you're seeing contractors who are actively working right now.</p>
+
+<h2>Permits Filed in the Last 90 Days</h2>
+<p>{{ '{:,}'.format(stats.permits_90d) }} San Antonio permits filed in the last 90 days. Top permit types:</p>
+{% if stats.top_permit_types %}
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Permit Type</th><th style="text-align: right; padding: 0.5rem;">Count</th></tr></thead>
+  <tbody>
+  {% for pt in stats.top_permit_types %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ pt.permit_type }}</td><td style="text-align: right; padding: 0.5rem;">{{ '{:,}'.format(pt.cnt) }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Most Active Contractors</h2>
+{% if stats.top_contractors %}
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Contractor</th><th style="text-align: right; padding: 0.5rem;">Permits</th></tr></thead>
+  <tbody>
+  {% for c in stats.top_contractors %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ c.business_name }}</td><td style="text-align: right; padding: 0.5rem;">{{ c.permits }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>San Antonio's Open Code Violations</h2>
+<p>San Antonio currently has <strong>{{ '{:,}'.format(stats.violations) }}</strong> open code violations on record. Each represents a property where work needs to be done — structural repairs, property maintenance, electrical upgrades, plumbing fixes.</p>
+<p>For contractors, these are ready-made leads. The property owner either needs to hire someone to fix the violation or face escalating fines. For investors, a property with code violations may signal a motivated seller.</p>
+
+<h2>Solar Permits in San Antonio</h2>
+<p>Solar installations require both a building/electrical permit from DSD AND a utility interconnection agreement from CPS Energy — these are separate processes. DSD review takes about 2 weeks. CPS Energy interconnection can take 2-12 weeks after installation. Submit to both simultaneously.</p>
+<p>Permit fees range from $275-$525. Texas allows homeowners to install their own solar, but hiring a licensed contractor is recommended for permitting compliance. As of September 2025, new consumer protection laws (SB 1036 & SB 1697) require solar retailer registration with TDLR.</p>
+
+<h2>Property Owner Data</h2>
+<p>We've matched <strong>{{ '{:,}'.format(stats.owners) }}</strong> property owners in San Antonio to permit addresses using Bexar County assessor records. When a permit is filed or a violation is issued, you can see who owns the property.</p>
+<p><a href="/permits/{{ city_slug }}">Browse San Antonio contractors and permits →</a></p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>How do I check if a contractor is licensed in San Antonio?</h3>
+<p>Use the Contractors Connect Portal for city registration, TDLR for electrical/mechanical, and TSBPE for plumbing.</p>
+<h3>How current is this data?</h3>
+<p>Updated daily from City of San Antonio open data feeds. Most recent permit in our system was filed on {{ stats.newest_permit }}.</p>
+<h3>Where can I see all open San Antonio violations?</h3>
+<p>Search by address on the <a href="/permits/{{ city_slug }}">San Antonio permits page</a>.</p>
