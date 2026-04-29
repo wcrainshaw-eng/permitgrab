@@ -127,6 +127,29 @@ ASSESSOR_SOURCES = {
         'state': 'DC',
         'source_tag': 'assessor:dc_vacant_blighted',
     },
+    'franklin_columbus': {
+        # V468 (CODE_V468 Phase 4B): Franklin County, OH (Columbus area).
+        # Tax Parcel layer at gis.franklincountyohio.gov. Probed 2026-04-29
+        # via SSH: 117-field schema with OWNERNME1 (primary owner),
+        # MAILNME1/PSTLADDRES (mailing), SITEADDRESS + ZIPCD (situs),
+        # TOTVALUEBASE (assessed value), PARCELID. Reachable from Render
+        # SSH (DNS resolves, returns valid f=json metadata).
+        # Columbus has 2,115 contractor profiles + 6,373 violations but
+        # zero owner records pre-V468.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Franklin County Tax Parcels',
+        'endpoint': 'https://gis.franklincountyohio.gov/hosting/rest/services/ParcelFeatures/Parcel_Features/MapServer/0',
+        'where_clause': "OWNERNME1 IS NOT NULL AND OWNERNME1 <> '' AND SITEADDRESS IS NOT NULL AND SITEADDRESS <> ''",
+        'field_map': {
+            'owner_name': 'OWNERNME1',
+            'address': 'SITEADDRESS',
+            'zip': 'ZIPCD',
+            'parcel_id': 'PARCELID',
+            'owner_mailing_address': 'PSTLADDRES',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:franklin_columbus',
+    },
     'cook_chicago': {
         # V429 (CODE_V428 Phase 1a): Cook County (Chicago + suburbs)
         # Assessor Parcel Addresses on Socrata. Probed 2026-04-27:
