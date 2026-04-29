@@ -1750,67 +1750,13 @@ def _deferred_startup():
     except Exception as e:
         print(f"[{datetime.now()}] [V183] Startup refresh error (non-fatal): {e}", flush=True)
 
-    # V365b: Skip ALL background threads when WORKER_MODE is on.
-    # The background worker (worker.py) handles collection, enrichment,
-    # maintenance, and email scheduling in its own process with its own
-    # 512MB memory budget.
-    if WORKER_MODE:
-        print(f"[{datetime.now()}] V365b: WORKER_MODE=true — skipping daemon threads "
-              f"(handled by background worker process)", flush=True)
-    else:
-        # V146: Safe auto-start daemon — runs start_collectors in background thread
-        # so it doesn't block gunicorn worker (start_collectors sleeps 120s+)
-        import threading as _th
-        def _v146_safe_autostart():
-            import time as _t
-            _t.sleep(10)  # V183: Reverted to 10s — profile refresh now runs in _deferred_startup before threads spawn
-            try:
-                print(f"[{datetime.now()}] V146: Auto-starting collectors (background)...", flush=True)
-                start_collectors()  # This takes 120s+ but runs in THIS thread, not blocking gunicorn
-                print(f"[{datetime.now()}] V146: Collectors auto-started OK", flush=True)
-            except Exception as _e:
-                print(f"[{datetime.now()}] V146: Auto-start failed: {_e}", flush=True)
-        _th.Thread(target=_v146_safe_autostart, daemon=True, name='v146_autostart').start()
-        print(f"[{datetime.now()}] V146: Daemon auto-start scheduled (background thread)")
-
-        # V106: Phase B — Heavy maintenance in background thread
-        # Server is ready to serve requests while this runs
-        def _run_background_maintenance():
-            try:
-                print(f"[{datetime.now()}] [V106] Background maintenance starting...")
-                from db import relink_orphaned_permits
-                from collector import (update_total_permits_from_actual, update_all_city_health,
-                                       activate_bulk_covered_cities, cleanup_balance_of_entries,
-                                       cleanup_source_id_mismatches, pause_tiny_no_endpoint_cities)
-
-                # V109b: One-time cleanup of V108 pipeline damage
-                _cleanup_v108_pipeline_damage()
-
-                relink_orphaned_permits()
-                update_total_permits_from_actual()
-                activate_bulk_covered_cities()
-                cleanup_balance_of_entries()
-                cleanup_source_id_mismatches()
-                pause_tiny_no_endpoint_cities()
-                update_all_city_health()
-
-                print(f"[{datetime.now()}] [V109b] Background maintenance complete")
-            except Exception as e:
-                print(f"[{datetime.now()}] [V106] Background maintenance error: {e}")
-                import traceback
-                traceback.print_exc()
-
-        maintenance_thread = threading.Thread(target=_run_background_maintenance, name='v106_maintenance', daemon=True)
-        maintenance_thread.start()
-        print(f"[{datetime.now()}] [V106] Background maintenance thread started — server ready to serve")
-
-        # V93: Start email scheduler thread automatically (uses JSON file + SMTP, no Postgres needed)
-        try:
-            email_thread = threading.Thread(target=schedule_email_tasks, name='email_scheduler', daemon=True)
-            email_thread.start()
-            print(f"[{datetime.now()}] V93: Email scheduler thread started automatically")
-        except Exception as e:
-            print(f"[{datetime.now()}] [ERROR] Email scheduler failed to start: {e}")
+    # V471 PR4: NO daemon threads in the web process. Collection, enrichment,
+    # maintenance, and email scheduling all run in the permitgrab-worker
+    # service (worker.py) on its own 512MB memory budget. The web process
+    # is HTTP-only.
+    print(f"[{datetime.now()}] V471 PR4: web process is HTTP-only — "
+          f"daemon threads (collection, enrichment, maintenance, email) "
+          f"run in the permitgrab-worker service.", flush=True)
 
 
 # V13.1: Jinja filter for human-readable date formatting
@@ -8653,109 +8599,31 @@ def _test_outbound_connectivity():
 
 
 def start_collectors():
-    """Start background data collection threads. Safe to call multiple times.
+    """V471 PR4: NO-OP. Collection runs in the separate permitgrab-worker
+    service (worker.py); the web process is HTTP-only. The function is
+    kept around so callers (the deferred-startup chain, the admin endpoint
+    fallback path) don't break — it just marks `_collector_started=True`
+    and prints a banner.
 
-    V66: Stagger thread starts to prevent connection pool stampede.
-    V414 (CODE_V365b PHASE A): when WORKER_MODE=true, skip entirely
-    — daemon threads are owned by the separate worker.py service.
+    The original implementation spawned scheduled_collection +
+    enrichment_daemon + email_scheduler + maintenance threads at gunicorn
+    startup. That made every collection cycle compete with HTTP traffic
+    for the same RAM and SQLite write lock, drove the web service to the
+    2GB Render plan, and left the daemon prone to wedging the worker
+    after V455 self-recycle. With this function neutered, the web process
+    runs HTTP only.
     """
     global _collector_started
     if _collector_started:
         return
-    # V414: respect WORKER_MODE — the web process should not own daemon
-    # threads when running alongside a Render Background Worker.
-    if WORKER_MODE:
-        print(f"[{datetime.now()}] V414: WORKER_MODE=true — daemon threads are handled by the background worker (worker.py). Web process is HTTP-only.", flush=True)
-        _collector_started = True  # mark "started" so health endpoint doesn't self-heal-loop
-        return
     _collector_started = True
-
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    # V12.2: Test network connectivity before starting threads
-    _test_outbound_connectivity()
-
-    # V75: Apply known fixes to broken city_sources configs
-    print(f"[{datetime.now()}] V75: Applying known config fixes...")
-    try:
-        fixes = fix_known_broken_configs()
-        print(f"[{datetime.now()}] V75: Applied {len(fixes)} config fixes")
-    except Exception as e:
-        print(f"[{datetime.now()}] V75: Config fix error (non-fatal): {e}")
-
-    # V77: Sync CITY_REGISTRY to prod_cities — activates paused cities
-    print(f"[{datetime.now()}] V77: Syncing CITY_REGISTRY to prod_cities...")
-    try:
-        sync_city_registry_to_prod_cities()
-        print(f"[{datetime.now()}] V77: Registry sync complete")
-    except Exception as e:
-        print(f"[{datetime.now()}] V77: Registry sync error (non-fatal): {e}")
-
-    print(f"[{datetime.now()}] V67: Starting background collectors with staggered init...")
-
-    # V414 (CODE_V365b PHASE A.2): SKIP initial_collection. It runs a one-shot
-    # full collection across every active city and is the biggest memory
-    # spike on startup — directly responsible for OOM kills landing the
-    # whole web process at 768MB / 150% of the 512MB Render limit.
-    # scheduled_collection picks up the same set of cities within ~30 min
-    # of starting, so we lose nothing meaningful by removing the kickoff.
-    # Re-enable only after the worker.py split is live.
-    print(f"[{datetime.now()}] V414: skipping run_initial_collection (memory relief — scheduled_collection picks up same set of cities in ~30 min)")
-
-    # Scheduled daily collection thread
-    collector_thread = threading.Thread(target=scheduled_collection, name='scheduled_collection', daemon=True)
-    collector_thread.start()
-    print(f"[{datetime.now()}] V67: Scheduled collection thread started, waiting 30s...")
-    time.sleep(30)
-
-    # V229 C5: dedicated enrichment daemon. scheduled_collection still runs
-    # enrich_batch(limit=200) per cycle, but that only fires when the
-    # collection cycle completes (30-60 min apart). This second thread
-    # runs enrichment on its own 30-min cadence so the queue drains
-    # steadily even when a collection cycle is slow/stuck.
-    def _enrichment_daemon():
-        time.sleep(600)  # let collection warm up first
-        while True:
-            # V242 P0: same import-pause guard the collection loop uses.
-            try:
-                from license_enrichment import is_import_running
-                if is_import_running():
-                    print(f"[{datetime.now()}] V242: enrichment daemon paused — license import in progress",
-                          flush=True)
-                    time.sleep(30)
-                    continue
-            except Exception:
-                pass
-            try:
-                from web_enrichment import enrich_batch
-                result = enrich_batch(limit=200)
-                print(f"[{datetime.now()}] [V229 C5] enrichment daemon: {result}",
-                      flush=True)
-            except Exception as e:
-                print(f"[{datetime.now()}] [V229 C5] enrichment daemon error: {e}",
-                      flush=True)
-            time.sleep(1800)  # 30 min between passes
-
-    try:
-        enrichment_thread = threading.Thread(
-            target=_enrichment_daemon, name='enrichment_daemon', daemon=True
-        )
-        enrichment_thread.start()
-        print(f"[{datetime.now()}] V229 C5: enrichment daemon started")
-    except Exception as e:
-        print(f"[{datetime.now()}] V229 C5: enrichment daemon failed to start: {e}")
-
-    # V12.53: Email scheduler thread
-    # V229 B6: removed — _deferred_startup() at line ~1041 already spawns
-    # this same thread. Having two copies run simultaneously risked sending
-    # duplicate digest emails. The earlier spawn wins; this block is a
-    # no-op now, kept as a comment so the numbering in the startup sequence
-    # still matches prior-version logs.
-
-    # V166: Removed dead _fix_socrata_addresses thread (function deleted in V163)
-    # V166: Removed dead autonomy_engine thread (file deleted in V163)
-
-    print(f"[{datetime.now()}] V67: All collector threads started (staggered over ~2 minutes).")
+    print(
+        f"[{datetime.now()}] V471 PR4: start_collectors() is a no-op — "
+        f"collection runs in the permitgrab-worker service (worker.py). "
+        f"Web process is HTTP-only.",
+        flush=True,
+    )
+    return
 
 # V229 addendum K1 / V471 PR2-prep: single, lock-guarded spawner for
 # _deferred_startup. Called only from the before_request hook now (the

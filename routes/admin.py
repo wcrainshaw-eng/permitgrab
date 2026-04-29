@@ -1027,74 +1027,19 @@ def admin_collection_status():
 
 @admin_bp.route('/api/admin/start-collectors', methods=['POST'])
 def admin_start_collectors():
-    """V69: Manually start background threads after server is stable.
-
-    Since V69 disables all automatic background threads on startup,
-    use this endpoint to manually trigger them when ready.
-    """
+    """V471 PR4: collection runs in the separate permitgrab-worker service
+    (worker.py). The web process no longer spawns daemon threads. Restart
+    the worker service on Render to restart collection."""
     valid, error = check_admin_key()
     if not valid:
         return error
-
-    # V365b: In WORKER_MODE, daemon threads run in the background worker process
-    if WORKER_MODE:
-        return jsonify({
-            'status': 'worker_mode',
-            'message': 'WORKER_MODE=true — daemon threads run in the background worker '
-                       'process (worker.py). Restart the permitgrab-worker service on '
-                       'Render to restart collection.'
-        }), 200
-
-
-    try:
-        # V443 (P0 zombie-daemon fix): the previous flag-only check would
-        # return "already_running" forever once the daemon thread had been
-        # spawned, even if the thread later died silently. Combined with
-        # start_collectors()'s own one-way `_s._collector_started` flag, that
-        # left the daemon dead with no way to restart short of redeploy.
-        # Now: probe for a live `scheduled_collection` thread first; if
-        # absent, reset both flags so the spawn actually fires.
-        import threading
-        live_daemon = any(
-            t.is_alive() and t.name == 'scheduled_collection'
-            for t in threading.enumerate()
-        )
-        force = request.args.get('force', '').lower() in ('1', 'true', 'yes')
-
-        if live_daemon and not force:
-            return jsonify({
-                'status': 'already_running',
-                'message': 'Collectors already started',
-                'daemon_thread_alive': True,
-            }), 200
-
-        if not live_daemon:
-            # Reset the one-way flags so the inner start_collectors() (and
-            # this endpoint's gate) will actually run the spawn path.
-            _s._collector_started = False
-            _s._collectors_manually_started = False
-            print(
-                f"[{datetime.now()}] V443: scheduled_collection thread not alive; "
-                f"resetting flags and respawning",
-                flush=True,
-            )
-
-        def _run_collectors():
-            print(f"[{datetime.now()}] V69/V443: Manual start_collectors triggered via API")
-            start_collectors()
-
-        t = threading.Thread(target=_run_collectors, daemon=True)
-        t.start()
-        _s._collectors_manually_started = True
-
-        return jsonify({
-            'status': 'started',
-            'message': 'Background collectors started in separate thread',
-            'reset_dead_daemon': not live_daemon,
-        }), 200
-
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    return jsonify({
+        'status': 'worker_mode',
+        'message': 'V471 PR4: daemon threads run in the permitgrab-worker '
+                   'background service (worker.py). The web process is HTTP-only. '
+                   'To restart collection, restart the permitgrab-worker service '
+                   'in the Render dashboard.',
+    }), 200
 
 
 @admin_bp.route('/api/admin/debug/threads', methods=['GET'])
