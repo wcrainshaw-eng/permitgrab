@@ -267,6 +267,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   background: #fee2e2;
   color: #991b1b;
 }
+/* V472: owner-data emblem (green) */
+.city-emblem.owners {
+  background: #dcfce7;
+  color: #166534;
+}
 .city-link-meta {
   display: flex;
   align-items: center;
@@ -323,21 +328,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <!-- STATE DIRECTORY -->
 <section class="state-directory">
   <h2>All Cities by State</h2>
-  <p>{{ total_cities }} cities across {{ total_states }} states with active building permit data.</p>
+  <p>{{ total_cities }} cities across {{ total_states }} states.</p>
 
-  {# V442 P3 (CODE_V442): replaced first-letter alphabet nav with one
-     pill per state abbreviation. Each pill anchors directly to that
-     state's section below — much faster than scrolling A→Z to find FL. #}
+  {# V442 P3 / V472: jump-nav pills now show full state names (anchor IDs
+     stay as the lower-case abbreviation so existing in-page links keep
+     working — only the visible label changes). Sort order matches the
+     route handler (alphabetical by full name). #}
   <div class="alpha-nav state-pill-nav">
-    {% for state_name, cities in sorted_states %}
-      <a href="#state-{{ state_name|lower }}">{{ state_name }}</a>
+    {% for state_abbr, cities in sorted_states %}
+      <a href="#state-{{ state_abbr|lower }}">{{ STATE_NAMES.get(state_abbr, state_abbr) }}</a>
     {% endfor %}
   </div>
 
-  {% for state_name, cities in sorted_states %}
-    <div class="state-section" id="state-{{ state_name|lower }}" data-state="{{ state_name|lower }}">
+  {% for state_abbr, cities in sorted_states %}
+    <div class="state-section" id="state-{{ state_abbr|lower }}" data-state="{{ state_abbr|lower }}">
       <div class="state-header">
-        <h3>{{ state_name }}</h3>
+        <h3>{{ STATE_NAMES.get(state_abbr, state_abbr) }}</h3>
         <span class="state-count">{{ cities|length }} {{ 'city' if cities|length == 1 else 'cities' }}</span>
       </div>
       <div class="city-grid">
@@ -348,6 +354,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
             <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
             {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles">C</span>{% endif %}
             {% if city.has_violations %}<span class="city-emblem violations" title="Code violations">V</span>{% endif %}
+            {% if city.has_owners %}<span class="city-emblem owners" title="Property owner data">O</span>{% endif %}
           </span>
         </a>
         {% endfor %}
