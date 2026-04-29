@@ -1625,53 +1625,98 @@ def search_page():
     return redirect('/cities')
 
 
+_V472_STATE_NAMES = {
+    'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+    'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+    'DC': 'District of Columbia', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii',
+    'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+    'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine',
+    'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota',
+    'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska',
+    'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico',
+    'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+    'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island',
+    'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas',
+    'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington',
+    'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+    'AS': 'American Samoa', 'GU': 'Guam', 'MP': 'Northern Mariana Islands',
+    'PR': 'Puerto Rico', 'VI': 'U.S. Virgin Islands',
+}
+
+
 @city_pages_bp.route('/cities')
 def cities_browse():
     """V17e: Dedicated browse page for all cities, organized by state.
-    Reduces homepage link dilution by moving 300+ city links here.
-    Acts as an SEO hub that distributes PageRank to all city pages.
 
-    V182 PR2: filters out bulk-misattribution cities (e.g. Fenner NY with
-    39K permits on 1,900 residents) so they don't appear in public rankings.
+    V472 (CODE_V472): three changes —
+      1. Section headers + jump-nav pills now show full state names,
+         sorted alphabetically by full name (Alabama, Alaska, Arizona…)
+         not by abbreviation.
+      2. Shows ALL cities from prod_cities (regardless of status / permit
+         count), so the page is a complete directory rather than only
+         cities currently collecting.
+      3. Adds an "O" badge for cities that have property_owners data,
+         alongside the existing C (contractors) and V (violations) badges.
     """
-    raw_cities = get_cities_with_data()
-    footer_cities = raw_cities
+    # Footer ranking still uses the curated public list (population /
+    # permit-volume filter applied) so we don't surface low-quality
+    # bulk-misattribution cities in the global footer.
+    footer_cities = get_cities_with_data()
 
-    # V182 PR2: apply public-ranking filter (population vs permit volume).
-    from contractor_profiles import city_passes_public_filter
-    all_cities = [
-        c for c in raw_cities
-        if city_passes_public_filter(c.get('population', 0), c.get('permit_count', 0))
-    ]
-    filtered_out = len(raw_cities) - len(all_cities)
-    if filtered_out:
-        print(f"[V182 cities] Filtered {filtered_out} bulk-misattribution cities from rankings", flush=True)
+    conn = permitdb.get_connection()
+    rows = conn.execute(
+        "SELECT city, state, city_slug, total_permits, "
+        "       has_enrichment, has_violations "
+        "FROM prod_cities "
+        "WHERE city IS NOT NULL AND city != '' "
+        "  AND state IS NOT NULL AND state != '' "
+    ).fetchall()
+    owner_rows = conn.execute(
+        "SELECT DISTINCT LOWER(city) c, UPPER(state) s "
+        "FROM property_owners "
+        "WHERE city IS NOT NULL AND state IS NOT NULL"
+    ).fetchall()
+    conn.close()
 
-    # Group cities by state
+    owner_set = {(r['c'], r['s']) for r in owner_rows}
+
+    all_cities = []
+    for r in rows:
+        city = r['city']
+        state = (r['state'] or '').upper()
+        all_cities.append({
+            'name': city,
+            'slug': r['city_slug'],
+            'state': state,
+            'permit_count': r['total_permits'] or 0,
+            'has_enrichment': bool(r['has_enrichment']),
+            'has_violations': bool(r['has_violations']),
+            'has_owners': (city.lower(), state) in owner_set,
+        })
+
+    # Group by state abbreviation, sort by FULL state name (not abbr),
+    # then sort cities within each state alphabetically by name.
     states = {}
     no_state = []
-    for city in all_cities:
-        state = city.get('state', '').strip()
+    for c in all_cities:
+        state = c['state']
         if state:
-            if state not in states:
-                states[state] = []
-            states[state].append(city)
+            states.setdefault(state, []).append(c)
         else:
-            no_state.append(city)
+            no_state.append(c)
 
-    # Sort states alphabetically.
-    # V446 P2 (CODE_V446): cities within each state were sorted by permit
-    # count (descending). Users browse by scanning for their city name —
-    # alphabetical is the natural mental model. Switched to alphabetical
-    # by name (case-insensitive) so "Cape Coral" comes before "Hialeah"
-    # under FL even though Hialeah has more permits.
-    sorted_states = sorted(states.items(), key=lambda x: x[0])
-    for state_name, cities in sorted_states:
+    sorted_states = sorted(
+        states.items(),
+        key=lambda x: _V472_STATE_NAMES.get(x[0], x[0]),
+    )
+    for _abbr, cities in sorted_states:
         cities.sort(key=lambda c: (c.get('name') or '').lower())
 
-    # Top cities across all states (for hero section)
-    # V13.2: Increased from 12 to 20 for better coverage
-    top_cities = all_cities[:20]
+    # Top cities for the hero — only ones with real permit volume.
+    top_cities = sorted(
+        [c for c in all_cities if c['permit_count'] > 0],
+        key=lambda c: -c['permit_count'],
+    )[:20]
 
     total_cities = len(all_cities)
     total_states = len(states)
@@ -1684,6 +1729,7 @@ def cities_browse():
         total_cities=total_cities,
         total_states=total_states,
         canonical_url=f"{SITE_URL}/cities",
+        STATE_NAMES=_V472_STATE_NAMES,
     )
 
 
