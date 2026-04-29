@@ -41,12 +41,20 @@ import db as permitdb
 
 
 def _enrichment_disabled():
-    """V439: emergency kill switch. Set DISABLE_ENRICHMENT=1 in Render
-    env vars to stop all DDG searches when the worker is overloaded.
-    DDG enrichment + concurrent assessor imports + retag = SQLite write
-    contention that wedged prod for 60+ min on 2026-04-27.
+    """V466 (CODE_V466 Phase 0): kill switch hardcoded off.
+
+    The V439 emergency disable (env var DISABLE_ENRICHMENT=1) was set after
+    a 60+ min daemon wedge on 2026-04-27 from DDG enrichment + concurrent
+    assessor imports + retag contending on the SQLite write lock. Since
+    then V461 fixed the staleness JOIN hang and V455/V457 added memory
+    self-recycle, so the original failure mode is mitigated.
+
+    Cowork V466 explicitly required enrichment to work, regardless of the
+    env var. Hardcoding False so admin /api/admin/enrich triggers actually
+    hit DDG. If the daemon wedges again, re-enable the env-var gate by
+    reverting this function.
     """
-    return os.environ.get('DISABLE_ENRICHMENT') == '1'
+    return False
 
 
 # ---------------------------------------------------------------------------
