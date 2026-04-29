@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html><head><title>PermitGrab Admin · Command Center</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;margin:0;padding:20px;background:#0f172a;color:#e2e8f0}
+h1{margin:0 0 4px;color:#f1f5f9}
+.sub{color:#94a3b8;font-size:14px;margin-bottom:18px}
+.summary{display:flex;gap:12px;margin:16px 0}
+.stat{background:#1e293b;padding:14px 20px;border-radius:10px;min-width:120px;border:1px solid #334155}
+.stat .num{font-size:28px;font-weight:700;display:block}
+.stat .lbl{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}
+.healthy{color:#4ade80}.stale{color:#facc15}.critical{color:#f87171}
+.no_data{color:#94a3b8}.paused{color:#64748b}
+.attn{display:inline-block;background:#dc2626;color:white;border-radius:50%;
+      width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;margin-left:6px}
+table{border-collapse:collapse;width:100%;background:#1e293b;border-radius:10px;overflow:hidden}
+th,td{padding:10px 14px;border-bottom:1px solid #334155;text-align:left}
+th{background:#0f172a;color:#cbd5e1;font-size:12px;text-transform:uppercase;letter-spacing:1px}
+tr:last-child td{border-bottom:none}
+button{padding:5px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px}
+.btn-collect{background:#2563eb;color:white}
+.btn-enrich{background:#8b5cf6;color:white}
+.btn-collect:hover{background:#1d4ed8}.btn-enrich:hover{background:#7c3aed}
+#log{background:#020617;padding:12px;margin-top:18px;border-radius:8px;
+     max-height:320px;overflow-y:auto;font-family:Menlo,monospace;font-size:12px;
+     border:1px solid #334155}
+.log-line{padding:2px 0;color:#94a3b8}
+.log-line.ok{color:#4ade80}
+.log-line.err{color:#f87171}
+</style></head><body>
+<h1>PermitGrab · Command Center</h1>
+<p class="sub">V227 · {{ now_utc }}</p>
+<div class="summary">
+  <div class="stat"><span class="num healthy">{{ summary['healthy'] }}</span><span class="lbl">Healthy</span></div>
+  <div class="stat"><span class="num stale">{{ summary['stale'] }}</span><span class="lbl">Stale</span></div>
+  <div class="stat"><span class="num critical">{{ summary['critical'] }}</span><span class="lbl">Critical</span></div>
+  <div class="stat"><span class="num no_data">{{ summary['no_data'] }}</span><span class="lbl">No Data</span></div>
+  <div class="stat"><span class="num paused">{{ summary['paused'] }}</span><span class="lbl">Paused</span></div>
+</div>
+<table>
+<tr><th>City</th><th>Status</th><th>Stale</th><th>Expected</th><th>Source</th>
+  <th>Permits</th><th>Violations</th><th>Profiles</th><th>Enrich%</th><th>Actions</th></tr>
+{{ rows_html|safe }}
+</table>
+<div id="log"><div class="log-line">Ready.</div></div>
+<script>
+const KEY = new URLSearchParams(location.search).get('key') || '';
+function log(msg, cls){
+  const l = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = 'log-line' + (cls ? ' '+cls : '');
+  d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+  l.prepend(d);
+}
+async function forceCollect(city){
+  log('→ collecting '+city);
+  try{
+    const r = await fetch('/api/admin/force-collect?city_slug='+encodeURIComponent(city)+'&type=both', {
+      method: 'GET', headers: {'X-Admin-Key': KEY}
+    });
+    const d = await r.json();
+    log(city+': '+d.status+' permits+'+d.permits_inserted+' viols+'+(d.violations_inserted||0)+' ('+d.elapsed_seconds+'s)',
+        r.ok ? 'ok' : 'err');
+  }catch(e){ log(city+': '+e, 'err') }
+}
+async function enrich(city){
+  log('→ enriching '+city);
+  try{
+    const r = await fetch('/api/admin/enrich', {
+      method: 'POST',
+      headers: {'X-Admin-Key': KEY, 'Content-Type': 'application/json'},
+      body: JSON.stringify({city_slug: city, batch_size: 20})
+    });
+    const d = await r.json();
+    log(city+': '+d.enriched+'/'+d.attempted+' enriched ('+d.elapsed_seconds+'s)',
+        r.ok ? 'ok' : 'err');
+  }catch(e){ log(city+': '+e, 'err') }
+}
+</script>
+</body></html>

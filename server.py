@@ -4,7 +4,7 @@ Flask app that serves the dashboard and API endpoints
 Deploy to any VPS (DigitalOcean, Railway, Render, etc.)
 """
 
-from flask import Flask, jsonify, request, send_from_directory, render_template_string, session, render_template, Response, redirect, abort, g
+from flask import Flask, jsonify, request, send_from_directory, session, render_template, Response, redirect, abort, g
 from difflib import SequenceMatcher
 import json
 import math
@@ -2848,88 +2848,11 @@ def admin_dashboard_html():
             f"<button class='btn-enrich' onclick=\"enrich('{slug}')\">Enrich</button></td></tr>"
         )
 
-    html = f"""<!DOCTYPE html>
-<html><head><title>PermitGrab Admin · Command Center</title>
-<meta name="robots" content="noindex, nofollow">
-<style>
-*{{box-sizing:border-box}}
-body{{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;margin:0;padding:20px;background:#0f172a;color:#e2e8f0}}
-h1{{margin:0 0 4px;color:#f1f5f9}}
-.sub{{color:#94a3b8;font-size:14px;margin-bottom:18px}}
-.summary{{display:flex;gap:12px;margin:16px 0}}
-.stat{{background:#1e293b;padding:14px 20px;border-radius:10px;min-width:120px;border:1px solid #334155}}
-.stat .num{{font-size:28px;font-weight:700;display:block}}
-.stat .lbl{{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8}}
-.healthy{{color:#4ade80}}.stale{{color:#facc15}}.critical{{color:#f87171}}
-.no_data{{color:#94a3b8}}.paused{{color:#64748b}}
-.attn{{display:inline-block;background:#dc2626;color:white;border-radius:50%;
-      width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;margin-left:6px}}
-table{{border-collapse:collapse;width:100%;background:#1e293b;border-radius:10px;overflow:hidden}}
-th,td{{padding:10px 14px;border-bottom:1px solid #334155;text-align:left}}
-th{{background:#0f172a;color:#cbd5e1;font-size:12px;text-transform:uppercase;letter-spacing:1px}}
-tr:last-child td{{border-bottom:none}}
-button{{padding:5px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px}}
-.btn-collect{{background:#2563eb;color:white}}
-.btn-enrich{{background:#8b5cf6;color:white}}
-.btn-collect:hover{{background:#1d4ed8}}.btn-enrich:hover{{background:#7c3aed}}
-#log{{background:#020617;padding:12px;margin-top:18px;border-radius:8px;
-     max-height:320px;overflow-y:auto;font-family:Menlo,monospace;font-size:12px;
-     border:1px solid #334155}}
-.log-line{{padding:2px 0;color:#94a3b8}}
-.log-line.ok{{color:#4ade80}}
-.log-line.err{{color:#f87171}}
-</style></head><body>
-<h1>PermitGrab · Command Center</h1>
-<p class="sub">V227 · {_dt.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
-<div class="summary">
-  <div class="stat"><span class="num healthy">{summary['healthy']}</span><span class="lbl">Healthy</span></div>
-  <div class="stat"><span class="num stale">{summary['stale']}</span><span class="lbl">Stale</span></div>
-  <div class="stat"><span class="num critical">{summary['critical']}</span><span class="lbl">Critical</span></div>
-  <div class="stat"><span class="num no_data">{summary['no_data']}</span><span class="lbl">No Data</span></div>
-  <div class="stat"><span class="num paused">{summary['paused']}</span><span class="lbl">Paused</span></div>
-</div>
-<table>
-<tr><th>City</th><th>Status</th><th>Stale</th><th>Expected</th><th>Source</th>
-  <th>Permits</th><th>Violations</th><th>Profiles</th><th>Enrich%</th><th>Actions</th></tr>
-{''.join(html_rows)}
-</table>
-<div id="log"><div class="log-line">Ready.</div></div>
-<script>
-const KEY = new URLSearchParams(location.search).get('key') || '';
-function log(msg, cls){{
-  const l = document.getElementById('log');
-  const d = document.createElement('div');
-  d.className = 'log-line' + (cls ? ' '+cls : '');
-  d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
-  l.prepend(d);
-}}
-async function forceCollect(city){{
-  log('→ collecting '+city);
-  try{{
-    const r = await fetch('/api/admin/force-collect?city_slug='+encodeURIComponent(city)+'&type=both', {{
-      method: 'GET', headers: {{'X-Admin-Key': KEY}}
-    }});
-    const d = await r.json();
-    log(city+': '+d.status+' permits+'+d.permits_inserted+' viols+'+(d.violations_inserted||0)+' ('+d.elapsed_seconds+'s)',
-        r.ok ? 'ok' : 'err');
-  }}catch(e){{ log(city+': '+e, 'err') }}
-}}
-async function enrich(city){{
-  log('→ enriching '+city);
-  try{{
-    const r = await fetch('/api/admin/enrich', {{
-      method: 'POST',
-      headers: {{'X-Admin-Key': KEY, 'Content-Type': 'application/json'}},
-      body: JSON.stringify({{city_slug: city, batch_size: 20}})
-    }});
-    const d = await r.json();
-    log(city+': '+d.enriched+'/'+d.attempted+' enriched ('+d.elapsed_seconds+'s)',
-        r.ok ? 'ok' : 'err');
-  }}catch(e){{ log(city+': '+e, 'err') }}
-}}
-</script>
-</body></html>"""
-    return Response(html, mimetype='text/html')
+    return render_template('admin/command_center.html',
+        now_utc=_dt.utcnow().strftime('%Y-%m-%d %H:%M UTC'),
+        summary=summary,
+        rows_html=''.join(html_rows),
+    )
 
 
 @app.route('/api/admin/add-source', methods=['POST'])
@@ -12481,16 +12404,14 @@ def _v469_render_faq_blog_post(slug):
         'newest_permit': 'today',
     }
 
-    from flask import render_template_string
     try:
-        body_html = render_template_string(
-            post['body_html'], stats=stats, post=post
-        )
+        body_html = render_template(f'blog/faq/{slug}.html', stats=stats, post=post)
         rendered_faqs = []
+        from jinja2 import Template
         for f in post.get('faqs', []):
             rendered_faqs.append({
-                'q': render_template_string(f['q'], stats=stats, post=post),
-                'a': render_template_string(f['a'], stats=stats, post=post),
+                'q': Template(f['q']).render(stats=stats, post=post),
+                'a': Template(f['a']).render(stats=stats, post=post),
             })
     except Exception as _body_err:
         print(f"[V469] body render failed for {slug}: {_body_err}", flush=True)
@@ -12518,7 +12439,7 @@ def _v469_render_faq_blog_post(slug):
 
 def _v467_render_seo_blog_post(slug):
     """V467 (CODE_V467 SEO blog posts): render one of the 5 ad-ready-city
-    SEO blog posts with live DB stats injected via render_template_string.
+    SEO blog posts with live DB stats injected via templates/blog/seo/&lt;slug&gt;.html.
     Returns a Flask response or None if the slug isn't an SEO post.
     """
     try:
@@ -12626,11 +12547,8 @@ def _v467_render_seo_blog_post(slug):
     }
 
     # Render body with stats injected, then safe-pass to the shell template.
-    from flask import render_template_string
     try:
-        body_html = render_template_string(
-            post['body_template'], stats=stats, post=post, city_slug=city_slug
-        )
+        body_html = render_template(f'blog/seo/{slug}.html', stats=stats, post=post, city_slug=city_slug)
     except Exception as _body_err:
         print(f"[V467] body render failed for {slug}: {_body_err}", flush=True)
         body_html = '<p>Content temporarily unavailable.</p>'
@@ -13075,36 +12993,7 @@ def api_forgot_password():
 
     # Send reset email
     reset_url = f"https://permitgrab.com/reset-password/{token}"
-    html_body = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }}
-            .container {{ max-width: 600px; margin: 0 auto; padding: 40px 20px; }}
-            .logo {{ font-size: 24px; font-weight: 700; color: #111; margin-bottom: 24px; }}
-            .logo span {{ color: #f97316; }}
-            .btn {{ display: inline-block; background: #2563eb; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }}
-            .footer {{ margin-top: 32px; font-size: 13px; color: #666; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="logo">Permit<span>Grab</span></div>
-            <h2>Reset Your Password</h2>
-            <p>We received a request to reset your password. Click the button below to create a new password:</p>
-            <p><a href="{reset_url}" class="btn">Reset Password</a></p>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #2563eb;">{reset_url}</p>
-            <p><strong>This link expires in 1 hour.</strong></p>
-            <p>If you didn't request this, you can safely ignore this email.</p>
-            <div class="footer">
-                <p>&copy; 2026 PermitGrab. All rights reserved.</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
+    html_body = render_template('emails/password_reset.html', reset_url=reset_url)
 
     try:
         from email_alerts import send_email
@@ -14448,43 +14337,21 @@ def api_unsubscribe():
     token = request.args.get('token', '')
 
     if not token:
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html><head><title>Error</title></head>
-            <body style="font-family: sans-serif; padding: 40px; text-align: center;">
-                <h1>Invalid Link</h1>
-                <p>This unsubscribe link is invalid or has expired.</p>
-            </body></html>
-        '''), 400
+        return render_template('unsubscribe_invalid.html',
+            message='This unsubscribe link is invalid or has expired.'), 400
 
     # V12.53: Use User model instead of subscribers.json
     user = User.query.filter_by(unsubscribe_token=token).first()
 
     if not user:
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html><head><title>Error</title></head>
-            <body style="font-family: sans-serif; padding: 40px; text-align: center;">
-                <h1>Invalid Link</h1>
-                <p>This unsubscribe link is invalid or has already been used.</p>
-            </body></html>
-        '''), 404
+        return render_template('unsubscribe_invalid.html',
+            message='This unsubscribe link is invalid or has already been used.'), 404
 
     # Mark digest as inactive
     user.digest_active = False
     db.session.commit()
 
-    return render_template_string('''
-        <!DOCTYPE html>
-        <html><head><title>Unsubscribed</title></head>
-        <body style="font-family: sans-serif; padding: 40px; text-align: center;">
-            <h1>You've been unsubscribed</h1>
-            <p>{{ email }} will no longer receive permit alerts.</p>
-            <p style="margin-top: 20px; color: #666;">
-                Changed your mind? <a href="/">Re-subscribe anytime</a>
-            </p>
-        </body></html>
-    ''', email=user.email)
+    return render_template('unsubscribe_success.html', email=user.email)
 
 
 # ===========================
@@ -14506,29 +14373,9 @@ def admin_page():
 
     if not session.get('admin_authenticated'):
         if not ADMIN_PASSWORD:
-            return render_template_string('''
-                <!DOCTYPE html>
-                <html><head><title>Admin</title></head>
-                <body style="font-family: sans-serif; padding: 40px; text-align: center;">
-                    <h1>Admin Not Configured</h1>
-                    <p>Set the ADMIN_PASSWORD environment variable to enable admin access.</p>
-                </body></html>
-            '''), 500
+            return render_template('admin/not_configured.html'), 500
 
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html><head><title>Admin Login</title></head>
-            <body style="font-family: sans-serif; padding: 40px; max-width: 400px; margin: 0 auto;">
-                <h1>Admin Login</h1>
-                <form method="GET" action="/admin">
-                    <input type="password" name="password" placeholder="Admin Password"
-                           style="width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 4px;">
-                    <button type="submit" style="width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        Login
-                    </button>
-                </form>
-            </body></html>
-        ''')
+        return render_template('admin/login.html')
 
     # V12.51: Load data from SQLite for admin dashboard
     permit_stats = permitdb.get_permit_stats()
@@ -14554,177 +14401,7 @@ def admin_page():
         except Exception:
             pass
 
-    return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>PermitGrab Admin</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f3f4f6; }
-                .header { background: #111827; color: white; padding: 20px 32px; }
-                .header h1 { font-size: 24px; }
-                .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-                .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-                .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-                .stat-card .value { font-size: 32px; font-weight: 700; color: #111827; }
-                .stat-card .label { font-size: 14px; color: #6b7280; margin-top: 4px; }
-                .section { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 24px; }
-                .section-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
-                .section-body { padding: 20px; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-                th { background: #f9fafb; font-weight: 600; font-size: 13px; color: #6b7280; }
-                .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-                .badge-active { background: #dcfce7; color: #166534; }
-                .badge-inactive { background: #fee2e2; color: #991b1b; }
-                .badge-pro { background: #dbeafe; color: #1e40af; }
-                .logout-link { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
-                .form-row { display: flex; gap: 12px; align-items: flex-end; }
-                .form-group { display: flex; flex-direction: column; gap: 4px; }
-                .form-group label { font-size: 13px; font-weight: 500; color: #374151; }
-                .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
-                .btn-upgrade { background: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 500; cursor: pointer; }
-                .btn-upgrade:hover { background: #1d4ed8; }
-                .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
-                .alert-success { background: #dcfce7; color: #166534; }
-                .alert-error { background: #fee2e2; color: #991b1b; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto;">
-                    <h1>PermitGrab Admin</h1>
-                    <a href="/admin?logout=1" class="logout-link">Logout</a>
-                </div>
-            </div>
-            <div class="container">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="value">{{ total_permits }}</div>
-                        <div class="label">Total Permits</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{{ city_count }}</div>
-                        <div class="label">Active Cities</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{{ total_users }}</div>
-                        <div class="label">Registered Users</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{{ pro_users }}</div>
-                        <div class="label">Pro Users</div>
-                    </div>
-                </div>
-                {% if last_updated %}
-                <div style="text-align: center; margin-bottom: 16px; padding: 8px; background: #dbeafe; border-radius: 6px; font-size: 14px; color: #1e40af;">
-                    Last data collection: {{ last_updated }}
-                </div>
-                {% endif %}
-
-                {% if success_msg %}
-                <div class="alert alert-success">{{ success_msg }}</div>
-                {% endif %}
-                {% if error_msg %}
-                <div class="alert alert-error">{{ error_msg }}</div>
-                {% endif %}
-
-                <div class="section">
-                    <div class="section-header">Upgrade User</div>
-                    <div class="section-body">
-                        <form method="POST" action="/admin/upgrade-user" class="form-row">
-                            <div class="form-group">
-                                <label for="email">Email</label>
-                                <input type="email" id="email" name="email" placeholder="user@example.com" required style="width: 280px;">
-                            </div>
-                            <div class="form-group">
-                                <label for="plan">Plan</label>
-                                <select id="plan" name="plan" required>
-                                    <option value="free">Free</option>
-                                    <option value="pro">Pro</option>
-                                    <option value="enterprise">Enterprise</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn-upgrade">Upgrade</button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-header">Collection Status</div>
-                    <div class="section-body">
-                        <p><strong>Last Updated:</strong> {{ last_updated or 'Never' }}</p>
-                        <p><strong>Total Users:</strong> {{ total_users }}</p>
-                        {% if diagnostic %}
-                        <hr style="margin: 16px 0; border: none; border-top: 1px solid #e5e7eb;">
-                        <h4 style="margin-bottom: 12px; color: #374151;">Collection Diagnostic</h4>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-                            <div style="background: #dcfce7; padding: 12px; border-radius: 6px; text-align: center;">
-                                <div style="font-size: 24px; font-weight: 700; color: #16a34a;">{{ diagnostic.cities_with_permits }}</div>
-                                <div style="font-size: 12px; color: #166534;">Cities With Permits</div>
-                            </div>
-                            <div style="background: #fef9c3; padding: 12px; border-radius: 6px; text-align: center;">
-                                <div style="font-size: 24px; font-weight: 700; color: #ca8a04;">{{ diagnostic.cities_zero_permits }}</div>
-                                <div style="font-size: 12px; color: #854d0e;">Zero Permits</div>
-                            </div>
-                            <div style="background: #fee2e2; padding: 12px; border-radius: 6px; text-align: center;">
-                                <div style="font-size: 24px; font-weight: 700; color: #dc2626;">{{ diagnostic.cities_with_errors }}</div>
-                                <div style="font-size: 12px; color: #991b1b;">Errors</div>
-                            </div>
-                        </div>
-                        <p style="font-size: 13px; color: #6b7280;"><strong>Timeouts:</strong> {{ diagnostic.cities_timeout }} | <strong>Connection Errors:</strong> {{ diagnostic.cities_connection_error }}</p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-header">Subscribers ({{ total_subscribers }})</div>
-                    <div class="section-body" style="overflow-x: auto;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Email</th>
-                                    <th>Name</th>
-                                    <th>City</th>
-                                    <th>Trade</th>
-                                    <th>Plan</th>
-                                    <th>Status</th>
-                                    <th>Subscribed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for sub in subscribers %}
-                                <tr>
-                                    <td>{{ sub.email }}</td>
-                                    <td>{{ sub.name or '-' }}</td>
-                                    <td>{{ sub.city or '-' }}</td>
-                                    <td>{{ sub.trade or '-' }}</td>
-                                    <td>
-                                        {% if sub.plan in ['professional', 'enterprise'] %}
-                                        <span class="badge badge-pro">{{ sub.plan }}</span>
-                                        {% else %}
-                                        {{ sub.plan or 'free' }}
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if sub.active != false %}
-                                        <span class="badge badge-active">Active</span>
-                                        {% else %}
-                                        <span class="badge badge-inactive">Inactive</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ sub.subscribed_at[:10] if sub.subscribed_at else '-' }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-    ''',
+    return render_template('admin/legacy.html',
         total_permits=permit_stats['total_permits'],
         city_count=city_count,
         total_users=len(all_users),
@@ -14830,149 +14507,14 @@ def admin_collector_health():
     yellow_count = sum(1 for c in health_data if c.get('health_color') == 'YELLOW')
     red_count = sum(1 for c in health_data if c.get('health_color') == 'RED')
 
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Collector Health - PermitGrab Admin</title>
-        <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
-            h1 {{ color: #00d4ff; }}
-            h2 {{ color: #888; margin-top: 30px; }}
-            table {{ border-collapse: collapse; width: 100%; margin-bottom: 30px; }}
-            th, td {{ border: 1px solid #333; padding: 8px 12px; text-align: left; }}
-            th {{ background: #252540; color: #00d4ff; }}
-            tr:nth-child(even) {{ background: #1e1e35; }}
-            .green {{ color: #00ff88; font-weight: bold; }}
-            .yellow {{ color: #ffcc00; font-weight: bold; }}
-            .red {{ color: #ff4444; font-weight: bold; }}
-            .summary {{ display: flex; gap: 20px; margin-bottom: 30px; }}
-            .summary-card {{ background: #252540; padding: 20px; border-radius: 8px; text-align: center; min-width: 120px; }}
-            .summary-card .value {{ font-size: 32px; font-weight: bold; }}
-            .summary-card .label {{ font-size: 14px; color: #888; }}
-            a {{ color: #00d4ff; }}
-            .back-link {{ margin-bottom: 20px; display: block; }}
-        </style>
-    </head>
-    <body>
-        <a href="/admin" class="back-link">&larr; Back to Admin</a>
-        <h1>Collector Health Dashboard</h1>
-
-        <div class="summary">
-            <div class="summary-card">
-                <div class="value green">{green_count}</div>
-                <div class="label">Healthy (0-2 days)</div>
-            </div>
-            <div class="summary-card">
-                <div class="value yellow">{yellow_count}</div>
-                <div class="label">Warning (3-7 days)</div>
-            </div>
-            <div class="summary-card">
-                <div class="value red">{red_count}</div>
-                <div class="label">Critical (7+ days)</div>
-            </div>
-            <div class="summary-card">
-                <div class="value">{len(health_data)}</div>
-                <div class="label">Total Cities</div>
-            </div>
-        </div>
-    '''
-
-    if summary:
-        html += f'''
-        <h2>Today's Collection Summary</h2>
-        <table>
-            <tr>
-                <th>Total Runs</th>
-                <th>Successful</th>
-                <th>Errors</th>
-                <th>No New Data</th>
-                <th>Permits Inserted</th>
-                <th>Avg Duration</th>
-            </tr>
-            <tr>
-                <td>{summary.get('total_runs', 0)}</td>
-                <td class="green">{summary.get('successful', 0)}</td>
-                <td class="red">{summary.get('errors', 0)}</td>
-                <td>{summary.get('no_new_data', 0)}</td>
-                <td>{summary.get('total_permits_inserted', 0)}</td>
-                <td>{int(summary.get('avg_duration_ms', 0) or 0)}ms</td>
-            </tr>
-        </table>
-        '''
-
-    html += '''
-        <h2>City Health Status</h2>
-        <table>
-            <tr>
-                <th>City</th>
-                <th>State</th>
-                <th>Status</th>
-                <th>Days Since Data</th>
-                <th>Total Permits</th>
-                <th>Failures</th>
-                <th>Last Error</th>
-            </tr>
-    '''
-
-    for city in health_data:
-        color_class = city.get('health_color', 'RED').lower()
-        days = city.get('days_since_data', 'N/A')
-        if days is None:
-            days = 'Never'
-        html += f'''
-            <tr>
-                <td>{city.get('city', '')}</td>
-                <td>{city.get('state', '')}</td>
-                <td class="{color_class}">{city.get('status', '').upper()}</td>
-                <td class="{color_class}">{days}</td>
-                <td>{city.get('total_permits', 0)}</td>
-                <td>{city.get('consecutive_failures', 0)}</td>
-                <td>{(city.get('last_error') or '')[:50]}</td>
-            </tr>
-        '''
-
-    html += '''
-        </table>
-
-        <h2>Recent Collection Runs</h2>
-        <table>
-            <tr>
-                <th>Time</th>
-                <th>City</th>
-                <th>Status</th>
-                <th>Permits Found</th>
-                <th>Inserted</th>
-                <th>Duration</th>
-                <th>Error</th>
-            </tr>
-    '''
-
-    for run in recent_runs:
-        status_class = 'green' if run.get('status') == 'success' else ('yellow' if run.get('status') == 'no_new' else 'red')
-        html += f'''
-            <tr>
-                <td>{run.get('run_started_at', '')}</td>
-                <td>{run.get('city', '')} {run.get('state', '')}</td>
-                <td class="{status_class}">{run.get('status', '')}</td>
-                <td>{run.get('permits_found', 0)}</td>
-                <td>{run.get('permits_inserted', 0)}</td>
-                <td>{run.get('duration_ms', '')}ms</td>
-                <td>{(run.get('error_message') or '')[:30]}</td>
-            </tr>
-        '''
-
-    html += '''
-        </table>
-
-        <p style="color: #666; margin-top: 40px;">
-            V15 Collector Redesign - prod_cities table
-        </p>
-    </body>
-    </html>
-    '''
-
-    return html
+    return render_template('admin/collector_health.html',
+        green_count=green_count,
+        yellow_count=yellow_count,
+        red_count=red_count,
+        health_data=health_data,
+        summary=summary,
+        recent_runs=recent_runs,
+    )
 
 
 @app.route('/admin/upgrade-user', methods=['POST'])

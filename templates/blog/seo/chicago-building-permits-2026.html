@@ -1,0 +1,57 @@
+<p>Every building project in Chicago starts with a permit. Whether you're renovating a kitchen, adding a deck, or doing a full gut rehab, the City of Chicago Department of Buildings requires a permit before work begins. This guide covers Chicago building permits in 2026 — plus how to search contractors, check code violations, and look up property owners using real, live data.</p>
+
+<h2>What Work Requires a Building Permit in Chicago?</h2>
+<p>A permit is required for new construction, major repairs, alterations, additions, renovations, and demolitions. You also need permits for fences, porches, decks, garages, and exterior work on Landmark buildings. The Department of Buildings issues specialty permits for elevators, demolition, sewer connections, signs, and water service.</p>
+<p>Work that does NOT require a permit includes minor cosmetic repairs, painting, and certain small maintenance tasks. When in doubt, contact the Department of Buildings at 312-744-3449 or dob-info@cityofchicago.org.</p>
+
+<h2>How to Get a Building Permit in Chicago</h2>
+<p>Chicago offers two main pathways:</p>
+<p>The <strong>Express Permit Program (EPP)</strong> is a fully web-enabled platform for most types of building repair work and small improvement projects. Qualifying projects like small rooftop solar PV systems (under 13.44kW) can get same-day approvals at reduced fees — $275 instead of $375, with the timeline cut from 30 days to one day.</p>
+<p>For larger projects, you'll submit a plan-based building permit application through the city's Inspection, Permitting & Licensing Portal. You'll need architectural plans, details of the work, and the estimated project cost. The property owner must sign the application, though they can authorize a contractor or architect to submit it.</p>
+
+<h2>How Many Contractors Are Pulling Permits in Chicago Right Now?</h2>
+<p>Chicago is one of the most active construction markets in the country. PermitGrab tracks <strong>{{ '{:,}'.format(stats.profiles) }}</strong> active contractors pulling permits in Chicago — a live database updated daily from official permit records, not a static directory.</p>
+<p>Of those, <strong>{{ '{:,}'.format(stats.phones) }}</strong> have direct phone numbers in our database, sourced from state license records and business registrations. If you're a building materials supplier, subcontractor, or home service company trying to connect with active contractors, this is the most current dataset available.</p>
+
+<h2>Permits Filed in the Last 90 Days</h2>
+<p>{{ '{:,}'.format(stats.permits_90d) }} building permits have been filed in Chicago in the last 90 days. Top permit types:</p>
+{% if stats.top_permit_types %}
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Permit Type</th><th style="text-align: right; padding: 0.5rem;">Count</th></tr></thead>
+  <tbody>
+  {% for pt in stats.top_permit_types %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ pt.permit_type }}</td><td style="text-align: right; padding: 0.5rem;">{{ '{:,}'.format(pt.cnt) }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Most Active Contractors</h2>
+{% if stats.top_contractors %}
+<p>These contractors have pulled the most permits in the last 6 months:</p>
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Contractor</th><th style="text-align: right; padding: 0.5rem;">Permits</th></tr></thead>
+  <tbody>
+  {% for c in stats.top_contractors %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ c.business_name }}</td><td style="text-align: right; padding: 0.5rem;">{{ c.permits }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+<p style="font-size: 0.85rem; color: #666;">Phone numbers available for {{ '{:,}'.format(stats.phones) }} contractors. <a href="/permits/{{ city_slug }}">View the full database →</a></p>
+{% endif %}
+
+<h2>Chicago Code Violations</h2>
+<p>The City of Chicago actively enforces building code compliance. PermitGrab tracks <strong>{{ '{:,}'.format(stats.violations) }}</strong> Chicago code violations on record. Each one represents a property where work needs to be done.</p>
+<p>For contractors, this is a built-in lead list — properties that legally must be repaired. For real estate investors, properties with active violations often indicate motivated sellers or below-market opportunities.</p>
+<p><a href="/permits/{{ city_slug }}">Search Chicago violations by address →</a></p>
+
+<h2>Chicago Property Owner Data</h2>
+<p>We've matched <strong>{{ '{:,}'.format(stats.owners) }}</strong> property owners to addresses in our Chicago database. When a permit is filed or a violation is issued, you can see who owns the property — including their mailing address from Cook County records.</p>
+
+<h2>Solar Permits in Chicago</h2>
+<p>Chicago's Easy Permit Process makes solar relatively straightforward. Small rooftop PV systems under 13.44kW qualify for expedited review — same-day approval at $275. You'll need a licensed electrical contractor with an Illinois Commerce Commission Distributed Generation Installer Certification. Structural drawings must be prepared by an Illinois-licensed architect or structural engineer.</p>
+<p><strong>Important for 2026:</strong> the federal 30% residential solar tax credit was terminated by the One Big Beautiful Bill Act signed July 4, 2025. New installations completed in 2026 and beyond are no longer eligible. The Cook County Sun and Save program is still available through August 31, 2026, offering bulk-purchase discounts for single-family and small multi-family residences.</p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>How often is the data updated?</h3>
+<p>Our system pulls new permit data every day from official city records. The most recent permit in our database was filed on {{ stats.newest_permit }}.</p>
+<h3>Where does the data come from?</h3>
+<p>All data comes from official Chicago open data portals — the same records available at city hall, organized and searchable.</p>
+<h3>Can I search by contractor name?</h3>
+<p>Yes. Search by contractor name, property address, permit type, or date range on the <a href="/permits/{{ city_slug }}">Chicago permits page</a>.</p>

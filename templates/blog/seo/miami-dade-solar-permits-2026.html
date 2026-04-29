@@ -1,0 +1,46 @@
+<p>Miami-Dade County has some of the strictest solar permitting requirements in the country, thanks to its High Velocity Hurricane Zone (HVHZ) designation. If you're a homeowner considering solar, a contractor installing systems, or a solar company prospecting in South Florida, this guide covers every requirement, cost, and insurance implication for 2026.</p>
+
+<h2>What is the HVHZ and Why Does It Matter for Solar?</h2>
+<p>The High Velocity Hurricane Zone is a Florida Building Code designation covering Miami-Dade and Broward counties. It enforces hurricane-resistant construction standards that go significantly beyond the rest of Florida. For solar installations, this means every component must carry a Miami-Dade Notice of Acceptance (NOA) — a local certification confirming the product passed HVHZ wind tunnel testing.</p>
+<p>This includes individual panel models, racking systems, clamps, and flashing. Each needs a separate NOA. A solar installer that's never worked in HVHZ will frequently submit a plan that gets rejected on the first review because at least one component lacks a current NOA.</p>
+
+<h2>How to Get a Solar Permit in Miami-Dade</h2>
+<p>Solar PV projects require both a structural permit and an electrical permit. Miami-Dade allows electronic submission through their Portal, routing documentation to multiple departments simultaneously for faster review. Projects using renewable energy qualify for Green Building Expedited review under Section 8-6 of the County Code.</p>
+<p>Standard review runs 10-15 business days. Most installers receive approval in 2-4 weeks with complete NOA documentation and a clean plan set. Projects using pre-approved flashing details benefit from reduced permit fees.</p>
+
+<h2>Do Solar Panels Affect Your Homeowner Insurance?</h2>
+<p>Yes — and most homeowners miss this. Adding solar panels almost always increases your premium by 10-20% because the replacement cost of the home rises. Florida also requires a Personal Liability Policy (PLP) of at least $1 million for Tier 2 solar systems — that runs about $500/year.</p>
+<p>The bigger risk: if you install solar without notifying your insurer and later file a claim for panel damage, the insurer can deny the claim AND non-renew your policy for "material misrepresentation." Always notify your insurance company before installation begins.</p>
+
+<h2>Miami-Dade by the Numbers</h2>
+<p>PermitGrab tracks the Miami-Dade construction market in real time:</p>
+<ul>
+  <li><strong>{{ '{:,}'.format(stats.profiles) }}</strong> active contractors pulling building permits</li>
+  <li><strong>{{ '{:,}'.format(stats.phones) }}</strong> with direct phone numbers</li>
+  <li><strong>{{ '{:,}'.format(stats.violations) }}</strong> open code violations tracked from county enforcement</li>
+  <li><strong>{{ '{:,}'.format(stats.owners) }}</strong> property owners matched to permit addresses</li>
+</ul>
+<p>This is the most comprehensive dataset available for anyone selling into the Miami-Dade construction market — solar companies, roofers, HVAC contractors, insurance agents, building material suppliers. Data comes from official Miami-Dade County records, updated daily.</p>
+
+<h2>Permits Filed in the Last 90 Days</h2>
+<p>{{ '{:,}'.format(stats.permits_90d) }} building permits filed in Miami-Dade in the last 90 days. Top permit types:</p>
+{% if stats.top_permit_types %}
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Permit Type</th><th style="text-align: right; padding: 0.5rem;">Count</th></tr></thead>
+  <tbody>
+  {% for pt in stats.top_permit_types %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ pt.permit_type }}</td><td style="text-align: right; padding: 0.5rem;">{{ '{:,}'.format(pt.cnt) }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Finding Solar Contractors in Miami-Dade</h2>
+<p>Solar United Neighbors runs the Miami-Dade Solar Purchasing Cooperative, helping homeowners get lower pricing through bulk equipment purchasing. But if you're a solar company looking for homeowner leads, PermitGrab shows you which properties are pulling renovation permits right now — homeowners already spending money on their house, making them ideal candidates for solar.</p>
+<p>With <strong>{{ '{:,}'.format(stats.owners) }}</strong> property owners in the database, matched to permit and violation records, you can identify properties actively under renovation. A homeowner who just pulled a roof permit is your best solar prospect. <a href="/permits/{{ city_slug }}">Browse Miami-Dade contractors and permits →</a></p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>How long does Miami-Dade solar permitting take?</h3>
+<p>Standard review runs 10-15 business days; complete applications with full NOA documentation typically clear in 2-4 weeks. Most recent Miami-Dade permit in our system was filed on {{ stats.newest_permit }}.</p>
+<h3>What's a Tier 2 PLP insurance requirement?</h3>
+<p>Florida requires solar systems above the Tier 1 threshold to carry a $1 million Personal Liability Policy. Annual cost is approximately $500.</p>
+<h3>Are federal solar tax credits still available in 2026?</h3>
+<p>No. The 30% federal residential solar tax credit was repealed by the One Big Beautiful Bill Act effective for 2026 installations. Florida state and local incentives still apply.</p>

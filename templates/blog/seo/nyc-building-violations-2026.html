@@ -1,0 +1,53 @@
+<p>New York City has two separate violation databases that every property owner, contractor, and investor needs to understand: the Department of Buildings (DOB) and Housing Preservation & Development (HPD). This guide shows how to search both, what the violations mean, and how to use this data.</p>
+
+<h2>DOB vs. HPD: What's the Difference?</h2>
+<p>DOB violations cover building code compliance — construction defects, unpermitted work, unsafe conditions, and building maintenance. HPD violations cover housing maintenance — heat and hot water issues, lead paint, pest infestations, and tenant habitability.</p>
+<p>Both are public record and free to search. But they live in different systems, making it easy to miss violations if you only check one.</p>
+
+<h2>How to Search NYC Building Violations</h2>
+<p>NYC operates two DOB systems: BIS (Buildings Information System) holds historical records from 1985-2020. DOB NOW holds new filings from 2018 forward. A single building can have records in both systems. For HPD violations, search at hpdonline.nyc.gov.</p>
+<p>You can search by address and find DOB violations and permits, HPD housing violations by class (A/B/C), FDNY fire safety records, 311 complaints, and stop work orders.</p>
+
+<h2>HPD Violation Classes</h2>
+<ul>
+  <li><strong>Class A:</strong> Non-hazardous — conditions that don't threaten safety but need correction</li>
+  <li><strong>Class B:</strong> Hazardous — must be corrected within 30 days</li>
+  <li><strong>Class C:</strong> Immediately hazardous — must be corrected within 24 hours (no heat, no hot water, lead paint, vermin)</li>
+</ul>
+<p>Rent-impairing violations are flagged separately. These can give tenants grounds to withhold rent until repairs are made.</p>
+
+<h2>NYC by the Numbers</h2>
+<p>PermitGrab tracks the NYC construction market comprehensively:</p>
+<ul>
+  <li><strong>{{ '{:,}'.format(stats.profiles) }}</strong> active contractors pulling DOB permits</li>
+  <li><strong>{{ '{:,}'.format(stats.phones) }}</strong> with direct phone numbers (growing weekly)</li>
+  <li><strong>{{ '{:,}'.format(stats.violations) }}</strong> HPD and DOB violations tracked across all five boroughs</li>
+  <li><strong>{{ '{:,}'.format(stats.owners) }}</strong> property owners matched via PLUTO database</li>
+</ul>
+
+<h2>Permits Filed in the Last 90 Days</h2>
+<p>{{ '{:,}'.format(stats.permits_90d) }} DOB permits filed in NYC in the last 90 days. Top permit types:</p>
+{% if stats.top_permit_types %}
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Permit Type</th><th style="text-align: right; padding: 0.5rem;">Count</th></tr></thead>
+  <tbody>
+  {% for pt in stats.top_permit_types %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ pt.permit_type }}</td><td style="text-align: right; padding: 0.5rem;">{{ '{:,}'.format(pt.cnt) }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Solar Permits in NYC</h2>
+<p>NYC solar requires two separate permits: an electrical permit issued to a NYC-Licensed Master Electrician (LME) and a construction work permit issued to a NYC-licensed General Contractor. Applications are filed through DOB NOW. Complete applications are typically reviewed in 5-10 business days.</p>
+<p>The federal 30% tax credit is gone for 2026 installations, but all New York state and local incentives remain: 25% state tax credit, NY-Sun rebates, NYC property tax abatement, the RPT 487 property tax exemption (15-year exemption on added home value), and net metering.</p>
+
+<h2>Who Uses This Data?</h2>
+<p><strong>Restoration contractors</strong> use violation data to find buildings that need immediate work. <strong>Solar companies</strong> use permit data to find homeowners already investing in their properties. <strong>Real estate investors</strong> use the combination of violation data, property owner records, and assessed values to identify distressed assets. <strong>Insurance adjusters</strong> use permit records to verify construction claims.</p>
+<p><a href="/permits/{{ city_slug }}">Browse NYC contractors, permits, and violations →</a></p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>What's the difference between BIS and DOB NOW?</h3>
+<p>BIS holds NYC building records from 1985-2020. DOB NOW holds filings from 2018 forward. A building may have records in both systems.</p>
+<h3>Are NYC violation searches free?</h3>
+<p>Yes. Both DOB and HPD violation searches on city portals are free. PermitGrab consolidates them into a single searchable view.</p>
+<h3>How current is this data?</h3>
+<p>Updated daily from NYC Open Data. Most recent permit in our system was filed on {{ stats.newest_permit }}.</p>

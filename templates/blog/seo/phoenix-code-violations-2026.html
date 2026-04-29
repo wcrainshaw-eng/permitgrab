@@ -1,0 +1,54 @@
+<p>Getting a code violation notice from the City of Phoenix can feel overwhelming. This guide explains exactly what happens, how much it costs, and how to resolve it — plus how contractors and investors use violation data to find business opportunities.</p>
+
+<h2>What Happens When You Get a Code Violation in Phoenix?</h2>
+<p>The city issues a notice and gives the property owner a set number of days to correct the issue — typically 30 days. If the violation isn't fixed within that window, the city has authority to abate the problem themselves and place a lien against the property for the costs.</p>
+
+<h2>Phoenix Code Violation Fines</h2>
+<p>Fines escalate with repeat offenses within 36 months:</p>
+<ul>
+  <li><strong>First violation:</strong> $100 to $2,500</li>
+  <li><strong>Second violation:</strong> minimum $250</li>
+  <li><strong>Third violation:</strong> minimum $500</li>
+</ul>
+<p>Each day the violation continues counts as a separate offense. A $100/day minimum violation left unresolved for a month could result in a $3,000 fine — plus the cost of the actual repair.</p>
+
+<h2>How to Fix a Code Violation in Phoenix</h2>
+<p>Read the violation notice carefully twice. Call the code enforcement officer to discuss what's required — get their cell phone number and email. Ask for a time extension if you need it. Document everything. Get the work done before your court date to minimize fines.</p>
+<p>If the work requires a contractor, make sure they're licensed through the Arizona Registrar of Contractors (ROC). Unpermitted repair work on a code violation can create additional violations.</p>
+
+<h2>Phoenix by the Numbers</h2>
+<p>PermitGrab tracks <strong>{{ '{:,}'.format(stats.violations) }}</strong> open code violations in Phoenix right now. Each one represents a property where work must be done — by law.</p>
+<p>We also track:</p>
+<ul>
+  <li><strong>{{ '{:,}'.format(stats.profiles) }}</strong> active contractors pulling permits</li>
+  <li><strong>{{ '{:,}'.format(stats.phones) }}</strong> with direct phone numbers</li>
+  <li><strong>{{ '{:,}'.format(stats.owners) }}</strong> property owners matched to addresses (Maricopa County)</li>
+</ul>
+
+<h2>Why This Matters for Contractors and Investors</h2>
+<p><strong>For contractors:</strong> every code violation is a property that needs your services. Roofing, electrical, plumbing, structural repair, property maintenance — these are properties where the city has said "fix this or else." That's not a cold lead. It's a legally mandated repair.</p>
+<p><strong>For real estate investors:</strong> properties with active violations often indicate distressed ownership situations. The combination of violation data, property owner information, and assessed values gives you a complete picture of investment opportunities.</p>
+<p><strong>For solar installers:</strong> Phoenix offers instant-permits solar through SolarAPP+ as of January 1, 2026. Arizona's 25% state solar tax credit (up to $1,000) is still active. Properties pulling renovation permits are already spending money on their house — add solar to the project.</p>
+
+<h2>Solar Permits in Phoenix</h2>
+<p>Arizona's HB2301 mandates all municipalities adopt instant permitting for home power installations as of January 2026. Phoenix uses SolarAPP+ for eligible residential PV systems. Maricopa County charges $300 for roof-mounted residential solar permits, including all inspections.</p>
+
+<h2>Permits Filed in the Last 90 Days</h2>
+<p>{{ '{:,}'.format(stats.permits_90d) }} permits filed in Phoenix in the last 90 days. Top types:</p>
+{% if stats.top_permit_types %}
+<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead><tr style="border-bottom: 2px solid #dee2e6;"><th style="text-align: left; padding: 0.5rem;">Permit Type</th><th style="text-align: right; padding: 0.5rem;">Count</th></tr></thead>
+  <tbody>
+  {% for pt in stats.top_permit_types %}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 0.5rem;">{{ pt.permit_type }}</td><td style="text-align: right; padding: 0.5rem;">{{ '{:,}'.format(pt.cnt) }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<p><a href="/permits/{{ city_slug }}">Search Phoenix permits and contractors →</a></p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>How much can a Phoenix code violation cost?</h3>
+<p>$100 to $2,500 per violation, with each day counting as a separate offense. Repeats within 36 months escalate the minimum to $250 and $500.</p>
+<h3>How long do I have to fix a Phoenix code violation?</h3>
+<p>Typically 30 days from the notice. After that the city can abate and lien the property for costs.</p>
+<h3>Where can I see currently open Phoenix violations?</h3>
+<p>Search by address on the <a href="/permits/{{ city_slug }}">Phoenix permits page</a>. Most recent permit in our system: {{ stats.newest_permit }}.</p>
