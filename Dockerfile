@@ -1,18 +1,11 @@
 FROM python:3.11-slim
 
-# V470 PR 1: procps for pkill (used by start.sh to kill leftover gunicorn
-# processes from a wedge before starting fresh — addresses the 2026-04-29
-# 90-min outage where pid 7 stuck in module-import phase blocked port 10000
-# while a new pid 17577 booted normally but couldn't accept connections).
-RUN apt-get update && apt-get install -y --no-install-recommends procps && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN chmod +x /app/start.sh
 
 EXPOSE 5000
 
@@ -42,13 +35,4 @@ EXPOSE 5000
 # serve. 12 threads gives headroom while we work on the slow queries
 # themselves; gthread workers are cheap (each is a Python thread, not
 # a process), and the gunicorn timeout=120 still bounds runaway calls.
-# V470 PR 1 (CODE_V470 Phase 3B): switch from inline flags to gunicorn.conf.py
-# via start.sh. start.sh pkills any leftover gunicorn before exec'ing the new
-# one — prevents the wedged-process port-conflict pattern we saw 2026-04-29.
-# Config differences from the prior inline cmd:
-#   - threads 12 → 8 (lower memory pressure on 2GB box)
-#   - preload_app=True (~30-60MB memory savings via copy-on-write)
-#   - post_fork DB engine reset (prevents stale shared-connection corruption)
-#   - post_request memory log when worker RSS > 1500MB (visibility)
-#   - max_requests 5000 → 1000 (catch slow leaks earlier)
-CMD ["bash", "/app/start.sh"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 12 --timeout 120 --graceful-timeout 30 --max-requests 5000 --max-requests-jitter 500 server:app"]
