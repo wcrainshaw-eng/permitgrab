@@ -1141,6 +1141,49 @@ def state_city_landing(state_slug, city_slug):
     # Format display name
     display_name = format_city_name(city_name)
 
+    # V475 Bug 5: empty-city early exit. Mirrors the city_landing_inner
+    # fix for the /permits/<state>/<city> route — without this, empty
+    # cities (e.g. /permits/wisconsin/verona) run a dozen expensive
+    # queries before producing nothing useful, and bot traffic was
+    # piling these up behind the daemon's write lock.
+    try:
+        _row = conn.execute(
+            "SELECT COUNT(*) FROM permits WHERE source_city_key = ? LIMIT 1",
+            (city_slug,)
+        ).fetchone()
+        _v475_permit_count = _row[0] if _row else 0
+        if _v475_permit_count == 0:
+            _row = conn.execute(
+                "SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key = ? LIMIT 1",
+                (city_slug,)
+            ).fetchone()
+            _v475_profile_count = _row[0] if _row else 0
+            if _v475_profile_count == 0:
+                from flask import make_response as _mk
+                _resp = render_template(
+                    'city_paused.html',
+                    city_name=display_name,
+                    state=city_state,
+                    last_updated=None,
+                    canonical_url=f"{SITE_URL}/permits/{state_slug_key}/{city_slug}",
+                    robots="noindex, follow",
+                    is_coming_soon=True,
+                )
+                _r = _mk(_resp)
+                _r.headers['Cache-Control'] = 'public, max-age=86400'
+                return _r
+    except Exception as _e:
+        print(f"[V475] empty-city early-exit check failed for {city_slug}: {_e}", flush=True)
+
+    # V475 Bug 1: hoist violations_count + violations_data init to BEFORE
+    # the V474 meta block. Previously these were initialized at line ~1368
+    # (after the V474 read), so every render hit
+    # UnboundLocalError on the violations_count reference. The actual
+    # population query still runs further down — these are just defaults
+    # so the V474 code path can read them safely.
+    violations_count = 0
+    violations_data = []
+
     # V474 (CODE_V474_BUYER_PERSONAS Section B+C): data-driven meta title +
     # description + FAQ JSON-LD. The V156 hard-coded SEO maps below are
     # kept as a fallback for the 19 anchor cities, but every city now

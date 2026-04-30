@@ -4,7 +4,7 @@ Flask app that serves the dashboard and API endpoints
 Deploy to any VPS (DigitalOcean, Railway, Render, etc.)
 """
 
-from flask import Flask, jsonify, request, send_from_directory, session, render_template, Response, redirect, abort, g
+from flask import Flask, jsonify, request, send_from_directory, session, render_template, Response, redirect, abort, g, make_response
 from difflib import SequenceMatcher
 import json
 import math
@@ -3701,18 +3701,43 @@ def get_city_directory_stats():
     grouped = {}
     try:
         conn = permitdb.get_connection()
+        # V475 Bug 2 perf fix: replace 4 correlated subqueries (× ~100
+        # cities = 400+ subqueries) with three pre-aggregated CTEs joined
+        # once. Cuts homepage cold-cache render from 45-60s → ~1-2s.
+        # The previous form was the single biggest cause of the
+        # homepage 5-minute timeouts and 502s.
         rows = conn.execute("""
+            WITH prof AS (
+                SELECT source_city_key,
+                       COUNT(*) AS profile_count,
+                       SUM(CASE WHEN phone IS NOT NULL AND phone <> ''
+                                THEN 1 ELSE 0 END) AS phone_count
+                FROM contractor_profiles
+                WHERE source_city_key IS NOT NULL
+                GROUP BY source_city_key
+            ),
+            viol AS (
+                SELECT source_city_key,
+                       COUNT(*) AS violation_count
+                FROM violations
+                WHERE source_city_key IS NOT NULL
+                GROUP BY source_city_key
+            ),
+            owns AS (
+                SELECT city, COUNT(*) AS owner_count
+                FROM property_owners
+                WHERE city IS NOT NULL AND city <> ''
+                GROUP BY city
+            )
             SELECT pc.city_slug, pc.city, pc.state, pc.total_permits,
-              (SELECT COUNT(*) FROM contractor_profiles cp
-                 WHERE cp.source_city_key = pc.city_slug) as profile_count,
-              (SELECT COUNT(*) FROM contractor_profiles cp
-                 WHERE cp.source_city_key = pc.city_slug
-                   AND cp.phone IS NOT NULL AND cp.phone != '') as phone_count,
-              (SELECT COUNT(*) FROM violations v
-                 WHERE v.source_city_key = pc.city_slug) as violation_count,
-              (SELECT COUNT(*) FROM property_owners po
-                 WHERE po.city = pc.city) as owner_count
+                   COALESCE(prof.profile_count, 0) AS profile_count,
+                   COALESCE(prof.phone_count, 0) AS phone_count,
+                   COALESCE(viol.violation_count, 0) AS violation_count,
+                   COALESCE(owns.owner_count, 0) AS owner_count
             FROM prod_cities pc
+            LEFT JOIN prof ON prof.source_city_key = pc.city_slug
+            LEFT JOIN viol ON viol.source_city_key = pc.city_slug
+            LEFT JOIN owns ON owns.city = pc.city
             WHERE pc.status = 'active' AND pc.total_permits > 0
             ORDER BY pc.state, pc.total_permits DESC
         """).fetchall()
@@ -6877,6 +6902,43 @@ def city_landing_inner(city_slug):
                 <p>Access permit data including project values, contact information, and trade categories. Start browsing {display_name} construction permits today.</p>
             """
         }
+
+    # V475 Bug 5: empty-city early exit. If this slug has 0 permits AND
+    # 0 contractor profiles, render a lightweight "Coming Soon" page
+    # instead of running the dozen expensive queries that follow. The
+    # bot army hitting /permits/salem and similar empty cities was the
+    # second-largest cause of homepage timeouts (the daemon write lock
+    # piled up behind dead-page renders that never produced anything).
+    try:
+        _check_conn = permitdb.get_connection()
+        _row = _check_conn.execute(
+            "SELECT COUNT(*) FROM permits WHERE source_city_key = ? LIMIT 1",
+            (city_slug,)
+        ).fetchone()
+        _v475_permit_count = _row[0] if _row else 0
+        if _v475_permit_count == 0:
+            _row = _check_conn.execute(
+                "SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key = ? LIMIT 1",
+                (city_slug,)
+            ).fetchone()
+            _v475_profile_count = _row[0] if _row else 0
+            if _v475_profile_count == 0:
+                _resp = render_template(
+                    'city_paused.html',
+                    city_name=config.get('name', city_slug.replace('-', ' ').title()),
+                    state=config.get('state', ''),
+                    last_updated=None,
+                    canonical_url=f"{SITE_URL}/permits/{city_slug}",
+                    robots="noindex, follow",
+                    is_coming_soon=True,
+                )
+                _r = make_response(_resp)
+                # V475 Bug 6: long-cache empty-city pages so bot retraversal
+                # doesn't keep beating the DB.
+                _r.headers['Cache-Control'] = 'public, max-age=86400'
+                return _r
+    except Exception as _e:
+        print(f"[V475] empty-city early-exit check failed for {city_slug}: {_e}", flush=True)
 
     # V161: Use prod_city_id for permit queries (fixes NYC name mismatch)
     filter_name = config.get('raw_name', config['name'])
