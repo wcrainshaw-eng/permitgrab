@@ -7491,8 +7491,14 @@ def city_landing_inner(city_slug):
     # logic works regardless of whether the connection has row_factory
     # set. The earlier `_r['c']` lookup silently returned 0 for cities
     # whose conn didn't carry a Row factory.
+    # V474c: open a FRESH connection instead of reusing the long-lived
+    # `conn` variable from earlier in this function — Henderson test
+    # showed all three counts coming back 0 with the shared conn even
+    # though the same SQL run via /api/admin/query returned the real
+    # counts (2,572 / 871 / 120,939). Suspected thread/lifetime issue.
+    _v474_conn = permitdb.get_connection()
     try:
-        _r = conn.execute(
+        _r = _v474_conn.execute(
             "SELECT COUNT(*), "
             "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) "
             "FROM contractor_profiles WHERE source_city_key = ?",
@@ -7505,7 +7511,7 @@ def city_landing_inner(city_slug):
         print(f"[V474] profiles count failed for {city_slug}: {_e}", flush=True)
     try:
         if _prod_city_id:
-            _r = conn.execute(
+            _r = _v474_conn.execute(
                 "SELECT COUNT(*) FROM violations WHERE prod_city_id = ?",
                 (_prod_city_id,),
             ).fetchone()
@@ -7513,7 +7519,7 @@ def city_landing_inner(city_slug):
     except Exception as _e:
         print(f"[V474] violations count failed for {city_slug}: {_e}", flush=True)
     try:
-        _r = conn.execute(
+        _r = _v474_conn.execute(
             "SELECT COUNT(*) FROM property_owners "
             "WHERE LOWER(city) = LOWER(?) AND state = ?",
             (config.get('name', ''), config.get('state', '')),
@@ -7521,6 +7527,10 @@ def city_landing_inner(city_slug):
         _v474_owners = _r[0] if _r else 0
     except Exception as _e:
         print(f"[V474] owners count failed for {city_slug}: {_e}", flush=True)
+    print(f"[V474] {city_slug}: profiles={_v474_profiles} phones={_v474_phones} "
+          f"violations={_v474_violations} owners={_v474_owners} "
+          f"name={config.get('name')!r} state={config.get('state')!r} "
+          f"prod_city_id={_prod_city_id}", flush=True)
 
     # Override meta only if this city is NOT in the hardcoded CITY_SEO_CONFIG
     # (those have hand-tuned copy). For every auto-generated city, swap to
