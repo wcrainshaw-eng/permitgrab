@@ -1058,12 +1058,19 @@ def admin_start_collectors():
                 'daemon_thread_alive': True,
             }), 200
 
-        if not live_daemon:
+        if not live_daemon or force:
             # Reset the one-way flag so start_collectors() actually spawns.
+            # V475: also reset on force=1, otherwise force is a no-op when
+            # the scheduled_collection thread is already alive — the
+            # endpoint wouldn't reach this block, and start_collectors()
+            # returns immediately because _collector_started=True. That
+            # blocks any new threads we add to start_collectors() from
+            # being spawned without a Render restart (hit during the
+            # V475 email_scheduler restoration).
             _s._collector_started = False
             _s._collectors_manually_started = False
             print(
-                f"[{datetime.now()}] V473b: scheduled_collection not alive; "
+                f"[{datetime.now()}] V475: live_daemon={live_daemon} force={force}; "
                 f"resetting flags and respawning",
                 flush=True,
             )
