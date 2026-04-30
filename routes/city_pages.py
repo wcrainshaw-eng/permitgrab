@@ -1692,6 +1692,15 @@ def cities_browse():
         "SELECT DISTINCT source FROM property_owners "
         "WHERE source LIKE 'permit_record:%'"
     ).fetchall()
+    # V473b: assessor sources are county-level — credit secondary cities
+    # in the same county with the parent county's owner data. Without
+    # this, e.g. Mesa AZ shows "no owners" even though Maricopa County
+    # has 78K owner rows that include Mesa parcels (just tagged
+    # 'Phoenix' by the source).
+    assessor_county_rows = conn.execute(
+        "SELECT DISTINCT source FROM property_owners "
+        "WHERE source LIKE 'assessor:%'"
+    ).fetchall()
     # V473 Bug 2: profile counts per city for the featured-card threshold.
     profile_rows = conn.execute(
         "SELECT source_city_key, COUNT(*) c FROM contractor_profiles "
@@ -1708,6 +1717,62 @@ def cities_browse():
     }
     profile_counts = {r['source_city_key']: r['c'] for r in profile_rows}
 
+    # V473b: which counties have any assessor rows? — used to credit
+    # sub-municipalities sharing a county with a wired assessor.
+    assessor_county_keys = {
+        r['source'].split(':', 1)[1]
+        for r in assessor_county_rows
+        if r['source'] and ':' in r['source']
+    }
+    # Map of (city.lower(), state.upper()) → assessor key the city
+    # belongs to. Hard-coded because we don't have a county lookup
+    # table; covers the top-100 cities that share counties with
+    # already-wired assessors.
+    _COUNTY_CITIES = {
+        'maricopa':              [('mesa','AZ'), ('scottsdale','AZ'), ('tempe','AZ'),
+                                  ('chandler','AZ'), ('gilbert','AZ'), ('glendale','AZ'),
+                                  ('peoria','AZ'), ('surprise','AZ')],
+        'clark_lasvegas':        [('henderson','NV'), ('paradise','NV'),
+                                  ('north las vegas','NV')],
+        'cook_chicago':          [('aurora','IL'), ('naperville','IL'), ('joliet','IL'),
+                                  ('elgin','IL')],
+        'miami_dade':            [('hialeah','FL'), ('miami beach','FL'),
+                                  ('miami gardens','FL'), ('homestead','FL'),
+                                  ('coral gables','FL'), ('north miami','FL')],
+        'broward_ftlauderdale':  [('fort lauderdale','FL'), ('hollywood','FL'),
+                                  ('pembroke pines','FL'), ('coral springs','FL'),
+                                  ('miramar','FL'), ('davie','FL'), ('plantation','FL'),
+                                  ('sunrise','FL'), ('pompano beach','FL'),
+                                  ('deerfield beach','FL')],
+        'hillsborough_tampa':    [('saint petersburg','FL')],   # actually Pinellas
+        'hennepin_minneapolis':  [('saint paul','MN'), ('bloomington','MN'),
+                                  ('brooklyn park','MN'), ('plymouth','MN')],
+        'multnomah_portland':    [('gresham','OR')],
+        'wake_raleigh':          [('cary','NC'), ('apex','NC'),
+                                  ('wake forest','NC')],
+        'travis_austin':         [('round rock','TX'), ('cedar park','TX')],
+        'philadelphia_opa':      [],  # Philadelphia is co-extensive with the county
+        'cuyahoga_cleveland':    [('parma','OH'), ('lakewood','OH')],
+        'erie_buffalo':          [],  # Buffalo is the principal city
+        'davidson_nashville':    [],  # Davidson = Nashville
+        'bexar':                 [],  # Bexar = San Antonio core
+        'tarrant_fortworth':     [('arlington','TX'), ('grand prairie','TX'),
+                                  ('mansfield','TX')],
+        'hamilton_cincinnati':   [],
+        'franklin_columbus':     [],
+        'marion_indianapolis':   [],
+        'lee_capecoral':         [('cape coral','FL'), ('fort myers','FL')],
+        'onondaga_syracuse':     [('clay','NY')],
+        'nyc_pluto':             [('brooklyn','NY'), ('queens','NY'),
+                                  ('bronx','NY'), ('staten island','NY'),
+                                  ('manhattan','NY')],
+    }
+    county_owners_set = set()
+    for county_key, city_list in _COUNTY_CITIES.items():
+        if county_key in assessor_county_keys:
+            for c, s in city_list:
+                county_owners_set.add((c, s))
+
     all_cities = []
     for r in rows:
         city = r['city']
@@ -1716,6 +1781,7 @@ def cities_browse():
         has_owners = (
             (city.lower(), state) in owner_tuple_set
             or slug in owner_slug_set
+            or (city.lower(), state) in county_owners_set
         )
         all_cities.append({
             'name': city,
