@@ -87,6 +87,31 @@ ASSESSOR_SOURCES = {
         'state': 'AZ',
         'source_tag': 'assessor:maricopa',
     },
+    'maricopa_secondary': {
+        # V474d: Maricopa County's non-Phoenix municipalities. Probed
+        # 2026-04-29: Mesa alone has 173,092 owner-bearing parcels.
+        # Combined Mesa/Scottsdale/Tempe/Chandler/Glendale/Peoria/
+        # Gilbert/Surprise/Avondale/Goodyear ≈ 700K+ parcels not
+        # covered by the existing 'maricopa' source's first 78K
+        # imports (which OBJECTID-ordered into Phoenix territory).
+        # JURISDICTION provides the city tag, so each parcel lands
+        # under its actual situs city — unblocks Mesa + Scottsdale
+        # for the /cities scorecard's COMPLETE bucket.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Maricopa County Assessor — non-Phoenix municipalities',
+        'endpoint': 'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/Parcels/MapServer/0',
+        'where_clause': "OWNER_NAME IS NOT NULL AND PHYSICAL_ADDRESS IS NOT NULL AND PHYSICAL_ADDRESS <> '' AND JURISDICTION IN ('MESA','SCOTTSDALE','TEMPE','CHANDLER','GLENDALE','PEORIA','GILBERT','SURPRISE','AVONDALE','GOODYEAR','BUCKEYE','TOLLESON','EL MIRAGE','LITCHFIELD PARK','FOUNTAIN HILLS','PARADISE VALLEY')",
+        'field_map': {
+            'owner_name': 'OWNER_NAME',
+            'address': 'PHYSICAL_ADDRESS',
+            'city': 'JURISDICTION',
+            'zip': 'PHYSICAL_ZIP',
+            'owner_mailing_address': 'MAIL_ADDRESS',
+            'parcel_id': 'APN',
+        },
+        'state': 'AZ',
+        'source_tag': 'assessor:maricopa_secondary',
+    },
     'bexar': {
         # Bexar County (San Antonio). 710K parcels. Schema richer than
         # Maricopa — has assessed value (TotVal), year built, and
