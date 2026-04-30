@@ -160,9 +160,33 @@ The daemon checks in order: prod_cities → city_sources → CITY_REGISTRY dict 
 
 ### Daemon
 - Does NOT auto-start on deploy. Must call: `POST /api/admin/start-collectors`
-- Runs as background thread in Flask process
+- Runs as background thread **inside the Flask process** (the only service)
 - Pauses during imports via IMPORT_IN_PROGRESS flag
 - Collects all active cities every ~30min
+
+### ARCHITECTURE GROUND TRUTH (don't repeat the V471 PR4 mistake)
+**There is exactly ONE Render service:** `permitgrab` (Docker, Oregon).
+The Flask web server **and** the collection daemon thread run **in the
+same process**. There is no separate worker container.
+
+`render.yaml` declares a `permitgrab-worker` Background Worker service
+and `worker.py` exists in the repo, **but the service was never created
+in the actual Render project**. Treat `worker.py` and the
+`permitgrab-worker` block in render.yaml as dead code / aspirational —
+running collection in a separate worker would be a future migration,
+not the current state.
+
+`WORKER_MODE` env var is **not set** on the live web service (verify
+before assuming). Code paths gated on `WORKER_MODE` are no-ops in prod.
+
+V471 PR4 (commit `0f5a7ef`, since reverted by PR #417 / commit
+`2c91a2a`) neutered `start_collectors()` because it assumed the worker
+was running. Don't make that mistake again — `start_collectors()` is
+the only collection mechanism, and POSTing to `/api/admin/start-collectors`
+is the only way to start it after a deploy.
+
+If you ever need to verify the deployed services, check the Render
+dashboard directly. Do NOT trust render.yaml.
 
 ---
 
@@ -730,22 +754,33 @@ Each cycle of the autonomous loop should use skills:
 
 ## RENDER DEPLOYMENT
 
-- **Service**: permitgrab (web service)
+- **Single service**: `permitgrab` (Docker, Oregon). Flask app + collection
+  daemon thread share this process. No separate worker. (See ARCHITECTURE
+  GROUND TRUTH above — the `permitgrab-worker` declaration in render.yaml
+  was never deployed.)
 - **SSH**: `ssh srv-d6s1tvsr85hc73em9ch0@ssh.oregon.render.com`
-- **Memory limit**: 512MB (import jobs MUST stay under ~200MB peak)
+- **Memory plan**: Standard 2GB (was 512MB pre-V418)
 - **Auto-deploy**: Pushes to main trigger automatic deploy
 - **Logs**: Available via Render dashboard or SSH
+- **Daemon restart after every deploy**: `curl -X POST -H "X-Admin-Key: ..."
+  https://permitgrab.com/api/admin/start-collectors` — collection does NOT
+  auto-start on deploy.
 
 ---
 
 ## FILE STRUCTURE (key files)
 
-- `server.py` — Flask app, admin API routes, daemon startup
-- `collector.py` — Permit collection daemon, _collect_all_inner()
-- `city_configs.py` — CITY_REGISTRY dict, STATE_CONFIGS, field_maps
-- `license_enrichment.py` — State license imports (FL DBPR, MN DLI, etc.)
+- `server.py` — Flask app + helpers + middleware (~8,800 lines after V471). Module load is zero-side-effects.
+- `routes/admin.py|api.py|auth.py|city_pages.py|health.py|seo.py` — V471 PR2 blueprint split (210 routes lifted out of server.py)
+- `models.py` — V471 PR2 step 1: SQLAlchemy User + SavedSearch
+- `city_configs.py` — STATE_CONFIGS + helpers (~326 lines after V471 PR3)
+- `city_registry_data.py` — V471 PR3: CITY_REGISTRY (1,467) + BULK_SOURCES (41) extracted from city_configs
+- `collector.py` — Permit collection (`_collect_all_inner`, `collect_refresh`, `_fetch_permits_with_timeout` for the V470b 5-min wall-clock cap)
+- `assessor_collector.py` — County assessor → property_owners pipeline
+- `license_enrichment.py` — State license imports (FL DBPR, MN DLI, NY DOL, WA L&I, CA CSLB, AZ ROC)
 - `accela_portal_collector.py` — Accela HTML scraper
-- `templates/` — Jinja2 templates for city pages, homepage, blog
+- `worker.py` — **DEAD CODE** (declared in render.yaml as `permitgrab-worker` but the service was never created on Render). Don't rely on this.
+- `templates/` — Jinja2 templates including admin/, blog/seo/, blog/faq/, emails/
 
 ---
 
