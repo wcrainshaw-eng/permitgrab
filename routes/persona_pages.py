@@ -361,3 +361,24 @@ def persona_contractors():
 @persona_bp.route('/leads/home-services')
 def persona_home_services():
     return _render_persona('home-services')
+
+
+# V477 Bug 1: external links / SEO inbound traffic discovered the
+# /solutions/* URL scheme even though the nav links to /leads/*.
+# 301 redirects so direct URL types and any cached external links
+# work, while /leads/* remains the canonical SEO target.
+from flask import redirect as _redirect
+
+@persona_bp.route('/solutions/real-estate-investors')
+def persona_re_investors_alias():
+    return _redirect('/leads/real-estate-investors', code=301)
+
+
+@persona_bp.route('/solutions/contractors')
+def persona_contractors_alias():
+    return _redirect('/leads/contractors', code=301)
+
+
+@persona_bp.route('/solutions/home-services')
+def persona_home_services_alias():
+    return _redirect('/leads/home-services', code=301)

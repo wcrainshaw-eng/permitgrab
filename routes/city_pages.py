@@ -1045,6 +1045,31 @@ def state_city_landing(state_slug, city_slug):
     }
     city_slug = _SLUG_ALIASES.get(city_slug, city_slug)
 
+    # V477 Bug 2: the data table in city_landing_v77 fetches permits via
+    # AJAX keyed on city_slug. /permits/phoenix-az passes 'phoenix-az'
+    # and the table renders 16K records; /permits/arizona/phoenix was
+    # passing 'phoenix' which has no permits in the DB and the table
+    # showed "0 records". Resolve the URL slug → canonical prod_cities
+    # slug here so both URL forms feed the same data layer.
+    try:
+        _resolve_conn = permitdb.get_connection()
+        _resolve_row = _resolve_conn.execute(
+            "SELECT city_slug FROM prod_cities "
+            "WHERE state = ? AND status = 'active' "
+            "  AND (city_slug = ? OR REPLACE(city_slug, '-' || ?, '') = ? "
+            "       OR LOWER(REPLACE(city, ' ', '-')) = ?) "
+            "ORDER BY total_permits DESC LIMIT 1",
+            (state_abbrev, city_slug, state_abbrev.lower(), city_slug, city_slug)
+        ).fetchone()
+        if _resolve_row and _resolve_row['city_slug']:
+            _canonical = _resolve_row['city_slug']
+            if _canonical != city_slug:
+                print(f"[V477] resolved {city_slug} → {_canonical} "
+                      f"in {state_abbrev}", flush=True)
+                city_slug = _canonical
+    except Exception as _e:
+        print(f"[V477] city slug resolve failed: {_e}", flush=True)
+
     # Look up city in prod_cities first (authoritative source)
     conn = permitdb.get_connection()
     city_row = conn.execute("""

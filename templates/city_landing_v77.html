@@ -913,12 +913,12 @@ body {
        ("{permit_count} permits tracked · ..."). Date range + last updated
        still surface metric value. #}
     <div class="summary-cards">
-      {% if earliest_date and latest_date %}
-      <div class="summary-card">
-        <div class="summary-card-value">{{ earliest_date[:4] if earliest_date else '---' }}-{{ latest_date[:4] if latest_date else '---' }}</div>
-        <div class="summary-card-label">Date Range</div>
-      </div>
-      {% endif %}
+      {# V477 Bug 5: removed "Date Range" card. The freshness badge above
+         already shows the correct "Updated recently · YYYY-MM-DD"
+         signal; the year-range card was redundant and confusingly
+         rendered "2025-2026" in blue while the freshness badge said
+         "Updated recently 2026-04-25" green. Two date signals on the
+         same hero made the page look broken. #}
       {% if last_collection %}
       <div class="summary-card">
         <div class="summary-card-value">{{ last_collection[:10] if last_collection else 'N/A' }}</div>
