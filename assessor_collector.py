@@ -149,6 +149,10 @@ ASSESSOR_SOURCES = {
         },
         'state': 'OH',
         'source_tag': 'assessor:franklin_columbus',
+        # V473b: tag every parcel with Columbus — Franklin's situs city
+        # column is omitted from field_map, so without this default the
+        # /cities (city,state) match credits Columbus with 0 owners.
+        'default_city': 'Columbus',
     },
     'cook_chicago': {
         # V429 (CODE_V428 Phase 1a): Cook County (Chicago + suburbs)
@@ -596,6 +600,10 @@ ASSESSOR_SOURCES = {
         },
         'state': 'IN',
         'source_tag': 'assessor:marion_indianapolis',
+        # V473b: county source has no SITUS_CITY column. Tag every row
+        # with 'Indianapolis' so the cities-page (city,state) match
+        # credits the principal city (Marion is ~95% Indianapolis).
+        'default_city': 'Indianapolis',
     },
     'tarrant_fortworth': {
         # V473b Section B #4: Tarrant County, TX (Fort Worth + Arlington).
@@ -616,6 +624,10 @@ ASSESSOR_SOURCES = {
         },
         'state': 'TX',
         'source_tag': 'assessor:tarrant_fortworth',
+        # V473b: tag every parcel with Fort Worth — Tarrant covers FW,
+        # Arlington, Grand Prairie, Mansfield etc. but the most common
+        # destination city in the top-100 list is Fort Worth.
+        'default_city': 'Fort Worth',
     },
     'hamilton_cincinnati': {
         # V473b Section B #5: Hamilton County, OH (Cincinnati).
@@ -648,6 +660,9 @@ ASSESSOR_SOURCES = {
         'state': 'OH',
         'source_tag': 'assessor:hamilton_cincinnati',
         'default_page_size': 200,
+        # V473b: county source's situs is split (ADDRNO/ADDRST/ADDRSF)
+        # with no city column — tag every parcel with Cincinnati.
+        'default_city': 'Cincinnati',
     },
 }
 
@@ -903,6 +918,16 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
                 return ' '.join(parts) if parts else None
             return attrs.get(src)
 
+        # V473b: default_city falls back when the source has no city
+        # field exposed (Marion / Tarrant / Hamilton parcels carry only
+        # ADDRESS lines, not a SITUS_CITY column). Without a city tag,
+        # the /cities page's (city, state) tuple match shows 0 owners
+        # even when 100K+ rows landed. The default labels every row
+        # with the county's principal city so the most-relevant city
+        # gets credit. Sub-municipalities (e.g. Arlington TX inside
+        # Tarrant) won't match — that's an acceptable trade-off vs.
+        # tagging zero.
+        default_city = cfg.get('default_city')
         rows = []
         for feat in features:
             attrs = feat.get('attributes', {}) or {}
@@ -910,7 +935,7 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
             rows.append({
                 'owner_name': _resolve(attrs, field_map.get('owner_name')),
                 'address': _resolve(attrs, field_map.get('address')),
-                'city': _resolve(attrs, field_map.get('city')),
+                'city': _resolve(attrs, field_map.get('city')) or default_city,
                 'zip': _resolve(attrs, field_map.get('zip')),
                 'owner_mailing_address': _resolve(attrs, field_map.get('owner_mailing_address')),
                 'parcel_id': _resolve(attrs, field_map.get('parcel_id')),
