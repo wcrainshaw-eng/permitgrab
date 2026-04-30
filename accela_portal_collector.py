@@ -430,9 +430,12 @@ def fetch_accela_arcgis_hybrid(config, days_back=30):
     max_details = int(config.get("max_details_per_run", 200))
     field_map = config.get("field_map", {}) or {}
 
-    # Build ArcGIS query — pull recent permits with the URL attribute populated
-    cutoff_ms = int((datetime.utcnow() - timedelta(days=days_back)).timestamp() * 1000)
-    where = f"{date_field} >= {cutoff_ms} AND {url_field} IS NOT NULL"
+    # Build ArcGIS query — pull recent permits with the URL attribute populated.
+    # ArcGIS expects timestamp() function or DATE 'YYYY-MM-DD' literal, NOT raw
+    # epoch ms. Use the timestamp() function so the comparison works against
+    # both string and epoch-typed date columns.
+    cutoff = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    where = f"{date_field} >= timestamp '{cutoff} 00:00:00' AND {url_field} IS NOT NULL"
     qs_params = {
         "where": where,
         "outFields": "*",
