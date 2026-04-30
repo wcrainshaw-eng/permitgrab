@@ -579,6 +579,19 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
     packages, etc.) MUST use guarded imports (try/except) and be tested locally
     before deploying. The V287 Sentry incident wasted 45 minutes and 3 commits.
 
+17. **DON'T STOP ON DEPLOY-ROLLOVER 502s.** A 502 during a Render deploy lasts
+    1-3 minutes and clears itself — it is NOT a reason to pause. Keep working.
+    The wakeup is for verifying long-term health, not for blocking on transient
+    edge errors. The user's worst frustration is "stop stopping" — when given
+    a goal like "50 complete cities" or "finish this file", DO NOT report
+    progress and ask if you should continue. Keep grinding until the goal is
+    met or a real blocker appears (a deploy that fails after 15+ min, a SQL
+    error that won't resolve with a retry, an irreducible dead-end that
+    requires user input). Mid-deploy 502s, "single check" loops, scheduled
+    wakeups, and intermediate progress milestones are NOT blockers. Don't
+    summarize and ask. Don't ask "want me to continue?". Don't pause for
+    permission to do the next thing on the user's stated list. Just do it.
+
 ---
 
 ## AUTONOMOUS OPERATION — NEVER STOP
