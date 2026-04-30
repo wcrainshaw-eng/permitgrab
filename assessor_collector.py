@@ -575,6 +575,66 @@ ASSESSOR_SOURCES = {
         # conservative at 5000 to keep per-page latency low.
         'default_page_size': 5000,
     },
+    'marion_indianapolis': {
+        # V473b Section B #1: Marion County, IN (Indianapolis).
+        # Probed 2026-04-30 — Accela_HHC_Parcels MapServer/0 has the full
+        # owner schema (OWNER_NAME, MAIL_ADDRESS1/2, MAIL_CITY/STATE/ZIP,
+        # ADDRESS1, plus fragmented STREET_NAME/STREET_SUFFIX). The
+        # adjacent HHC_ParcelOwner service only has SUM_ACRES — wrong
+        # service, the working one is Accela_HHC_Parcels.
+        # Sample: "GETTELFINGER, ERIC M & JENNIFER L REBER" /
+        # "3240 E FALL CREEK PW N DR" / mailing "430 N PARK AVE APT 103
+        # INDIANAPOLIS IN 46202-3677".
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Marion County (Indianapolis) Parcels',
+        'endpoint': 'https://gis.indy.gov/server/rest/services/Accela/Accela_HHC_Parcels/MapServer/0',
+        'where_clause': "OWNER_NAME IS NOT NULL AND OWNER_NAME <> '' AND ADDRESS1 IS NOT NULL AND ADDRESS1 <> ''",
+        'field_map': {
+            'owner_name': 'OWNER_NAME',
+            'address': 'ADDRESS1',
+            'owner_mailing_address': 'MAIL_ADDRESS1',
+        },
+        'state': 'IN',
+        'source_tag': 'assessor:marion_indianapolis',
+    },
+    'tarrant_fortworth': {
+        # V473b Section B #4: Tarrant County, TX (Fort Worth + Arlington).
+        # Probed 2026-04-30 — Tarrant Appraisal District's Parcels_Enriched
+        # FeatureServer/0 carries OWNER_NAME, MAILING_ADDRESS_LINE_1/2/3 +
+        # MAILING_CITY_NAME/STATE/ZIP_CODE, LOCATION_ADDRESS (situs),
+        # STREET_NAME, plus TOTAL_ASSESSED_VALUE. Sample row was an
+        # institutional owner ("PINERY MEADOWS METRO DISTRICT 2") but
+        # field structure is correct.
+        'platform': 'arcgis_mapserver',  # FeatureServer uses identical query API
+        'service_description': 'Tarrant Appraisal District Parcels Enriched',
+        'endpoint': 'https://services.arcgis.com/seTexOicoRXDvRsJ/arcgis/rest/services/Parcels_Enriched/FeatureServer/0',
+        'where_clause': "OWNER_NAME IS NOT NULL AND OWNER_NAME <> '' AND LOCATION_ADDRESS IS NOT NULL AND LOCATION_ADDRESS <> ''",
+        'field_map': {
+            'owner_name': 'OWNER_NAME',
+            'address': 'LOCATION_ADDRESS',
+            'owner_mailing_address': 'MAILING_ADDRESS_LINE_1',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:tarrant_fortworth',
+    },
+    'hamilton_cincinnati': {
+        # V473b Section B #5: Hamilton County, OH (Cincinnati).
+        # Probed 2026-04-30 — CAGIS Cadastral MapServer/0 has the full
+        # owner schema: OWNNM1 (primary owner), OWNNM2 (secondary),
+        # OWNAD1/OWNAD2 (mailing), MLTOWN, plus situs from
+        # ADDRNO + ADDRST + ADDRSF (number + street + suffix).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Hamilton County (Cincinnati) Parcels',
+        'endpoint': 'https://cagisonline.hamilton-co.org/arcgis/rest/services/HCE/Cadastral/MapServer/0',
+        'where_clause': "OWNNM1 IS NOT NULL AND OWNNM1 <> '' AND ADDRST IS NOT NULL AND ADDRST <> ''",
+        'field_map': {
+            'owner_name': 'OWNNM1',
+            'address': 'ADDRST',
+            'owner_mailing_address': 'OWNAD1',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:hamilton_cincinnati',
+    },
 }
 
 
