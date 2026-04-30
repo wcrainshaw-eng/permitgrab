@@ -704,6 +704,28 @@ ASSESSOR_SOURCES = {
         'source_tag': 'assessor:washoe_reno',
         'default_city': 'Reno',
     },
+    'dane_madison': {
+        # V474: Dane County WI (Madison + Sun Prairie + Fitchburg + Stoughton).
+        # Probed 2026-04-29 — TaxParcels/MapServer/0 has Owner (primary)
+        # + CoOwner + PropertyAddress (situs). Municipality field is
+        # values like "City of Madison" / "City of Stoughton" — too
+        # noisy to map cleanly to (city,state) tuple matching, so
+        # default_city Madison covers the principal city. Sub-
+        # municipalities won't credit (~30% of parcels) but Madison
+        # gets full count. Note arcgissrv (not arcgis) in path.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Dane County (Madison) Tax Parcels',
+        'endpoint': 'https://dcimapapps.danecounty.gov/arcgissrv/rest/services/TaxParcels/MapServer/0',
+        'where_clause': "Owner IS NOT NULL AND PropertyAddress IS NOT NULL",
+        'field_map': {
+            'owner_name': 'Owner',
+            'address': 'PropertyAddress',
+            'owner_mailing_address': 'BillingStreetAddress',
+        },
+        'state': 'WI',
+        'source_tag': 'assessor:dane_madison',
+        'default_city': 'Madison',
+    },
     'pima_tucson': {
         # V474: Pima County AZ (Tucson). NOTE: the `own` field is just
         # an ownership category ("Private", "Public") — NOT the owner
