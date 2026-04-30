@@ -6166,6 +6166,16 @@ CITY_REGISTRY = {
             "filing_date": "CREATEDDATE",
             "issued_date": "CREATEDDATE",
             "date": "CREATEDDATE",
+            # V476: the hybrid collector injects contractor_name directly
+            # into the permit dict from the Accela detail-page parser
+            # (NOT from a raw ArcGIS field). normalize_permit reads
+            # field_map[<our_field>] → raw_record[<source_field>], so we
+            # self-map the keys to make the injected fields flow through.
+            "contractor_name": "contractor_name",
+            "license_number": "license_number",
+            "contact_email": "contact_email",
+            "contact_phone": "contact_phone",
+            "contact_name": "contact_name",
         },
         "limit": 200,
         "active": True,
