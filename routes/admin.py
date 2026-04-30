@@ -1027,19 +1027,63 @@ def admin_collection_status():
 
 @admin_bp.route('/api/admin/start-collectors', methods=['POST'])
 def admin_start_collectors():
-    """V471 PR4: collection runs in the separate permitgrab-worker service
-    (worker.py). The web process no longer spawns daemon threads. Restart
-    the worker service on Render to restart collection."""
+    """V473b corrective: V471 PR4's "use worker.py" message was wrong —
+    the permitgrab-worker Render service was never created (only declared
+    in render.yaml). The web process is the only collector. Calling this
+    endpoint spawns the daemon threads inside this process, which is the
+    historical design per CLAUDE.md ("Daemon does NOT auto-start on
+    deploy. Must call: POST /api/admin/start-collectors").
+
+    V443 (P0 zombie-daemon fix): the previous flag-only check could
+    return "already_running" forever after the daemon thread died.
+    Probe for a live `scheduled_collection` thread first; if absent,
+    reset the flags so the spawn fires.
+    """
     valid, error = check_admin_key()
     if not valid:
         return error
-    return jsonify({
-        'status': 'worker_mode',
-        'message': 'V471 PR4: daemon threads run in the permitgrab-worker '
-                   'background service (worker.py). The web process is HTTP-only. '
-                   'To restart collection, restart the permitgrab-worker service '
-                   'in the Render dashboard.',
-    }), 200
+
+    try:
+        import threading
+        live_daemon = any(
+            t.is_alive() and t.name == 'scheduled_collection'
+            for t in threading.enumerate()
+        )
+        force = request.args.get('force', '').lower() in ('1', 'true', 'yes')
+
+        if live_daemon and not force:
+            return jsonify({
+                'status': 'already_running',
+                'message': 'Collectors already started',
+                'daemon_thread_alive': True,
+            }), 200
+
+        if not live_daemon:
+            # Reset the one-way flag so start_collectors() actually spawns.
+            _s._collector_started = False
+            _s._collectors_manually_started = False
+            print(
+                f"[{datetime.now()}] V473b: scheduled_collection not alive; "
+                f"resetting flags and respawning",
+                flush=True,
+            )
+
+        def _run_collectors():
+            print(f"[{datetime.now()}] V473b: Manual start_collectors triggered via API")
+            start_collectors()
+
+        t = threading.Thread(target=_run_collectors, daemon=True)
+        t.start()
+        _s._collectors_manually_started = True
+
+        return jsonify({
+            'status': 'started',
+            'message': 'Background collectors started in separate thread',
+            'reset_dead_daemon': not live_daemon,
+        }), 200
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @admin_bp.route('/api/admin/debug/threads', methods=['GET'])
