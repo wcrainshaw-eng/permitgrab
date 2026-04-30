@@ -146,6 +146,12 @@ def sitemap_pages():
         {'loc': f"{SITE_URL}/blog", 'changefreq': 'weekly', 'priority': '0.7', 'lastmod': today},
         {'loc': f"{SITE_URL}/cities", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
         {'loc': f"{SITE_URL}/stats", 'changefreq': 'daily', 'priority': '0.7', 'lastmod': today},
+        # V474 (CODE_V474_BUYER_PERSONAS): three persona landing pages.
+        # Buyer-intent SEO; daily changefreq because the data they cite is
+        # pulled fresh on every render.
+        {'loc': f"{SITE_URL}/leads/real-estate-investors", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
+        {'loc': f"{SITE_URL}/leads/contractors", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
+        {'loc': f"{SITE_URL}/leads/home-services", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
         {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6', 'lastmod': today},
         {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5', 'lastmod': today},
         {'loc': f"{SITE_URL}/privacy", 'changefreq': 'monthly', 'priority': '0.3', 'lastmod': today},

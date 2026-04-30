@@ -1141,6 +1141,38 @@ def state_city_landing(state_slug, city_slug):
     # Format display name
     display_name = format_city_name(city_name)
 
+    # V474 (CODE_V474_BUYER_PERSONAS Section B+C): data-driven meta title +
+    # description + FAQ JSON-LD. The V156 hard-coded SEO maps below are
+    # kept as a fallback for the 19 anchor cities, but every city now
+    # gets a data-aware meta title/description and FAQ schema based on
+    # what data is actually present (profiles / phones / violations / owners).
+    _v474_profiles_count = 0
+    _v474_phones_count = 0
+    _v474_owners_count = 0
+    try:
+        _row = conn.execute(
+            "SELECT COUNT(*) p, "
+            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) ph "
+            "FROM contractor_profiles WHERE source_city_key = ?",
+            (city_slug,)
+        ).fetchone()
+        if _row:
+            _v474_profiles_count = _row['p'] or 0
+            _v474_phones_count = _row['ph'] or 0
+    except Exception:
+        pass
+    try:
+        # Owner counts use the prod_cities (city, state) tuple; the cities
+        # page already has alias-handling for Miami-Dade / county sources.
+        _row = conn.execute(
+            "SELECT COUNT(*) c FROM property_owners "
+            "WHERE LOWER(city) = LOWER(?) AND state = ?",
+            (city_name, city_state)
+        ).fetchone()
+        _v474_owners_count = _row['c'] if _row else 0
+    except Exception:
+        pass
+
     # V156: SEO-optimized meta for top cities, generic fallback for others
     _pc = f"{int(permit_count or 0):,}"
     # V231 P2-10: every title includes ", <state>" for SEO parity with
@@ -1200,6 +1232,113 @@ def state_city_landing(state_slug, city_slug):
     _key = (city_name, city_state)
     meta_title = _SEO_TITLES.get(_key, f"{display_name}, {state_name} Building Permits | PermitGrab")
     meta_description = _SEO_METAS.get(_key, f"Browse recent building permits in {display_name}, {state_name}. Track new construction, renovations, and remodeling permits updated daily. Built for contractors and builders.")
+
+    # V474 Section B: pivot meta to buyer-intent language when the city has
+    # the data to back it up. Picks one of four templates based on which
+    # data dimensions are populated. Falls through to the V156 hard-coded
+    # entries above for the 19 anchor cities (those have hand-tuned copy
+    # we don't want to clobber). For every OTHER city, this is a buyer-
+    # intent rewrite using real numbers.
+    _v474_use_dynamic = _key not in _SEO_TITLES
+    if _v474_use_dynamic:
+        _has_profiles = _v474_profiles_count >= 100
+        _has_phones = _v474_phones_count >= 50
+        _has_violations = (violations_count or 0) > 0
+        _has_owners = _v474_owners_count > 0
+        _vp = f"{_v474_profiles_count:,}"
+        _vh = f"{_v474_phones_count:,}"
+        _vv = f"{(violations_count or 0):,}"
+        _vo = f"{_v474_owners_count:,}"
+        if _has_profiles and _has_violations and _has_owners:
+            meta_title = (
+                f"{display_name} Construction Leads — {_vp} Contractors, "
+                f"{_vv} Violations | PermitGrab"
+            )[:70]
+            meta_description = (
+                f"Access {_vp} contractor profiles{' with phone numbers' if _has_phones else ''}, "
+                f"{_vv} code violation properties, and {_vo} property owner "
+                f"records in {display_name}. Updated daily from official "
+                f"sources. $149/mo."
+            )[:200]
+        elif _has_profiles and _has_phones and not _has_violations:
+            meta_title = (
+                f"{display_name} Contractor Leads — {_vp} Active "
+                f"Contractors with Contact Info | PermitGrab"
+            )[:70]
+            meta_description = (
+                f"Reach {_vp} active contractors in {display_name} — "
+                f"{_vh} with verified phone numbers. Filter by trade, "
+                f"see new permits daily. $149/mo."
+            )[:200]
+        elif _has_violations and not _has_profiles:
+            meta_title = (
+                f"{display_name} Code Violation Properties — {_vv} "
+                f"Distressed Property Records | PermitGrab"
+            )[:70]
+            meta_description = (
+                f"{_vv} code violation properties in {display_name} — find "
+                f"motivated sellers and distressed properties{' with owner names' if _has_owners else ''}. "
+                f"Updated daily from city code enforcement. $149/mo."
+            )[:200]
+        elif _has_profiles:
+            meta_title = (
+                f"{display_name} Building Permit Activity — {_vp} "
+                f"Active Contractors | PermitGrab"
+            )[:70]
+            meta_description = (
+                f"Track {_pc} building permits and {_vp} active "
+                f"contractors in {display_name}. Updated daily from "
+                f"official city data. $149/mo."
+            )[:200]
+        # else: leave the V156 fallback strings as-is
+
+    # V474 Section C: FAQ JSON-LD with buyer-intent questions. Only include
+    # the question variants the city actually has data for.
+    _v474_faq = []
+    if _v474_profiles_count > 0:
+        _v474_faq.append((
+            f"How can I find contractors in {display_name}?",
+            f"PermitGrab tracks {_v474_profiles_count:,} active contractors "
+            f"in {display_name} who have pulled building permits. "
+            f"{_v474_phones_count:,} have verified phone numbers. Filter by "
+            f"trade: electrical, plumbing, HVAC, roofing, and more."
+        ))
+    if (violations_count or 0) > 0:
+        _v474_faq.append((
+            f"Where can I find code violation properties in {display_name}?",
+            f"PermitGrab has {(violations_count or 0):,} code violation "
+            f"records in {display_name} from official city code enforcement "
+            f"databases. These properties may indicate motivated sellers — "
+            f"owners facing violations are often willing to sell below "
+            f"market value."
+        ))
+    if _v474_owners_count > 0:
+        _v474_faq.append((
+            f"How do I get homeowner leads from building permits in {display_name}?",
+            f"PermitGrab provides {_v474_owners_count:,} property owner "
+            f"records for {display_name} including owner names and "
+            f"addresses. Homeowners who just pulled permits are actively "
+            f"investing in their property — ideal leads for solar, "
+            f"insurance, and home service companies."
+        ))
+    _v474_faq.append((
+        f"How often is the {display_name} permit data updated?",
+        f"PermitGrab collects new permit data for {display_name} every "
+        f"30 minutes from official city open data portals. Violation and "
+        f"property owner data is refreshed daily to monthly depending on "
+        f"the source."
+    ))
+    _v474_faq_jsonld = {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        'mainEntity': [
+            {
+                '@type': 'Question',
+                'name': q,
+                'acceptedAnswer': {'@type': 'Answer', 'text': a},
+            } for q, a in _v474_faq
+        ],
+    }
 
     # Robots directive — V236 PR#6: thin-page suppression at <20 permits.
     robots_directive = "index, follow" if permit_count >= 20 and is_active else "noindex, follow"
@@ -1336,6 +1475,9 @@ def state_city_landing(state_slug, city_slug):
         city_blog_url=None,
         top_trades=[],
         market_insights=market_insights,  # V236 PR#5
+        v474_faq=_v474_faq,  # list of (question, answer) tuples for the
+                             # rendered <details> FAQ section in the template
+        v474_faq_jsonld=_v474_faq_jsonld,
     )
 
 

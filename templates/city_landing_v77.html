@@ -29,6 +29,13 @@
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 {% include 'partials/analytics.html' %}
 
+<!-- V474 (CODE_V474_BUYER_PERSONAS Section C): FAQ schema. Question set is
+     dynamically pruned per-city based on which data dimensions are populated
+     (only emit the violations Q if the city has violations, etc.). -->
+{% if v474_faq_jsonld %}
+<script type="application/ld+json">{{ v474_faq_jsonld | tojson }}</script>
+{% endif %}
+
 <!-- V77: Dataset Schema -->
 <script type="application/ld+json">
 {

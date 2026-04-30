@@ -200,6 +200,17 @@
 
       <a href="/contractors">Contractors</a>
 
+      {# V474 (CODE_V474): persona landing pages — buyer-intent copy that
+         rolls up under "Solutions" so SEO funnel stays visible from any page. #}
+      <div class="nav-dropdown">
+        <button class="dropdown-toggle">Solutions <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5H2.5Z"/></svg></button>
+        <div class="dropdown-menu">
+          <a href="/leads/real-estate-investors">For real estate investors</a>
+          <a href="/leads/contractors">For contractors</a>
+          <a href="/leads/home-services">For home services</a>
+        </div>
+      </div>
+
       {% if user %}
       {# Logged-in: Analytics replaces Blog in the main row #}
       <a href="/analytics">Analytics</a>

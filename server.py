@@ -8772,6 +8772,8 @@ from routes.auth import auth_bp
 from routes.city_pages import city_pages_bp
 from routes.health import health_bp
 from routes.seo import seo_bp
+# V474: persona landing pages (real estate investors / contractors / home services)
+from routes.persona_pages import persona_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(api_bp)
@@ -8779,6 +8781,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(city_pages_bp)
 app.register_blueprint(health_bp)
 app.register_blueprint(seo_bp)
+app.register_blueprint(persona_bp)
 
 if __name__ == '__main__':
     # Local development only (gunicorn handles production)

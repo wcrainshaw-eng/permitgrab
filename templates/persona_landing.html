@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta_title }}</title>
+<meta name="description" content="{{ meta_description }}">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta name="robots" content="index, follow">
+
+<meta property="og:title" content="{{ meta_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="https://permitgrab.com/og-image.png">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ meta_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
+
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+
+<!-- V474: FAQ schema for the persona's questions -->
+<script type="application/ld+json">{{ faq_jsonld | tojson }}</script>
+
+<style>
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-900: #111827;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--gray-900);
+  background: white;
+  line-height: 1.6;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+.hero {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
+  color: white;
+  padding: 80px 0 64px;
+  text-align: center;
+}
+.hero .kicker {
+  display: inline-block;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  background: rgba(255,255,255,0.15);
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: 44px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 20px;
+}
+.hero .copy {
+  font-size: 19px;
+  max-width: 720px;
+  margin: 0 auto 32px;
+  opacity: 0.92;
+}
+.hero .cta-row { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.btn {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: none;
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-primary {
+  background: white;
+  color: var(--primary-dark);
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+.btn-ghost {
+  border: 1.5px solid rgba(255,255,255,.4);
+  color: white;
+}
+.btn-ghost:hover { background: rgba(255,255,255,.1); }
+.section { padding: 64px 0; }
+.section h2 {
+  font-size: 30px;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 12px;
+  letter-spacing: -.5px;
+}
+.section .subhead {
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 17px;
+  max-width: 720px;
+  margin: 0 auto 40px;
+}
+.proof-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 24px;
+}
+.proof-lead {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -1px;
+  margin-bottom: 8px;
+}
+.proof-detail {
+  font-size: 16px;
+  color: var(--gray-700);
+  max-width: 720px;
+}
+.city-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+.city-tile {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 14px 18px;
+  text-decoration: none;
+  color: var(--gray-900);
+  transition: border-color .15s, transform .15s;
+  display: block;
+}
+.city-tile:hover { border-color: var(--primary); transform: translateY(-1px); }
+.city-tile .name { font-weight: 600; font-size: 15px; }
+.city-tile .stat { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
+.value-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 16px;
+}
+.value-card {
+  border-left: 3px solid var(--primary);
+  padding: 12px 18px;
+  background: var(--gray-50);
+  border-radius: 0 8px 8px 0;
+  font-size: 15px;
+  color: var(--gray-700);
+}
+.cta-block {
+  text-align: center;
+  background: var(--gray-900);
+  color: white;
+  border-radius: 16px;
+  padding: 48px 32px;
+  margin-top: 32px;
+}
+.cta-block h3 {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  letter-spacing: -.5px;
+}
+.cta-block p { color: rgba(255,255,255,.75); margin-bottom: 24px; }
+.cta-block .btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.cta-block .btn-primary:hover { background: var(--primary-dark); }
+.faq details {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  background: white;
+}
+.faq summary {
+  font-weight: 600;
+  font-size: 17px;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: '+';
+  font-size: 22px;
+  color: var(--gray-500);
+  transition: transform .15s;
+}
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details[open] summary { margin-bottom: 12px; }
+.faq p { color: var(--gray-700); font-size: 15px; }
+.cross-links {
+  background: var(--gray-50);
+  padding: 32px 0;
+  text-align: center;
+  border-top: 1px solid var(--gray-200);
+}
+.cross-links h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.cross-links a {
+  display: inline-block;
+  margin: 0 12px;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.cross-links a:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .hero { padding: 56px 0 48px; }
+  .hero h1 { font-size: 32px; }
+  .hero .copy { font-size: 16px; }
+  .section { padding: 40px 0; }
+  .section h2 { font-size: 24px; }
+  .proof-lead { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<header class="hero">
+  <div class="container">
+    <span class="kicker">{{ hero_kicker }}</span>
+    <h1>{{ h1 }}</h1>
+    <p class="copy">{{ hero_copy }}</p>
+    <div class="cta-row">
+      <a href="/pricing" class="btn btn-primary">{{ cta_text }}</a>
+      <a href="/cities" class="btn btn-ghost">Browse city data</a>
+    </div>
+  </div>
+</header>
+
+{% if data_block.lead %}
+<section class="section">
+  <div class="container">
+    <h2>What you get</h2>
+    <p class="subhead">Real numbers from the live PermitGrab database. Every count below is current as of today.</p>
+    <div class="proof-card">
+      <div class="proof-lead">{{ data_block.lead }}</div>
+      <p class="proof-detail">{{ data_block.detail }}</p>
+    </div>
+    {% if data_block.cities %}
+    <div class="city-grid">
+      {% for c in data_block.cities %}
+      <a class="city-tile" href="/permits/{{ c.city|lower|replace(' ','-')|replace('-county','-county') }}">
+        <div class="name">{{ c.city }}{% if c.state %}, {{ c.state }}{% endif %}</div>
+        <div class="stat">{{ '{:,}'.format(c.cnt) }}
+          {%- if persona_slug == 'real-estate-investors' %} violations
+          {%- elif persona_slug == 'contractors' %} permits (90d)
+          {%- else %} owners
+          {%- endif -%}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section" style="background: var(--gray-50);">
+  <div class="container">
+    <h2>Why PermitGrab</h2>
+    <div class="value-grid">
+      {% for v in value_props %}
+      <div class="value-card">{{ v }}</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section faq">
+  <div class="container">
+    <h2>Frequently asked questions</h2>
+    {% for q, a in faq %}
+    <details {% if loop.first %}open{% endif %}>
+      <summary>{{ q }}</summary>
+      <p>{{ a }}</p>
+    </details>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-block">
+      <h3>Ready to start?</h3>
+      <p>14-day free trial. No card required. Cancel anytime.</p>
+      <a href="/pricing" class="btn btn-primary">{{ cta_text }}</a>
+    </div>
+  </div>
+</section>
+
+<aside class="cross-links">
+  <div class="container">
+    <h3>Other PermitGrab use cases</h3>
+    {% if persona_slug != 'real-estate-investors' %}
+    <a href="/leads/real-estate-investors">For real estate investors</a>
+    {% endif %}
+    {% if persona_slug != 'contractors' %}
+    <a href="/leads/contractors">For contractors</a>
+    {% endif %}
+    {% if persona_slug != 'home-services' %}
+    <a href="/leads/home-services">For home service companies</a>
+    {% endif %}
+  </div>
+</aside>
+
+{% include 'partials/footer.html' %}
+
+</body>
+</html>
