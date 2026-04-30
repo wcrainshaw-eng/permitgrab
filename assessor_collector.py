@@ -87,6 +87,29 @@ ASSESSOR_SOURCES = {
         'state': 'AZ',
         'source_tag': 'assessor:maricopa',
     },
+    'miami_dade_hialeah': {
+        # V476: Miami-Dade County's PaParcelView_gdb has 37,373 parcels with
+        # TRUE_SITE_CITY='HIALEAH' but the existing miami_dade source's
+        # 81,126 stored rows are all tagged city='Miami' (relic of an
+        # earlier default_city='Miami' import). Splitting Hialeah into its
+        # own filtered source lets us land Hialeah-tagged rows so the
+        # /cities scorecard credits Hialeah for owners (currently 29).
+        # Same source endpoint, just a where_clause filter on TRUE_SITE_CITY.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Miami-Dade Property Appraiser — Hialeah only',
+        'endpoint': 'https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/PaParcelView_gdb/FeatureServer/0',
+        'where_clause': "TRUE_OWNER1 IS NOT NULL AND TRUE_SITE_CITY = 'HIALEAH'",
+        'field_map': {
+            'owner_name': 'TRUE_OWNER1',
+            'address': 'TRUE_SITE_ADDR',
+            'city': 'TRUE_SITE_CITY',
+            'zip': 'TRUE_SITE_ZIP',
+            'owner_mailing_address': 'TRUE_MAILING_ADDR1',
+            'parcel_id': 'FOLIO',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:miami_dade_hialeah',
+    },
     'santa_clara_sj': {
         # V474g: Santa Clara County CA (San Jose). Probed 2026-04-30 —
         # services3.arcgis.com/JAU7IM34hqT9y9ew is Santa Clara's full
