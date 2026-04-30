@@ -341,6 +341,170 @@ def fetch_accela(config, days_back=30):
                                portal_base_url=portal_base_url)
 
 
+# ---------------------------------------------------------------------------
+# V476: Accela + ArcGIS hybrid collector for cities that publish a permit
+# index on ArcGIS but only expose contractor info on the linked Accela
+# CapDetail.aspx HTML page. Tampa is the original use case (P1 from CLAUDE.md):
+# the search-grid scraper has no contractor column, but the per-permit
+# detail page exposes "Licensed Professional: <NAME> <EMAIL> <BUSINESS>
+# <ADDRESS> <LICENSE TYPE> <LICENSE NUMBER>" — which the parser below
+# extracts at ~100% yield.
+# ---------------------------------------------------------------------------
+
+# Order longer suffixes first so "HOOTER CONSTRUCTION" wins over "HOOTER CO"
+# (the regex engine returns leftmost-longest; alternation is leftmost-first
+# within a single position).
+_BIZ_SUFFIX = (r"(?:CONSTRUCTION|COMPANY|BUILDERS|SERVICES|CONTRACTOR|"
+               r"REMODELING|INC|LLC|CORP|HOMES|CO)")
+_BIZ_PATTERN = re.compile(
+    rf"\b([A-Z][A-Z0-9 &.,'\-/]{{3,80}}?(?:,?\s+{_BIZ_SUFFIX}\.?))(?=\s|$)"
+)
+_EMAIL_RE = re.compile(r"\b([\w.+-]+@[\w-]+\.[\w.-]+)\b")
+_PHONE_RE = re.compile(r"\(?(\d{3})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})\b")
+_LICENSE_RE = re.compile(r"\b([A-Z]{2,4}\d{5,9})\b")
+
+
+def parse_accela_licensed_professional(html: str) -> dict:
+    """Extract Licensed Professional info from an Accela CapDetail.aspx HTML page.
+
+    Returns: {contractor_name, license_number, phone, email, contact_name}.
+    Empty dict if the section isn't present.
+    """
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"\s+", " ", text).strip()
+    idx = text.find("Licensed Professional:")
+    if idx < 0:
+        return {}
+    chunk = text[idx + len("Licensed Professional:"):idx + 1500].strip()
+    # Trim at the next section header
+    for terminator in ("Project Description:", "Owner:",
+                       "Application Information:", "Inspection Information:"):
+        end_idx = chunk.find(terminator)
+        if end_idx > 0:
+            chunk = chunk[:end_idx].strip()
+            break
+
+    out = {}
+    m = _EMAIL_RE.search(chunk)
+    if m:
+        out["email"] = m.group(1)
+    m = _PHONE_RE.search(chunk)
+    if m:
+        out["phone"] = f"({m.group(1)}) {m.group(2)}-{m.group(3)}"
+    m = _LICENSE_RE.search(chunk)
+    if m:
+        out["license_number"] = m.group(1)
+    biz_match = _BIZ_PATTERN.search(chunk)
+    if biz_match:
+        out["contractor_name"] = biz_match.group(1).strip().rstrip(",").strip()
+    name_match = re.match(r"^([A-Z][A-Z\s.'-]{4,40})\s+\S+@", chunk)
+    if name_match:
+        out["contact_name"] = name_match.group(1).strip()
+    return out
+
+
+def fetch_accela_arcgis_hybrid(config, days_back=30):
+    """V476: hybrid fetch for cities like Tampa that publish a permit index
+    on a city-hosted ArcGIS service but only expose contractor info on the
+    linked Accela CapDetail.aspx page.
+
+    Required config keys:
+        endpoint: ArcGIS FeatureServer/MapServer query URL (the index)
+        url_field: name of the ArcGIS attribute that carries the Accela link
+                   (default 'URL')
+        date_field: ArcGIS date field for filtering (default 'CREATEDDATE')
+        field_map: standard PermitGrab field map; values are ArcGIS attribute
+                   names. The collector applies parsed contractor info on top
+                   so the contractor_name is taken from the detail page.
+
+    Optional:
+        max_details_per_run: cap on detail-page fetches per call (default 200).
+                              Each fetch is ~1–2 sec; the cap keeps a single
+                              call under ~5 minutes for Render's request budget.
+    """
+    endpoint = config.get("endpoint", "")
+    if not endpoint:
+        return []
+    url_field = config.get("url_field", "URL")
+    date_field = config.get("date_field", "CREATEDDATE")
+    max_details = int(config.get("max_details_per_run", 200))
+    field_map = config.get("field_map", {}) or {}
+
+    # Build ArcGIS query — pull recent permits with the URL attribute populated
+    cutoff_ms = int((datetime.utcnow() - timedelta(days=days_back)).timestamp() * 1000)
+    where = f"{date_field} >= {cutoff_ms} AND {url_field} IS NOT NULL"
+    qs_params = {
+        "where": where,
+        "outFields": "*",
+        "resultRecordCount": max_details,
+        "returnGeometry": "false",
+        "orderByFields": f"{date_field} DESC",
+        "f": "json",
+    }
+    import urllib.parse as _up
+    list_url = endpoint.rstrip("?") + ("?" if "?" not in endpoint else "&") + _up.urlencode(qs_params)
+
+    sess = _build_session()
+    try:
+        resp = sess.get(list_url, timeout=60)
+        resp.raise_for_status()
+        list_data = resp.json()
+    except Exception as e:
+        print(f"  [V476] ArcGIS index fetch failed: {e}")
+        return []
+
+    features = list_data.get("features", []) or []
+    if not features:
+        return []
+
+    permits = []
+    for feat in features:
+        attrs = feat.get("attributes", {}) or {}
+        detail_url = attrs.get(url_field)
+        if not detail_url:
+            continue
+
+        # Map ArcGIS attribute → PermitGrab field via config.field_map
+        permit = {}
+        for pg_field, arcgis_field in field_map.items():
+            v = attrs.get(arcgis_field)
+            if v is None:
+                continue
+            # Convert epoch-ms date fields to ISO date strings
+            if pg_field in ("date", "issued_date", "filing_date") and isinstance(v, (int, float)):
+                try:
+                    permit[pg_field] = datetime.utcfromtimestamp(v / 1000).strftime("%Y-%m-%d")
+                except Exception:
+                    permit[pg_field] = str(v)
+            else:
+                permit[pg_field] = v
+
+        # Fetch detail page + parse contractor
+        try:
+            d_resp = sess.get(detail_url, timeout=30)
+            d_resp.raise_for_status()
+            parsed = parse_accela_licensed_professional(d_resp.text)
+            if parsed.get("contractor_name"):
+                permit["contractor_name"] = parsed["contractor_name"]
+            if parsed.get("license_number"):
+                permit["license_number"] = parsed["license_number"]
+            if parsed.get("email"):
+                permit["contact_email"] = parsed["email"]
+            if parsed.get("phone"):
+                permit["contact_phone"] = parsed["phone"]
+            if parsed.get("contact_name"):
+                permit["contact_name"] = parsed["contact_name"]
+        except Exception as e:
+            # Don't drop the permit if the detail page is slow/transient
+            print(f"  [V476] detail fetch failed for {permit.get('permit_number')}: {e}")
+        time.sleep(_RATE_LIMIT_SECONDS)
+        permits.append(permit)
+
+    print(f"  [V476] hybrid yielded {len(permits)} permits "
+          f"({sum(1 for p in permits if p.get('contractor_name'))} with contractor)")
+    return permits
+
+
 if __name__ == "__main__":
     # Test with Dallas
     permits = fetch_accela_portal("DALLASTX", days_back=14)

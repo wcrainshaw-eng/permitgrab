@@ -2040,6 +2040,14 @@ def fetch_permits(city_key, days_back=30):
             elif platform == "accela":
                 from accela_portal_collector import fetch_accela as fetch_accela_portal
                 raw = fetch_accela_portal(config, days_back)
+            elif platform == "accela_arcgis_hybrid":
+                # V476: cities like Tampa that publish a permit index on a
+                # local ArcGIS service but only expose contractor info on
+                # the linked Accela CapDetail.aspx detail page. The hybrid
+                # fetcher pulls the index then per-permit parses Licensed
+                # Professional from the detail HTML.
+                from accela_portal_collector import fetch_accela_arcgis_hybrid
+                raw = fetch_accela_arcgis_hybrid(config, days_back)
             elif platform == "json":
                 raw = fetch_json(config, days_back)
             else:

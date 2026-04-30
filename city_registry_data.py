@@ -6144,24 +6144,32 @@ CITY_REGISTRY = {
         "slug": "tampa-fl",
         "lat": 27.951,
         "lon": -82.457,
-        "platform": "accela",
-        "agency_code": "TAMPA",
-        "_accela_city_key": "tampa_fl",
-        "endpoint": "https://aca-prod.accela.com/TAMPA/Cap/CapHome.aspx?module=Building&TabName=Building",
-        "description": "Building Permits (Accela)",
-        "date_field": "Date",
+        # V476: switched from Accela search-grid (no contractor field) to
+        # accela_arcgis_hybrid — pulls the permit index from arcgis.
+        # tampagov.net Planning/PermitsAll then fetches each linked Accela
+        # CapDetail.aspx and parses "Licensed Professional:" for the
+        # contractor business name + license + email. Probed 2026-04-30,
+        # 100% yield on 15 sample permits.
+        "platform": "accela_arcgis_hybrid",
+        "endpoint": "https://arcgis.tampagov.net/arcgis/rest/services/Planning/PermitsAll/MapServer/0/query",
+        "url_field": "URL",
+        "date_field": "CREATEDDATE",
+        "max_details_per_run": 100,
+        "description": "Building Permits — ArcGIS index + Accela detail",
         "field_map": {
-            "permit_number": "Record Number",
-            "permit_type": "Record Type",
-            "address": "Address",
-            "description": "Description",
-            "issued_date": "Date",
-            "date": "Date",
-            "status": "Status",
+            "permit_number": "RECORD_ID",
+            "address": "ADDRESS",
+            "zip": "ZIP",
+            "permit_type": "RECORDTYPE",
+            "description": "PROJECTDESCRIPTION",
+            "status": "PROJECTSTATUS",
+            "filing_date": "CREATEDDATE",
+            "issued_date": "CREATEDDATE",
+            "date": "CREATEDDATE",
         },
-        "limit": 2000,
+        "limit": 200,
         "active": True,
-        "notes": "V35: Tampa FL Accela portal. Agency code TAMPA, module=Building.",
+        "notes": "V476: hybrid ArcGIS-list + Accela-detail collector to recover contractor names blocked by Accela grid scraper.",
     },
 
     "hillsborough_county_fl": {
