@@ -104,7 +104,22 @@ def run_initial_collection():
     """One-time startup collection with 180-day lookback for backfill.
 
     Mirrors server.py run_initial_collection() but with memory guards.
+
+    V473b optimization: now skipped by default. The V414-era reasoning
+    that prompted skipping run_initial_collection on the WEB side
+    ("scheduled_collection picks up the same set of cities within ~30
+    min") applies equally to the worker — running a 180-day backfill
+    across ~2,200 active cities on every warm restart is a 30-60 min
+    SQLite-writer monopoly that blocks scheduled_collection from
+    landing fresh data. Set RUN_INITIAL_COLLECTION=1 to opt in for
+    cold/post-incident bootstrap.
     """
+    if os.environ.get('RUN_INITIAL_COLLECTION', '').lower() not in ('1', 'true', 'yes'):
+        print(f"[WORKER] V473b: skipping run_initial_collection (set "
+              f"RUN_INITIAL_COLLECTION=1 to enable). scheduled_collection "
+              f"will pick up the same cities within ~30 min.", flush=True)
+        return
+
     print(f"[WORKER] Initial collection waiting 120s for startup...", flush=True)
     time.sleep(120)
 
@@ -163,8 +178,13 @@ def scheduled_collection():
     """
     import db as permitdb
 
-    print(f"[WORKER] Scheduled collector waiting 5 minutes for startup...", flush=True)
-    time.sleep(300)
+    # V473b optimization: 5-min sleep dropped to 60s. The original 5-min
+    # gave run_initial_collection room to land its backfill first; with
+    # initial_collection now opt-in (RUN_INITIAL_COLLECTION env var) the
+    # scheduled loop should kick off as soon as the worker is healthy.
+    init_wait = int(os.environ.get('SCHEDULED_INIT_WAIT', '60'))
+    print(f"[WORKER] Scheduled collector waiting {init_wait}s for startup...", flush=True)
+    time.sleep(init_wait)
 
     while True:
         # V242: Yield to license imports
