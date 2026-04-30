@@ -26,6 +26,7 @@
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 {% include 'partials/analytics.html' %}
+{% include 'partials/design_v478.html' %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -82,9 +83,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 {% include 'partials/nav.html' %}
 
+<style>
+  /* V478 blog — replace blue hero with white. */
+  .hero { display: none !important; }
+</style>
+
+<header style="background: var(--pg-white); padding: 80px 0 32px;">
+  <div class="pg-container">
+    <span class="pg-eyebrow">Blog</span>
+    <h1 class="pg-h1">Construction permit data &amp; contractor resources</h1>
+    <p class="pg-subtitle">Market reports, industry insights, and guides for home service professionals.</p>
+  </div>
+</header>
+
+<!-- Legacy hero (hidden) -->
 <div class="hero">
   <h1>PermitGrab Blog</h1>
-  <p>Expert insights on finding construction leads and growing your business</p>
 </div>
 
 <!-- V223 T6: Email capture — every blog visitor who isn't ready to pay

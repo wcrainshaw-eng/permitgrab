@@ -296,13 +296,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
      scheme. partials/nav.html is the single source of truth. -->
 {% include 'partials/nav.html' %}
 
-<!-- HERO -->
+<style>
+  /* V478 cities directory — replace blue hero with white hero. */
+  section.cities-hero { display: none !important; }
+  .v478-cities-hero { background: var(--pg-white); padding: 80px 0 32px; text-align: center; }
+  .v478-cities-hero .v478-search { max-width: 500px; margin: 24px auto 0; position: relative; }
+  .v478-cities-hero .v478-search input {
+    width: 100%; padding: 14px 16px 14px 44px; border-radius: 10px;
+    border: 1px solid var(--pg-border); font-size: 16px;
+    background: var(--pg-white); color: var(--pg-text);
+    box-shadow: var(--pg-shadow);
+  }
+  .v478-cities-hero .v478-search input:focus { outline: none; border-color: var(--pg-primary); box-shadow: 0 0 0 3px rgba(51,102,204,0.12); }
+  .v478-cities-hero .v478-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--pg-text-gray); }
+</style>
+
+<!-- V478 cities hero -->
+<header class="v478-cities-hero">
+  <div class="pg-container">
+    <span class="pg-eyebrow">City Directory</span>
+    <h1 class="pg-h1">Building permit data in {{ "{:,}".format(total_cities or 0) }} cities</h1>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">Browse by state or search for your city. Every city page has permits, contractors, violations, and property owner data.</p>
+    <div class="v478-search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="citySearch" placeholder="Search cities..." oninput="filterCities(this.value)">
+    </div>
+  </div>
+</header>
+
+<!-- HERO (legacy, hidden) -->
 <section class="cities-hero">
   <h1>Browse {{ total_cities }}+ Cities</h1>
   <p>Real-time building permit data across {{ total_states }} states. Find construction leads in your market.</p>
   <div class="search-box">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="text" id="citySearch" placeholder="Search cities..." oninput="filterCities(this.value)">
+    <input type="text" placeholder="Search cities..." oninput="filterCities(this.value)">
   </div>
 </section>
 

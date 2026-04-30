@@ -242,15 +242,29 @@ body {
 
 {% include 'partials/nav.html' %}
 
+<style>
+  /* V478 persona — replace blue gradient hero with white. */
+  header.hero { display: none !important; }
+</style>
+
+<header style="background: var(--pg-white); padding: 80px 0 56px; text-align: center;">
+  <div class="pg-container">
+    <span class="pg-eyebrow">{{ hero_kicker }}</span>
+    <h1 class="pg-h1">{{ h1 }}</h1>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto; font-size: 19px;">{{ hero_copy }}</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      <a href="/pricing" class="pg-btn pg-btn-primary">{{ cta_text }}</a>
+      <a href="/cities" class="pg-btn pg-btn-secondary">Browse Cities</a>
+    </div>
+  </div>
+</header>
+
+<!-- Legacy hero (hidden) -->
 <header class="hero">
   <div class="container">
     <span class="kicker">{{ hero_kicker }}</span>
     <h1>{{ h1 }}</h1>
     <p class="copy">{{ hero_copy }}</p>
-    <div class="cta-row">
-      <a href="/pricing" class="btn btn-primary">{{ cta_text }}</a>
-      <a href="/cities" class="btn btn-ghost">Browse city data</a>
-    </div>
   </div>
 </header>
 

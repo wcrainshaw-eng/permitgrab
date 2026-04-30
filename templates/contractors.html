@@ -14,6 +14,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/design_v478.html' %}
 <!-- V13.9.2 SEO: WebPage schema for contractors page -->
 <script type="application/ld+json">
 {
@@ -507,11 +508,28 @@ tr:hover td {
 <!-- Header -->
 {% include 'partials/nav.html' %}
 
-<!-- Page Header -->
+<style>
+  /* V478 contractors — replace blue page-header with white hero. */
+  .page-header { display: none !important; }
+</style>
+
+<!-- V478 contractors hero -->
+<header style="background: var(--pg-white); padding: 64px 0 32px;">
+  <div class="pg-container">
+    <span class="pg-eyebrow">Contractor Database</span>
+    <h1 class="pg-h1">Find active contractors by permit history</h1>
+    <p class="pg-subtitle">Search thousands of contractors across {{ city_count or 100 }}+ cities. Filter by trade, permit count, and service area.</p>
+    <div class="pg-cta-row">
+      <a href="/pricing" class="pg-btn pg-btn-primary">Start Free Trial</a>
+      <a href="/cities" class="pg-btn pg-btn-secondary">Browse by City</a>
+    </div>
+  </div>
+</header>
+
+<!-- Legacy header (hidden) -->
 <div class="page-header">
   <div class="page-header-inner">
     <h1>Contractor Intelligence</h1>
-    <p>Analyze contractors pulling permits in your target markets. See who's most active and what they're building.</p>
   </div>
 </div>
 
@@ -807,6 +825,17 @@ async function loadCities() {
 loadCities();
 loadContractors();
 </script>
+
+{# V478 contractors final CTA #}
+<section class="pg-section-dark" style="text-align: center;">
+  <div class="pg-container">
+    <h2 class="pg-h2">Get full access to contractor phone numbers</h2>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">$149/month · 14-day free trial · Cancel anytime</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      <a href="/pricing" class="pg-btn pg-btn-primary">Start Free Trial</a>
+    </div>
+  </div>
+</section>
 
 {% include 'partials/footer.html' %}
 

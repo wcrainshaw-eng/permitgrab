@@ -233,10 +233,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .error-code { font-size: 80px; }
 }
 </style>
+{% include 'partials/design_v478.html' %}
 </head>
 <body>
 
 {% include 'partials/nav.html' %}
+
+<style>
+  /* V478 — replace heavy 404 hero with clean centered layout. */
+  section.error-hero { display: none !important; }
+</style>
+
+<section style="background: var(--pg-white); padding: 100px 0; text-align: center;">
+  <div class="pg-container" style="max-width: 600px;">
+    <div style="font-size: 72px; font-weight: 800; color: var(--pg-primary); letter-spacing: -0.02em; margin-bottom: 16px;">404</div>
+    <h1 class="pg-h1" style="font-size: 36px; margin-bottom: 12px;">{% if show_city_suggestions %}City not found{% else %}Page not found{% endif %}</h1>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">{% if show_city_suggestions %}We couldn't find "{{ searched_slug | replace('-', ' ') | title }}" in our coverage area.{% else %}The page you're looking for doesn't exist or has been moved.{% endif %}</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      <a href="/" class="pg-btn pg-btn-primary">Go Home</a>
+      <a href="/cities" class="pg-btn pg-btn-secondary">Browse Cities</a>
+    </div>
+  </div>
+</section>
 
 <section class="error-hero">
   <div class="error-content">
