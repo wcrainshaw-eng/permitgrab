@@ -68,7 +68,18 @@ ASSESSOR_SOURCES = {
         'field_map': {
             'owner_name': 'OWNER_NAME',
             'address': 'PHYSICAL_ADDRESS',
-            'city': 'PHYSICAL_CITY',
+            # V474c: switch from PHYSICAL_CITY → JURISDICTION. Probed
+            # 2026-04-29: PHYSICAL_CITY is reliably populated for the
+            # ~5K residential parcels at offset 50K (99 PHOENIX +
+            # 1 SURPRISE in a 100-record sample), but the first 78K
+            # imported rows all landed as 'Phoenix' regardless of true
+            # situs because earlier code used a Phoenix default. Going
+            # forward, JURISDICTION carries the same values as
+            # PHYSICAL_CITY (PHOENIX/MESA/SCOTTSDALE/TEMPE/CHANDLER/
+            # GLENDALE/SURPRISE/AVONDALE/PEORIA) and is non-null on
+            # every utility/government parcel where PHYSICAL_CITY is
+            # blank — so JURISDICTION gives strictly better coverage.
+            'city': 'JURISDICTION',
             'zip': 'PHYSICAL_ZIP',
             'owner_mailing_address': 'MAIL_ADDRESS',
             'parcel_id': 'APN',
