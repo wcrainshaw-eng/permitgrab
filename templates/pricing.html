@@ -441,7 +441,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
+{% include 'partials/design_v478.html' %}
 {% include 'partials/nav.html' %}
+
+<style>
+  /* V478 pricing redesign — replaces blue hero with white hero + bigger card. */
+  section.hero { display: none !important; }
+  .v478-pricing-hero { background: var(--pg-white); padding: 80px 0 40px; text-align: center; }
+  .v478-pricing-card {
+    max-width: 480px; margin: 0 auto;
+    background: var(--pg-white);
+    border-radius: 16px;
+    border-top: 4px solid var(--pg-primary);
+    padding: 48px 40px;
+    box-shadow: var(--pg-shadow-lg);
+    text-align: center;
+  }
+  .v478-pricing-card .plan { font-size: 24px; font-weight: 700; color: var(--pg-text); margin: 0 0 8px; }
+  .v478-pricing-card .price-row { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin: 0 0 12px; }
+  .v478-pricing-card .price { font-size: 56px; font-weight: 800; letter-spacing: -0.02em; color: var(--pg-text); line-height: 1; }
+  .v478-pricing-card .per { font-size: 18px; color: var(--pg-text-gray); }
+  .v478-pricing-card .trial-line { color: var(--pg-text-gray); font-size: 14px; margin: 0 0 24px; }
+  .v478-pricing-card hr { border: none; border-top: 1px solid var(--pg-border); margin: 24px 0; }
+  .v478-pricing-card ul.features { list-style: none; padding: 0; margin: 0 0 28px; text-align: left; }
+  .v478-pricing-card ul.features li { padding: 8px 0; font-size: 15px; color: var(--pg-text); display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
+  .v478-pricing-card ul.features li::before { content: '✓'; color: var(--pg-success); font-weight: 700; flex-shrink: 0; }
+  .v478-pricing-card .pg-btn { display: block; width: 100%; text-align: center; }
+  .v478-pricing-card .fine { font-size: 13px; color: var(--pg-text-gray); margin-top: 12px; }
+  .v478-faq { max-width: 760px; margin: 0 auto; }
+  .v478-faq .qa { padding: 24px 0; border-top: 1px solid var(--pg-border); }
+  .v478-faq .qa:last-child { border-bottom: 1px solid var(--pg-border); }
+  .v478-faq .qa h3 { font-size: 18px; font-weight: 700; color: var(--pg-text); margin: 0 0 8px; }
+  .v478-faq .qa p { font-size: 16px; color: var(--pg-text-gray); margin: 0; line-height: 1.6; }
+</style>
 
 {# V379 (CODE_V363 P0 follow-up): give users feedback when they land
    here from a cancelled Stripe checkout or a not-yet-configured plan.
@@ -465,6 +497,108 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <h1>Simple, Transparent Pricing</h1>
   <p>Get the leads your competitors don't know about yet.</p>
 </section>
+
+{# V478 pricing hero #}
+<header class="v478-pricing-hero">
+  <div class="pg-container">
+    <span class="pg-eyebrow">Pricing</span>
+    <h1 class="pg-h1" style="margin-bottom: 16px;">One plan. Everything included.</h1>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">Full access to permits, contractor profiles, phone numbers, violations, and property owner data across all cities.</p>
+  </div>
+</header>
+
+<section style="padding: 40px 0 80px;">
+  <div class="v478-pricing-card">
+    <div class="plan">Pro</div>
+    <div class="price-row">
+      <span class="price">$149</span>
+      <span class="per">/month</span>
+    </div>
+    <p class="trial-line">14-day free trial · Cancel anytime</p>
+    <hr>
+    <ul class="features">
+      <li>All building permits, updated daily</li>
+      <li>Contractor profiles with phone numbers</li>
+      <li>Code violation records</li>
+      <li>Property owner data</li>
+      <li>Export to CSV</li>
+      <li>Daily email alerts</li>
+      <li>{{ city_count or 100 }}+ cities, 30+ states</li>
+    </ul>
+    <a href="/start-checkout?plan=pro" class="pg-btn pg-btn-primary">Start Free Trial</a>
+    <p class="fine">No credit card required to start</p>
+  </div>
+</section>
+
+{# V478 What's Included — 3-column grid #}
+<section class="pg-section-light">
+  <div class="pg-container" style="text-align: center;">
+    <span class="pg-eyebrow">What's Included</span>
+    <h2 class="pg-h2">Three data products, one subscription</h2>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; text-align: left;">
+      <div class="pg-card">
+        <h3 style="font-size: 20px; font-weight: 700; margin: 0 0 12px;">Permits</h3>
+        <p style="color: var(--pg-text-gray); margin: 0; font-size: 15px; line-height: 1.6;">Fresh building permit data from {{ city_count or 100 }}+ city portals, filterable by trade, value, and date.</p>
+      </div>
+      <div class="pg-card">
+        <h3 style="font-size: 20px; font-weight: 700; margin: 0 0 12px;">Contractors</h3>
+        <p style="color: var(--pg-text-gray); margin: 0; font-size: 15px; line-height: 1.6;">Deduplicated profiles with permit history, trade categories, and enriched phone numbers.</p>
+      </div>
+      <div class="pg-card">
+        <h3 style="font-size: 20px; font-weight: 700; margin: 0 0 12px;">Violations &amp; Owners</h3>
+        <p style="color: var(--pg-text-gray); margin: 0; font-size: 15px; line-height: 1.6;">Code enforcement records paired with county assessor data for motivated seller leads.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# V478 FAQ — simple stacked Q/A #}
+<section class="pg-section">
+  <div class="pg-container">
+    <div style="text-align: center; margin-bottom: 48px;">
+      <span class="pg-eyebrow">Questions</span>
+      <h2 class="pg-h2">Frequently asked</h2>
+    </div>
+    <div class="v478-faq">
+      <div class="qa">
+        <h3>What cities do you cover?</h3>
+        <p>We track building permits in {{ city_count or 100 }}+ cities across {{ state_count or 30 }} states. New cities are added monthly. Browse the full directory at <a href="/cities" style="color: var(--pg-primary);">/cities</a>.</p>
+      </div>
+      <div class="qa">
+        <h3>How fresh is the data?</h3>
+        <p>Permits are collected daily from official city open data portals (Socrata, ArcGIS, CKAN). Most cities update on a 24-hour cycle, so new permits typically appear within 1–3 days of filing.</p>
+      </div>
+      <div class="qa">
+        <h3>Can I cancel anytime?</h3>
+        <p>Yes. Cancel through your account settings — no contracts, no cancellation fees. Your subscription stays active through the end of the current billing period.</p>
+      </div>
+      <div class="qa">
+        <h3>Do you offer team plans?</h3>
+        <p>Not yet, but we're working on it. Email <a href="mailto:support@permitgrab.com" style="color: var(--pg-primary);">support@permitgrab.com</a> if you're interested in multi-seat pricing.</p>
+      </div>
+      <div class="qa">
+        <h3>What format is the data?</h3>
+        <p>Browse it online with full filters, or export any city to CSV. API access is on the roadmap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# V478 Pricing CTA — dark bg #}
+<section class="pg-section-dark" style="text-align: center;">
+  <div class="pg-container">
+    <h2 class="pg-h2">Still not sure? Browse our data for free.</h2>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">No login required to browse city directories or sample contractor data.</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      <a href="/cities" class="pg-btn pg-btn-primary">Browse Cities</a>
+      <a href="/get-alerts" class="pg-btn pg-btn-secondary">Get Free Alerts</a>
+    </div>
+  </div>
+</section>
+
+{# Legacy pricing card hidden via .pricing-section CSS — kept below for
+   reference only. The V478 card above is the active surface. #}
+<style>.pricing-section { display: none !important; }</style>
 
 <section class="pricing-section">
   <div class="pricing-inner">

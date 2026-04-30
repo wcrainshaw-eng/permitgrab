@@ -88,11 +88,30 @@ def index():
     # V366 (CODE_V363 Part F): browseable city directory grouped by state.
     cities_by_state = get_city_directory_stats()
 
+    # V478 Section 4: state pill grid on homepage. Per-state count of
+    # active cities with permit data. Cached on prod_cities so this is
+    # one cheap query.
+    _v478_states = []
+    try:
+        _sc = permitdb.get_connection()
+        _v478_states = [
+            {'state': r['state'], 'count': r['cnt']}
+            for r in _sc.execute(
+                "SELECT state, COUNT(*) AS cnt FROM prod_cities "
+                "WHERE status = 'active' AND total_permits > 0 "
+                "AND state IS NOT NULL AND state <> '' "
+                "GROUP BY state ORDER BY cnt DESC"
+            ).fetchall()
+        ]
+    except Exception as _e:
+        print(f"[V478] state grid query failed: {_e}", flush=True)
+
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
                           city_count=city_count, state_count=state_count,
                           all_dropdown_cities=all_dropdown_cities,
                           cities_by_state=cities_by_state,
+                          v478_states=_v478_states,  # V478 state pill grid
                           initial_stats=initial_stats,
                           # V224 T1: hide the sticky filter bar and the 50-card
                           # permit grid on the homepage itself — they're from

@@ -28,6 +28,7 @@
 
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 {% include 'partials/analytics.html' %}
+{% include 'partials/design_v478.html' %}
 
 <!-- V474 (CODE_V474_BUYER_PERSONAS Section C): FAQ schema. Question set is
      dynamically pruned per-city based on which data dimensions are populated
@@ -897,6 +898,69 @@ body {
   </div>
 </nav>
 
+{# V478 city hero — replaces the legacy blue/dark hero. White bg,
+   left-aligned, eyebrow + headline + 3-stat subtitle + 2 buttons. #}
+<style>
+  .v478-city-hero { background: var(--pg-white); padding: 60px 0 40px; }
+  .v478-city-hero h1 { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; color: var(--pg-text); margin: 0 0 16px; }
+  .v478-city-hero .stats-line { font-size: 18px; color: var(--pg-text-gray); line-height: 1.5; margin: 0 0 24px; max-width: 720px; }
+  /* Hide legacy in-template hero so the V478 hero is the only one shown. */
+  section.hero, .hero { display: none !important; }
+  @media (max-width: 768px) {
+    .v478-city-hero h1 { font-size: 30px; }
+    .v478-city-hero .stats-line { font-size: 16px; }
+  }
+</style>
+<header class="v478-city-hero">
+  <div class="pg-container">
+    <span class="pg-eyebrow">{{ state_name | upper }} · Building Permits</span>
+    <h1>{{ city_name }} Construction Leads</h1>
+    <p class="stats-line">
+      {{ "{:,}".format(permit_count or 0) }} permits tracked
+      {%- if violations_count and violations_count > 0 %} · {{ "{:,}".format(violations_count) }} code violations{% endif %}
+      {%- if last_collection %} · Updated {{ last_collection[:10] }}{% endif %}
+    </p>
+    <div class="pg-cta-row">
+      <a href="/pricing" class="pg-btn pg-btn-primary">Start Free Trial</a>
+      <a href="/api/permits/{{ city_slug }}/export.csv" class="pg-btn pg-btn-secondary">Download CSV</a>
+    </div>
+  </div>
+</header>
+
+{# V478 stats bar — dark, 4-stat layout. Skips when city has no data
+   (early-exit Coming Soon pages don't reach this template). #}
+{% if (permit_count or 0) > 0 or (violations_count or 0) > 0 %}
+<section class="pg-stats-bar">
+  <div class="pg-stats-grid">
+    <div>
+      <div class="pg-stat-value">{{ "{:,}".format(permit_count or 0) }}</div>
+      <div class="pg-stat-label">Active Permits</div>
+    </div>
+    <div>
+      <div class="pg-stat-value">{{ "{:,}".format(top_contractors | length if top_contractors else 0) }}+</div>
+      <div class="pg-stat-label">Contractors</div>
+    </div>
+    {% if violations_count and violations_count > 0 %}
+    <div>
+      <div class="pg-stat-value">{{ "{:,}".format(violations_count) }}</div>
+      <div class="pg-stat-label">Code Violations</div>
+    </div>
+    {% else %}
+    <div>
+      <div class="pg-stat-value">{{ "{:,}".format(property_owners | length if property_owners else 0) }}</div>
+      <div class="pg-stat-label">Property Owners</div>
+    </div>
+    {% endif %}
+    <div>
+      <div class="pg-stat-value">Daily</div>
+      <div class="pg-stat-label">Update Frequency</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# Legacy hero — hidden by V478 stylesheet above. Kept for variable
+   wiring (summary-cards block referenced elsewhere). #}
 <!-- HERO with Permit Activity Summary -->
 <section class="hero">
   <div class="hero-inner">
@@ -1735,6 +1799,17 @@ function v328ApplyFilter(val) {
   ]
 }
 </script>
+
+{# V478 city final CTA — dark bg before footer #}
+<section class="pg-section-dark" style="text-align: center;">
+  <div class="pg-container">
+    <h2 class="pg-h2">Get {{ city_name }} contractor leads today</h2>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">$149/month · 14-day free trial · Cancel anytime</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      <a href="/pricing" class="pg-btn pg-btn-primary">Start Free Trial</a>
+    </div>
+  </div>
+</section>
 
 {% include 'partials/footer.html' %}
 

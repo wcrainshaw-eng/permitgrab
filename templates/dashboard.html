@@ -17,6 +17,7 @@
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 {% include 'partials/analytics.html' %}
+{% include 'partials/design_v478.html' %}
 <!-- V12.23 SEO: Organization structured data -->
 <script type="application/ld+json">
 {
@@ -1386,6 +1387,255 @@ footer a:hover { color: white; }
      city pages used partials/nav.html with Home/Blog/no-Analytics — same
      auth state, two different nav rows. Now all pages share one source. -->
 {% include 'partials/nav.html' %}
+
+{# V478: REDESIGN — full-page Apple/shovels-inspired homepage. The
+   sections below replace the legacy hero / testimonials / how-it-works
+   / SEO content blocks that follow further down the file. Hide-rules
+   at the bottom of this <style> override visibility on the legacy
+   blocks so we don't have to delete them (preserves the V224 logged-in
+   personalization fallback). #}
+<style>
+  /* V478 hero */
+  .v478-hero { background: var(--pg-white); padding: 100px 0 80px; text-align: center; }
+  .v478-hero h1 { font-size: 56px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; color: var(--pg-text); margin: 0 auto 20px; max-width: 880px; }
+  .v478-hero .subtitle { font-size: 20px; line-height: 1.55; color: var(--pg-text-gray); max-width: 640px; margin: 0 auto 32px; }
+  /* V478 product cards (3 alternating sections) */
+  .v478-product { padding: 100px 0; }
+  .v478-product .pg-container { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+  .v478-product.bg-gray { background: var(--pg-light-bg); }
+  .v478-product .text-side .pg-h2 { font-size: 40px; }
+  .v478-product .visual-side .preview {
+    background: var(--pg-white);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: var(--pg-shadow);
+    font-size: 14px;
+    color: var(--pg-text-gray);
+  }
+  .v478-product.bg-gray .visual-side .preview { background: var(--pg-white); }
+  .v478-product table { width: 100%; border-collapse: collapse; }
+  .v478-product table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #999; padding: 6px 8px; border-bottom: 1px solid var(--pg-border); }
+  .v478-product table td { padding: 10px 8px; border-bottom: 1px solid var(--pg-border); }
+  .v478-product table tr:last-child td { border-bottom: none; }
+  /* V478 step grid */
+  .v478-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; max-width: 1100px; margin: 0 auto; }
+  .v478-step h3 { font-size: 20px; font-weight: 700; margin: 0 0 8px; color: var(--pg-text); }
+  .v478-step p { font-size: 16px; line-height: 1.6; color: var(--pg-text-gray); margin: 0; max-width: 320px; }
+  /* Hide legacy sections per V478 "WHAT TO REMOVE" list */
+  .hero, section.hero,
+  .testimonials-bar,
+  .how-it-works-section,
+  .seo-content-section,
+  .state-directory,
+  .pricing-section { display: none !important; }
+  @media (max-width: 768px) {
+    .v478-hero h1 { font-size: 36px; }
+    .v478-hero .subtitle { font-size: 16px; }
+    .v478-product { padding: 56px 0; }
+    .v478-product .pg-container { grid-template-columns: 1fr; gap: 32px; }
+    .v478-steps { grid-template-columns: 1fr; gap: 32px; }
+  }
+</style>
+
+{% if user %}
+{# V224 keep: logged-in welcome banner. Above the new hero so returning
+   users see a personalized strip without losing the fresh design. #}
+<div style="background: var(--pg-light-bg); padding: 14px 24px; text-align: center; font-size: 14px; color: var(--pg-text-gray); border-bottom: 1px solid var(--pg-border);">
+  Welcome back, {{ user.name or user.email.split('@')[0] }}.
+  <a href="/cities" style="color: var(--pg-primary); font-weight: 600; margin-left: 8px;">Browse Cities →</a>
+  <a href="/my-leads" style="color: var(--pg-primary); font-weight: 600; margin-left: 16px;">My Leads</a>
+</div>
+{% endif %}
+
+<!-- V478 Section 1: Hero -->
+<header class="v478-hero">
+  <div class="pg-container">
+    <span class="pg-eyebrow">Building Permit Intelligence</span>
+    <h1>Know who's building — before anyone else</h1>
+    <p class="subtitle">Track new permits, find active contractors with phone numbers, and identify property owners across {{ city_count | default(100) }} cities in {{ state_count | default(30) }} states.</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      {% if user %}
+      <a href="/cities" class="pg-btn pg-btn-primary">Browse Cities</a>
+      <a href="/my-leads" class="pg-btn pg-btn-secondary">My Leads</a>
+      {% else %}
+      <a href="/pricing" class="pg-btn pg-btn-primary">Start Free Trial</a>
+      <a href="/cities" class="pg-btn pg-btn-secondary">Browse Cities</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<!-- V478 Section 2: Stats bar -->
+<section class="pg-stats-bar">
+  <div class="pg-stats-grid">
+    <div>
+      <div class="pg-stat-value">{% if (initial_stats.total_permits or 0) >= 1000000 %}{{ "%.2fM" | format((initial_stats.total_permits or 0) / 1000000) }}{% else %}{{ "{:,}".format(initial_stats.total_permits or 0) }}{% endif %}</div>
+      <div class="pg-stat-label">Active Permits</div>
+    </div>
+    <div>
+      <div class="pg-stat-value">{{ "{:,}".format(city_count or 100) }}</div>
+      <div class="pg-stat-label">Cities Tracked</div>
+    </div>
+    <div>
+      <div class="pg-stat-value">{{ state_count or 30 }}</div>
+      <div class="pg-stat-label">States Covered</div>
+    </div>
+    <div>
+      <div class="pg-stat-value">{% if (initial_stats.total_value or 0) >= 1000000000 %}${{ "%.1fB" | format((initial_stats.total_value or 0) / 1000000000) }}{% else %}${{ "%.0fM" | format((initial_stats.total_value or 0) / 1000000) }}{% endif %}</div>
+      <div class="pg-stat-label">Total Project Value</div>
+    </div>
+  </div>
+</section>
+
+<!-- V478 Section 3a: Permits product card -->
+<section class="v478-product">
+  <div class="pg-container">
+    <div class="text-side">
+      <span class="pg-eyebrow">Permits</span>
+      <h2 class="pg-h2">Every permit, the day it's filed</h2>
+      <p class="pg-subtitle">Fresh building permit data from official city and county portals. Filtered by trade, value, zip code, and date — updated daily.</p>
+      <div class="pg-cta-row">
+        <a href="/cities" class="pg-btn pg-btn-primary">Browse Permits</a>
+        <a href="/pricing" class="pg-btn pg-btn-secondary">See Pricing</a>
+      </div>
+    </div>
+    <div class="visual-side">
+      <div class="preview">
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Address</th><th>Contractor</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>2026-04-29</td><td>Roofing</td><td>1423 Oak St</td><td style="color: var(--pg-primary); font-weight: 600;">ABC Roofing LLC</td><td>$18,500</td></tr>
+            <tr><td>2026-04-29</td><td>HVAC</td><td>3201 Pine Ave</td><td style="color: var(--pg-primary); font-weight: 600;">Comfort Pro Inc</td><td>$12,400</td></tr>
+            <tr><td>2026-04-28</td><td>Solar</td><td>889 Cedar Ln</td><td style="color: var(--pg-primary); font-weight: 600;">SunPath Solar</td><td>$32,800</td></tr>
+            <tr><td>2026-04-28</td><td>Plumbing</td><td>515 Maple Dr</td><td style="color: var(--pg-primary); font-weight: 600;">FirstClass Plumbing</td><td>$8,200</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- V478 Section 3b: Contractors card (gray) -->
+<section class="v478-product bg-gray">
+  <div class="pg-container">
+    <div class="visual-side">
+      <div class="preview" style="padding: 28px;">
+        <div style="font-size: 18px; font-weight: 700; color: var(--pg-text); margin-bottom: 4px;">ABC Roofing LLC</div>
+        <div style="font-size: 13px; color: var(--pg-text-gray); margin-bottom: 16px;">Phoenix, AZ · Roofing</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+          <div><div style="color: #999; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px;">Phone</div><div style="color: var(--pg-primary); font-weight: 600; margin-top: 2px;">(555) 123-4567</div></div>
+          <div><div style="color: #999; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px;">Permits 12mo</div><div style="font-weight: 600; margin-top: 2px;">47</div></div>
+        </div>
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--pg-border); font-size: 13px;">
+          <div style="color: #999; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px;">Service Area</div>
+          <div style="margin-top: 4px;">Phoenix · Scottsdale · Mesa · Tempe</div>
+        </div>
+      </div>
+    </div>
+    <div class="text-side">
+      <span class="pg-eyebrow">Contractors</span>
+      <h2 class="pg-h2">Active contractors with phone numbers</h2>
+      <p class="pg-subtitle">We build profiles from permit history — project count, trade mix, service area — then enrich with phone and website from public sources.</p>
+      <div class="pg-cta-row">
+        <a href="/contractors" class="pg-btn pg-btn-primary">View Contractors</a>
+        <a href="/pricing" class="pg-btn pg-btn-secondary">Start Free Trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- V478 Section 3c: Violations + owners card (white) -->
+<section class="v478-product">
+  <div class="pg-container">
+    <div class="text-side">
+      <span class="pg-eyebrow">Violations &amp; Owners</span>
+      <h2 class="pg-h2">Code violations meet property owner data</h2>
+      <p class="pg-subtitle">Properties with active violations are motivated sellers. We pair code enforcement records with county assessor data to surface leads for investors, solar installers, and insurance agents.</p>
+      <div class="pg-cta-row">
+        <a href="/leads/real-estate-investors" class="pg-btn pg-btn-primary">Find Motivated Sellers</a>
+        <a href="/cities" class="pg-btn pg-btn-secondary">See All Data</a>
+      </div>
+    </div>
+    <div class="visual-side">
+      <div class="preview" style="padding: 28px;">
+        <div style="display: inline-block; padding: 4px 10px; border-radius: 12px; background: rgba(245,158,11,0.15); color: #92400e; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Open Violation</div>
+        <div style="font-size: 17px; font-weight: 700; color: var(--pg-text); margin-top: 12px;">1847 Elm Street</div>
+        <div style="font-size: 13px; color: var(--pg-text-gray); margin-top: 4px;">Exterior maintenance · Filed 2026-04-22</div>
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--pg-border); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+          <div><div style="color: #999; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px;">Owner</div><div style="font-weight: 600; margin-top: 2px;">Smith Family Trust</div></div>
+          <div><div style="color: #999; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px;">Assessed</div><div style="font-weight: 600; margin-top: 2px;">$285,000</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- V478 Section 4: State grid -->
+<section class="pg-section">
+  <div class="pg-container" style="text-align: center;">
+    <span class="pg-eyebrow">Coverage</span>
+    <h2 class="pg-h2">Active in {{ state_count or 30 }} states</h2>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">Click any state to browse cities with live permit data.</p>
+    <div class="pg-state-grid" style="margin-top: 32px;">
+      {% for s in v478_states or [] %}
+      <a class="pg-state-pill" href="/cities#state-{{ s.state | lower }}">
+        <span class="abbr">{{ s.state }}</span>
+        <span class="count">{{ s.count }} {% if s.count == 1 %}city{% else %}cities{% endif %}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <div style="margin-top: 32px;">
+      <a href="/cities" style="color: var(--pg-primary); font-weight: 600; text-decoration: none;">Browse all {{ '{:,}'.format(city_count or 100) }} cities →</a>
+    </div>
+  </div>
+</section>
+
+<!-- V478 Section 5: How it works -->
+<section class="pg-section-light">
+  <div class="pg-container" style="text-align: center;">
+    <span class="pg-eyebrow">How It Works</span>
+    <h2 class="pg-h2">Three steps to fresh leads</h2>
+    <div class="v478-steps" style="margin-top: 48px; text-align: left;">
+      <div class="v478-step">
+        <span class="pg-step-num">1</span>
+        <h3>We collect permits daily</h3>
+        <p>Direct feeds from {{ city_count or 100 }}+ official city portals — Socrata, ArcGIS, and CKAN APIs.</p>
+      </div>
+      <div class="v478-step">
+        <span class="pg-step-num">2</span>
+        <h3>We build contractor profiles</h3>
+        <p>Every permit links to the contractor who pulled it. We deduplicate, categorize by trade, and enrich with phone numbers.</p>
+      </div>
+      <div class="v478-step">
+        <span class="pg-step-num">3</span>
+        <h3>You get leads first</h3>
+        <p>Search by city, trade, date, or zip. Export to CSV or get real-time alerts. Your competitors are still waiting for the phone book.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- V478 Section 6: Trust strip -->
+<div class="pg-trust-strip">
+  <span>Official Data Sources</span>
+  <span>Updated Daily</span>
+  <span>{{ city_count or 100 }}+ City Portals</span>
+  <span>14-Day Free Trial</span>
+</div>
+
+<!-- V478 Section 7: Final CTA -->
+<section class="pg-section-dark" style="text-align: center;">
+  <div class="pg-container">
+    <h2 class="pg-h2">Start finding leads in your market</h2>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">$149/month · 14-day free trial · Cancel anytime</p>
+    <div class="pg-cta-row" style="justify-content: center;">
+      <a href="/pricing" class="pg-btn pg-btn-primary">Start Free Trial</a>
+    </div>
+  </div>
+</section>
+
+{# Legacy hero kept below for fallback only — hidden via .hero { display: none }
+   in the V478 stylesheet above. Footer rendering remains intact. #}
 <!-- HERO -->
 <section class="hero">
   <div class="hero-content">

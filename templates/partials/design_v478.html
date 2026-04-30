@@ -1,0 +1,177 @@
+{# V478: shared design system. Include in every page's <head> via
+   {% include 'partials/design_v478.html' %} BEFORE the page-specific <style>
+   block. Defines global CSS custom properties + shared utility classes
+   (eyebrow, headline, btn-primary, btn-secondary, stats-bar, dark-cta,
+   etc.) so every template can use them without duplicating CSS. #}
+<style>
+:root {
+  --pg-primary: #3366cc;
+  --pg-primary-dark: #2855a8;
+  --pg-dark-bg: #1a1a2e;
+  --pg-light-bg: #f5f5f7;
+  --pg-white: #ffffff;
+  --pg-text: #111111;
+  --pg-text-gray: #555555;
+  --pg-border: #e5e7eb;
+  --pg-success: #22c55e;
+  --pg-warning: #f59e0b;
+  --pg-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --pg-shadow-lg: 0 4px 24px rgba(0,0,0,0.12);
+}
+.pg-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.pg-section { padding: 80px 0; }
+.pg-section-light { background: var(--pg-light-bg); padding: 80px 0; }
+.pg-section-dark { background: var(--pg-dark-bg); color: var(--pg-white); padding: 80px 0; }
+.pg-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--pg-primary);
+  margin-bottom: 16px;
+}
+.pg-section-dark .pg-eyebrow { color: rgba(255,255,255,0.7); }
+.pg-h1 {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--pg-text);
+  line-height: 1.1;
+  margin: 0 0 20px;
+}
+.pg-h2 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--pg-text);
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+.pg-section-dark .pg-h1, .pg-section-dark .pg-h2 { color: var(--pg-white); }
+.pg-subtitle {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--pg-text-gray);
+  max-width: 600px;
+  margin: 0 0 32px;
+}
+.pg-section-dark .pg-subtitle { color: rgba(255,255,255,0.75); }
+.pg-cta-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.pg-btn {
+  display: inline-block;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  transition: transform .15s, background .15s, box-shadow .15s;
+  cursor: pointer;
+  border: 2px solid transparent;
+  line-height: 1.2;
+}
+.pg-btn-primary { background: var(--pg-primary); color: var(--pg-white); }
+.pg-btn-primary:hover {
+  background: var(--pg-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(51,102,204,0.3);
+}
+.pg-btn-secondary {
+  background: transparent;
+  border-color: var(--pg-primary);
+  color: var(--pg-primary);
+}
+.pg-btn-secondary:hover { background: rgba(51,102,204,0.08); }
+.pg-section-dark .pg-btn-primary { background: var(--pg-white); color: var(--pg-primary); }
+.pg-section-dark .pg-btn-primary:hover { background: rgba(255,255,255,0.92); }
+.pg-section-dark .pg-btn-secondary { color: var(--pg-white); border-color: rgba(255,255,255,0.5); }
+.pg-section-dark .pg-btn-secondary:hover { background: rgba(255,255,255,0.1); }
+.pg-card {
+  background: var(--pg-white);
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: var(--pg-shadow);
+}
+.pg-card-lg { padding: 48px; box-shadow: var(--pg-shadow-lg); border-radius: 16px; }
+/* Stats bar pattern (used on homepage, city pages) */
+.pg-stats-bar {
+  background: var(--pg-dark-bg);
+  color: var(--pg-white);
+  padding: 60px 0;
+}
+.pg-stats-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  text-align: center;
+}
+.pg-stat-value {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.pg-stat-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  color: rgba(255,255,255,0.7);
+}
+/* Eyebrow numbered circle for "How It Works" steps */
+.pg-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--pg-primary);
+  color: var(--pg-white);
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+/* State pill grid */
+.pg-state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.pg-state-pill {
+  background: var(--pg-primary);
+  color: var(--pg-white);
+  padding: 14px 12px;
+  border-radius: 10px;
+  text-align: center;
+  text-decoration: none;
+  transition: transform .15s, box-shadow .15s;
+  display: block;
+}
+.pg-state-pill:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(51,102,204,0.3); }
+.pg-state-pill .abbr { display: block; font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+.pg-state-pill .count { display: block; font-size: 12px; opacity: 0.85; margin-top: 2px; }
+/* Trust strip */
+.pg-trust-strip {
+  background: var(--pg-light-bg);
+  padding: 32px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--pg-text-gray);
+}
+.pg-trust-strip span { margin: 0 14px; }
+.pg-trust-strip span + span:before { content: '·'; margin-right: 14px; opacity: 0.5; }
+@media (max-width: 768px) {
+  .pg-section, .pg-section-light, .pg-section-dark { padding: 56px 0; }
+  .pg-h1 { font-size: 34px; }
+  .pg-h2 { font-size: 28px; }
+  .pg-subtitle { font-size: 16px; }
+  .pg-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  .pg-stat-value { font-size: 32px; }
+  .pg-cta-row .pg-btn { width: 100%; text-align: center; }
+}
+</style>
