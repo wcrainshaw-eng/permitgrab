@@ -626,6 +626,10 @@ ASSESSOR_SOURCES = {
         # Concat'd via _resolve()'s list-handling path so the assembled
         # situs ("3920 RIVER RD") matches what permits.address looks like.
         # 419,561 parcels with owner; 353,902 of those have full situs.
+        # default_page_size=200: server advertises maxRecordCount=1000
+        # but empirically returns HTTP 400 "Unable to complete operation"
+        # when the where_clause + orderByFields + resultRecordCount=1000
+        # combination is sent. 200 is well under the threshold.
         'platform': 'arcgis_mapserver',
         'service_description': 'Hamilton County (Cincinnati) Parcels',
         'endpoint': 'https://cagisonline.hamilton-co.org/arcgis/rest/services/HCE/Cadastral/MapServer/0',
@@ -637,6 +641,7 @@ ASSESSOR_SOURCES = {
         },
         'state': 'OH',
         'source_tag': 'assessor:hamilton_cincinnati',
+        'default_page_size': 200,
     },
 }
 
