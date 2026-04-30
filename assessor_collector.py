@@ -633,7 +633,13 @@ ASSESSOR_SOURCES = {
         'platform': 'arcgis_mapserver',
         'service_description': 'Hamilton County (Cincinnati) Parcels',
         'endpoint': 'https://cagisonline.hamilton-co.org/arcgis/rest/services/HCE/Cadastral/MapServer/0',
-        'where_clause': "OWNNM1 IS NOT NULL AND OWNNM1 <> '' AND ADDRST IS NOT NULL",
+        # NOTE: NO `<> ''` empty-string filter — Hamilton's MapServer
+        # silently returns 0 features when that clause is present
+        # (the underlying SQL provider treats varchar NULL/'' inconsistently
+        # with the engine, and the empty-string compare collapses the result
+        # set to nothing). Empty-string owners get filtered downstream by
+        # _insert_batch's `if not owner` guard.
+        'where_clause': "OWNNM1 IS NOT NULL AND ADDRST IS NOT NULL",
         'field_map': {
             'owner_name': 'OWNNM1',
             'address': ['ADDRNO', 'ADDRST', 'ADDRSF'],
