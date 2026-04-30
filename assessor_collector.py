@@ -664,6 +664,66 @@ ASSESSOR_SOURCES = {
         # with no city column — tag every parcel with Cincinnati.
         'default_city': 'Cincinnati',
     },
+    'fl_statewide': {
+        # V474: Florida statewide cadastral (DOR-published). One source
+        # covers Orlando, Jacksonville, St. Petersburg, Hialeah, Cape
+        # Coral, Fort Lauderdale + dozens more FL cities in a single
+        # feed. OWN_NAME is the primary owner; OWN_CITY tags each parcel
+        # with its situs city so no default_city needed. PHY_ADDR1 is
+        # the physical (situs) address. Probed 2026-04-29 — 2000-record
+        # maxRecordCount, fields confirmed.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Florida Statewide Cadastral (DOR)',
+        'endpoint': 'https://services9.arcgis.com/Gh9awoU677aKree0/arcgis/rest/services/Florida_Statewide_Cadastral/FeatureServer/0',
+        'where_clause': "OWN_NAME IS NOT NULL AND PHY_ADDR1 IS NOT NULL",
+        'field_map': {
+            'owner_name': 'OWN_NAME',
+            'address': 'PHY_ADDR1',
+            'owner_mailing_address': 'OWN_ADDR1',
+            'city': 'OWN_CITY',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:fl_statewide',
+    },
+    'washoe_reno': {
+        # V474: Washoe County NV (Reno + Sparks). LASTNAME holds the
+        # primary owner entity (LLC, trust, family); FIRSTNAME holds
+        # individual first names which can be empty. _resolve() concats
+        # list fields with empty-filtering so missing FIRSTNAME drops
+        # cleanly. FullAddress is the situs. No city column exposed —
+        # tag everything Reno (Washoe is ~85% Reno population).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Washoe County (Reno) Open Data',
+        'endpoint': 'https://wcgisweb.washoecounty.us/arcgis/rest/services/OpenData/OpenData/FeatureServer/0',
+        'where_clause': "LASTNAME IS NOT NULL AND FullAddress IS NOT NULL",
+        'field_map': {
+            'owner_name': ['FIRSTNAME', 'LASTNAME'],
+            'address': 'FullAddress',
+        },
+        'state': 'NV',
+        'source_tag': 'assessor:washoe_reno',
+        'default_city': 'Reno',
+    },
+    'pima_tucson': {
+        # V474: Pima County AZ (Tucson). NOTE: the `own` field is just
+        # an ownership category ("Private", "Public") — NOT the owner
+        # name. Real owner is in ADDRESSEE (mailing-address recipient).
+        # SITE_ADDRESS is the situs. ADDRESS is the mailing address
+        # (may differ for absentee owners — useful as
+        # owner_mailing_address). No city column — tag Tucson.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Pima County (Tucson) Property Housing',
+        'endpoint': 'https://mapdata.tucsonaz.gov/public/rest/services/PublicMaps/PropertyHousing/MapServer/40',
+        'where_clause': "ADDRESSEE IS NOT NULL AND SITE_ADDRESS IS NOT NULL",
+        'field_map': {
+            'owner_name': 'ADDRESSEE',
+            'address': 'SITE_ADDRESS',
+            'owner_mailing_address': 'ADDRESS',
+        },
+        'state': 'AZ',
+        'source_tag': 'assessor:pima_tucson',
+        'default_city': 'Tucson',
+    },
 }
 
 
