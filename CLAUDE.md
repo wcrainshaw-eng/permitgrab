@@ -174,6 +174,34 @@ The daemon checks in order: prod_cities → city_sources → CITY_REGISTRY dict 
 - Pauses during imports via IMPORT_IN_PROGRESS flag
 - Collects all active cities every ~30min
 
+### Tampa Accela P1 — RESOLVED in V476
+The long-standing P1 ("Accela scraper has no contractor column") is
+fixed via a new hybrid platform `accela_arcgis_hybrid`:
+1. Pull permit list from `arcgis.tampagov.net Planning/PermitsAll`
+   (each row carries a `URL` linking to the Accela CapDetail page).
+2. Per permit, fetch the Accela detail HTML and parse
+   "Licensed Professional:" via regex.
+3. 100% yield on 15 sample probes (DOMAIN HOMES INC, HOOTER
+   CONSTRUCTION, JP CONSTRUCTION INC, etc.).
+The same pattern can wire Memphis or any other city with this
+ArcGIS-index + Accela-detail combo. See
+`accela_portal_collector.parse_accela_licensed_professional` and
+`fetch_accela_arcgis_hybrid`.
+
+### Saint Petersburg — DEAD via current REST sources (V476 audit)
+- Old config endpoint `egis.stpete.org/.../ServicesDSD/AllPermitApplicaitons/MapServer/0` is **404**.
+- Replacement `ServicesDSD/PermitsExternal/MapServer/0` is **frozen 2019-2021** AND its CONTRACTOR field is blank on every record (only OWNER populated).
+- `ServicesDOTS/PermitsResidential/MapServer/{0..3}` has only OWNER + a CLICKGOVLINK to `actiononline.stpete.org/Click2GovBP/` — same Click2Gov detail-page scrape pattern as Tampa, but a DIFFERENT (Tyler/CivicAccess) HTML structure. Would need its own parser.
+- The 2,537 existing `saint-petersburg` profiles are mostly **homeowner names** ("ZWINGE, KIRK T *", "ZIMMERMAN, JOSEPH V *") — they came from CONTRACTOR field that was actually populated with owner names. FL DBPR can't match these because DBPR licensees are businesses.
+Verdict: Saint Pete needs a Click2Gov detail-page scraper to recover real contractors. Documented as research dead-end without that engineering work.
+
+### Jacksonville FL — DEAD via current REST sources (V476 audit)
+- Existing config points to `services2.arcgis.com/CyVvlIiUfRBmMQuu/.../Building_Permits_Applications_view/FeatureServer/0` — but **the data is for Virginia Beach VA** (sample shows City=Virginia Beach, State=VA). Wrong-source bug.
+- Hosts `data.coj.net`, `maps.coj.net`, `gis.coj.net`, `aca.coj.net`, `data.jacksonville.gov` all fail DNS or 404 from Render egress.
+- ArcGIS Hub returns 0 hits for Jacksonville/Duval permits.
+- `www.coj.net` HTML has no embedded ArcGIS URLs.
+Verdict: no public REST permit feed found 2026-04-30. The 27 stored Jacksonville permits are stragglers from the wrong-source config. Documented dead-end until a real source emerges.
+
 ### Email digest scheduler (V475 — don't repeat the V473b miss)
 The web process spawns THREE daemon threads via `start_collectors()`:
 `scheduled_collection`, `enrichment_daemon`, **`email_scheduler`**.
