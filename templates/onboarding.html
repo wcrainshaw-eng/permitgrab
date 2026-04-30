@@ -327,6 +327,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button class="btn btn-primary" onclick="goToStep2()" id="next-btn">
         See My Leads
       </button>
+      {# V476 Bug 4: visible "Skip for now" link so returning users
+         aren't trapped in the onboarding loop. Hits /onboarding/skip
+         which sets onboarding_completed=True permanently. #}
+      <div style="margin-top: 16px; text-align: center;">
+        <a href="/onboarding/skip" style="color: #6b7280; font-size: 14px; text-decoration: underline;">Skip for now &mdash; I'll do this later</a>
+      </div>
     </div>
 
     <!-- Step 2: Sample Leads -->

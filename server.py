@@ -8110,6 +8110,25 @@ def scheduled_collection():
         except Exception:
             pass  # license_enrichment import failure is non-fatal
 
+        # V476 Bug 3: pre-cycle memory guardrail. If system memory is
+        # already > 75% (e.g. an admin-triggered import is consuming
+        # RAM, or a previous cycle's data is still GC-pending), skip
+        # this cycle and try again in 5 min. This prevents the daemon
+        # from compounding memory pressure to OOM (UAT round 1 had
+        # site totally down at 83.8%). The mid-cycle V457 check
+        # remains as a backstop that triggers SIGTERM at 1700MB RSS.
+        try:
+            import psutil as _v476_ps, gc as _v476_gc
+            _v476_gc.collect()
+            _v476_pct = _v476_ps.virtual_memory().percent
+            if _v476_pct > 75:
+                print(f"[{datetime.now()}] V476: skipping collection cycle — "
+                      f"memory at {_v476_pct:.1f}% (> 75% guardrail)", flush=True)
+                time.sleep(300)
+                continue
+        except Exception:
+            pass
+
         # V229 C1: capture cycle start for dynamic sleep calculation below
         _v229_cycle_start = time.time()
         print(f"[{datetime.now()}] V12.50: Starting scheduled collection cycle...")

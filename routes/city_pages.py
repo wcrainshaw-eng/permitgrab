@@ -31,7 +31,13 @@ def index():
     """Serve the dashboard."""
     # V8: Redirect new users to onboarding
     # V9 Fix: Only redirect truly new users - existing users with preferences or Pro plan skip onboarding
-    if 'user_email' in session:
+    # V476 Bug 4: also skip the redirect if the visitor was already
+    # bounced to /onboarding once this session — without that, a user
+    # who clicks "Logo" / hits Back / re-types `/` after seeing
+    # onboarding loops right back to /onboarding instead of seeing
+    # the homepage they wanted. The redirect now fires AT MOST ONCE
+    # per session for users who are still legitimately incomplete.
+    if 'user_email' in session and not session.get('_onboarding_seen'):
         user = find_user_by_email(session['user_email'])
         if user and not user.onboarding_completed:
             # Existing users who already have preferences or are Pro don't need onboarding
@@ -42,6 +48,7 @@ def index():
                 user.onboarding_completed = True
                 db.session.commit()
             else:
+                session['_onboarding_seen'] = True
                 return redirect('/onboarding')
     footer_cities = get_cities_with_data()
 
@@ -956,6 +963,13 @@ def saved_searches_page():
 @city_pages_bp.route('/permits/<state_slug>')
 def state_or_city_landing(state_slug):
     """Route that handles both state hub pages and city landing pages."""
+    # V476 Bug 1: /permits/cities was falling through the wildcard slug
+    # handler and rendering the empty-city "Coming Soon" template — the
+    # "Browse All Cities" button in nav/footer was effectively a dead
+    # link. The real directory lives at /cities; 301 redirect there so
+    # link equity flows and visitors land on the working page.
+    if state_slug == 'cities':
+        return redirect('/cities', code=301)
     # V309 (CODE_V280b Bug 23): slug alias → 301 redirect BEFORE state lookup
     # so that /permits/miami-dade → /permits/miami-dade-county, etc. SEO-safe
     # 301 so the old URL's link equity flows to the canonical one.
@@ -1113,6 +1127,32 @@ def state_city_landing(state_slug, city_slug):
     permit_count = stats_row['permit_count'] if stats_row else 0
     earliest_date = stats_row['earliest_date'] if stats_row else None
     latest_date = stats_row['latest_date'] if stats_row else None
+
+    # V476 Bug 2: align freshness with city_landing_inner (the slug
+    # route). prod_cities.newest_permit_date can be NULL or stale —
+    # /permits/arizona/phoenix was showing "2025-2026" red and "Data
+    # not yet available" while /permits/phoenix-az showed "Updated
+    # recently 2026-04-25" green. Same data, different freshness.
+    # Override with latest_date (= MAX(filing_date) from permits) when
+    # it's newer than newest_permit_date, and refresh data_freshness
+    # to match.
+    if permit_count > 0 and latest_date:
+        if not newest_permit_date or str(latest_date)[:10] > str(newest_permit_date)[:10]:
+            newest_permit_date = latest_date
+        # Recompute data_freshness from the corrected newest_permit_date.
+        try:
+            _age_days = (
+                datetime.now().date()
+                - datetime.strptime(str(newest_permit_date)[:10], '%Y-%m-%d').date()
+            ).days
+            if _age_days <= 7:
+                data_freshness = 'fresh'
+            elif _age_days <= 30:
+                data_freshness = 'aging'
+            else:
+                data_freshness = 'stale'
+        except Exception:
+            pass
 
     # V160: Get permit types breakdown using prod_city_id
     if prod_city_id:

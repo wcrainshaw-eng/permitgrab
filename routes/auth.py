@@ -106,6 +106,24 @@ def onboarding_page():
     return render_template('onboarding.html', cities=cities, trades=trades)
 
 
+@auth_bp.route('/onboarding/skip', methods=['GET', 'POST'])
+def onboarding_skip():
+    """V476 Bug 4: permanent skip — mark the user's onboarding as
+    complete so the homepage stops bouncing them here. Different from
+    the per-session `_onboarding_seen` flag in index() because that
+    only suppresses for the current session; this writes to the DB so
+    new logins also skip onboarding. Returns to /."""
+    user = get_current_user()
+    if user:
+        try:
+            user.onboarding_completed = True
+            db.session.commit()
+        except Exception as _e:
+            print(f"[V476] onboarding_skip commit failed: {_e}", flush=True)
+    session['_onboarding_seen'] = True
+    return redirect('/')
+
+
 @auth_bp.route('/register')
 def register_redirect():
     """Redirect /register to /signup."""
