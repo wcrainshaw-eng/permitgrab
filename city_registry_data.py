@@ -12,6 +12,39 @@ CITY_REGISTRY = {
     # SOCRATA PLATFORM CITIES (SODA API)
     # =========================================================================
 
+    # V473 (CODE_V473 Section B P2): San Diego County contractor sub-table.
+    # The parent permits dataset (dyzh-7eat) has no contractor field; this
+    # sibling dataset 76h4-nnmj is keyed by permitnum and carries
+    # ContractorCompanyName / ContractorPhone / ContractorLicNum / etc.
+    # Each row is one contractor on one permit, so the row count >>> permit
+    # count, but refresh_contractor_profiles dedupes by normalized name.
+    # Slug: san-diego-county (new prod_cities entry).
+    "san_diego_county_contractors": {
+        "name": "San Diego County",
+        "state": "CA",
+        "slug": "san-diego-county",
+        "lat": 32.7,
+        "lon": -117.1,
+        "platform": "socrata",
+        "endpoint": "https://data.sandiegocounty.gov/resource/76h4-nnmj.json",
+        "dataset_id": "76h4-nnmj",
+        "description": "San Diego County Building Permits — Contractors sub-table",
+        "field_map": {
+            "permit_number": "permitnum",
+            "contractor_name": "contractorcompanyname",
+            "contact_phone": "contractorphone",
+            "contact_name": "contractorfullname",
+            "license_number": "contractorlicnum",
+            "trade_category": "contractortrade",
+            "date": "lastupdated",
+            "filing_date": "lastupdated",
+        },
+        "date_field": "lastupdated",
+        "limit": 2000,
+        "active": True,
+        "notes": "V473 PR2 P2: contractor sub-table joined to parent dyzh-7eat by permitnum",
+    },
+
         "new_york": {
         "name": "New York City",
         "state": "NY",
