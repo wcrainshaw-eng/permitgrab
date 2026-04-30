@@ -174,6 +174,25 @@ The daemon checks in order: prod_cities → city_sources → CITY_REGISTRY dict 
 - Pauses during imports via IMPORT_IN_PROGRESS flag
 - Collects all active cities every ~30min
 
+### Email digest scheduler (V475 — don't repeat the V473b miss)
+The web process spawns THREE daemon threads via `start_collectors()`:
+`scheduled_collection`, `enrichment_daemon`, **`email_scheduler`**.
+V471 PR4 deleted all three; V473b corrective restored only the first
+two — `email_scheduler` was missed and daily digests stopped firing on
+2026-04-30. V475 added it back. If you ever neuter `start_collectors()`
+again, restore all three or daily digests die silently.
+
+The `/api/admin/start-collectors?force=1` endpoint resets the
+`_collector_started` flag even when scheduled_collection is alive
+(also V475) — this is what lets you spawn newly-added daemon threads
+without a Render restart. Without `force=1`, the endpoint short-circuits
+on "already_running" and `start_collectors()` body never runs.
+
+Verify post-deploy: `GET /api/admin/digest/status` should show
+`thread_alive: true` + a recent `last_heartbeat`. If thread_alive=false,
+hit `POST /api/admin/start-collectors?force=1` and check
+`/api/admin/debug/threads` for an `email_scheduler` entry.
+
 ### ARCHITECTURE GROUND TRUTH (don't repeat the V471 PR4 mistake)
 **There is exactly ONE Render service:** `permitgrab` (Docker, Oregon).
 The Flask web server **and** the collection daemon thread run **in the
