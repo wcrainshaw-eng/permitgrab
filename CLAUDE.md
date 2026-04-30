@@ -11,7 +11,17 @@ A city is "ad-ready" when it has ALL THREE:
 2. **Phones** (>50 profiles with phone numbers)
 3. **Violations** (>0 code enforcement violation records)
 
-**Current state (2026-04-26, post-V437 retag + 18 assessor-source imports):**
+**Current state (2026-04-29, post-V474 assessor expansion):**
+- **17 COMPLETE cities** (have permits + violations + >500 owners):
+  Fort Worth (97K owners), Miami (82K), Phoenix (79K), Cincinnati (79K), Chicago (72K), Nashville (71K), Cleveland (60K), Austin (55K), Philadelphia (55K), **Mesa (38K — V474 win)**, Raleigh (20K), **Scottsdale (17K — V474 win)**, NYC (13K), Columbus (5K), San Antonio (5K), Buffalo (2K), **Orlando (531 — V474 win)**.
+- **V474 session adds (~851K new property_owners rows):**
+  - fl_statewide: 134K rows (Orlando + Jacksonville + St Pete + Hialeah + Tampa + Cape Coral + Fort Lauderdale via single source)
+  - washoe_reno: 178K, pima_tucson: 156K, dane_madison: 186K
+  - maricopa_secondary: 164K (filtered to JURISDICTION IN Mesa/Glendale/Tempe/Scottsdale/etc — split off the original 'maricopa' source which OBJECTID-ordered into Phoenix-only territory)
+  - collin_plano: 33K (NCTCOG Collin CAD parcel feed via services2.arcgis.com/5aVZxf6eblRfH5Yb)
+- **Need violations (DEAD per V474 sweep):** Madison (195K owners), Reno (183K), Tucson (161K), Indianapolis (96K), Portland (54K), Tampa (40K), Minneapolis (29K), Tempe (25K), Las Vegas (7.5K), Boston (3.6K), Jacksonville (1.1K), Dallas (925) — all probed, no live REST violations source.
+- **Need owners (potential next-cycle wins):** Houston (3.4K permits + 83K violations + 0 owners; HCAD is HTML-only via REST), Charlotte (540p + 8K v + 0 — Mecklenburg owner data only on polaris HTML portal), LA (34K p + 2.8K v), New Orleans, Pittsburgh, Denver, Henderson (Clark assessor wired but tag mismatch?), Anaheim, San Jose, Hialeah (Miami-Dade tagged 'Miami').
+**Older snapshot below from 2026-04-26, post-V437 retag + 18 assessor-source imports:**
 - **Ad-ready (13):** Chicago (3,498), Miami-Dade (3,980), Phoenix (1,080), San Antonio (3,830), NYC (791), LA (591), Nashville (73), Cleveland (148), Henderson (362), Buffalo (85), Orlando (57), Anaheim (242), San Jose (112) — phones in parens; all 13 have >100 profiles + >50 phones + >0 violations
 - **Property owners pipeline live (~947K rows across 18 assessor sources).** Top owner counts: Miami-Dade 81K, Phoenix 79K, Broward 77K, Clark/LV 73K, Cook/Chicago 72K, Davidson/Nashville 71K, Cuyahoga/Cleveland 60K, Erie/Buffalo 59K, Travis/Austin 55K, Philadelphia 55K, Wake/Raleigh 54K, Onondaga/Syracuse 54K, Multnomah/Portland 54K, Hillsborough/Tampa 53K, Hennepin/Minneapolis 29K, NYC PLUTO 5K, Bexar/SA 5K, Lee/Cape Coral 4K
 - **Near-miss watch:** Philadelphia 1,345 profiles / 12 phones (PA has no bulk DB → DDG-only path); Minneapolis/Hialeah/Las Vegas all gated by violations (known dead-ends per below)
