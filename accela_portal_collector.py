@@ -447,7 +447,16 @@ def fetch_accela_arcgis_hybrid(config, days_back=30):
     import urllib.parse as _up
     list_url = endpoint.rstrip("?") + ("?" if "?" not in endpoint else "&") + _up.urlencode(qs_params)
 
-    sess = _build_session()
+    # V476: do NOT use _build_session() here — that returns an Accela CSRF
+    # session keyed to the search grid which sends cookies that confuse
+    # Accela CapDetail.aspx into returning a redirect / login page instead
+    # of the full detail HTML. Plain requests session works because
+    # CapDetail.aspx is publicly accessible without an ACA session.
+    sess = requests.Session()
+    sess.headers.update({
+        "User-Agent": "Mozilla/5.0 (compatible; PermitGrab/1.0)",
+        "Accept": "text/html,application/json",
+    })
     try:
         resp = sess.get(list_url, timeout=60)
         resp.raise_for_status()
