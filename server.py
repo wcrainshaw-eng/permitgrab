@@ -7487,36 +7487,40 @@ def city_landing_inner(city_slug):
     _v474_phones = 0
     _v474_owners = 0
     _v474_violations = 0
+    # V474b: use positional access (_r[0] / _r[1]) for SQL counts so the
+    # logic works regardless of whether the connection has row_factory
+    # set. The earlier `_r['c']` lookup silently returned 0 for cities
+    # whose conn didn't carry a Row factory.
     try:
         _r = conn.execute(
-            "SELECT COUNT(*) p, "
-            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) ph "
+            "SELECT COUNT(*), "
+            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) "
             "FROM contractor_profiles WHERE source_city_key = ?",
             (city_slug,),
         ).fetchone()
         if _r:
-            _v474_profiles = _r['p'] or 0
-            _v474_phones = _r['ph'] or 0
-    except Exception:
-        pass
+            _v474_profiles = _r[0] or 0
+            _v474_phones = _r[1] or 0
+    except Exception as _e:
+        print(f"[V474] profiles count failed for {city_slug}: {_e}", flush=True)
     try:
         if _prod_city_id:
             _r = conn.execute(
-                "SELECT COUNT(*) c FROM violations WHERE prod_city_id = ?",
+                "SELECT COUNT(*) FROM violations WHERE prod_city_id = ?",
                 (_prod_city_id,),
             ).fetchone()
-            _v474_violations = _r['c'] if _r else 0
-    except Exception:
-        pass
+            _v474_violations = _r[0] if _r else 0
+    except Exception as _e:
+        print(f"[V474] violations count failed for {city_slug}: {_e}", flush=True)
     try:
         _r = conn.execute(
-            "SELECT COUNT(*) c FROM property_owners "
+            "SELECT COUNT(*) FROM property_owners "
             "WHERE LOWER(city) = LOWER(?) AND state = ?",
             (config.get('name', ''), config.get('state', '')),
         ).fetchone()
-        _v474_owners = _r['c'] if _r else 0
-    except Exception:
-        pass
+        _v474_owners = _r[0] if _r else 0
+    except Exception as _e:
+        print(f"[V474] owners count failed for {city_slug}: {_e}", flush=True)
 
     # Override meta only if this city is NOT in the hardcoded CITY_SEO_CONFIG
     # (those have hand-tuned copy). For every auto-generated city, swap to
@@ -7571,6 +7575,19 @@ def city_landing_inner(city_slug):
             config['meta_description'] = (
                 f"Track building permits and {_vp} active contractors in "
                 f"{_disp}. Updated daily from official city data. $149/mo."
+            )[:200]
+        elif _has_o:
+            # V474b: owners-only cities (Madison, Reno, Tucson, Tampa, etc.
+            # — the V474 sweep landed huge assessor backfills with no
+            # paired permit/violation data). Use the homeowner-lead angle.
+            config['meta_title'] = (
+                f"{_disp} Property Owner Records — {_vo} Homeowner "
+                f"Leads | PermitGrab"
+            )[:70]
+            config['meta_description'] = (
+                f"Reach {_vo} property owners in {_disp} with names and "
+                f"addresses. Ideal homeowner leads for solar, insurance, "
+                f"and home services. $149/mo."
             )[:200]
 
     # FAQ JSON-LD with buyer-intent questions; prune by available data

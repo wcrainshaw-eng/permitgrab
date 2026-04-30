@@ -1149,29 +1149,28 @@ def state_city_landing(state_slug, city_slug):
     _v474_profiles_count = 0
     _v474_phones_count = 0
     _v474_owners_count = 0
+    # V474b: positional access for safety across row_factory variants
     try:
         _row = conn.execute(
-            "SELECT COUNT(*) p, "
-            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) ph "
+            "SELECT COUNT(*), "
+            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) "
             "FROM contractor_profiles WHERE source_city_key = ?",
             (city_slug,)
         ).fetchone()
         if _row:
-            _v474_profiles_count = _row['p'] or 0
-            _v474_phones_count = _row['ph'] or 0
-    except Exception:
-        pass
+            _v474_profiles_count = _row[0] or 0
+            _v474_phones_count = _row[1] or 0
+    except Exception as _e:
+        print(f"[V474] profiles count failed for {city_slug}: {_e}", flush=True)
     try:
-        # Owner counts use the prod_cities (city, state) tuple; the cities
-        # page already has alias-handling for Miami-Dade / county sources.
         _row = conn.execute(
-            "SELECT COUNT(*) c FROM property_owners "
+            "SELECT COUNT(*) FROM property_owners "
             "WHERE LOWER(city) = LOWER(?) AND state = ?",
             (city_name, city_state)
         ).fetchone()
-        _v474_owners_count = _row['c'] if _row else 0
-    except Exception:
-        pass
+        _v474_owners_count = _row[0] if _row else 0
+    except Exception as _e:
+        print(f"[V474] owners count failed for {city_slug}: {_e}", flush=True)
 
     # V156: SEO-optimized meta for top cities, generic fallback for others
     _pc = f"{int(permit_count or 0):,}"
@@ -1289,6 +1288,17 @@ def state_city_landing(state_slug, city_slug):
                 f"Track {_pc} building permits and {_vp} active "
                 f"contractors in {display_name}. Updated daily from "
                 f"official city data. $149/mo."
+            )[:200]
+        elif _has_owners:
+            # V474b: owners-only cities — homeowner-lead angle.
+            meta_title = (
+                f"{display_name} Property Owner Records — {_vo} "
+                f"Homeowner Leads | PermitGrab"
+            )[:70]
+            meta_description = (
+                f"Reach {_vo} property owners in {display_name} with "
+                f"names and addresses. Ideal homeowner leads for solar, "
+                f"insurance, and home services. $149/mo."
             )[:200]
         # else: leave the V156 fallback strings as-is
 
