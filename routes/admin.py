@@ -2172,6 +2172,9 @@ def admin_test_and_backfill():
             elif platform == 'accela':
                 from accela_portal_collector import fetch_accela as _portal_fetch
                 test_raw = _portal_fetch(test_config, 90)
+            elif platform == 'accela_arcgis_hybrid':
+                from accela_portal_collector import fetch_accela_arcgis_hybrid
+                test_raw = fetch_accela_arcgis_hybrid(test_config, 90)
             else:
                 return jsonify({'error': f'Unsupported platform: {platform}'}), 400
         except Exception as e:
