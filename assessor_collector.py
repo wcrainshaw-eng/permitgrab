@@ -87,6 +87,28 @@ ASSESSOR_SOURCES = {
         'state': 'AZ',
         'source_tag': 'assessor:maricopa',
     },
+    'santa_clara_sj': {
+        # V474g: Santa Clara County CA (San Jose). Probed 2026-04-30 —
+        # services3.arcgis.com/JAU7IM34hqT9y9ew is Santa Clara's full
+        # parcel feed with ASSESSEE (owner) + SiteAddressFull (situs)
+        # + SITUS_CITY_NAME + Jurisdiction. Same structure as
+        # standard ArcGIS county parcels. Covers San Jose + Santa
+        # Clara + Sunnyvale + Mountain View + Campbell + Cupertino.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Santa Clara County (San Jose) Parcels',
+        'endpoint': 'https://services3.arcgis.com/JAU7IM34hqT9y9ew/arcgis/rest/services/Parcels/FeatureServer/0',
+        'where_clause': "ASSESSEE IS NOT NULL AND SiteAddressFull IS NOT NULL",
+        'field_map': {
+            'owner_name': 'ASSESSEE',
+            'address': 'SiteAddressFull',
+            'city': 'City',
+            'zip': 'SITUSZIP',
+            'owner_mailing_address': 'MAILING_ADDRESS',
+            'parcel_id': 'APN',
+        },
+        'state': 'CA',
+        'source_tag': 'assessor:santa_clara_sj',
+    },
     'clark_henderson': {
         # V474f: Clark County NV — Henderson-specific filter. Probed
         # 2026-04-29: Clark XAPO has 132,595 Henderson parcels but the
