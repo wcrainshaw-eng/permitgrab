@@ -1839,6 +1839,16 @@ _V472_STATE_NAMES = {
 }
 
 
+# V475 Bug 2: module-level full-response cache for /cities. The route
+# does ~5 large scans across prod_cities + property_owners +
+# contractor_profiles, then ~30K Python iterations to build the badge
+# state per city. Cold-cache renders were 19-30s and timing out under
+# bot load. Render the page once every 10 min and serve the cached
+# response for everyone in between.
+_CITIES_BROWSE_CACHE = {'response': None, 'expires_at': 0}
+_CITIES_BROWSE_TTL = 600  # 10 min
+
+
 @city_pages_bp.route('/cities')
 def cities_browse():
     """V17e + V472 + V473: Dedicated browse page for all cities, organized by state.
@@ -1858,6 +1868,18 @@ def cities_browse():
       4. Featured cards now show the full state name ("New York", "Texas")
          to match the section headers and jump-nav pills below.
     """
+    # V475 Bug 2: serve cached response if we have one. The directory
+    # listing changes slowly (cities are added once a week, badges
+    # refresh once a day) so a 10-min cache is fine. Drops p99 from
+    # 19-30s → <100ms.
+    import time as _t
+    _now = _t.time()
+    if _CITIES_BROWSE_CACHE['response'] is not None and _now < _CITIES_BROWSE_CACHE['expires_at']:
+        from flask import make_response
+        _r = make_response(_CITIES_BROWSE_CACHE['response'])
+        _r.headers['Cache-Control'] = 'public, max-age=600'
+        _r.headers['X-PermitGrab-Cache'] = 'HIT'
+        return _r
     # Footer ranking still uses the curated public list (population /
     # permit-volume filter applied) so we don't surface low-quality
     # bulk-misattribution cities in the global footer.
@@ -2020,7 +2042,7 @@ def cities_browse():
     total_cities = len(all_cities)
     total_states = len(states)
 
-    return render_template('cities_browse.html',
+    _html = render_template('cities_browse.html',
         footer_cities=footer_cities,
         sorted_states=sorted_states,
         no_state_cities=no_state,
@@ -2030,6 +2052,16 @@ def cities_browse():
         canonical_url=f"{SITE_URL}/cities",
         STATE_NAMES=_V472_STATE_NAMES,
     )
+    # V475 Bug 2: cache the rendered HTML for 10 minutes. The page is
+    # purely public info — no per-user state — so a process-wide cache
+    # is safe and lets bots hammer this URL without re-hitting the DB.
+    _CITIES_BROWSE_CACHE['response'] = _html
+    _CITIES_BROWSE_CACHE['expires_at'] = _t.time() + _CITIES_BROWSE_TTL
+    from flask import make_response
+    _r = make_response(_html)
+    _r.headers['Cache-Control'] = 'public, max-age=600'
+    _r.headers['X-PermitGrab-Cache'] = 'MISS'
+    return _r
 
 
 @city_pages_bp.route('/unsubscribe/<int:search_id>')

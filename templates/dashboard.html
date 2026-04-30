@@ -1390,7 +1390,7 @@ footer a:hover { color: white; }
 <section class="hero">
   <div class="hero-content">
     <h1>Real-time permit intelligence for home service businesses</h1>
-    <p>Track new building permits, find active contractors, and identify property owners across {{ city_count | default(260) }}+ cities. Updated daily from official sources.</p>
+    <p>Track new building permits, find active contractors, and identify property owners across {{ city_count | default(100) }}+ cities. Updated daily from official sources.</p>
     {# V224 T6: prominent hero CTAs — the nav "Sign Up" is too easy to
        miss on a cold Google Ads click. #}
     {# V308 (CODE_V280b Bug 2): hero CTA splits on auth. Pro user seeing
@@ -1419,11 +1419,11 @@ footer a:hover { color: white; }
       <div class="stat-label">Active Permits</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-cities">{{ city_count | default(900) }}+</div>
+      <div class="stat-value" id="stat-cities">{{ city_count | default(100) }}+</div>
       <div class="stat-label">Cities Covered</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value" id="stat-states">{{ state_count | default(38) }}</div>
+      <div class="stat-value" id="stat-states">{{ state_count | default(30) }}</div>
       <div class="stat-label">States</div>
     </div>
     <div class="stat-item">
@@ -1439,7 +1439,7 @@ footer a:hover { color: white; }
     <div class="trusted-badge">Official Data Sources</div>
     <div class="testimonial-item">
       <span class="testimonial-stars" style="color: var(--primary);">&#9679;</span>
-      <span class="testimonial-text">{{ city_count | default(140) }}+ cities covered</span>
+      <span class="testimonial-text">{{ city_count | default(100) }}+ cities covered</span>
     </div>
     <div class="testimonial-item">
       <span class="testimonial-stars" style="color: var(--primary);">&#9679;</span>

@@ -315,13 +315,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       {# V473 Bug 4: full state name to match section headers / jump-nav. #}
       <span class="top-city-meta">{{ STATE_NAMES.get(city.state, city.state) }}</span>
       <span class="top-city-count">{{ "{:,}".format(city.permit_count) }} permits</span>
-      {% if city.has_enrichment or city.has_violations or city.has_owners %}
       <span class="city-emblems">
         {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles available">Contractors</span>{% endif %}
         {% if city.has_violations %}<span class="city-emblem violations" title="Code violations available">Violations</span>{% endif %}
         {% if city.has_owners %}<span class="city-emblem owners" title="Property owner data available">Owners</span>{% endif %}
+        {# V475 Bug 4: every card must show some emblem. If no specific
+           data tier is loaded yet, surface a generic "Permits" badge so
+           the layout doesn't render with a missing icon slot. #}
+        {% if not city.has_enrichment and not city.has_violations and not city.has_owners %}
+        <span class="city-emblem" style="background: var(--gray-100, #f3f4f6); color: var(--gray-600, #4b5563); border: 1px solid var(--gray-200, #e5e7eb);" title="Building permits available">Permits</span>
+        {% endif %}
       </span>
-      {% endif %}
     </a>
     {% endfor %}
   </div>
@@ -357,6 +361,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
             {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles">C</span>{% endif %}
             {% if city.has_violations %}<span class="city-emblem violations" title="Code violations">V</span>{% endif %}
             {% if city.has_owners %}<span class="city-emblem owners" title="Property owner data">O</span>{% endif %}
+            {# V475 Bug 4: fallback emblem so every card has at least one badge. #}
+            {% if not city.has_enrichment and not city.has_violations and not city.has_owners %}<span class="city-emblem" style="background: var(--gray-100, #f3f4f6); color: var(--gray-600, #4b5563); border: 1px solid var(--gray-200, #e5e7eb);" title="Building permits available">P</span>{% endif %}
           </span>
         </a>
         {% endfor %}
@@ -378,6 +384,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <span class="count">{{ "{:,}".format(city.permit_count) }}</span>
           {% if city.has_enrichment %}<span class="city-emblem enrichment" title="Contractor profiles">C</span>{% endif %}
           {% if city.has_violations %}<span class="city-emblem violations" title="Code violations">V</span>{% endif %}
+          {# V475 Bug 4: fallback emblem so every card has at least one badge. #}
+          {% if not city.has_enrichment and not city.has_violations %}<span class="city-emblem" style="background: var(--gray-100, #f3f4f6); color: var(--gray-600, #4b5563); border: 1px solid var(--gray-200, #e5e7eb);" title="Building permits available">P</span>{% endif %}
         </span>
       </a>
       {% endfor %}

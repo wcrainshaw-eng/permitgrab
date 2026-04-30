@@ -7750,7 +7750,7 @@ def city_landing_inner(city_slug):
         ],
     }
 
-    return render_template(
+    _v475_html = render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         seo_blog_slug=_v467_seo_blog_slug,
         v474_faq=_v474_faq,
@@ -7826,6 +7826,12 @@ def city_landing_inner(city_slug):
         zip_heatmap=zip_heatmap,  # V251 F13
         stalled_permits=stalled_permits,  # V252 F3
     )
+    # V475 Bug 6: Cache-Control on full city pages. Bot traffic was
+    # piling up identical requests and beating the DB. 5-min public
+    # cache lets Cloudflare-style intermediaries serve repeat hits.
+    _v475_resp = make_response(_v475_html)
+    _v475_resp.headers['Cache-Control'] = 'public, max-age=300'
+    return _v475_resp
 
 
 
