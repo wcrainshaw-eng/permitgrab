@@ -8599,31 +8599,97 @@ def _test_outbound_connectivity():
 
 
 def start_collectors():
-    """V471 PR4: NO-OP. Collection runs in the separate permitgrab-worker
-    service (worker.py); the web process is HTTP-only. The function is
-    kept around so callers (the deferred-startup chain, the admin endpoint
-    fallback path) don't break — it just marks `_collector_started=True`
-    and prints a banner.
+    """Start background data collection threads. Safe to call multiple times.
 
-    The original implementation spawned scheduled_collection +
-    enrichment_daemon + email_scheduler + maintenance threads at gunicorn
-    startup. That made every collection cycle compete with HTTP traffic
-    for the same RAM and SQLite write lock, drove the web service to the
-    2GB Render plan, and left the daemon prone to wedging the worker
-    after V455 self-recycle. With this function neutered, the web process
-    runs HTTP only.
+    V473b corrective: the V471 PR4 no-op was based on a false premise —
+    there is no permitgrab-worker Render service (it was defined in
+    render.yaml but never created in the actual Render project). The
+    web process is the only collector. Calling this function from the
+    /api/admin/start-collectors endpoint spawns the daemon threads
+    inside this process, which is the intended (and historical) design
+    per CLAUDE.md: "Daemon: Does NOT auto-start on deploy. Must call:
+    POST /api/admin/start-collectors".
+
+    V471 PR2-prep is preserved: nothing here runs at module import time.
+    Spawning happens only on explicit call from the admin endpoint, which
+    means worker re-fork (or V455 self-recycle) doesn't deadlock against
+    `from server import *` in the blueprint modules.
     """
     global _collector_started
     if _collector_started:
         return
     _collector_started = True
-    print(
-        f"[{datetime.now()}] V471 PR4: start_collectors() is a no-op — "
-        f"collection runs in the permitgrab-worker service (worker.py). "
-        f"Web process is HTTP-only.",
-        flush=True,
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    # V12.2: Test network connectivity before starting threads
+    try:
+        _test_outbound_connectivity()
+    except Exception as _e:
+        print(f"[{datetime.now()}] connectivity test error (non-fatal): {_e}", flush=True)
+
+    # V75: Apply known fixes to broken city_sources configs
+    print(f"[{datetime.now()}] V75: Applying known config fixes...", flush=True)
+    try:
+        fixes = fix_known_broken_configs()
+        print(f"[{datetime.now()}] V75: Applied {len(fixes)} config fixes", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] V75: Config fix error (non-fatal): {e}", flush=True)
+
+    # V77: Sync CITY_REGISTRY to prod_cities — activates paused cities
+    print(f"[{datetime.now()}] V77: Syncing CITY_REGISTRY to prod_cities...", flush=True)
+    try:
+        sync_city_registry_to_prod_cities()
+        print(f"[{datetime.now()}] V77: Registry sync complete", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] V77: Registry sync error (non-fatal): {e}", flush=True)
+
+    print(f"[{datetime.now()}] V67: Starting background collectors...", flush=True)
+    # V414/V473b: skip initial_collection. scheduled_collection picks up the
+    # same cities within ~30 min of starting, and the 180-day backfill is
+    # the biggest startup memory spike. Re-enable via direct call only.
+    print(f"[{datetime.now()}] V414: skipping run_initial_collection (scheduled_collection picks up same cities ~30 min)", flush=True)
+
+    # Scheduled daily collection thread
+    collector_thread = threading.Thread(
+        target=scheduled_collection, name='scheduled_collection', daemon=True,
     )
-    return
+    collector_thread.start()
+    print(f"[{datetime.now()}] V67: Scheduled collection thread started", flush=True)
+
+    # V229 C5: dedicated enrichment daemon. scheduled_collection runs
+    # enrich_batch per cycle (30-60 min apart). This second thread runs
+    # enrichment on its own 30-min cadence so the queue drains steadily
+    # even when a collection cycle is slow/stuck.
+    def _enrichment_daemon():
+        time.sleep(600)  # let collection warm up first
+        while True:
+            try:
+                from license_enrichment import is_import_running
+                if is_import_running():
+                    print(f"[{datetime.now()}] V242: enrichment daemon paused — license import in progress", flush=True)
+                    time.sleep(30)
+                    continue
+            except Exception:
+                pass
+            try:
+                from web_enrichment import enrich_batch
+                result = enrich_batch(limit=200)
+                print(f"[{datetime.now()}] [V229 C5] enrichment daemon: {result}", flush=True)
+            except Exception as e:
+                print(f"[{datetime.now()}] [V229 C5] enrichment daemon error: {e}", flush=True)
+            time.sleep(1800)
+
+    try:
+        enrichment_thread = threading.Thread(
+            target=_enrichment_daemon, name='enrichment_daemon', daemon=True,
+        )
+        enrichment_thread.start()
+        print(f"[{datetime.now()}] V229 C5: enrichment daemon started", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] V229 C5: enrichment daemon failed to start: {e}", flush=True)
+
+    print(f"[{datetime.now()}] V67: All collector threads started.", flush=True)
 
 # V229 addendum K1 / V471 PR2-prep: single, lock-guarded spawner for
 # _deferred_startup. Called only from the before_request hook now (the
