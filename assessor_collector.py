@@ -621,15 +621,18 @@ ASSESSOR_SOURCES = {
         # V473b Section B #5: Hamilton County, OH (Cincinnati).
         # Probed 2026-04-30 — CAGIS Cadastral MapServer/0 has the full
         # owner schema: OWNNM1 (primary owner), OWNNM2 (secondary),
-        # OWNAD1/OWNAD2 (mailing), MLTOWN, plus situs from
+        # OWNAD1/OWNAD2 (mailing), MLTOWN, plus situs split across
         # ADDRNO + ADDRST + ADDRSF (number + street + suffix).
+        # Concat'd via _resolve()'s list-handling path so the assembled
+        # situs ("3920 RIVER RD") matches what permits.address looks like.
+        # 419,561 parcels with owner; 353,902 of those have full situs.
         'platform': 'arcgis_mapserver',
         'service_description': 'Hamilton County (Cincinnati) Parcels',
         'endpoint': 'https://cagisonline.hamilton-co.org/arcgis/rest/services/HCE/Cadastral/MapServer/0',
-        'where_clause': "OWNNM1 IS NOT NULL AND OWNNM1 <> '' AND ADDRST IS NOT NULL AND ADDRST <> ''",
+        'where_clause': "OWNNM1 IS NOT NULL AND OWNNM1 <> '' AND ADDRST IS NOT NULL",
         'field_map': {
             'owner_name': 'OWNNM1',
-            'address': 'ADDRST',
+            'address': ['ADDRNO', 'ADDRST', 'ADDRSF'],
             'owner_mailing_address': 'OWNAD1',
         },
         'state': 'OH',
