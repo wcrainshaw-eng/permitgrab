@@ -1,5 +1,5 @@
 """
-PermitGrab Background Worker — V365b
+PermitGrab Background Worker — V365b / V473 worker-restart
 
 Runs the collector daemon, enrichment, and email scheduler as a standalone
 process, separate from the gunicorn web server. This eliminates memory
@@ -13,6 +13,12 @@ Usage:
 
 Environment:
     DATABASE_URL  — PostgreSQL connection string (Render provides this)
+
+V473 worker-restart 2026-04-30: this comment edit forces Render to redeploy
+the permitgrab-worker service after it stalled for ~4.5h with no fresh
+scraper_runs entries (last cycle 2026-04-29 21:14:40 UTC, db_now
+2026-04-30 01:51 UTC). No code change — just a docstring update to
+trigger the auto-deploy.
 """
 
 import os
