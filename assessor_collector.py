@@ -87,6 +87,32 @@ ASSESSOR_SOURCES = {
         'state': 'AZ',
         'source_tag': 'assessor:maricopa',
     },
+    'collin_plano': {
+        # V474e: Collin County (Plano + Frisco + McKinney + Allen).
+        # Probed 2026-04-29 — services2.arcgis.com/5aVZxf6eblRfH5Yb is
+        # the NCTCOG-hosted Collin CAD parcel feed. 33,432 total
+        # records with OwnerName; 468 explicitly tagged situs_city=PLANO
+        # (the dataset appears to be a non-residential / commercial
+        # subset, not full Collin coverage). situs_display gives the
+        # full assembled situs ("2300 W PLANO PKWY \r\nPLANO, TX
+        # 75075") which we map to address. addr_line1 is the OWNER
+        # mailing address (often "C/O" entries), kept as
+        # owner_mailing_address.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Collin CAD Parcels (NCTCOG-hosted)',
+        'endpoint': 'https://services2.arcgis.com/5aVZxf6eblRfH5Yb/arcgis/rest/services/Parcel/FeatureServer/0',
+        'where_clause': "OwnerName IS NOT NULL AND situs_display IS NOT NULL",
+        'field_map': {
+            'owner_name': 'OwnerName',
+            'address': 'situs_display',
+            'city': 'situs_city',
+            'zip': 'situs_zip',
+            'owner_mailing_address': 'addr_line1',
+            'parcel_id': 'GEO_ID',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:collin_plano',
+    },
     'maricopa_secondary': {
         # V474d: Maricopa County's non-Phoenix municipalities. Probed
         # 2026-04-29: Mesa alone has 173,092 owner-bearing parcels.
