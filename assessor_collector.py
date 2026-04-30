@@ -94,7 +94,10 @@ ASSESSOR_SOURCES = {
         # earlier default_city='Miami' import). Splitting Hialeah into its
         # own filtered source lets us land Hialeah-tagged rows so the
         # /cities scorecard credits Hialeah for owners (currently 29).
-        # Same source endpoint, just a where_clause filter on TRUE_SITE_CITY.
+        # NOTE: TRUE_SITE_ZIP is omitted from the outFields — combining it
+        # with TRUE_SITE_ADDR + TRUE_SITE_CITY + extra fields trips a
+        # 400 "Invalid query parameters" on the FeatureServer (probed
+        # 2026-04-30 via a cumulative add test). All other fields work.
         'platform': 'arcgis_mapserver',
         'service_description': 'Miami-Dade Property Appraiser — Hialeah only',
         'endpoint': 'https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/PaParcelView_gdb/FeatureServer/0',
@@ -103,7 +106,6 @@ ASSESSOR_SOURCES = {
             'owner_name': 'TRUE_OWNER1',
             'address': 'TRUE_SITE_ADDR',
             'city': 'TRUE_SITE_CITY',
-            'zip': 'TRUE_SITE_ZIP',
             'owner_mailing_address': 'TRUE_MAILING_ADDR1',
             'parcel_id': 'FOLIO',
         },
