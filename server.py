@@ -6780,6 +6780,47 @@ def city_landing_inner(city_slug):
     db_slug = _INNER_ALIASES.get(city_slug, city_slug)
     city_slug = db_slug  # legacy var name used below for internal queries
 
+    # V475 Bug 5 — EARLY exit for empty cities, BEFORE the expensive
+    # registry/auto-discovery lookups. The previous V475 check ran
+    # AFTER get_city_by_slug_auto + permitdb.lookup_prod_city_by_slug,
+    # which can be slow on cold caches and is what was making
+    # /permits/salem hit Render's 30s worker timeout. This runs ONE
+    # indexed COUNT against permits + a fallback against
+    # contractor_profiles — both ~1ms even on cold cache. If both are
+    # zero AND the slug isn't in the hand-curated CITY_SEO_CONFIG, we
+    # render the lightweight Coming Soon page and return.
+    try:
+        _check_conn = permitdb.get_connection()
+        _row = _check_conn.execute(
+            "SELECT COUNT(*) FROM permits WHERE source_city_key = ? LIMIT 1",
+            (city_slug,)
+        ).fetchone()
+        _early_permits = _row[0] if _row else 0
+        if _early_permits == 0 and city_slug not in CITY_SEO_CONFIG:
+            _row = _check_conn.execute(
+                "SELECT COUNT(*) FROM contractor_profiles "
+                "WHERE source_city_key = ? LIMIT 1",
+                (city_slug,)
+            ).fetchone()
+            _early_profiles = _row[0] if _row else 0
+            if _early_profiles == 0:
+                _display = (city_slug.replace('-', ' ')
+                            .replace('  ', ' ').title())
+                _resp = render_template(
+                    'city_paused.html',
+                    city_name=_display,
+                    state='',
+                    last_updated=None,
+                    canonical_url=f"{SITE_URL}/permits/{request_slug}",
+                    robots="noindex, follow",
+                    is_coming_soon=True,
+                )
+                _r = make_response(_resp)
+                _r.headers['Cache-Control'] = 'public, max-age=86400'
+                return _r
+    except Exception as _e:
+        print(f"[V475] early-exit check failed for {city_slug}: {_e}", flush=True)
+
     # V251 F2: URL-param filters for the permits table (zip / trade / days).
     # V251 F8: added min_value to the same filter machinery so "$100k+" is
     # reachable in one query param. Whitelisted to prevent arbitrary ORDER
