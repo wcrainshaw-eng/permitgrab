@@ -1732,23 +1732,23 @@ def _deferred_startup():
         except Exception:
             pass
 
-    # V183: Refresh contractor profiles + emblems BEFORE spawning background
-    # threads. This is the only reliable write window — _deferred_startup runs
-    # sequentially, and once maintenance/_v146_safe_autostart spawn, the SQLite
-    # write lock is held near-continuously by collection + maintenance threads.
-    try:
-        import time as _t183
-        _t183_start = _t183.time()
-        from contractor_profiles import refresh_contractor_profiles, update_city_emblems
-        prof = refresh_contractor_profiles()
-        emb = update_city_emblems()
-        print(f"[{datetime.now()}] [V183] Startup profile refresh: "
-              f"{prof['profiles_upserted']} profiles, "
-              f"{emb.get('cities_with_enrichment', 0)} enriched / "
-              f"{emb.get('cities_with_violations', 0)} violations, "
-              f"{_t183.time() - _t183_start:.1f}s", flush=True)
-    except Exception as e:
-        print(f"[{datetime.now()}] [V183] Startup refresh error (non-fatal): {e}", flush=True)
+    # V473b optimization: V183's startup profile refresh REMOVED.
+    #
+    # The V183 rationale ("only reliable write window — once daemon threads
+    # spawn, the SQLite write lock is held near-continuously") dates from
+    # before V471 PR4 split the daemon out into worker.py. Now the web
+    # process spawns ZERO daemon threads, so the rationale is moot — and
+    # running refresh_contractor_profiles() synchronously on every web
+    # restart was actively harmful: it iterated all ~2,263 active
+    # prod_cities, blocked `_deferred_startup` for 30-60 min, held the
+    # SQLite write lock against the worker's collection cycles, and
+    # spiked memory.
+    #
+    # The worker's scheduled_collection() loop in worker.py already calls
+    # refresh_contractor_profiles() on every 30-min cycle — that's the
+    # right place. Web restart no longer has to do it.
+    print(f"[{datetime.now()}] V473b: skipping V183 in-web profile refresh "
+          f"(now handled exclusively by permitgrab-worker)", flush=True)
 
     # V471 PR4: NO daemon threads in the web process. Collection, enrichment,
     # maintenance, and email scheduling all run in the permitgrab-worker
