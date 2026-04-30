@@ -8689,6 +8689,23 @@ def start_collectors():
     except Exception as e:
         print(f"[{datetime.now()}] V229 C5: enrichment daemon failed to start: {e}", flush=True)
 
+    # V475 corrective: V471 PR4 deleted three daemon threads from this
+    # function (scheduled_collection, enrichment_daemon, email_scheduler).
+    # The V473b corrective (commit 2c91a2a) restored the first two but
+    # forgot email_scheduler — so daily digests stopped firing on
+    # 2026-04-30 (yesterday's 11:01 UTC digest was the last one before
+    # the V471 PR4 nerf at 2026-04-29 21:21 UTC; today's 11 AM UTC
+    # window had no thread to run send_daily_digest()). Restoring the
+    # V93 spawn pattern: threading.Thread targeting schedule_email_tasks.
+    try:
+        email_thread = threading.Thread(
+            target=schedule_email_tasks, name='email_scheduler', daemon=True,
+        )
+        email_thread.start()
+        print(f"[{datetime.now()}] V475: email_scheduler thread started", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] V475: email_scheduler failed to start: {e}", flush=True)
+
     print(f"[{datetime.now()}] V67: All collector threads started.", flush=True)
 
 # V229 addendum K1 / V471 PR2-prep: single, lock-guarded spawner for
