@@ -1153,6 +1153,40 @@ def state_city_landing(state_slug, city_slug):
     earliest_date = stats_row['earliest_date'] if stats_row else None
     latest_date = stats_row['latest_date'] if stats_row else None
 
+    # V477 Bug 2 (real fix): build `unified_records` so the data
+    # table renders. The template iterates `unified_records` (not
+    # `recent_permits`) for the actual table rows, and this route
+    # never populated it — that's why /permits/arizona/phoenix
+    # showed "0 records" while /permits/phoenix-az showed 16K.
+    unified_records = []
+    try:
+        if prod_city_id:
+            _ucur = conn.execute("""
+                SELECT COALESCE(filing_date, issued_date, date) AS record_date,
+                       address,
+                       permit_type AS type_label,
+                       description,
+                       contractor_name,
+                       trade_category
+                FROM permits
+                WHERE prod_city_id = ?
+                  AND COALESCE(filing_date, issued_date, date) IS NOT NULL
+                ORDER BY record_date DESC
+                LIMIT 50
+            """, (prod_city_id,))
+            unified_records = [{
+                'record_type': 'permit',
+                'record_date': r['record_date'],
+                'address': r['address'],
+                'type_label': r['type_label'],
+                'description': r['description'],
+                'contractor_name': r['contractor_name'],
+                'trade_category': r['trade_category'],
+                'status': None,
+            } for r in _ucur]
+    except Exception as _e:
+        print(f"[V477] unified_records build failed for {city_slug}: {_e}", flush=True)
+
     # V476 Bug 2: align freshness with city_landing_inner (the slug
     # route). prod_cities.newest_permit_date can be NULL or stale —
     # /permits/arizona/phoenix was showing "2025-2026" red and "Data
@@ -1596,6 +1630,11 @@ def state_city_landing(state_slug, city_slug):
         v474_faq=_v474_faq,  # list of (question, answer) tuples for the
                              # rendered <details> FAQ section in the template
         v474_faq_jsonld=_v474_faq_jsonld,
+        # V477 Bug 2: required by city_landing_v77.html data table; the
+        # state/city route was missing this so the table always showed
+        # "0 records" even on cities with thousands of permits.
+        unified_records=unified_records,
+        total_records=permit_count,  # template's "showing X of Y" badge
     )
 
 
