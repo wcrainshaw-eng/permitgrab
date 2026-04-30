@@ -87,6 +87,28 @@ ASSESSOR_SOURCES = {
         'state': 'AZ',
         'source_tag': 'assessor:maricopa',
     },
+    'clark_henderson': {
+        # V474f: Clark County NV — Henderson-specific filter. Probed
+        # 2026-04-29: Clark XAPO has 132,595 Henderson parcels but the
+        # 'clark_lasvegas' source's OBJECTID-ordered scan stays in N
+        # Las Vegas / Mesquite / LV proper for the first 73K records,
+        # never reaching Henderson. Splitting Henderson into its own
+        # source lets us target 132K rows directly.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Clark County NV Accela XAPO — Henderson only',
+        'endpoint': 'https://maps.clarkcountynv.gov/arcgis/rest/services/Accela/AccelaPoints/MapServer/0',
+        'where_clause': "ownerFullName IS NOT NULL AND address IS NOT NULL AND primaryParcelFlag = 'Y' AND city = 'HENDERSON'",
+        'field_map': {
+            'owner_name': 'ownerFullName',
+            'address': 'address',
+            'city': 'city',
+            'zip': 'zip',
+            'owner_mailing_address': 'mailAddress1',
+            'parcel_id': 'parcelNumber',
+        },
+        'state': 'NV',
+        'source_tag': 'assessor:clark_henderson',
+    },
     'collin_plano': {
         # V474e: Collin County (Plano + Frisco + McKinney + Allen).
         # Probed 2026-04-29 — services2.arcgis.com/5aVZxf6eblRfH5Yb is
