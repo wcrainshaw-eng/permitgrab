@@ -7479,9 +7479,152 @@ def city_landing_inner(city_slug):
     }
     _v467_seo_blog_slug = _v467_blog_slugs.get(city_slug)
 
+    # V474 (CODE_V474_BUYER_PERSONAS B+C): data-driven meta + FAQ JSON-LD on
+    # this single-segment route too. Mirrors the logic added to
+    # state_city_landing in routes/city_pages.py. Pulls live counts via
+    # the connection that's already open in this scope.
+    _v474_profiles = 0
+    _v474_phones = 0
+    _v474_owners = 0
+    _v474_violations = 0
+    try:
+        _r = conn.execute(
+            "SELECT COUNT(*) p, "
+            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) ph "
+            "FROM contractor_profiles WHERE source_city_key = ?",
+            (city_slug,),
+        ).fetchone()
+        if _r:
+            _v474_profiles = _r['p'] or 0
+            _v474_phones = _r['ph'] or 0
+    except Exception:
+        pass
+    try:
+        if _prod_city_id:
+            _r = conn.execute(
+                "SELECT COUNT(*) c FROM violations WHERE prod_city_id = ?",
+                (_prod_city_id,),
+            ).fetchone()
+            _v474_violations = _r['c'] if _r else 0
+    except Exception:
+        pass
+    try:
+        _r = conn.execute(
+            "SELECT COUNT(*) c FROM property_owners "
+            "WHERE LOWER(city) = LOWER(?) AND state = ?",
+            (config.get('name', ''), config.get('state', '')),
+        ).fetchone()
+        _v474_owners = _r['c'] if _r else 0
+    except Exception:
+        pass
+
+    # Override meta only if this city is NOT in the hardcoded CITY_SEO_CONFIG
+    # (those have hand-tuned copy). For every auto-generated city, swap to
+    # buyer-intent data-driven copy.
+    _v474_dynamic = city_slug not in CITY_SEO_CONFIG
+    if _v474_dynamic:
+        _has_p = _v474_profiles >= 100
+        _has_ph = _v474_phones >= 50
+        _has_v = _v474_violations > 0
+        _has_o = _v474_owners > 0
+        _vp = f"{_v474_profiles:,}"
+        _vh = f"{_v474_phones:,}"
+        _vv = f"{_v474_violations:,}"
+        _vo = f"{_v474_owners:,}"
+        _disp = config.get('name', city_slug)
+        if _has_p and _has_v and _has_o:
+            config['meta_title'] = (
+                f"{_disp} Construction Leads — {_vp} Contractors, "
+                f"{_vv} Violations | PermitGrab"
+            )[:70]
+            config['meta_description'] = (
+                f"Access {_vp} contractor profiles{' with phone numbers' if _has_ph else ''}, "
+                f"{_vv} code violation properties, and {_vo} property owner "
+                f"records in {_disp}. Updated daily from official sources. $149/mo."
+            )[:200]
+        elif _has_p and _has_ph and not _has_v:
+            config['meta_title'] = (
+                f"{_disp} Contractor Leads — {_vp} Active "
+                f"Contractors with Contact Info | PermitGrab"
+            )[:70]
+            config['meta_description'] = (
+                f"Reach {_vp} active contractors in {_disp} — {_vh} with "
+                f"verified phone numbers. Filter by trade, see new permits "
+                f"daily. $149/mo."
+            )[:200]
+        elif _has_v and not _has_p:
+            config['meta_title'] = (
+                f"{_disp} Code Violation Properties — {_vv} "
+                f"Distressed Property Records | PermitGrab"
+            )[:70]
+            config['meta_description'] = (
+                f"{_vv} code violation properties in {_disp} — find "
+                f"motivated sellers and distressed properties"
+                f"{' with owner names' if _has_o else ''}. Updated daily "
+                f"from city code enforcement. $149/mo."
+            )[:200]
+        elif _has_p:
+            config['meta_title'] = (
+                f"{_disp} Building Permit Activity — {_vp} "
+                f"Active Contractors | PermitGrab"
+            )[:70]
+            config['meta_description'] = (
+                f"Track building permits and {_vp} active contractors in "
+                f"{_disp}. Updated daily from official city data. $149/mo."
+            )[:200]
+
+    # FAQ JSON-LD with buyer-intent questions; prune by available data
+    _v474_faq = []
+    _v474_disp = config.get('name', city_slug)
+    if _v474_profiles > 0:
+        _v474_faq.append((
+            f"How can I find contractors in {_v474_disp}?",
+            f"PermitGrab tracks {_v474_profiles:,} active contractors in "
+            f"{_v474_disp} who have pulled building permits. "
+            f"{_v474_phones:,} have verified phone numbers. Filter by "
+            f"trade: electrical, plumbing, HVAC, roofing, and more."
+        ))
+    if _v474_violations > 0:
+        _v474_faq.append((
+            f"Where can I find code violation properties in {_v474_disp}?",
+            f"PermitGrab has {_v474_violations:,} code violation records "
+            f"in {_v474_disp} from official city code enforcement databases. "
+            f"These properties may indicate motivated sellers — owners "
+            f"facing violations are often willing to sell below market value."
+        ))
+    if _v474_owners > 0:
+        _v474_faq.append((
+            f"How do I get homeowner leads from building permits in {_v474_disp}?",
+            f"PermitGrab provides {_v474_owners:,} property owner records "
+            f"for {_v474_disp} including owner names and addresses. "
+            f"Homeowners who just pulled permits are actively investing in "
+            f"their property — ideal leads for solar, insurance, and home "
+            f"service companies."
+        ))
+    _v474_faq.append((
+        f"How often is the {_v474_disp} permit data updated?",
+        f"PermitGrab collects new permit data for {_v474_disp} every 30 "
+        f"minutes from official city open data portals. Violation and "
+        f"property owner data is refreshed daily to monthly depending on "
+        f"the source."
+    ))
+    _v474_faq_jsonld = {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        'mainEntity': [
+            {
+                '@type': 'Question',
+                'name': q,
+                'acceptedAnswer': {'@type': 'Answer', 'text': a},
+            } for q, a in _v474_faq
+        ],
+    }
+
     return render_template(
         'city_landing_v77.html',  # V175: Unified to one template (was city_landing.html)
         seo_blog_slug=_v467_seo_blog_slug,
+        v474_faq=_v474_faq,
+        v474_faq_jsonld=_v474_faq_jsonld,
         city_name=config['name'],
         city_slug=city_slug,
         state_abbrev=current_state,  # V77 template expects state_abbrev, not city_state
