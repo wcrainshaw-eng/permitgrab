@@ -4431,6 +4431,66 @@ def admin_cleanup_prod_cities():
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/api/admin/v480/deactivate-stale-cities', methods=['POST'])
+def admin_v480_deactivate_stale_cities():
+    """V480 P1-2: pause cities marked active that haven't published a permit
+    in 2026 (or have no permits at all). The daemon was burning cycles on
+    dead endpoints (brownsville-wi, lawnside, hi-nella, etc.) which inflate
+    error logs and waste collection budget without adding any leads.
+
+    Pauses (not deletes) so the row stays around for forensics. Uses
+    'paused' rather than 'inactive' because prod_cities.status has a CHECK
+    constraint that only allows ('active', 'paused', 'failed', 'pending').
+
+    Optional POST body: {"cutoff": "2025-01-01"} — newest permit older
+    than this counts as stale. Defaults to 2025-01-01 per V480 spec.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        body = request.get_json(silent=True) or {}
+        cutoff = body.get('cutoff', '2025-01-01')
+        conn = permitdb.get_connection()
+
+        # 1) Cities whose newest permit is before cutoff OR who have no permits.
+        stale_rows = conn.execute("""
+            SELECT pc.city_slug, MAX(p.date) AS newest
+            FROM prod_cities pc
+            LEFT JOIN permits p ON p.source_city_key = pc.city_slug
+            WHERE pc.status = 'active'
+            GROUP BY pc.city_slug
+            HAVING MAX(p.date) < ? OR MAX(p.date) IS NULL
+        """, (cutoff,)).fetchall()
+        stale_slugs = [r['city_slug'] for r in stale_rows]
+
+        paused_count = 0
+        if stale_slugs:
+            placeholders = ','.join('?' * len(stale_slugs))
+            res = conn.execute(
+                f"UPDATE prod_cities SET status = 'paused' "
+                f"WHERE city_slug IN ({placeholders}) AND status = 'active'",
+                stale_slugs,
+            )
+            paused_count = res.rowcount or 0
+            conn.commit()
+
+        active_count = conn.execute(
+            "SELECT COUNT(*) FROM prod_cities WHERE status='active'"
+        ).fetchone()[0]
+        return jsonify({
+            'status': 'success',
+            'cutoff': cutoff,
+            'paused': paused_count,
+            'paused_slugs': stale_slugs,
+            'prod_cities_active_after': active_count,
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @admin_bp.route('/api/admin/activate-paused-cities', methods=['POST'])
 def admin_activate_paused_cities():
     """V77: Bulk-activate paused cities that have valid CITY_REGISTRY configs.

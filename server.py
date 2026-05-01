@@ -1436,6 +1436,28 @@ def _migrate_create_sources_table():
     # The lock-guarded spawner makes a re-call here a no-op.
     _ensure_deferred_startup_spawned()
 
+    # V480: also auto-spawn the collection / enrichment / email_scheduler
+    # daemons on the first request a fresh worker handles. Without this,
+    # gunicorn's `--max-requests 5000` recycle silently kills all three
+    # daemons (the new worker has _collector_started=False) and they stay
+    # dead until someone POSTs /api/admin/start-collectors. That's how
+    # the 2026-04-30 daily digest got skipped — the worker recycled and
+    # nothing was running at 7 AM ET to fire send_daily_digest().
+    # Done in a background thread so the cold-start network probe inside
+    # start_collectors() (3 HTTPS GETs to Socrata) doesn't block the
+    # first user request. start_collectors() is idempotent and lock-
+    # guarded by the _collector_started flag, so concurrent calls from
+    # this hook + a manual /api/admin/start-collectors are safe.
+    try:
+        if not _collector_started:
+            threading.Thread(
+                target=start_collectors,
+                name='v480_auto_start_collectors',
+                daemon=True,
+            ).start()
+    except Exception as _e:
+        print(f"[{datetime.now()}] V480 auto-start error (non-fatal): {_e}", flush=True)
+
 
 def _bulk_load_city_research():
     """V149: One-time bulk load of US cities into city_research from us_cities."""
@@ -4428,18 +4450,29 @@ def _get_nav_cities():
         return _NAV_CITIES_CACHE['value']
     try:
         conn = permitdb.get_connection()
+        # V480 P1-3: rank by phones (the ad-ready signal) instead of raw
+        # profile count. The old query showed Cook County / Collin County /
+        # Henderson high in the dropdown because the assessor backfills
+        # inflated profile counts without contributing any phone leads.
+        # Gate on phones > 30 to keep owner-only cities out of the nav.
         rows = conn.execute("""
             SELECT pc.city_slug AS slug, pc.city AS name,
-                   COALESCE(cp.profiles, 0) AS profile_count
+                   COALESCE(cp.profiles, 0) AS profile_count,
+                   COALESCE(cp.phones, 0)   AS phone_count
             FROM prod_cities pc
             LEFT JOIN (
-                SELECT source_city_key, COUNT(*) AS profiles
+                SELECT source_city_key,
+                       COUNT(*) AS profiles,
+                       SUM(CASE WHEN phone IS NOT NULL AND phone <> ''
+                                THEN 1 ELSE 0 END) AS phones
                 FROM contractor_profiles
                 GROUP BY source_city_key
             ) cp ON cp.source_city_key = pc.city_slug
-            WHERE pc.status = 'active' AND COALESCE(cp.profiles, 0) > 50
-            ORDER BY profile_count DESC
-            LIMIT 20
+            WHERE pc.status = 'active'
+              AND COALESCE(cp.profiles, 0) > 100
+              AND COALESCE(cp.phones, 0)   > 30
+            ORDER BY phone_count DESC, profile_count DESC
+            LIMIT 10
         """).fetchall()
         cities = [{'slug': r['slug'], 'name': r['name']} for r in rows or []]
     except Exception:
@@ -6504,6 +6537,11 @@ _PERMIT_SLUG_ALIASES = {
     'kansas-city': 'kansas-city-mo',
     'las-vegas-nevada': 'las-vegas',
     'vegas': 'las-vegas',
+    # V480 P0-2: nav/footer/sitemap have linked /permits/san-jose-ca for a
+    # while but the prod_cities slug is the bare `san-jose`. The mismatch
+    # rendered an empty "Data Updating" page. 301 to the canonical so
+    # external links and any cached Google results redirect cleanly.
+    'san-jose-ca': 'san-jose',
 }
 
 
@@ -7684,31 +7722,25 @@ def city_landing_inner(city_slug):
         _vv = f"{_v474_violations:,}"
         _vo = f"{_v474_owners:,}"
         _disp = config.get('name', city_slug)
+        # V480 P1-1: see routes/city_pages.py — same fix applied here. Short
+        # natural titles under 60 chars; numbers move to meta_description so
+        # Google never truncates the title mid-word or strands a trailing pipe.
         if _has_p and _has_v and _has_o:
-            config['meta_title'] = (
-                f"{_disp} Construction Leads — {_vp} Contractors, "
-                f"{_vv} Violations | PermitGrab"
-            )[:70]
+            config['meta_title'] = f"{_disp} Construction Leads | PermitGrab"
             config['meta_description'] = (
                 f"Access {_vp} contractor profiles{' with phone numbers' if _has_ph else ''}, "
                 f"{_vv} code violation properties, and {_vo} property owner "
                 f"records in {_disp}. Updated daily from official sources. $149/mo."
             )[:200]
         elif _has_p and _has_ph and not _has_v:
-            config['meta_title'] = (
-                f"{_disp} Contractor Leads — {_vp} Active "
-                f"Contractors with Contact Info | PermitGrab"
-            )[:70]
+            config['meta_title'] = f"{_disp} Contractor Leads | PermitGrab"
             config['meta_description'] = (
                 f"Reach {_vp} active contractors in {_disp} — {_vh} with "
                 f"verified phone numbers. Filter by trade, see new permits "
                 f"daily. $149/mo."
             )[:200]
         elif _has_v and not _has_p:
-            config['meta_title'] = (
-                f"{_disp} Code Violation Properties — {_vv} "
-                f"Distressed Property Records | PermitGrab"
-            )[:70]
+            config['meta_title'] = f"{_disp} Code Violations | PermitGrab"
             config['meta_description'] = (
                 f"{_vv} code violation properties in {_disp} — find "
                 f"motivated sellers and distressed properties"
@@ -7716,10 +7748,7 @@ def city_landing_inner(city_slug):
                 f"from city code enforcement. $149/mo."
             )[:200]
         elif _has_p:
-            config['meta_title'] = (
-                f"{_disp} Building Permit Activity — {_vp} "
-                f"Active Contractors | PermitGrab"
-            )[:70]
+            config['meta_title'] = f"{_disp} Building Permits | PermitGrab"
             config['meta_description'] = (
                 f"Track building permits and {_vp} active contractors in "
                 f"{_disp}. Updated daily from official city data. $149/mo."
@@ -7728,10 +7757,7 @@ def city_landing_inner(city_slug):
             # V474b: owners-only cities (Madison, Reno, Tucson, Tampa, etc.
             # — the V474 sweep landed huge assessor backfills with no
             # paired permit/violation data). Use the homeowner-lead angle.
-            config['meta_title'] = (
-                f"{_disp} Property Owner Records — {_vo} Homeowner "
-                f"Leads | PermitGrab"
-            )[:70]
+            config['meta_title'] = f"{_disp} Homeowner Leads | PermitGrab"
             config['meta_description'] = (
                 f"Reach {_vo} property owners in {_disp} with names and "
                 f"addresses. Ideal homeowner leads for solar, insurance, "

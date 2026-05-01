@@ -363,6 +363,14 @@ def persona_home_services():
     return _render_persona('home-services')
 
 
+# V480 P0-1: external traffic + nav references both /leads/solar-home-services
+# (the persona spec uses solar as the headline use case) and /leads/home-services.
+# Render the same persona for both so neither URL 404s.
+@persona_bp.route('/leads/solar-home-services')
+def persona_solar_home_services():
+    return _render_persona('home-services')
+
+
 # V477 Bug 1: external links / SEO inbound traffic discovered the
 # /solutions/* URL scheme even though the nav links to /leads/*.
 # 301 redirects so direct URL types and any cached external links
@@ -374,6 +382,12 @@ def persona_re_investors_alias():
     return _redirect('/leads/real-estate-investors', code=301)
 
 
+# V480 P0-1: short alias used in older marketing copy.
+@persona_bp.route('/solutions/investors')
+def persona_investors_short_alias():
+    return _redirect('/leads/real-estate-investors', code=301)
+
+
 @persona_bp.route('/solutions/contractors')
 def persona_contractors_alias():
     return _redirect('/leads/contractors', code=301)
@@ -382,3 +396,9 @@ def persona_contractors_alias():
 @persona_bp.route('/solutions/home-services')
 def persona_home_services_alias():
     return _redirect('/leads/home-services', code=301)
+
+
+# V480 P0-1: /solutions/solar inbound link → solar-home-services.
+@persona_bp.route('/solutions/solar')
+def persona_solar_alias():
+    return _redirect('/leads/solar-home-services', code=301)

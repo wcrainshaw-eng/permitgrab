@@ -1418,11 +1418,13 @@ def state_city_landing(state_slug, city_slug):
         _vh = f"{_v474_phones_count:,}"
         _vv = f"{(violations_count or 0):,}"
         _vo = f"{_v474_owners_count:,}"
+        # V480 P1-1: title tags MUST stay under 60 chars or Google truncates them
+        # mid-word ("…61,139 Violation") or strands a trailing pipe (V474's
+        # `[:70]` slice cut "PermitGrab" off the end). Drop the inline numbers
+        # from the title — they live in meta_description — and use a clean,
+        # consistent "{City} <angle> | PermitGrab" format.
         if _has_profiles and _has_violations and _has_owners:
-            meta_title = (
-                f"{display_name} Construction Leads — {_vp} Contractors, "
-                f"{_vv} Violations | PermitGrab"
-            )[:70]
+            meta_title = f"{display_name} Construction Leads | PermitGrab"
             meta_description = (
                 f"Access {_vp} contractor profiles{' with phone numbers' if _has_phones else ''}, "
                 f"{_vv} code violation properties, and {_vo} property owner "
@@ -1430,30 +1432,21 @@ def state_city_landing(state_slug, city_slug):
                 f"sources. $149/mo."
             )[:200]
         elif _has_profiles and _has_phones and not _has_violations:
-            meta_title = (
-                f"{display_name} Contractor Leads — {_vp} Active "
-                f"Contractors with Contact Info | PermitGrab"
-            )[:70]
+            meta_title = f"{display_name} Contractor Leads | PermitGrab"
             meta_description = (
                 f"Reach {_vp} active contractors in {display_name} — "
                 f"{_vh} with verified phone numbers. Filter by trade, "
                 f"see new permits daily. $149/mo."
             )[:200]
         elif _has_violations and not _has_profiles:
-            meta_title = (
-                f"{display_name} Code Violation Properties — {_vv} "
-                f"Distressed Property Records | PermitGrab"
-            )[:70]
+            meta_title = f"{display_name} Code Violations | PermitGrab"
             meta_description = (
                 f"{_vv} code violation properties in {display_name} — find "
                 f"motivated sellers and distressed properties{' with owner names' if _has_owners else ''}. "
                 f"Updated daily from city code enforcement. $149/mo."
             )[:200]
         elif _has_profiles:
-            meta_title = (
-                f"{display_name} Building Permit Activity — {_vp} "
-                f"Active Contractors | PermitGrab"
-            )[:70]
+            meta_title = f"{display_name} Building Permits | PermitGrab"
             meta_description = (
                 f"Track {_pc} building permits and {_vp} active "
                 f"contractors in {display_name}. Updated daily from "
@@ -1461,10 +1454,7 @@ def state_city_landing(state_slug, city_slug):
             )[:200]
         elif _has_owners:
             # V474b: owners-only cities — homeowner-lead angle.
-            meta_title = (
-                f"{display_name} Property Owner Records — {_vo} "
-                f"Homeowner Leads | PermitGrab"
-            )[:70]
+            meta_title = f"{display_name} Homeowner Leads | PermitGrab"
             meta_description = (
                 f"Reach {_vo} property owners in {display_name} with "
                 f"names and addresses. Ideal homeowner leads for solar, "

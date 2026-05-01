@@ -2508,15 +2508,22 @@ function debounce(fn, ms) {
 }
 
 function updateResultsCount() {
-  const start = (currentPage - 1) * perPage + 1;
-  const end = Math.min(currentPage * perPage, filteredPermits.length);
+  // V480 P0-3: homepage and other pages don't render the showing/total spans
+  // (is_homepage hides the table). Bail early if the targets are missing
+  // instead of throwing "Cannot set properties of null" 7× per page load.
   const showingEl = document.getElementById('showing-count');
   const totalEl = document.getElementById('total-count');
+  if (!showingEl && !totalEl) return;
 
-  if (filteredPermits.length > perPage) {
-    showingEl.textContent = `${start.toLocaleString()}-${end.toLocaleString()}`;
-  } else {
-    showingEl.textContent = filteredPermits.length.toLocaleString();
+  const start = (currentPage - 1) * perPage + 1;
+  const end = Math.min(currentPage * perPage, filteredPermits.length);
+
+  if (showingEl) {
+    if (filteredPermits.length > perPage) {
+      showingEl.textContent = `${start.toLocaleString()}-${end.toLocaleString()}`;
+    } else {
+      showingEl.textContent = filteredPermits.length.toLocaleString();
+    }
   }
   // V12.23: Show true total from API when no filters active, filtered count otherwise
   const city = document.getElementById('filter-city')?.value || '';
@@ -2527,7 +2534,7 @@ function updateResultsCount() {
   const search = document.getElementById('filter-search')?.value || '';
   const filtersActive = city || trade || value || status || quality || search;
   const displayTotal = filtersActive ? filteredPermits.length : (totalPermitCount || filteredPermits.length);
-  totalEl.textContent = displayTotal.toLocaleString();
+  if (totalEl) totalEl.textContent = displayTotal.toLocaleString();
 }
 
 // ===========================
