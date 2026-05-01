@@ -1436,27 +1436,18 @@ def _migrate_create_sources_table():
     # The lock-guarded spawner makes a re-call here a no-op.
     _ensure_deferred_startup_spawned()
 
-    # V480: also auto-spawn the collection / enrichment / email_scheduler
-    # daemons on the first request a fresh worker handles. Without this,
-    # gunicorn's `--max-requests 5000` recycle silently kills all three
-    # daemons (the new worker has _collector_started=False) and they stay
-    # dead until someone POSTs /api/admin/start-collectors. That's how
-    # the 2026-04-30 daily digest got skipped — the worker recycled and
-    # nothing was running at 7 AM ET to fire send_daily_digest().
-    # Done in a background thread so the cold-start network probe inside
-    # start_collectors() (3 HTTPS GETs to Socrata) doesn't block the
-    # first user request. start_collectors() is idempotent and lock-
-    # guarded by the _collector_started flag, so concurrent calls from
-    # this hook + a manual /api/admin/start-collectors are safe.
-    try:
-        if not _collector_started:
-            threading.Thread(
-                target=start_collectors,
-                name='v480_auto_start_collectors',
-                daemon=True,
-            ).start()
-    except Exception as _e:
-        print(f"[{datetime.now()}] V480 auto-start error (non-fatal): {_e}", flush=True)
+    # V481: V480's auto-spawn-on-first-request was the wrong layer to fix
+    # the recycled-daemon problem. Spawning scheduled_collection inside
+    # the request hook re-enters the same single-vCPU pool as the 12
+    # gthread request handlers — the daemon's stats refresh + concurrent
+    # V474 buyer-intent aggregate queries in city_landing_inner saturate
+    # the GIL and wedge every request thread. The real fix is to move
+    # the daemons to the permitgrab-worker Background Worker service
+    # (already declared in render.yaml — never enabled in Render
+    # dashboard) and gate the daemon spawn on os.environ['WORKER_MODE'].
+    # Until that lands, daemons must be started manually via
+    # /api/admin/start-collectors after each deploy or worker recycle —
+    # the historical pre-V480 contract.
 
 
 def _bulk_load_city_research():
@@ -9002,6 +8993,22 @@ def start_collectors():
     if _collector_started:
         return
     _collector_started = True
+
+    # V481 (worker/web split): the daemons MUST only run inside the
+    # permitgrab-worker Background Worker service. The web process and
+    # the worker share the same module, but only the worker has
+    # WORKER_MODE=1 set in its Render env. If we ever spawn these
+    # threads in the web process again, the V480 wedge returns: 12
+    # gthread request handlers + 3 daemons share one Python GIL on a
+    # single vCPU and an aggregate-query refresh starves every request.
+    if os.environ.get('WORKER_MODE') != '1':
+        print(
+            f"[{datetime.now()}] V481: start_collectors no-op on web "
+            f"process (WORKER_MODE != '1'). Daemons run on the "
+            f"permitgrab-worker service via worker.py.",
+            flush=True,
+        )
+        return
 
     os.makedirs(DATA_DIR, exist_ok=True)
 

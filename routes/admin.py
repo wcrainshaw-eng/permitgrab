@@ -1043,6 +1043,24 @@ def admin_start_collectors():
     if not valid:
         return error
 
+    # V481: the web process never runs daemons. Calling this endpoint on
+    # the web service would do nothing (start_collectors returns early
+    # without WORKER_MODE='1'). Surface that explicitly so dashboard
+    # buttons/scripts don't think collection started when it didn't.
+    if os.environ.get('WORKER_MODE') != '1':
+        return jsonify({
+            'status': 'noop',
+            'message': (
+                "Daemons run on the permitgrab-worker Background Worker "
+                "service, not the web process. The worker spawns "
+                "scheduled_collection / enrichment_daemon / "
+                "email_scheduler automatically on boot via worker.py. "
+                "If you need to restart them, redeploy the worker "
+                "service from the Render dashboard."
+            ),
+            'web_worker_mode': os.environ.get('WORKER_MODE', '<unset>'),
+        }), 200
+
     try:
         import threading
         live_daemon = any(

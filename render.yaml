@@ -39,10 +39,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-      # V414 (CODE_V365b PHASE B): tells server.py's start_collectors()
-      # to no-op and let worker.py own the daemon threads.
-      - key: WORKER_MODE
-        value: "true"
+      # V481 (worker/web split): the web service MUST NOT have
+      # WORKER_MODE=1 — only the permitgrab-worker service does. The
+      # gate in server.py's start_collectors() refuses to spawn daemons
+      # unless WORKER_MODE == '1'. Older configs used WORKER_MODE=true
+      # to mean "no daemons here"; V481 inverts the convention so the
+      # check is `== '1'` (positive identification of the worker).
       - key: DATABASE_URL
         fromDatabase:
           name: permitgrab-db
@@ -60,10 +62,12 @@ services:
   # V415 (CODE_V365b PHASE B Part 3): standalone background worker service.
   # Runs the collector + enrichment + email scheduler outside the web process
   # so the web server has dedicated memory. Communicates with the web service
-  # only through the shared PostgreSQL DB. (V418 note: web is on Standard plan
-  # = 2GB RAM. This worker service is currently NOT deployed — daemon runs
-  # in-process in the web service via WORKER_MODE=false. Kept here as a
-  # ready-to-enable failsafe.)
+  # only through the shared PostgreSQL DB.
+  # V481 (2026-05-01): now LIVE. Created in Render dashboard with
+  # WORKER_MODE=1 set as the daemon-spawn gate. Web service intentionally
+  # has no WORKER_MODE so server.py's start_collectors() returns early
+  # there. This split eliminates the GIL-contention wedges that took the
+  # site down through V287/V455/V470/V478/V480.
   - type: worker
     name: permitgrab-worker
     runtime: python
@@ -72,6 +76,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
+      # V481: the daemon-spawn gate. server.py:start_collectors() and
+      # /api/admin/start-collectors both refuse to run unless this == '1'.
+      - key: WORKER_MODE
+        value: "1"
       - key: DATABASE_URL
         fromDatabase:
           name: permitgrab-db
