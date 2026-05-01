@@ -5504,8 +5504,19 @@ CITY_REGISTRY = {
         },
         "date_field": "issuedate",
         "limit": 2000,
-        "active": True,
-        "notes": "V12.8: Deactivated - duplicate slug with new_orleans",
+        # V483b: this entry has been a duplicate of new_orleans_la for ages
+        # and was supposed to be deactivated by V12.8 — but `active=True`
+        # was never flipped, so the daemon kept writing to slug
+        # `new-orleans-blds` while everyone (V258, the docs, the prod
+        # cities row) thought it was using `new-orleans`. The 159K-row
+        # NOLA owner import landed under the canonical slug `new-orleans`
+        # via city='New Orleans', exposing the split. SSH UPDATEs migrated
+        # 16,099 permits + 3,614 profiles from `new-orleans-blds` →
+        # `new-orleans` and renamed prod_cities.city_slug; setting
+        # active=False here prevents the daemon from writing a fresh
+        # batch back under the old slug.
+        "active": False,
+        "notes": "V12.8: Deactivated - duplicate slug with new_orleans (V483b: actually flipped active=False)",
     },
 
     "henderson_nv": {
