@@ -903,6 +903,12 @@ ASSESSOR_SOURCES = {
         'endpoint': 'https://gis.nola.gov/arcgis/rest/services/apps/property3/MapServer/15',
         'where_clause': "OWNERNME1 IS NOT NULL AND OWNERNME1 <> '' AND SITEADDRESS IS NOT NULL AND SITEADDRESS <> ''",
         'verify_ssl': False,
+        # V483b: this MapServer rejects any query containing resultOffset
+        # with a generic 'code: 400 Failed to execute query'. The fix is
+        # OBJECTID-based pagination — collect() appends `AND OBJECTID > N`
+        # to the where clause and increments N to the max OBJECTID seen
+        # in the previous page.
+        'pagination_strategy': 'objectid',
         'field_map': {
             'owner_name': 'OWNERNME1',
             'address': 'SITEADDRESS',
@@ -935,6 +941,39 @@ def _fetch_arcgis_page(endpoint, where, offset, page_size, out_fields, verify_ss
         'where': where,
         'outFields': out_fields,
         'resultOffset': offset,
+        'resultRecordCount': page_size,
+        'returnGeometry': 'false',
+        'orderByFields': 'OBJECTID ASC',
+        'f': 'json',
+    }
+    resp = SESSION.get(endpoint + '/query', params=params, timeout=60, verify=verify_ssl)
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get('error'):
+        raise RuntimeError(f"ArcGIS error: {data['error']}")
+    return data.get('features', [])
+
+
+def _fetch_arcgis_objectid_page(endpoint, base_where, last_objectid, page_size, out_fields, verify_ssl=True):
+    """V483b: ArcGIS pagination via OBJECTID > N for endpoints that don't
+    support resultOffset (e.g. gis.nola.gov returns code:400 for any query
+    that includes resultOffset, regardless of the where clause).
+
+    The caller passes the *base* where clause; this helper appends
+    `AND OBJECTID > {last_objectid}` and drops resultOffset entirely.
+    OBJECTID is implicitly added to out_fields so the caller can advance
+    last_objectid from the response.
+    """
+    where = (
+        f"({base_where}) AND OBJECTID > {last_objectid}"
+        if base_where else f"OBJECTID > {last_objectid}"
+    )
+    fields = out_fields
+    if 'OBJECTID' not in fields.split(','):
+        fields = 'OBJECTID,' + fields
+    params = {
+        'where': where,
+        'outFields': fields,
         'resultRecordCount': page_size,
         'returnGeometry': 'false',
         'orderByFields': 'OBJECTID ASC',
@@ -1125,6 +1164,11 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
     out_fields = ','.join(_flat_fields)
     page_size = page_size or cfg.get('default_page_size') or DEFAULT_PAGE_SIZE
     offset = start_offset
+    # V483b: OBJECTID-based pagination state. last_objectid initializes
+    # from start_offset so a resumed call carries the high-water mark
+    # forward. Used only when pagination_strategy=='objectid'.
+    pagination_strategy = cfg.get('pagination_strategy', 'offset')
+    last_objectid = start_offset
     total_fetched = 0
     total_inserted = 0
     pages = 0
@@ -1137,11 +1181,18 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
         this_page = min(remaining, page_size)
         try:
             if platform == 'arcgis_mapserver':
-                features = _fetch_arcgis_page(
-                    cfg['endpoint'], cfg['where_clause'],
-                    offset, this_page, out_fields,
-                    verify_ssl=cfg.get('verify_ssl', True),
-                )
+                if pagination_strategy == 'objectid':
+                    features = _fetch_arcgis_objectid_page(
+                        cfg['endpoint'], cfg['where_clause'],
+                        last_objectid, this_page, out_fields,
+                        verify_ssl=cfg.get('verify_ssl', True),
+                    )
+                else:
+                    features = _fetch_arcgis_page(
+                        cfg['endpoint'], cfg['where_clause'],
+                        offset, this_page, out_fields,
+                        verify_ssl=cfg.get('verify_ssl', True),
+                    )
             elif platform == 'carto':
                 features = _fetch_carto_page(
                     cfg['endpoint'], cfg['where_clause'],
@@ -1209,6 +1260,20 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
         total_inserted += inserted
         pages += 1
 
+        # V483b: advance the OBJECTID high-water mark for OBJECTID
+        # pagination — the next page asks for OBJECTID > last_objectid.
+        # Falls back gracefully if a row's attributes dict somehow lacks
+        # OBJECTID (shouldn't happen since _fetch_arcgis_objectid_page
+        # injects it into outFields).
+        if pagination_strategy == 'objectid':
+            ids = [
+                f.get('attributes', {}).get('OBJECTID')
+                for f in features
+            ]
+            ids = [i for i in ids if isinstance(i, int)]
+            if ids:
+                last_objectid = max(ids)
+
         # If the server returned fewer than requested, we've hit the
         # end of the dataset.
         if len(features) < this_page:
@@ -1221,6 +1286,6 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
         'pages': pages,
         'total_fetched': total_fetched,
         'total_inserted': total_inserted,
-        'last_offset': offset,
+        'last_offset': last_objectid if pagination_strategy == 'objectid' else offset,
         'elapsed_sec': round(time.time() - started, 1),
     }
