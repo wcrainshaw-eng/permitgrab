@@ -877,6 +877,45 @@ ASSESSOR_SOURCES = {
         'source_tag': 'assessor:pima_tucson',
         'default_city': 'Tucson',
     },
+    'orleans_new_orleans': {
+        # V483b: Orleans Parish Assessor (New Orleans). Probed 2026-05-01:
+        # apps/property3/MapServer/15 ("Property Information [Parcels]")
+        # has 22 fields including OWNERNME1/OWNERNME2 (primary +
+        # secondary owner), SITEADDRESS (format: "624 S ALEXANDER ST,
+        # LA, 70119" — situs with state+ZIP appended inline), PSTLADDRESS
+        # / PSTLCITY / PSTLSTATE / PSTLZIP5 (mailing — differs from
+        # situs = absentee owner signal), PARCELID (GeoPIN), TAXBILLID,
+        # USECD. maxRecordCount=1000.
+        # NOTE the V483b spec quirk: where=1=1 returns embedded
+        # error.code=400 ("Failed to execute query"). The standard
+        # field-existence WHERE we use here is a valid filter, so
+        # ArcGIS pagination via resultOffset works without needing
+        # an OBJECTID-based fallback. NOLA SSL cert chain doesn't
+        # validate cleanly on the Render container, but the SESSION's
+        # default verify=True works — only urllib3 / urllib hit the
+        # CA bundle issue. Promotes New Orleans Tier 4 → Tier 5
+        # (already has permits + profiles + phones + violations,
+        # owners is the missing leg).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Orleans Parish Assessor Parcels',
+        'endpoint': 'https://gis.nola.gov/arcgis/rest/services/apps/property3/MapServer/15',
+        'where_clause': "OWNERNME1 IS NOT NULL AND OWNERNME1 <> '' AND SITEADDRESS IS NOT NULL AND SITEADDRESS <> ''",
+        'field_map': {
+            'owner_name': 'OWNERNME1',
+            'address': 'SITEADDRESS',
+            'owner_mailing_address': 'PSTLADDRESS',
+            'parcel_id': 'PARCELID',
+        },
+        'state': 'LA',
+        'source_tag': 'assessor:orleans_new_orleans',
+        # SITEADDRESS has no situs city column — this is Orleans Parish
+        # which is essentially coterminous with the city of New Orleans.
+        # default_city ensures rows tag as 'New Orleans' so /permits/
+        # new-orleans (slug=new-orleans) credits the owners after the
+        # standard slug-derivation in stats_cache (REPLACE city ' '/'.'
+        # → 'new-orleans').
+        'default_city': 'New Orleans',
+    },
 }
 
 
