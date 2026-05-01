@@ -1680,6 +1680,68 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+    # V484 B1: Tucson AZ — ENGOV_CodeCases via Pima County (City of Tucson)
+    # ArcGIS. Probed 2026-05-01: 21,598 records, newest OPENEDDATE
+    # 2026-04-30. Pairs with the existing pima_tucson assessor source
+    # (V474 wired the 161K owners) so Tucson now hits permits + owners +
+    # violations. Server returns 400 if you pass orderByFields=OPENEDDATE
+    # DESC (no index on the date col); rely on the default OBJECTID
+    # ordering the collector already uses.
+    'tucson-az': {
+        'prod_city_id': None,
+        'city': 'Tucson',
+        'state': 'AZ',
+        'endpoints': [
+            {
+                'name': 'ENGOV CodeCases',
+                'platform': 'arcgis',
+                'resource_id': 'tucson-engov-code-cases',
+                'arcgis_url': 'https://mapdata.tucsonaz.gov/arcgis/rest/services/PublicMaps/PermitsCode/MapServer/102',
+                'date_field': 'OPENEDDATE',
+                'id_field': 'CASENUMBER',
+                'description_field': 'DESCRIPTION',
+                'status_field': 'status',
+                'type_field': 'CaseType',
+                'address_fields': {'full': 'MainAddress'},
+                'zip_field': 'POSTALCODE',
+                'lat_field': 'LAT',
+                'lng_field': 'LON',
+            },
+        ],
+    },
+    # V484 B2: Washington DC — DOB code violations via the city's 311
+    # ServiceRequests FeatureServer, filtered on ORGANIZATIONACRONYM='DOB'.
+    # FeatureServer/21 is the 2026 layer (DC adds a fresh layer per year).
+    # Probed 2026-05-01: 164,897 service requests county-wide; newest
+    # ADDDATE 2026-05-01. The base_where filter narrows to the DOB subset
+    # (code violations specifically, excluding parking, sanitation, etc).
+    # MAINTENANCE: when DC rolls into 2027 they'll spin a new layer
+    # (probably FeatureServer/22). The arcgis_url here will need to
+    # advance accordingly — a calendar reminder for January 2027 is
+    # cheaper than a per-request layer-discovery probe.
+    'washington-dc': {
+        'prod_city_id': None,
+        'city': 'Washington',
+        'state': 'DC',
+        'endpoints': [
+            {
+                'name': 'DOB Service Requests 2026',
+                'platform': 'arcgis',
+                'resource_id': 'washington-dc-dob-2026',
+                'arcgis_url': 'https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/ServiceRequests/FeatureServer/21',
+                'base_where': "ORGANIZATIONACRONYM='DOB'",
+                'date_field': 'ADDDATE',
+                'id_field': 'SERVICEREQUESTID',
+                'description_field': 'SERVICECODEDESCRIPTION',
+                'status_field': 'SERVICEORDERSTATUS',
+                'type_field': 'SERVICECODE',
+                'address_fields': {'full': 'STREETADDRESS'},
+                'zip_field': 'ZIPCODE',
+                'lat_field': 'LATITUDE',
+                'lng_field': 'LONGITUDE',
+            },
+        ],
+    },
 }
 
 

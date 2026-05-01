@@ -877,6 +877,57 @@ ASSESSOR_SOURCES = {
         'source_tag': 'assessor:pima_tucson',
         'default_city': 'Tucson',
     },
+    'duval_jacksonville': {
+        # V484 B3: Duval County (Jacksonville FL) Property Appraiser
+        # Parcels. Probed 2026-05-01: 405,716 parcels city-wide (covers
+        # Jacksonville + Beach cities), updated DAILY per Duval PA docs.
+        # The owner name is in a single field (LNAMEOWNER), but the
+        # property address is split across 4 columns — leverage the
+        # V433b list-form `address` field_map (same pattern as
+        # hennepin_minneapolis HOUSE_NO + STREET_NM) so the collector
+        # concats them client-side. Mailing-address fields (MAILADDR1,
+        # MAILCITY, MAILSTATE, MAILZIP) are separately exposed; we only
+        # store the line-1 form to match the schema (one column for
+        # owner_mailing_address). Site city comes through ADDRCITY so
+        # the slug derivation (LOWER+REPLACE) keys most rows under
+        # 'jacksonville' (the principal city).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Duval County Property Appraiser Parcels',
+        'endpoint': 'https://maps.coj.net/coj/rest/services/CityBiz/Parcels/MapServer/0',
+        'where_clause': "LNAMEOWNER IS NOT NULL AND LNAMEOWNER <> ''",
+        'field_map': {
+            'owner_name': 'LNAMEOWNER',
+            'address': ['STREET_NO', 'ST_DIR', 'ST_NAME', 'ST_TYPE'],
+            'owner_mailing_address': 'MAILADDR1',
+            'parcel_id': 'RE',
+            'city': 'ADDRCITY',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:duval_jacksonville',
+        'pagination_strategy': 'objectid',
+    },
+    'spokane_spokane': {
+        # V484 B4: Spokane County WA Parcels (SCOUT PropertyLookup).
+        # Probed 2026-05-01: 138,046 parcels, nightly refresh. Field
+        # names are lowercase (different from most ArcGIS feeds).
+        # No mailing-address column is exposed in this layer — leave
+        # owner_mailing_address out of the field_map. The
+        # `NOT LIKE '%Pending%'` filter excludes the few hundred
+        # "Current Information Pending" rows for active segregations.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Spokane County Parcels (SCOUT)',
+        'endpoint': 'https://gismo.spokanecounty.org/arcgis/rest/services/SCOUT/PropertyLookup/MapServer/0',
+        'where_clause': "owner_name IS NOT NULL AND owner_name NOT LIKE '%Pending%'",
+        'field_map': {
+            'owner_name': 'owner_name',
+            'address': 'site_address',
+            'parcel_id': 'PID_NUM',
+            'city': 'site_city',
+        },
+        'state': 'WA',
+        'source_tag': 'assessor:spokane_spokane',
+        'pagination_strategy': 'objectid',
+    },
     'orleans_new_orleans': {
         # V483b: Orleans Parish Assessor (New Orleans). Probed 2026-05-01:
         # apps/property3/MapServer/15 ("Property Information [Parcels]")

@@ -832,6 +832,46 @@ CITY_REGISTRY = {
         "active": False,  # V99: Actually deactivated — ArcGIS endpoint dead since Jan 2026
     },
 
+    # V484 B6: Savannah GA — SAGIS BuildingPermit_FC. Probed 2026-05-01:
+    # 1,811 residential records (FeatureServer/1) + 610 commercial
+    # records (/0), newest IssuedDate 2026-04-17 (14 days fresh — passes
+    # the <30d cutoff). Registry only supports a single endpoint per
+    # entry, so this entry wires the larger residential layer; if the
+    # commercial layer (~25% of total volume) is needed later, add a
+    # parallel "savannah_commercial" entry pointing at /FeatureServer/0
+    # with the same field_map. ApplicantName is the only contractor-
+    # style field — mix of individuals and small businesses, comparable
+    # to DC/Boston quality. Issue dates are stored as epoch ms in
+    # IssuedDate_DATE; the human-readable IssuedDate (mm/dd/yyyy) is
+    # display-only — do NOT sort/filter on the string version.
+    "savannah_ga": {
+        "name": "Savannah",
+        "state": "GA",
+        "slug": "savannah",
+        "lat": 32.0809,
+        "lon": -81.0912,
+        "platform": "arcgis",
+        "endpoint": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/1/query",
+        "dataset_id": "Savannah_BuildingPermit_Residential",
+        "description": "Savannah Building Permits — residential layer (SAGIS)",
+        "field_map": {
+            "permit_number": "PermitNumber",
+            "permit_type": "PermitType",
+            "work_type": "WorkClass",
+            "status": "PermitStatus",
+            "filing_date": "IssuedDate_DATE",
+            "address": "Address",
+            "contractor_name": "ApplicantName",
+            "description": "Description",
+            "estimated_cost": "Permit_Value",
+            "parcel": "PIN",
+        },
+        "date_field": "IssuedDate_DATE",
+        "date_format": "epoch_ms",
+        "limit": 2000,
+        "active": True,
+    },
+
     # V91 - Virginia Beach, VA - Added 2026-04-06 - Current data through Apr 2026
     "virginia_beach": {
         "name": "Virginia Beach",
