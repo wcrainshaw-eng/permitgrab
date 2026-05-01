@@ -4599,14 +4599,29 @@ def add_cache_headers(response):
             response.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=86400'
         elif path.startswith('/report/'):
             response.headers['Cache-Control'] = 'public, max-age=900, s-maxage=3600'
+        # V484: persona pages — anonymous-cacheable. AdsBot was catching the
+        # `cf-cache-status: DYNAMIC` window during gunicorn worker recycles
+        # and disapproving the campaign with "Destination not working" 502s.
+        # Logged-in users hit the `private, max-age=0` branch above and
+        # never reach here. stale-if-error keeps the edge serving the last
+        # good response for 24h if origin ever 502s — closes the AdsBot loop.
+        elif path.startswith('/leads/'):
+            response.headers['Cache-Control'] = 'public, max-age=600, s-maxage=3600, stale-if-error=86400'
+        # V484: pricing was previously left uncached on the theory that it
+        # might redirect. Anonymous /pricing is in fact static (Stripe
+        # checkout links are server-rendered identically for every visitor)
+        # and the redirect cases are all handled by the logged_in branch
+        # above. Caching publicly closes the same AdsBot 502 window.
+        elif path == '/pricing':
+            response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=1800, stale-if-error=86400'
         elif path == '/contractors':
             response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=3600'
         elif path == '/':
             # Homepage redirects logged-in users; the logged_in-skip above
             # already covers that. For anon, short cache OK.
             response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=1800'
-        # Don't cache /pricing, /signup, /login — they may redirect or
-        # show form errors. Falling through means default browser handling.
+        # Don't cache /signup, /login — they may redirect or show form
+        # errors. Falling through means default browser handling.
     except Exception:
         pass
     return response
