@@ -88,23 +88,31 @@ def index():
     # V366 (CODE_V363 Part F): browseable city directory grouped by state.
     cities_by_state = get_city_directory_stats()
 
-    # V478 Section 4: state pill grid on homepage. Per-state count of
-    # active cities with permit data. Cached on prod_cities so this is
-    # one cheap query.
-    _v478_states = []
+    # V479: state pill grid now reads from the precomputed stats cache
+    # (refreshed by the daemon at end-of-cycle). Templates get a
+    # ready-to-render list instead of running a 2,200-row GROUP BY on
+    # every page load — which was the root cause of the V478 499s.
     try:
-        _sc = permitdb.get_connection()
+        from stats_cache import get_cached_stats as _v479_get
+        _v479_state_counts = _v479_get().get('state_counts', {}) or {}
         _v478_states = [
-            {'state': r['state'], 'count': r['cnt']}
-            for r in _sc.execute(
-                "SELECT state, COUNT(*) AS cnt FROM prod_cities "
-                "WHERE status = 'active' AND total_permits > 0 "
-                "AND state IS NOT NULL AND state <> '' "
-                "GROUP BY state ORDER BY cnt DESC"
-            ).fetchall()
+            {'state': st, 'count': cnt}
+            for st, cnt in sorted(
+                _v479_state_counts.items(),
+                key=lambda kv: kv[1], reverse=True,
+            )
         ]
     except Exception as _e:
-        print(f"[V478] state grid query failed: {_e}", flush=True)
+        print(f"[V479] state grid cache read failed: {_e}", flush=True)
+        _v478_states = []
+
+    # V479: pass the full stats dict so templates can read counts
+    # without ever running their own queries.
+    try:
+        from stats_cache import get_cached_stats as _v479_get
+        _v479_stats = _v479_get()
+    except Exception:
+        _v479_stats = {}
 
     return render_template('dashboard.html', footer_cities=footer_cities,
                           default_city=default_city, default_trade=default_trade,
@@ -112,6 +120,7 @@ def index():
                           all_dropdown_cities=all_dropdown_cities,
                           cities_by_state=cities_by_state,
                           v478_states=_v478_states,  # V478 state pill grid
+                          v479_stats=_v479_stats,    # V479 full cache
                           initial_stats=initial_stats,
                           # V224 T1: hide the sticky filter bar and the 50-card
                           # permit grid on the homepage itself — they're from

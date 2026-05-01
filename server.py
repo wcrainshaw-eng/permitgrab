@@ -1760,6 +1760,41 @@ def _deferred_startup():
 
 
 # V13.1: Jinja filter for human-readable date formatting
+@app.template_filter('format_number')
+def _v479_format_number(value):
+    """V479: 1234567 → '1,234,567'."""
+    try:
+        return f"{int(value):,}"
+    except (ValueError, TypeError):
+        return str(value or 0)
+
+
+@app.template_filter('format_compact')
+def _v479_format_compact(value):
+    """V479: 1234567 → '1.23M', 1234 → '1.2K'. Plain numbers, no $."""
+    try:
+        n = float(value)
+        if n >= 1_000_000_000: return f"{n/1_000_000_000:.1f}B"
+        if n >= 1_000_000:     return f"{n/1_000_000:.2f}M"
+        if n >= 1_000:         return f"{n/1_000:.1f}K"
+        return f"{int(n):,}"
+    except (ValueError, TypeError):
+        return str(value or 0)
+
+
+@app.template_filter('format_currency')
+def _v479_format_currency(value):
+    """V479: 80800000000 → '$80.8B'."""
+    try:
+        n = float(value)
+        if n >= 1_000_000_000: return f"${n/1_000_000_000:.1f}B"
+        if n >= 1_000_000:     return f"${n/1_000_000:.1f}M"
+        if n >= 1_000:         return f"${n/1_000:.0f}K"
+        return f"${int(n)}"
+    except (ValueError, TypeError):
+        return "$0"
+
+
 @app.template_filter('format_date')
 def format_date_filter(date_str):
     """Format date string to human-readable format: Mar 24, 2026"""
@@ -8133,6 +8168,16 @@ def scheduled_collection():
         _v229_cycle_start = time.time()
         print(f"[{datetime.now()}] V12.50: Starting scheduled collection cycle...")
 
+        # V479: refresh stats cache up-front the first time so a fresh
+        # worker has a populated cache available to templates. Failures
+        # here are non-fatal — pages will fall back to defaults.
+        try:
+            from stats_cache import refresh_stats_cache as _v479_refresh, get_cached_stats as _v479_get
+            if not _v479_get().get('updated_at'):
+                _v479_refresh(permitdb.get_connection())
+        except Exception as _e:
+            print(f"[{datetime.now()}] V479: pre-cycle stats refresh failed: {_e}", flush=True)
+
         # V13.3: Each task has its own try/except so one failure doesn't block others
         # Permit collection - V72.1: Disabled include_scrapers to prevent memory crash
         try:
@@ -8523,6 +8568,20 @@ def scheduled_collection():
         # rest, maximum 1h rest) — under normal load that's ~2 full passes
         # per hour instead of <1.
         _duration = max(0, int(time.time() - _v229_cycle_start))
+
+        # V479: end-of-cycle stats cache refresh. Runs in this daemon
+        # thread (NOT a request handler), so the 1.28M-row GROUP BY can
+        # take ~10s without affecting page latency. Templates read from
+        # the resulting in-memory dict in < 1ms.
+        try:
+            from stats_cache import refresh_stats_cache as _v479_refresh
+            refresh_stats_cache_thread_started = time.time()
+            _v479_refresh(permitdb.get_connection())
+            _v479_elapsed = int(time.time() - refresh_stats_cache_thread_started)
+            print(f"[{datetime.now()}] V479: stats cache refreshed (took {_v479_elapsed}s)", flush=True)
+        except Exception as _e:
+            print(f"[{datetime.now()}] V479: stats refresh failed: {_e}", flush=True)
+
         _sleep_for = max(300, min(3600, 1800 - _duration))
         print(f"[{datetime.now()}] V229 C1: cycle took {_duration}s, "
               f"sleeping {_sleep_for}s", flush=True)

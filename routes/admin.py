@@ -3281,6 +3281,37 @@ def admin_collect_assessor_data():
         return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
 
 
+@admin_bp.route('/api/admin/refresh-stats', methods=['POST'])
+def admin_refresh_stats():
+    """V479: force a stats-cache refresh.
+
+    Heavy aggregate queries (1.28M-row GROUP BYs) run synchronously in
+    THIS request so the caller pays the cost — never run them in normal
+    page handlers, that's what crashed V478. The daemon's regular cycle
+    also calls refresh_stats_cache() at the end; this endpoint is a
+    way to force a refresh after a deploy without waiting for the next
+    cycle.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        from stats_cache import refresh_stats_cache, get_cached_stats
+        conn = permitdb.get_connection()
+        refresh_stats_cache(conn)
+        s = get_cached_stats()
+        return jsonify({
+            'status': 'ok',
+            'cities': len(s.get('city_stats') or {}),
+            'permits': s.get('global', {}).get('total_permits', 0),
+            'updated_at': s.get('updated_at'),
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
+
+
 @admin_bp.route('/api/admin/query', methods=['POST'])
 def admin_query():
     """V34: Run a read-only SQL query for diagnostics.
