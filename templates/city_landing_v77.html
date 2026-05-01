@@ -1800,6 +1800,54 @@ function v328ApplyFilter(val) {
 }
 </script>
 
+{# V478 Part 2 Section D — city insights, light gray bg, 3-column grid.
+   All counts come from v479_stats cache (zero DB queries at render time). #}
+{% if v479_stats and v479_stats.city_top_trades and v479_stats.city_top_trades.get(city_slug) %}
+<section class="pg-section-light">
+  <div class="pg-container">
+    <div style="text-align: center; margin-bottom: 40px;">
+      <span class="pg-eyebrow">{{ city_name }} Insights</span>
+      <h2 class="pg-h2">What's happening in {{ city_name }}</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+      <div class="pg-card">
+        <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 16px;">Top Trades</h3>
+        {% for t in v479_stats.city_top_trades.get(city_slug) or [] %}
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; color: var(--pg-text-gray); border-bottom: 1px solid var(--pg-border);">
+          <span>{{ t.trade }}</span>
+          <span style="font-weight: 600; color: var(--pg-text);">{{ t.count | format_number }}</span>
+        </div>
+        {% else %}
+        <p style="color: var(--pg-text-gray); font-size: 14px; margin: 0;">Trade breakdown updates after the next collection cycle.</p>
+        {% endfor %}
+      </div>
+      <div class="pg-card">
+        <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 16px;">Top Contractors</h3>
+        {% for c in v479_stats.city_top_contractors.get(city_slug) or [] %}
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; color: var(--pg-text-gray); border-bottom: 1px solid var(--pg-border);">
+          <span style="color: var(--pg-primary); font-weight: 500;">{{ c.name }}</span>
+          <span style="font-weight: 600; color: var(--pg-text);">{{ c.count | format_number }}</span>
+        </div>
+        {% else %}
+        <p style="color: var(--pg-text-gray); font-size: 14px; margin: 0;">Contractor activity rebuilds after each collection cycle.</p>
+        {% endfor %}
+      </div>
+      <div class="pg-card">
+        <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 16px;">Recent Activity</h3>
+        <div style="font-size: 32px; font-weight: 700; color: var(--pg-primary); letter-spacing: -0.02em;">
+          {{ v479_stats.city_recent_count.get(city_slug, 0) | format_number }}
+        </div>
+        <p style="margin: 4px 0 16px; font-size: 14px; color: var(--pg-text-gray);">new permits this week</p>
+        {% if last_collection %}
+        <p style="margin: 0; font-size: 13px; color: var(--pg-text-gray);">Last updated: {{ last_collection[:10] }}</p>
+        {% endif %}
+        <p style="margin: 4px 0 0; font-size: 13px; color: var(--pg-text-gray);">Source: Official {{ city_name }} permit portal</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 {# V478 city final CTA — dark bg before footer #}
 <section class="pg-section-dark" style="text-align: center;">
   <div class="pg-container">
