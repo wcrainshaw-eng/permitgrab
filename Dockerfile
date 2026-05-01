@@ -17,22 +17,14 @@ EXPOSE 5000
 # local; two workers would spawn two daemon threads) and added threads=4
 # so the admin dashboard / JSON endpoints stay responsive while a
 # force-collect or enrich call is in flight on the single worker.
-# V448 (CODE_V447 follow-on): bumped --max-requests 500 → 5000.
-# The 500 cap was recycling the worker every 1–2 hours under normal
-# traffic (admin probes + user requests + healthcheck pings), and
-# scheduled_collection cycles take 60–90 min. Cycles were getting
-# killed mid-flight, so the daemon never wrote completion logs and
-# top cities went stale. 5000 buys ~80h of uptime, plenty for the
-# daemon to complete several cycles per worker. WAL is capped at
-# 64MB by V445 and process memory tops out around 1.2GB / 2GB so
-# the recycle is no longer needed for leak protection at the old
-# rate.
-# V452 (CODE_V448 follow-on): bumped --threads 4 → 12. After V450
-# unblocked the collector, city-page queries (slow ones in
-# city_trade_landing / _get_property_owners) saturated the 4-thread
-# pool every time more than 2-3 users hit a slow page concurrently.
-# Render's gateway returned 502 because /healthz had no thread to
-# serve. 12 threads gives headroom while we work on the slow queries
-# themselves; gthread workers are cheap (each is a Python thread, not
-# a process), and the gunicorn timeout=120 still bounds runaway calls.
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 12 --timeout 120 --graceful-timeout 30 --max-requests 5000 --max-requests-jitter 500 server:app"]
+# V452 bumped --threads 4 → 12 to handle slow city-page queries.
+# V481 (worker/web split): dropped --max-requests / --max-requests-jitter.
+# The historical reason for periodic recycling was leak protection
+# from in-process daemons (collection / enrichment / digest). With the
+# daemons moved to permitgrab-worker, the web process is lightweight
+# and stable — recycling just dropped in-flight requests and forced a
+# 30s graceful-timeout window every 5K requests for no benefit.
+# Bumped --workers 1 → 4 now that no daemon-thread locality is needed.
+# 4 workers × 8 threads = 32 concurrent request slots, each fully
+# isolated from the daemons.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 4 --threads 8 --timeout 120 --graceful-timeout 30 server:app"]
