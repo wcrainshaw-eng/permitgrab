@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta_title }}</title>
+<meta name="description" content="{{ meta_description }}">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta name="robots" content="index, follow">
+
+<meta property="og:title" content="{{ meta_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="https://permitgrab.com/og-image.png">
+
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+{% include 'partials/design_v478.html' %}
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"How do building material suppliers use permit data?","acceptedAnswer":{"@type":"Answer","text":"Suppliers use permit data to identify active construction projects and the contractors running them. By filtering permits by type, suppliers target contractors who need their specific materials. The busiest contractors pulling the most permits are the highest-potential accounts for material orders."}},
+    {"@type":"Question","name":"Can I see which contractors are most active in my area?","acceptedAnswer":{"@type":"Answer","text":"Yes. PermitGrab tracks contractor activity by city and trade category. You can see which companies pull the most permits, what types of projects they work on, and contact them directly using verified phone numbers."}},
+    {"@type":"Question","name":"What does $149/month include?","acceptedAnswer":{"@type":"Answer","text":"Unlimited access to building permit data, contractor profiles with phone numbers, property owner records, and code violation data across all available cities. No per-record fees, no contracts, cancel anytime."}}
+  ]
+}
+</script>
+
+<style>
+.lead-article { max-width: 880px; margin: 0 auto; padding: 60px 24px; color: var(--pg-text); }
+.lead-article h1 { font-size: 44px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 24px; }
+.lead-article .hero-copy { font-size: 22px; line-height: 1.5; color: var(--pg-text-gray); margin: 0 0 40px; }
+.lead-article h2 { font-size: 30px; font-weight: 700; margin: 56px 0 20px; letter-spacing: -0.01em; }
+.lead-article h3 { font-size: 18px; font-weight: 700; margin: 24px 0 12px; }
+.lead-article p { line-height: 1.65; font-size: 17px; color: var(--pg-text); margin: 0 0 16px; }
+.lead-article ul { line-height: 1.7; margin: 0 0 24px 24px; }
+.lead-article ul li { margin-bottom: 8px; }
+.lead-article .three-column { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 32px 0; }
+.lead-article .three-column .column { background: var(--pg-bg-light); border: 1px solid var(--pg-border); border-radius: 12px; padding: 24px; }
+.lead-article .three-column h3 { margin-top: 0; }
+.lead-article table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 16px; }
+.lead-article th, .lead-article td { padding: 12px 16px; border-bottom: 1px solid var(--pg-border); text-align: left; }
+.lead-article th { background: var(--pg-bg-light); font-weight: 700; }
+.lead-article .pricing-cta { background: var(--pg-bg-dark); color: white; padding: 48px; border-radius: 16px; text-align: center; margin: 56px 0; }
+.lead-article .pricing-cta h2 { color: white; margin-top: 0; }
+.lead-article .pricing-cta p { color: rgba(255,255,255,0.85); }
+.lead-article .cta-button { display: inline-block; background: var(--pg-primary); color: white; padding: 16px 32px; border-radius: 8px; font-weight: 700; text-decoration: none; margin-top: 16px; }
+.lead-article .faq-item { border: 1px solid var(--pg-border); border-radius: 12px; padding: 20px 24px; margin-bottom: 12px; }
+.lead-article .faq-item h3 { margin: 0 0 8px; font-size: 17px; }
+.lead-article .faq-item p { margin: 0; font-size: 16px; color: var(--pg-text-gray); }
+@media (max-width: 768px) {
+  .lead-article .three-column { grid-template-columns: 1fr; }
+  .lead-article h1 { font-size: 32px; }
+  .lead-article .hero-copy { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<article class="lead-article">
+<h1>Construction Project Leads for Building Material Suppliers</h1>
+
+<p class="hero-copy">Every permit filed is a project that needs materials. Lumber, HVAC equipment, electrical supplies, plumbing fixtures, roofing materials — PermitGrab shows you who's building what, where, and when. Stop cold-calling. Start selling to active projects.</p>
+
+<section class="value-prop">
+<h2>Why Suppliers Need Permit Data</h2>
+<div class="three-column">
+  <div class="column">
+    <h3>See What's Being Built</h3>
+    <p>Permit type tells you the scope: new construction needs everything from foundation to finish. Renovations need specific materials. Electrical permits need panels, wire, and fixtures. Know the project before you make the call.</p>
+  </div>
+  <div class="column">
+    <h3>Find Your Best Customers</h3>
+    <p>The most active contractors are your best repeat buyers. PermitGrab shows you who's pulling the most permits in each trade — those are the companies placing the biggest material orders.</p>
+  </div>
+  <div class="column">
+    <h3>Track Market Trends</h3>
+    <p>Permit volume by trade category shows you where the market is heading. More HVAC permits? Stock up on equipment. Roofing surge? Make sure your shingle inventory is ready.</p>
+  </div>
+</div>
+</section>
+
+<section class="trade-data">
+<h2>Active Contractors by Trade — Real Data</h2>
+<p>These are actual contractor counts from the PermitGrab database, updated daily:</p>
+<h3>Chicago</h3>
+<p>Electrical: 2,774 active companies | HVAC: 2,001 | Plumbing: 575 | Landscaping &amp; Exterior: 615 | Interior Renovation: 572</p>
+<h3>Miami-Dade County</h3>
+<p>HVAC: 945 | General Construction: 847 | Roofing: 692 | Landscaping &amp; Exterior: 450 | Windows &amp; Doors: 315</p>
+<h3>San Antonio</h3>
+<p>Landscaping &amp; Exterior: 1,202 | Plumbing: 689 | HVAC: 641 | Electrical: 585 | General Construction: 580</p>
+<h3>Phoenix</h3>
+<p>General Construction: 553 | Plumbing: 383 | Electrical: 211 | Interior Renovation: 171 | HVAC: 142</p>
+<p>Each contractor profile includes the business name, trade category, permit history, and — for the majority of profiles — a verified phone number.</p>
+</section>
+
+<section class="permit-volume">
+<h2>Project Volume by City</h2>
+<p>Permits filed in the last 90 days:</p>
+<table>
+  <thead>
+    <tr><th>City</th><th>Permits (90 days)</th><th>Daily Projects</th><th>Contractors on File</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>New York City</td><td>27,916</td><td>310</td><td>4,366</td></tr>
+    <tr><td>San Antonio</td><td>22,555</td><td>251</td><td>4,626</td></tr>
+    <tr><td>Cleveland</td><td>9,922</td><td>110</td><td>2,291</td></tr>
+    <tr><td>Orlando</td><td>8,753</td><td>97</td><td>1,791</td></tr>
+    <tr><td>Phoenix</td><td>6,039</td><td>67</td><td>1,966</td></tr>
+    <tr><td>Chicago</td><td>5,684</td><td>63</td><td>8,872</td></tr>
+    <tr><td>Miami-Dade County</td><td>5,421</td><td>60</td><td>4,290</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section class="use-cases">
+<h2>How Suppliers Use Permit Data</h2>
+<p><strong>Outside sales teams</strong> use permit data to plan their routes. Instead of cold-calling every contractor in the phone book, filter by trade and permit volume to visit the busiest companies first — the ones placing the largest orders.</p>
+<p><strong>Account managers</strong> use permit data to spot when existing customers win new projects. A timely call — "I see you pulled a permit for a 12-unit development on Main Street. Want me to put together a materials quote?" — shows you're paying attention and makes reordering effortless.</p>
+<p><strong>Sales managers</strong> use trade-level permit trends to forecast demand. If HVAC permits are up 15% quarter-over-quarter in Phoenix, your HVAC equipment inventory should reflect that growth.</p>
+<p><strong>Territory managers</strong> use city-level permit data to identify underserved markets. A city with 8,000+ permits per quarter but no local distributor presence is an expansion opportunity.</p>
+</section>
+
+<section class="phone-coverage">
+<h2>Direct Phone Numbers Included</h2>
+<p>PermitGrab enriches contractor profiles with verified phone numbers from state licensing databases. Coverage by city:</p>
+<ul>
+  <li>Miami-Dade County: 93% phone coverage (4,002 of 4,290 profiles)</li>
+  <li>San Antonio: 83% (3,838 of 4,626)</li>
+  <li>Phoenix: 55% (1,088 of 1,966)</li>
+  <li>Chicago: 40% (3,500 of 8,872)</li>
+  <li>New York City: 19% (814 of 4,366)</li>
+</ul>
+</section>
+
+<section class="pricing-cta">
+<h2>$149/Month — Unlimited Access</h2>
+<p>All cities. All trades. All permit types. Contractor profiles with phone numbers. Property owner data. Code violation records. No per-lead fees. No contracts.</p>
+<a href="/pricing" class="cta-button">Start Your Free Trial</a>
+</section>
+
+<section class="faq">
+<h2>Frequently Asked Questions</h2>
+<div class="faq-item">
+<h3>How do building material suppliers use permit data?</h3>
+<p>Suppliers use permit data to identify active construction projects and the contractors running them. By filtering permits by type (new construction, renovation, electrical, plumbing), suppliers can target contractors who need their specific materials. The busiest contractors — those pulling the most permits — are your highest-potential accounts.</p>
+</div>
+<div class="faq-item">
+<h3>Can I see which contractors are most active in my area?</h3>
+<p>Yes. PermitGrab tracks contractor activity by city and trade. You can see which companies pull the most permits, what types of projects they work on, and contact them directly using the phone numbers in their profile.</p>
+</div>
+<div class="faq-item">
+<h3>What does $149/month include?</h3>
+<p>Unlimited access to building permit data, contractor profiles with phone numbers, property owner records, and code violation data across all available cities. No per-record fees, no contracts, cancel anytime.</p>
+</div>
+</section>
+
+<p style="margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--pg-border); font-size: 15px; color: var(--pg-text-gray);">
+Related guides:
+<a href="/blog/subcontractor-permit-leads" style="color: var(--pg-primary);">Subcontractor Permit Lead Playbook</a> ·
+<a href="/blog/home-service-leads-from-permits" style="color: var(--pg-primary);">Home Service Leads from Permits</a> ·
+<a href="/leads/contractors" style="color: var(--pg-primary);">Active Contractor Profiles</a>
+</p>
+</article>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>

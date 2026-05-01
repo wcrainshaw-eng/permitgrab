@@ -402,3 +402,49 @@ def persona_home_services_alias():
 @persona_bp.route('/solutions/solar')
 def persona_solar_alias():
     return _redirect('/leads/solar-home-services', code=301)
+
+
+# V482 Part B1+B2: standalone landing pages for two new buyer personas
+# (insurance agents and material suppliers). The content is hand-written
+# and lives in templates/leads/{insurance,suppliers}.html. These pages
+# do NOT use the _PERSONAS dict + persona_landing.html scaffold because
+# the article structure (data tables, multi-column value props, FAQ
+# blocks) doesn't fit the dict's hero/value-prop/cta shape.
+_V482_INSURANCE_META = {
+    'meta_title': 'New Homeowner & Renovation Leads for Insurance Agents | PermitGrab',
+    'meta_description': (
+        'Find homeowners filing building permits in real-time. Perfect '
+        'leads for home insurance, renovation coverage, and new '
+        'construction policies. Active in 11+ cities. $149/mo unlimited.'
+    ),
+}
+_V482_SUPPLIERS_META = {
+    'meta_title': 'Construction Project Leads for Building Material Suppliers | PermitGrab',
+    'meta_description': (
+        'Track new construction and renovation permits across 11+ US '
+        'cities. Know what is being built, where, and by whom — before '
+        'your competitors do. $149/mo unlimited.'
+    ),
+}
+
+
+@persona_bp.route('/leads/insurance')
+def persona_insurance():
+    return render_template(
+        'leads/insurance.html',
+        meta_title=_V482_INSURANCE_META['meta_title'],
+        meta_description=_V482_INSURANCE_META['meta_description'],
+        canonical_url=f"{SITE_URL}/leads/insurance",
+        current_year=datetime.now().year,
+    )
+
+
+@persona_bp.route('/leads/suppliers')
+def persona_suppliers():
+    return render_template(
+        'leads/suppliers.html',
+        meta_title=_V482_SUPPLIERS_META['meta_title'],
+        meta_description=_V482_SUPPLIERS_META['meta_description'],
+        canonical_url=f"{SITE_URL}/leads/suppliers",
+        current_year=datetime.now().year,
+    )

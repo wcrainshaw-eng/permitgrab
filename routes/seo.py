@@ -75,7 +75,25 @@ def blog_post(slug):
     the live report on the fly so the numbers stay fresh on every load.
     V467: SEO blog posts for ad-ready cities — checked first, before the
     legacy BLOG_POSTS list lookup.
+    V482 Part B3: buyer-persona blog posts (NOT city-specific) checked
+    first. They're hand-written + pre-baked with real numbers and run zero
+    DB queries at render time.
     """
+    try:
+        from buyer_persona_posts import BUYER_PERSONA_POSTS
+        if slug in BUYER_PERSONA_POSTS:
+            post = BUYER_PERSONA_POSTS[slug]
+            related_posts = [(s, p) for s, p in BUYER_PERSONA_POSTS.items() if s != slug][:3]
+            footer_cities = get_cities_with_data()
+            return render_template(
+                'blog/persona/post.html',
+                slug=slug, post=post,
+                related_posts=related_posts,
+                footer_cities=footer_cities,
+            )
+    except Exception as _e:
+        print(f"[V482] buyer persona post render failed for {slug}: {_e}", flush=True)
+
     _seo = _v467_render_seo_blog_post(slug)
     if _seo is not None:
         return _seo
@@ -152,6 +170,11 @@ def sitemap_pages():
         {'loc': f"{SITE_URL}/leads/real-estate-investors", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
         {'loc': f"{SITE_URL}/leads/contractors", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
         {'loc': f"{SITE_URL}/leads/home-services", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
+        # V480: alias for the same audience under the solar-leaning slug.
+        {'loc': f"{SITE_URL}/leads/solar-home-services", 'changefreq': 'daily', 'priority': '0.9', 'lastmod': today},
+        # V482 Part B1+B2: two new buyer-persona landing pages.
+        {'loc': f"{SITE_URL}/leads/insurance", 'changefreq': 'weekly', 'priority': '0.85', 'lastmod': today},
+        {'loc': f"{SITE_URL}/leads/suppliers", 'changefreq': 'weekly', 'priority': '0.85', 'lastmod': today},
         {'loc': f"{SITE_URL}/about", 'changefreq': 'monthly', 'priority': '0.6', 'lastmod': today},
         {'loc': f"{SITE_URL}/contact", 'changefreq': 'monthly', 'priority': '0.5', 'lastmod': today},
         {'loc': f"{SITE_URL}/privacy", 'changefreq': 'monthly', 'priority': '0.3', 'lastmod': today},
@@ -383,6 +406,19 @@ def sitemap_blog():
             })
     except Exception as _faq_err:
         print(f"[V469] sitemap-blog FAQ posts skipped: {_faq_err}", flush=True)
+
+    # V482 Part B3: buyer-persona blog posts.
+    try:
+        from buyer_persona_posts import BUYER_PERSONA_POSTS
+        for _slug, _post in BUYER_PERSONA_POSTS.items():
+            urls.append({
+                'loc': f"{SITE_URL}/blog/{_slug}",
+                'changefreq': 'weekly',
+                'priority': '0.85',
+                'lastmod': _post.get('meta_published', '2026-05-01'),
+            })
+    except Exception as _bp_err:
+        print(f"[V482] sitemap-blog persona posts skipped: {_bp_err}", flush=True)
 
     for post in BLOG_POSTS:
         urls.append({
