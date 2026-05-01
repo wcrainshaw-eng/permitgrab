@@ -311,6 +311,25 @@ def scheduled_collection():
         except Exception as e:
             print(f"[WORKER] Staleness check error (non-fatal): {e}", flush=True)
 
+        # ── V483: Refresh the V479 stats cache at the end of each cycle ──
+        # The cache is what city pages read from (zero DB queries at render
+        # time per V479 design). When the worker collects new permits /
+        # owners / violations, the cache must be re-aggregated or the web
+        # serves stale numbers. refresh_stats_cache() lives in stats_cache.py,
+        # is plain-Python (no Flask coupling), and atomically rewrites
+        # /var/data/stats_cache.json — which the web service reads via
+        # _load_from_disk() since web + worker share the same disk.
+        if memory_ok("stats_cache_refresh"):
+            try:
+                from stats_cache import refresh_stats_cache
+                conn = permitdb.get_connection()
+                refresh_stats_cache(conn)
+                print(f"[WORKER] V483: stats cache refreshed", flush=True)
+                gc.collect()
+            except Exception as e:
+                print(f"[WORKER] V483: stats cache refresh error (non-fatal): {e}",
+                      flush=True)
+
         # ── Cycle complete ──
         elapsed_total = time.time() - cycle_start
         mem = get_memory_mb()
@@ -482,6 +501,20 @@ def main():
 
     # 2. Sync configs
     sync_configs()
+
+    # 2b. V483: refresh the V479 stats cache once on startup so a fresh
+    # worker boot immediately reflects any recent direct-DB writes (e.g.
+    # the V482 Miami-Dade owner slug realignment). Subsequent refreshes
+    # happen at the end of each scheduled_collection cycle. Wrapped in
+    # try/except so a refresh failure never blocks the worker's main loop.
+    try:
+        import db as _permitdb
+        from stats_cache import refresh_stats_cache as _v483_refresh
+        _v483_refresh(_permitdb.get_connection())
+        print(f"[WORKER] V483: startup stats cache refresh complete", flush=True)
+    except Exception as _v483_e:
+        print(f"[WORKER] V483: startup stats refresh failed (non-fatal): "
+              f"{_v483_e}", flush=True)
 
     # 3. Start threads
     threads = []
