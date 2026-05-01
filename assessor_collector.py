@@ -886,20 +886,23 @@ ASSESSOR_SOURCES = {
         # / PSTLCITY / PSTLSTATE / PSTLZIP5 (mailing — differs from
         # situs = absentee owner signal), PARCELID (GeoPIN), TAXBILLID,
         # USECD. maxRecordCount=1000.
-        # NOTE the V483b spec quirk: where=1=1 returns embedded
-        # error.code=400 ("Failed to execute query"). The standard
-        # field-existence WHERE we use here is a valid filter, so
-        # ArcGIS pagination via resultOffset works without needing
-        # an OBJECTID-based fallback. NOLA SSL cert chain doesn't
-        # validate cleanly on the Render container, but the SESSION's
-        # default verify=True works — only urllib3 / urllib hit the
-        # CA bundle issue. Promotes New Orleans Tier 4 → Tier 5
-        # (already has permits + profiles + phones + violations,
-        # owners is the missing leg).
+        # The V483b spec quirk where=1=1 returns embedded error.code=400
+        # doesn't bite us — the standard field-existence WHERE pattern
+        # ("OWNERNME1 IS NOT NULL AND ..." with `<> ''`) is itself a
+        # valid filter, so ArcGIS resultOffset pagination works without
+        # needing an OBJECTID-based fallback. Promotes New Orleans Tier 4
+        # → Tier 5 (already has permits + profiles + phones + violations;
+        # owners was the missing leg).
+        # verify_ssl=False because gis.nola.gov's certificate chain
+        # doesn't validate against the Render container's CA bundle
+        # (verified live during V483b deploy: SSLCertVerificationError).
+        # Public parcel data, no creds in flight, JSON parsed verbatim —
+        # acceptable trade-off for unblocking the import.
         'platform': 'arcgis_mapserver',
         'service_description': 'Orleans Parish Assessor Parcels',
         'endpoint': 'https://gis.nola.gov/arcgis/rest/services/apps/property3/MapServer/15',
         'where_clause': "OWNERNME1 IS NOT NULL AND OWNERNME1 <> '' AND SITEADDRESS IS NOT NULL AND SITEADDRESS <> ''",
+        'verify_ssl': False,
         'field_map': {
             'owner_name': 'OWNERNME1',
             'address': 'SITEADDRESS',
@@ -919,8 +922,15 @@ ASSESSOR_SOURCES = {
 }
 
 
-def _fetch_arcgis_page(endpoint, where, offset, page_size, out_fields):
-    """Fetch one page from ArcGIS MapServer, non-spatial."""
+def _fetch_arcgis_page(endpoint, where, offset, page_size, out_fields, verify_ssl=True):
+    """Fetch one page from ArcGIS MapServer, non-spatial.
+
+    V483b: verify_ssl can be False for endpoints whose cert chain doesn't
+    validate against the Render container's CA bundle (e.g. gis.nola.gov).
+    The data is public-facing parcel data, so unverified TLS is an
+    acceptable trade-off — we're not sending creds and the response is
+    JSON we parse and persist verbatim.
+    """
     params = {
         'where': where,
         'outFields': out_fields,
@@ -930,7 +940,7 @@ def _fetch_arcgis_page(endpoint, where, offset, page_size, out_fields):
         'orderByFields': 'OBJECTID ASC',
         'f': 'json',
     }
-    resp = SESSION.get(endpoint + '/query', params=params, timeout=60)
+    resp = SESSION.get(endpoint + '/query', params=params, timeout=60, verify=verify_ssl)
     resp.raise_for_status()
     data = resp.json()
     if data.get('error'):
@@ -1129,7 +1139,8 @@ def collect(source_key, max_records=None, page_size=None, start_offset=0):
             if platform == 'arcgis_mapserver':
                 features = _fetch_arcgis_page(
                     cfg['endpoint'], cfg['where_clause'],
-                    offset, this_page, out_fields
+                    offset, this_page, out_fields,
+                    verify_ssl=cfg.get('verify_ssl', True),
                 )
             elif platform == 'carto':
                 features = _fetch_carto_page(
