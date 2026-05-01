@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta_title }}</title>
+<meta name="description" content="{{ meta_description }}">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta name="robots" content="index, follow">
+
+<meta property="og:title" content="{{ meta_title }}">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PermitGrab">
+<meta property="og:image" content="https://permitgrab.com/og-image.png">
+
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+{% include 'partials/design_v478.html' %}
+
+{# V482 Part B5: FAQPage JSON-LD #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"How do building permits help insurance agents find leads?","acceptedAnswer":{"@type":"Answer","text":"Every building permit represents a homeowner actively investing in their property. New construction needs builder's risk and homeowner's policies. Renovations increase home value, creating coverage gaps. Electrical and mechanical upgrades can qualify for premium discounts. PermitGrab delivers these permit records daily so you can reach homeowners before they start shopping for coverage."}},
+    {"@type":"Question","name":"What cities have insurance lead data?","acceptedAnswer":{"@type":"Answer","text":"PermitGrab currently covers 11+ major US cities including New York City, San Antonio, Austin, Cleveland, Orlando, Phoenix, Chicago, Miami-Dade County, Cape Coral, Fort Lauderdale, Mesa, and St. Petersburg."}},
+    {"@type":"Question","name":"Is building permit data legal to use for insurance prospecting?","acceptedAnswer":{"@type":"Answer","text":"Yes. Building permits are public records filed with municipal governments and published on official city open data portals. PermitGrab aggregates this public data into a searchable format."}},
+    {"@type":"Question","name":"How much do building permit leads cost?","acceptedAnswer":{"@type":"Answer","text":"PermitGrab is $149/month for unlimited access to all cities, all permit types, and all property data. No per-lead fees, no contracts, cancel anytime."}}
+  ]
+}
+</script>
+
+<style>
+.lead-article { max-width: 880px; margin: 0 auto; padding: 60px 24px; color: var(--pg-text); }
+.lead-article h1 { font-size: 44px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 24px; }
+.lead-article .hero-copy { font-size: 22px; line-height: 1.5; color: var(--pg-text-gray); margin: 0 0 40px; }
+.lead-article h2 { font-size: 30px; font-weight: 700; margin: 56px 0 20px; letter-spacing: -0.01em; }
+.lead-article h3 { font-size: 18px; font-weight: 700; margin: 24px 0 12px; }
+.lead-article p { line-height: 1.65; font-size: 17px; color: var(--pg-text); margin: 0 0 16px; }
+.lead-article ul { line-height: 1.7; margin: 0 0 24px 24px; }
+.lead-article ul li { margin-bottom: 8px; }
+.lead-article .three-column { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 32px 0; }
+.lead-article .three-column .column { background: var(--pg-bg-light); border: 1px solid var(--pg-border); border-radius: 12px; padding: 24px; }
+.lead-article .three-column h3 { margin-top: 0; }
+.lead-article table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 16px; }
+.lead-article th, .lead-article td { padding: 12px 16px; border-bottom: 1px solid var(--pg-border); text-align: left; }
+.lead-article th { background: var(--pg-bg-light); font-weight: 700; }
+.lead-article .pricing-cta { background: var(--pg-bg-dark); color: white; padding: 48px; border-radius: 16px; text-align: center; margin: 56px 0; }
+.lead-article .pricing-cta h2 { color: white; margin-top: 0; }
+.lead-article .pricing-cta p { color: rgba(255,255,255,0.85); }
+.lead-article .cta-button { display: inline-block; background: var(--pg-primary); color: white; padding: 16px 32px; border-radius: 8px; font-weight: 700; text-decoration: none; margin-top: 16px; }
+.lead-article .faq-item { border: 1px solid var(--pg-border); border-radius: 12px; padding: 20px 24px; margin-bottom: 12px; }
+.lead-article .faq-item h3 { margin: 0 0 8px; font-size: 17px; }
+.lead-article .faq-item p { margin: 0; font-size: 16px; color: var(--pg-text-gray); }
+@media (max-width: 768px) {
+  .lead-article .three-column { grid-template-columns: 1fr; }
+  .lead-article h1 { font-size: 32px; }
+  .lead-article .hero-copy { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+{% include 'partials/nav.html' %}
+
+<article class="lead-article">
+<h1>New Homeowner &amp; Renovation Leads for Insurance Agents</h1>
+
+<p class="hero-copy">Every building permit signals an insurance opportunity. New construction needs builder's risk and homeowner's policies. Renovations need updated coverage. PermitGrab delivers these leads daily from public permit records in 11+ major cities.</p>
+
+<section class="value-prop">
+<h2>Why Permit Data Works for Insurance</h2>
+<p>Building permits are trigger events — they signal a homeowner actively investing in their property. That means they need to think about their insurance coverage right now, not six months from now.</p>
+<div class="three-column">
+  <div class="column">
+    <h3>New Construction</h3>
+    <p>Every new home needs builder's risk insurance during construction and a homeowner's policy at completion. Two policies from one permit filing.</p>
+  </div>
+  <div class="column">
+    <h3>Major Renovations</h3>
+    <p>A $50K kitchen remodel increases home value. If the current policy covers $300K but the home is now worth $350K, there's a coverage gap you can fill.</p>
+  </div>
+  <div class="column">
+    <h3>Electrical &amp; Mechanical</h3>
+    <p>Updated wiring and new HVAC systems improve a home's risk profile. These permits signal a homeowner who may qualify for premium discounts — an easy conversation starter.</p>
+  </div>
+</div>
+</section>
+
+<section class="data-proof">
+<h2>Real Permit Volume by City</h2>
+<p>These are actual numbers from the last 90 days of building permit filings:</p>
+<table>
+  <thead>
+    <tr><th>City</th><th>Permits (90 days)</th><th>Daily Leads</th><th>Violation Records</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>New York City</td><td>27,916</td><td>310</td><td>61,139</td></tr>
+    <tr><td>San Antonio</td><td>22,555</td><td>251</td><td>—</td></tr>
+    <tr><td>Austin</td><td>12,041</td><td>134</td><td>6,809</td></tr>
+    <tr><td>Cleveland</td><td>9,922</td><td>110</td><td>—</td></tr>
+    <tr><td>Orlando</td><td>8,753</td><td>97</td><td>6,208</td></tr>
+    <tr><td>Phoenix</td><td>6,039</td><td>67</td><td>—</td></tr>
+    <tr><td>Chicago</td><td>5,684</td><td>63</td><td>20,670</td></tr>
+    <tr><td>Miami-Dade County</td><td>5,421</td><td>60</td><td>11,655</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section class="what-you-get">
+<h2>What You Get</h2>
+<ul>
+  <li><strong>Daily permit filings</strong> with property addresses and permit types</li>
+  <li><strong>Property owner names</strong> from county assessor records (where available)</li>
+  <li><strong>Permit type classification</strong> — new construction, renovation, electrical, plumbing, mechanical</li>
+  <li><strong>Contractor information</strong> — who's doing the work (useful for referral partnerships)</li>
+  <li><strong>Code violation data</strong> — properties with deferred maintenance may need updated liability coverage</li>
+</ul>
+</section>
+
+<section class="how-to-use">
+<h2>How Insurance Agents Use Permit Data</h2>
+<p><strong>1. Filter by permit type.</strong> Focus on new construction (needs full policy), major renovations (coverage gap), and roof replacements (most common claim area).</p>
+<p><strong>2. Time your outreach.</strong> Call within 1–2 weeks of permit filing. The homeowner is in planning mode and receptive to conversations about protecting their investment.</p>
+<p><strong>3. Reference the permit.</strong> "I noticed you filed a permit for a roof replacement at 456 Oak Street. Depending on the scope, your current homeowner's policy may not cover the increased value. I can do a quick review."</p>
+<p><strong>4. Follow up at completion.</strong> Set a reminder for the estimated project completion date. That's when the home's value has officially increased and the coverage gap is real.</p>
+</section>
+
+<section class="pricing-cta">
+<h2>$149/Month — Unlimited Access</h2>
+<p>All cities. All permit types. Property owner data. Code violations. Contractor profiles. No per-lead fees. No contracts. Cancel anytime.</p>
+<a href="/pricing" class="cta-button">Start Your Free Trial</a>
+</section>
+
+<section class="faq">
+<h2>Frequently Asked Questions</h2>
+<div class="faq-item">
+<h3>How do building permits help insurance agents find leads?</h3>
+<p>Every building permit represents a homeowner actively investing in their property. New construction needs builder's risk and homeowner's policies. Renovations increase home value, creating coverage gaps. Electrical and mechanical upgrades can qualify for premium discounts. PermitGrab delivers these permit records daily so you can reach homeowners before they start shopping for coverage.</p>
+</div>
+<div class="faq-item">
+<h3>What cities have insurance lead data?</h3>
+<p>PermitGrab currently covers 11+ major US cities including New York City, San Antonio, Austin, Cleveland, Orlando, Phoenix, Chicago, Miami-Dade County, Cape Coral, Fort Lauderdale, Mesa, and St. Petersburg. New cities are added regularly.</p>
+</div>
+<div class="faq-item">
+<h3>Is building permit data legal to use for insurance prospecting?</h3>
+<p>Yes. Building permits are public records filed with municipal governments. The data is published on official city open data portals and is freely available to anyone. PermitGrab aggregates this public data into a searchable format.</p>
+</div>
+<div class="faq-item">
+<h3>How much do building permit leads cost?</h3>
+<p>PermitGrab is $149/month for unlimited access to all cities, all permit types, and all property data. No per-lead fees. Compare that to traditional lead vendors charging $15–50 per lead shared with 3–4 competitors.</p>
+</div>
+</section>
+
+<p style="margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--pg-border); font-size: 15px; color: var(--pg-text-gray);">
+Related guides:
+<a href="/blog/building-permit-leads-insurance-agents" style="color: var(--pg-primary);">Insurance Agent Permit Lead Playbook</a> ·
+<a href="/leads/real-estate-investors" style="color: var(--pg-primary);">Code Violation Property Lists</a> ·
+<a href="/leads/contractors" style="color: var(--pg-primary);">Active Contractor Profiles</a>
+</p>
+</article>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>
