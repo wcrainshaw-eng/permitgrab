@@ -1547,6 +1547,48 @@ def _backfill_sources_table():
     print(f"[{datetime.now()}] V145: Backfill — {total} total, {active} active, {unverified} unverified")
 
 
+def _v486_warn_registry_duplicates():
+    """V486: surface every duplicate CITY_REGISTRY / ASSESSOR_SOURCES key.
+
+    Python dict-literals silently keep the LAST occurrence of a
+    duplicate key. The Fort Worth incident (V486): the live ArcGIS
+    CFW_Development_Permits config at city_registry_data.py:1525 was
+    shadowed by a stale Socrata BLDS qy5k-jz7m config at line 38117 —
+    so the daemon collected 2015-frozen Fort Worth permits for years
+    while the fresh ArcGIS feed sat unused. Same failure mode as V483b
+    (nola_blds shadowing new_orleans_la for 4 years).
+
+    This walks the source FILES (not the loaded dict — by the time the
+    dict exists, the duplicates are already collapsed) and prints every
+    duplicate key it finds. Surfacing them in worker logs means future
+    drift gets caught by deploy-time grep instead of by data forensics.
+    """
+    import re
+    for label, path in (
+        ('CITY_REGISTRY', 'city_registry_data.py'),
+        ('ASSESSOR_SOURCES', 'assessor_collector.py'),
+    ):
+        try:
+            here = os.path.dirname(os.path.abspath(__file__))
+            full = os.path.join(here, path)
+            with open(full) as f:
+                src = f.read()
+            keys = re.findall(r'^    "([a-z_][a-z0-9_]*)":\s*\{', src, re.MULTILINE)
+            from collections import Counter
+            dupes = {k: n for k, n in Counter(keys).items() if n > 1}
+            if dupes:
+                top = sorted(dupes.items(), key=lambda kv: -kv[1])[:10]
+                print(
+                    f"[V486] {label} duplicate-key WARNING: "
+                    f"{len(dupes)} keys appear more than once — Python keeps "
+                    f"only the LAST entry. Top 10: "
+                    f"{', '.join(f'{k}({n})' for k, n in top)}",
+                    flush=True,
+                )
+        except Exception as _e:
+            print(f"[V486] {label} duplicate scan failed: {_e}", flush=True)
+
+
 def _v471_sync_city_registry_to_city_sources():
     """V471 PR3: upsert every CITY_REGISTRY + BULK_SOURCES entry into the
     city_sources table so the runtime config can move from a Python dict
@@ -1657,6 +1699,7 @@ def _deferred_startup():
     # uses INSERT OR REPLACE so updates flow through.
     try:
         _v471_sync_city_registry_to_city_sources()
+        _v486_warn_registry_duplicates()
     except Exception as e:
         print(f"[{datetime.now()}] V471 PR3: city_sources sync error (non-fatal): {e}")
 
