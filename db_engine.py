@@ -820,6 +820,31 @@ def _init_postgres_schema(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_date ON violations(violation_date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status)")
 
+    # V485 B8: page_views — close the SEO measurement loop. The
+    # analytics_track_page_view after_request hook in server.py:4692
+    # has been INSERTing into this table for years, but the table never
+    # existed in production — every INSERT silently swallowed by the
+    # surrounding try/except. With this CREATE, every page load
+    # (excluding /static, /api/, /health, /favicon, /robots, /sitemap)
+    # writes a row, so we can finally measure Googlebot crawl rate,
+    # bot vs human ratio, and which pages get traffic.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS page_views (
+            id            SERIAL PRIMARY KEY,
+            path          TEXT NOT NULL,
+            method        TEXT,
+            status_code   INTEGER,
+            user_agent    TEXT,
+            ip_address    TEXT,
+            referrer      TEXT,
+            session_id    TEXT,
+            user_id       INTEGER,
+            created_at    TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_page_views_path_created ON page_views(path, created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_page_views_created_at ON page_views(created_at)")
+
     print("[DB_ENGINE] PostgreSQL schema initialized")
 
 
