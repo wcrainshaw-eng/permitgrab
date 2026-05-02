@@ -3998,12 +3998,18 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                         continue
 
                 # V126: INSERT IMMEDIATELY after each city + loud logging
+                # V485: pass the canonical slug (config['slug']) NOT the
+                # source_id (registry key) so /permits/<slug> reads the
+                # rows. The V485 db.py canonicalizer also remaps at
+                # insert time as a safety net, but pass the right value
+                # here too to be explicit.
                 permit_count = len(city_permits)
                 inserted_count = 0
                 if city_permits:
                     try:
-                        inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=source_id)
-                        print(f"    [V126-INSERT] {city_name} ({source_id}): {permit_count} normalized, {inserted_count} inserted to DB", flush=True)
+                        canonical_key = config.get('slug') or source_id
+                        inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=canonical_key)
+                        print(f"    [V126-INSERT] {city_name} ({source_id} -> {canonical_key}): {permit_count} normalized, {inserted_count} inserted to DB", flush=True)
                     except Exception as upsert_err:
                         print(f"    [V126-INSERT-ERROR] {city_name} ({source_id}): {upsert_err}", flush=True)
                 all_permits_count += len(city_permits)  # V166: Count only, don't accumulate
@@ -4134,12 +4140,18 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                             continue
 
                         # V126: INSERT IMMEDIATELY + loud logging
+                        # V485: pass the canonical slug; the registry key
+                        # (city_key) is the source_id form (underscore),
+                        # not the user-facing slug. db.py canonicalizes
+                        # as a safety net, but be explicit here.
                     permit_count = len(city_permits)
                     inserted_count = 0
                     if city_permits:
                         try:
-                            inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=city_key)
-                            print(f"    [V126-INSERT] {city_name} ({city_key}): {permit_count} normalized, {inserted_count} inserted", flush=True)
+                            _city_cfg = _get_source_config(city_key) or {}
+                            canonical_key = _city_cfg.get('slug') or city_key
+                            inserted_count, _ = permitdb.upsert_permits(city_permits, source_city_key=canonical_key)
+                            print(f"    [V126-INSERT] {city_name} ({city_key} -> {canonical_key}): {permit_count} normalized, {inserted_count} inserted", flush=True)
                         except Exception as upsert_err:
                             print(f"    [V126-INSERT-ERROR] {city_name} ({city_key}): {upsert_err}", flush=True)
                     all_permits_count += len(city_permits)  # V166: Count only, don't accumulate
