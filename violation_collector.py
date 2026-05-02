@@ -1764,6 +1764,36 @@ VIOLATION_SOURCES = {
             },
         ],
     },
+
+    # V487 PR1 B1: Detroit blight tickets — pairs with V486's 378K Detroit
+    # owner records to make Detroit a strong owners + violations metro for
+    # the motivated-seller playbook. ~30 fresh tickets/day, ~50K archive.
+    # Quirk: source has obvious year-overflow corruption rows (e.g.
+    # ticket_issued_date='8535-09-25', '3822-10-01'). The where_clause
+    # bounds the valid range so they're filtered out at fetch time.
+    'detroit-mi': {
+        'prod_city_id': None,
+        'city': 'Detroit',
+        'state': 'MI',
+        'endpoints': [{
+            'name': 'Detroit Blight Tickets',
+            'platform': 'arcgis',
+            'arcgis_url': 'https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/blight_tickets/FeatureServer/0',
+            'base_where': "ticket_issued_date <= DATE '2026-12-31' AND ticket_issued_date >= DATE '2020-01-01'",
+            'date_field': 'ticket_issued_date',
+            'id_field': 'ticket_number',
+            'description_field': 'ordinance_description',
+            'status_field': 'disposition',
+            'type_field': 'ordinance_law',
+            'address_fields': {'full': 'address'},
+            'fine_field': 'amt_fine',
+            'judgment_field': 'amt_judgment',
+            'inspector_field': 'inspector_name',
+            'agency_field': 'agency_name',
+            'lat_field': 'latitude',
+            'lng_field': 'longitude',
+        }],
+    },
 }
 
 
