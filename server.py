@@ -4562,13 +4562,31 @@ def inject_nav_context():
 
 @app.before_request
 def seo_redirects():
-    """V29: Redirect www.permitgrab.com → permitgrab.com (301) and normalize trailing slashes."""
+    """V29: www→non-www + trailing-slash normalization. V485 B7: force HTTPS on the
+    redirect Location header so we don't double-hop through HTTP.
+
+    Old behavior: `https://permitgrab.com/permits/chicago-il/` →301→
+    `http://permitgrab.com/permits/chicago-il` (Cloudflare strips the 's' because
+    request.url reflected the gunicorn-side scheme=http inside Render's load
+    balancer) →301→ `https://permitgrab.com/permits/chicago-il`. Two hops, the
+    intermediate one is HTTP, Search Console flagged the chain. The fix is to
+    rewrite the Location to https:// before returning so Cloudflare gets the
+    final URL on the first hop.
+    """
     # www → non-www redirect
     if request.host.startswith('www.'):
-        return redirect(request.url.replace('://www.', '://', 1), code=301)
+        return redirect(
+            request.url.replace('://www.', '://', 1).replace('http://', 'https://'),
+            code=301,
+        )
     # Remove trailing slashes (except root)
     if request.path != '/' and request.path.endswith('/'):
-        return redirect(request.url.replace(request.path, request.path.rstrip('/')), code=301)
+        return redirect(
+            request.url
+                .replace(request.path, request.path.rstrip('/'))
+                .replace('http://', 'https://'),
+            code=301,
+        )
 
 
 # ===========================
