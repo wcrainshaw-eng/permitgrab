@@ -937,7 +937,12 @@ body {
       <div class="pg-stat-label">Active Permits</div>
     </div>
     <div>
-      <div class="pg-stat-value">{{ "{:,}".format(top_contractors | length if top_contractors else 0) }}+</div>
+      {# V488 P2: was `top_contractors | length`+`+`, which always rendered "25+"
+         because top_contractors is the truncated display list (capped at ~25),
+         not the real contractor total. contractor_count is the full count from
+         contractor_profiles WHERE source_city_key=<slug>. Falls back to the
+         display-list length only if contractor_count is unset. #}
+      <div class="pg-stat-value">{{ "{:,}".format(contractor_count or (top_contractors | length if top_contractors else 0)) }}</div>
       <div class="pg-stat-label">Contractors</div>
     </div>
     {% if violations_count and violations_count > 0 %}
