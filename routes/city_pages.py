@@ -1418,47 +1418,49 @@ def state_city_landing(state_slug, city_slug):
         _vh = f"{_v474_phones_count:,}"
         _vv = f"{(violations_count or 0):,}"
         _vo = f"{_v474_owners_count:,}"
-        # V480 P1-1: title tags MUST stay under 60 chars or Google truncates them
-        # mid-word ("…61,139 Violation") or strands a trailing pipe (V474's
-        # `[:70]` slice cut "PermitGrab" off the end). Drop the inline numbers
-        # from the title — they live in meta_description — and use a clean,
-        # consistent "{City} <angle> | PermitGrab" format.
-        if _has_profiles and _has_violations and _has_owners:
-            meta_title = f"{display_name} Construction Leads | PermitGrab"
-            meta_description = (
-                f"Access {_vp} contractor profiles{' with phone numbers' if _has_phones else ''}, "
-                f"{_vv} code violation properties, and {_vo} property owner "
-                f"records in {display_name}. Updated daily from official "
-                f"sources. $149/mo."
-            )[:200]
-        elif _has_profiles and _has_phones and not _has_violations:
-            meta_title = f"{display_name} Contractor Leads | PermitGrab"
-            meta_description = (
-                f"Reach {_vp} active contractors in {display_name} — "
-                f"{_vh} with verified phone numbers. Filter by trade, "
-                f"see new permits daily. $149/mo."
-            )[:200]
-        elif _has_violations and not _has_profiles:
+        # V480 P1-1 + V485 B5: title tags MUST stay under 60 chars (Google
+        # truncation). The meta_description is now data-driven instead of
+        # branching: build a list of "X contractor profiles", "Y code
+        # violation properties", "Z property owner records" from whatever
+        # stats are non-zero, then assemble. The old chain (V474) only hit
+        # the data-rich variant when ALL of (profiles + violations + owners)
+        # were >0; if even one was missing, we fell to a 1-stat fallback
+        # like "Track X building permits and Y active contractors" — which
+        # is what made Miami-Dade emit a thin description despite having
+        # 81K owners + 4.3K profiles + 4K phones (just zero violations in
+        # the cache for a separate stats_cache aggregation bug). Now every
+        # tier-3+ city gets the full data-rich treatment.
+
+        # Pick the best-fit title based on which dimensions dominate.
+        if _has_violations and _has_owners and not _has_profiles:
             meta_title = f"{display_name} Code Violations | PermitGrab"
-            meta_description = (
-                f"{_vv} code violation properties in {display_name} — find "
-                f"motivated sellers and distressed properties{' with owner names' if _has_owners else ''}. "
-                f"Updated daily from city code enforcement. $149/mo."
-            )[:200]
+        elif _has_owners and not _has_profiles and not _has_violations:
+            meta_title = f"{display_name} Homeowner Leads | PermitGrab"
+        elif _has_profiles and _has_violations:
+            meta_title = f"{display_name} Construction Leads | PermitGrab"
+        elif _has_profiles and not _has_violations and _has_phones:
+            meta_title = f"{display_name} Contractor Leads | PermitGrab"
         elif _has_profiles:
             meta_title = f"{display_name} Building Permits | PermitGrab"
+        # else leave the _SEO_TITLES default for cities with no data.
+
+        # Build the meta_description from the parts that actually have data.
+        if _has_profiles or _has_violations or _has_owners:
+            parts = []
+            if _has_profiles:
+                phone_suffix = ' with phone numbers' if _has_phones else ''
+                parts.append(f"{_vp} contractor profiles{phone_suffix}")
+            if _has_violations:
+                parts.append(f"{_vv} code violation properties")
+            if _has_owners:
+                parts.append(f"{_vo} property owner records")
+            if len(parts) >= 2:
+                joined = ', '.join(parts[:-1]) + ', and ' + parts[-1]
+            else:
+                joined = parts[0]
             meta_description = (
-                f"Track {_pc} building permits and {_vp} active "
-                f"contractors in {display_name}. Updated daily from "
+                f"Access {joined} in {display_name}. Updated daily from "
                 f"official city data. $149/mo."
-            )[:200]
-        elif _has_owners:
-            # V474b: owners-only cities — homeowner-lead angle.
-            meta_title = f"{display_name} Homeowner Leads | PermitGrab"
-            meta_description = (
-                f"Reach {_vo} property owners in {display_name} with "
-                f"names and addresses. Ideal homeowner leads for solar, "
-                f"insurance, and home services. $149/mo."
             )[:200]
         # else: leave the V156 fallback strings as-is
 
