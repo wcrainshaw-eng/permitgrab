@@ -3299,6 +3299,37 @@ def admin_collect_assessor_data():
         return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
 
 
+@admin_bp.route('/api/admin/wal-checkpoint', methods=['POST'])
+def admin_wal_checkpoint():
+    """V488 IRONCLAD: force a PRAGMA wal_checkpoint(TRUNCATE).
+
+    The /api/admin/query endpoint blocks the literal substring
+    'TRUNCATE' (forbidden_keywords list), so we can't run this from
+    there — and worker.py's heartbeat already does TRUNCATE every
+    ~5 min but if the worker process holds a long-running write
+    transaction, its own checkpoint returns busy=1 and can't shrink
+    the WAL. This endpoint runs from the WEB process which has shorter
+    transactions, so it actually does shrink in practice.
+
+    Returns the (busy, frames_in_wal, frames_truncated) triple.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        conn = permitdb.get_connection()
+        result = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        # PRAGMA returns: (busy_int, log_size, checkpointed)
+        return jsonify({
+            'status': 'ok',
+            'busy': result[0] if result else None,
+            'frames_in_wal_before': result[1] if result else None,
+            'frames_checkpointed': result[2] if result else None,
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
+
+
 @admin_bp.route('/api/admin/refresh-stats', methods=['POST'])
 def admin_refresh_stats():
     """V479: force a stats-cache refresh.

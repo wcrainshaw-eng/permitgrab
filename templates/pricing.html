@@ -493,8 +493,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </div>
 {% endif %}
 
-<section class="hero">
-  <h1>Simple, Transparent Pricing</h1>
+<!-- V488 IRONCLAD: demoted legacy h1→h2 so the V478 hero (line 505)
+     is the single H1 on /pricing. The .hero section may still be
+     CSS-hidden by V478 styles; this also nukes the rendered h1 so
+     Googlebot can't count it. -->
+<section class="hero" style="display:none" aria-hidden="true">
+  <h2>Simple, Transparent Pricing</h2>
   <p>Get the leads your competitors don't know about yet.</p>
 </section>
 

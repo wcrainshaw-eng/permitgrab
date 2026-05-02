@@ -42,10 +42,54 @@ def blog_index():
     footer_cities = get_cities_with_data()
 
     market_reports = _generate_market_reports()
+
+    # V488 IRONCLAD: surface buyer-persona + city-persona posts on the
+    # blog index. Without this, the 5 V482 buyer posts and 10 V486+V487
+    # city × persona posts are unreachable from /blog — Google had to
+    # find them via sitemap-blog.xml alone, which works for indexing
+    # but kills internal-link equity. Each post object on this page
+    # gets converted to {slug,title,excerpt,date} the template expects.
+    buyer_persona_index = []
+    try:
+        from buyer_persona_posts import BUYER_PERSONA_POSTS
+        for slug, p in BUYER_PERSONA_POSTS.items():
+            buyer_persona_index.append({
+                'slug': slug,
+                'title': p.get('h1') or p.get('title') or slug,
+                'excerpt': (p.get('meta_description') or '')[:240],
+                'date': p.get('meta_published') or '2026-04-15',
+            })
+    except Exception as _bpe:
+        print(f"[V488] buyer_persona_posts import skipped: {_bpe}", flush=True)
+
+    city_persona_index = []
+    try:
+        from city_persona_posts import CITY_PERSONA_POSTS
+        for slug, p in CITY_PERSONA_POSTS.items():
+            city_persona_index.append({
+                'slug': slug,
+                'title': p.get('h1') or p.get('title') or slug,
+                'excerpt': (p.get('meta_description') or '')[:240],
+                'city_name': p.get('city') or '',
+                'date': p.get('meta_published') or '2026-05-01',
+            })
+    except Exception as _cpe:
+        print(f"[V488] city_persona_posts import skipped: {_cpe}", flush=True)
+
     categories = {
         'market-reports': {
             'title': 'City Market Reports (Live Data)',
             'posts': market_reports,
+        },
+        # V488 new sections — placed BEFORE the cost/trade guides so the
+        # high-intent buyer-facing content sits at the top of /blog.
+        'buyer-personas': {
+            'title': 'Lead-Generation Guides by Persona',
+            'posts': buyer_persona_index,
+        },
+        'city-personas': {
+            'title': 'City × Persona Lead Guides',
+            'posts': city_persona_index,
         },
         'permit-costs': {
             'title': 'Permit Cost Guides',

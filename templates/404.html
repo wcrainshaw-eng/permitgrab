@@ -256,14 +256,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </div>
 </section>
 
-<section class="error-hero">
+<!-- V488 IRONCLAD: legacy 404 hero demoted h1→h2. The V478 visible H1
+     at line 250 is the single H1 Googlebot indexes for this template. -->
+<section class="error-hero" style="display:none" aria-hidden="true">
   <div class="error-content">
     <div class="error-code">404</div>
     {% if show_city_suggestions %}
-    <h1 class="error-title">City Not Found</h1>
+    <h2 class="error-title">City Not Found</h2>
     <p class="error-message">We couldn't find "{{ searched_slug | replace('-', ' ') | title }}" in our coverage area.</p>
     {% else %}
-    <h1 class="error-title">Page Not Found</h1>
+    <h2 class="error-title">Page Not Found</h2>
     <p class="error-message">The page you're looking for doesn't exist or has been moved.</p>
     {% endif %}
     {# V392 (CODE_V286 grind): "View Coverage" routed to /pricing, an
