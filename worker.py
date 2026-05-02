@@ -203,15 +203,57 @@ def scheduled_collection():
 
         # ── Permit collection ──
         if memory_ok("permit_collection"):
+            # V488 follow-up: write a per-cycle summary row to scraper_runs
+            # so the health endpoint can tell whether the worker is alive.
+            # collector._log_v15_collection has a broad try/except that's
+            # been silently dropping every per-city log since 2026-05-01
+            # 12:41 — without this top-level row the health metric goes
+            # dark even though permits.collected_at is being stamped.
+            permit_cycle_t0 = time.time()
+            permit_cycle_status = 'success'
+            permit_cycle_err = None
+            permits_in_cycle = 0
             try:
                 from collector import collect_refresh
+                # Snapshot the highest collected_at NOW so we can diff after
+                # the cycle finishes — collect_refresh returns (new_permits,
+                # stats) but new_permits is empty in the V166 inline-upsert
+                # path; the diff is the only honest count.
+                _pre = permitdb.get_connection().execute(
+                    "SELECT COUNT(*) FROM permits WHERE collected_at > datetime('now', '-1 minute')"
+                ).fetchone()[0]
                 collect_refresh(days_back=7)
                 gc.collect()
-                print(f"[WORKER] Permit refresh complete", flush=True)
+                _post = permitdb.get_connection().execute(
+                    "SELECT COUNT(*) FROM permits WHERE collected_at > datetime('now', '-1 minute')"
+                ).fetchone()[0]
+                permits_in_cycle = max(0, _post - _pre)
+                print(f"[WORKER] Permit refresh complete (+{permits_in_cycle} stamped this cycle)", flush=True)
             except Exception as e:
+                permit_cycle_status = 'error'
+                permit_cycle_err = str(e)[:300]
                 print(f"[WORKER] Permit collection error: {e}", flush=True)
                 import traceback
                 traceback.print_exc()
+            # Single per-cycle row — one is enough for the health endpoint.
+            # Per-city granularity comes from collector._log_v15_collection
+            # if/when that path is repaired; this row is the heartbeat.
+            try:
+                permitdb.log_scraper_run(
+                    source_name='worker_scheduled_collection',
+                    city='ALL',
+                    state=None,
+                    city_slug=None,
+                    permits_found=permits_in_cycle,
+                    permits_inserted=permits_in_cycle,
+                    status=permit_cycle_status,
+                    error_message=permit_cycle_err,
+                    duration_ms=int((time.time() - permit_cycle_t0) * 1000),
+                    collection_type='scheduled',
+                    triggered_by='worker',
+                )
+            except Exception as log_err:
+                print(f"[WORKER] scraper_runs cycle log failed: {log_err}", flush=True)
 
         # ── Prune old permits ──
         try:
