@@ -1639,7 +1639,8 @@ footer a:hover { color: white; }
 <!-- HERO -->
 <section class="hero">
   <div class="hero-content">
-    <h1>Real-time permit intelligence for home service businesses</h1>
+    {# V485 B3: legacy H1 demoted to H2 — duplicate of the V478 hero H1 at line 1454. #}
+    <h2 style="display:none" aria-hidden="true">Real-time permit intelligence for home service businesses</h2>
     <p>Track new building permits, find active contractors, and identify property owners across {{ city_count | default(100) }}+ cities. Updated daily from official sources.</p>
     {# V224 T6: prominent hero CTAs — the nav "Sign Up" is too easy to
        miss on a cold Google Ads click. #}

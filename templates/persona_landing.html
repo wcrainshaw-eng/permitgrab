@@ -259,11 +259,13 @@ body {
   </div>
 </header>
 
-<!-- Legacy hero (hidden) -->
-<header class="hero">
+<!-- V485 B3: legacy hero block — display:none since V478. Demoted H1
+     to H2 with aria-hidden so Googlebot stops counting it as a second
+     keyword-targeting signal alongside the V478 visible H1 above. -->
+<header class="hero" style="display:none" aria-hidden="true">
   <div class="container">
     <span class="kicker">{{ hero_kicker }}</span>
-    <h1>{{ h1 }}</h1>
+    <h2>{{ h1 }}</h2>
     <p class="copy">{{ hero_copy }}</p>
   </div>
 </header>
