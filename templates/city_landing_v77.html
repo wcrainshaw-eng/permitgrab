@@ -964,7 +964,13 @@ body {
 <!-- HERO with Permit Activity Summary -->
 <section class="hero">
   <div class="hero-inner">
-    <h1>{{ city_name }} Building Permits &amp; Contractor Data</h1>
+    {# V485 B3: demoted legacy H1 → H2 to fix duplicate-H1 SEO issue.
+       The V478 visible H1 lives at line 917. This block is hidden via
+       display:none in V478's stylesheet, but Googlebot still parsed it
+       and counted both H1s as keyword-targeting signals — diluting
+       targeting on every city page. Demoting (not deleting) preserves
+       the surrounding Jinja variable wiring this template still needs. #}
+    <h2 style="display:none" aria-hidden="true">{{ city_name }} Building Permits &amp; Contractor Data</h2>
     {# V447 P4 (CODE_V447): include violations in the subtitle when present
        so the header count and the table count below reconcile. Was just
        "{permit_count} permits tracked" → users saw a different number
