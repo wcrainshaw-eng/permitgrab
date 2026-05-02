@@ -652,6 +652,21 @@ Use these real numbers in page content: "Chicago had 2,847 building permits file
     summarize and ask. Don't ask "want me to continue?". Don't pause for
     permission to do the next thing on the user's stated list. Just do it.
 
+18. **"DON'T STOP" IS DURABLE FOR THE WHOLE SESSION.** When Wes says
+    "keep going", "don't stop", "go through it all", "execute fully",
+    "finish everything" — that directive applies to the rest of the
+    session, not just the next step. After every PR merge or task
+    milestone, IMMEDIATELY pick up the next item on the explicit
+    or implicit list. NEVER end a turn with "want me to continue
+    on X?" or a status-summary-then-pause pattern. Wes can interrupt
+    anytime to redirect — that's cheaper than letting momentum die.
+    Real blockers that DO warrant a pause: missing credentials,
+    irreversible destructive action that needs sign-off, or the user
+    has explicitly contradicted the prior directive. End-of-task
+    "should I do Y next?" is NOT a real blocker; pick the highest-
+    impact next item and start. Only summarize when the user
+    explicitly asks "where are we / status / summary".
+
 ---
 
 ## AUTONOMOUS OPERATION — NEVER STOP

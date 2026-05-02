@@ -239,37 +239,18 @@ def sitemap_cities():
     city_lastmod = _get_city_lastmod_map()
     state_slugs = set(STATE_CONFIG.keys())
 
-    # City pages from discovered cities (old format: /permits/{city})
-    all_discovered_cities = discover_cities_from_permits()
-    for slug, city_info in all_discovered_cities.items():
-        if slug in state_slugs:
-            continue
-        if city_info['name'] not in cities_with_permits:
-            continue
-
-        lastmod = city_lastmod.get(slug, today)
-        loc = f"{SITE_URL}/permits/{slug}"
-        if loc not in url_map:
-            url_map[loc] = {
-                'loc': loc,
-                'changefreq': 'daily',
-                'priority': '0.8',
-                'lastmod': lastmod
-            }
-
-    # V58: Also include ALL active CITY_REGISTRY cities for SEO (even without data yet)
-    for key, config in CITY_REGISTRY.items():
-        if not config.get('active'):
-            continue
-        slug = config.get('slug', key.replace('_', '-'))
-        loc = f"{SITE_URL}/permits/{slug}"
-        if loc not in url_map and slug not in state_slugs:
-            url_map[loc] = {
-                'loc': loc,
-                'changefreq': 'weekly',
-                'priority': '0.6',
-                'lastmod': today
-            }
+    # V485 B1 (CODE_V485 SEO P0): the legacy 1-segment /permits/<slug>
+    # entries that lived here have been DROPPED. They were duplicate-
+    # canonicalizing every city: /permits/chicago-il and
+    # /permits/illinois/chicago-il both went into the sitemap, each
+    # self-canonicalizing, and Google saw ~716 city URLs (358 cities ×
+    # 2 paths) — picked one form arbitrarily, dropped the other
+    # unevenly. Result: only 2 of 3,115 pages indexed. The 1-segment
+    # /permits/<slug> route now 301-redirects to
+    # /permits/<state>/<slug> (see state_or_city_landing in
+    # routes/city_pages.py), so external links still resolve and link
+    # equity flows to the canonical form. The 2-segment loop below
+    # is now the SOLE source of city URLs in this sitemap.
 
     # V77: Add city URLs in new /permits/{state}/{city} format
     # These are the SEO-optimized URLs targeting "[city] building permits" keywords

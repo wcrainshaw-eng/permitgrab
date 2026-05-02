@@ -1028,7 +1028,40 @@ def state_or_city_landing(state_slug):
                                    state_blog_posts=state_blog_posts,
                                    **state_data)
 
-    # Otherwise, fall through to city landing page logic
+    # V485 B1 (CODE_V485 SEO P0): SEO root cause — only 2 of 3,115 pages
+    # indexed by Google. Sitemap was publishing BOTH /permits/<slug> AND
+    # /permits/<state>/<slug> for every city, each self-canonicalizing.
+    # Google saw ~716 city URLs (358 cities × 2 paths), picked one form
+    # arbitrarily, dropped the other unevenly. Result: ~half the city
+    # pages never get indexed.
+    # Fix: pick /permits/<state>/<slug> as the SINGLE canonical form
+    # (better keyword shape — "Texas building permits Houston" — and
+    # matches the persona-page convention). Look up the state for this
+    # city slug and 301-redirect to the canonical form. The 301
+    # preserves link equity from any external/internal links still
+    # pointing at the 1-segment form. The complementary sitemap-side
+    # fix drops the 1-segment loops so Google only sees the canonical.
+    try:
+        _conn = permitdb.get_connection()
+        _row = _conn.execute(
+            "SELECT state FROM prod_cities WHERE city_slug=? "
+            "  AND status IN ('active','paused') AND state IS NOT NULL "
+            "LIMIT 1",
+            (state_slug,)
+        ).fetchone()
+        if _row and _row[0]:
+            _abbrev_to_slug = {v['abbrev']: k for k, v in STATE_CONFIG.items()}
+            _state_slug = _abbrev_to_slug.get(_row[0])
+            if _state_slug:
+                return redirect(f'/permits/{_state_slug}/{state_slug}', code=301)
+    except Exception:
+        # If the lookup fails for any reason, fall through to render the
+        # legacy 1-segment page rather than 500.
+        pass
+
+    # Fallback: render the city directly. Reached when:
+    #  - slug isn't in prod_cities (legacy / discovered)
+    #  - state lookup fails for any reason
     return city_landing_inner(state_slug)
 
 
