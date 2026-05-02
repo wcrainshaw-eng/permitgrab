@@ -6,9 +6,9 @@ data are STILL VIABLE: solar companies want owner/address data from permits.
 Show "No contractor data available" on the city page when contractor_name
 is absent. "Dead Ends" are cities with NO working permit API at all.
 
-## Property-Owner Sources Wired (V428–V433n, 2026-04-27)
+## Property-Owner Sources Wired (V428–V484, 2026-05-01)
 
-17 owner sources covering 23+ cities now in `assessor_collector.ASSESSOR_SOURCES`.
+35 owner sources now in `assessor_collector.ASSESSOR_SOURCES` (was 33 pre-V484).
 Trigger via `POST /api/admin/collect-assessor-data {"source":"<key>"}`. After
 the import, run `POST /api/admin/fix-property-owner-cities` to retag rows
 where the source feed populates suburb names instead of the metro slug.
@@ -17,14 +17,17 @@ where the source feed populates suburb names instead of the metro slug.
 |---|---|
 | nyc_pluto (pre-V428) | New York City |
 | maricopa | Phoenix (+ Mesa/Scottsdale/Tempe metro) |
+| maricopa_secondary | Mesa/Glendale/Tempe/Scottsdale (V474 split) |
 | cook_chicago | Chicago + Cook suburbs |
 | miami_dade | Miami-Dade + Hialeah |
+| miami_dade_hialeah | Hialeah-specific subset |
 | davidson_nashville | Nashville |
 | cuyahoga_cleveland | Cleveland |
 | philadelphia_opa | Philadelphia (Carto SQL platform) |
 | hennepin_minneapolis | Minneapolis (concat-list address) |
 | bexar (pre-V428) | San Antonio |
-| clark_lasvegas | Las Vegas + Henderson |
+| clark_lasvegas | Las Vegas |
+| clark_henderson | Henderson NV |
 | travis_austin | Austin |
 | erie_buffalo | Buffalo |
 | onondaga_syracuse | Syracuse |
@@ -35,12 +38,53 @@ where the source feed populates suburb names instead of the metro slug.
 | multnomah_portland | Portland OR |
 | hillsborough_tampa | Tampa (parked — Tampa permits dead pending Accela parser fix) |
 | dc_vacant_blighted (pre-V428) | DC vacant/blighted properties |
+| dane_madison | Madison WI |
+| franklin_columbus | Columbus OH |
+| marion_indianapolis | Indianapolis |
+| pima_tucson | Tucson |
+| santa_clara_sj | San Jose |
+| tarrant_fortworth | Fort Worth |
+| washoe_reno | Reno |
+| collin_plano | Plano TX |
+| fl_statewide | FL DOR NAL — Cape Coral, Orlando, Jacksonville, Tampa, etc. |
+| orleans_new_orleans (V483b) | New Orleans LA |
+| **duval_jacksonville** (V484) | Jacksonville FL — daily-fresh, 405K parcels w/ full mailing addr |
+| **spokane_spokane** (V484) | Spokane WA — nightly, 138K parcels |
+| **mecklenburg_charlotte** (V485) | Charlotte NC — daily, ~250K Charlotte parcels with mailing addr |
+| **hcad_houston** (V485) | Houston TX — ~500K Houston-city parcels (Appraised_value_COH filter) |
+| **wayne_detroit** (V486) | Detroit MI — 378K parcels, daily, full mailing addr (NEW METRO) |
+| **lucas_toledo** (V486) | Toledo OH — 204K parcels, weekly (NEW METRO) |
+| **fulton_atlanta** (V486) | Atlanta core + Sandy Springs / Roswell — 372K parcels (NEW METRO) |
+| **dekalb_atlanta** (V486) | Decatur / Brookhaven / Tucker / Doraville — 245K (NEW METRO) |
+| **stlouis_county_mo** (V486) | St. Louis County suburbs — 401K (NEW METRO) |
+| **saint_louis_city** (V487) | City of St. Louis MO — 129K (independent jurisdiction, pairs w/ county) |
+| **hamilton_chattanooga** (V487) | Chattanooga TN — 166K (NEW METRO) |
+| **anchorage_moa** (V487) | Anchorage AK — 99K, daily refresh (NEW METRO, owners-only) |
 
 **Confirmed structurally suppressed** (no public owner data — would need
 commercial source like DataTree/FirstAmerican/ATTOM): all California metros
-(LA, OC/Anaheim, San Diego, San Francisco, San Jose), Pittsburgh PA
-(Allegheny classifies but doesn't name), Orlando FL (OCPA web-search only),
-Monroe NY/Rochester (not in NYS public dataset).
+(LA, OC/Anaheim, San Diego, San Francisco, San Jose has Santa Clara wired
+but suppressed at name level), Louisville KY (Jefferson PVA hides owner
+names from public REST — V484 confirmed), Seattle WA (King County
+Property layer omits owner field — V484 confirmed), Pittsburgh PA
+(Allegheny classifies but doesn't name), Orlando FL (OCPA web-search only;
+covered by fl_statewide statewide), Monroe NY/Rochester (not in NYS public
+dataset), Charleston SC (no public REST with owner field — V484 probed).
+
+**STATEWIDE OWNER SUPPRESSION** (V487 environmental findings — don't probe
+counties in these states for the owner pillar):
+- **New Jersey** statewide — Daniel's Law (P.L. 2020 c.125) explicitly
+  redacts OWNER_NAME from all hosted parcel feeds. Bergen County confirmed.
+  Don't probe Hudson, Essex, Middlesex, Monmouth, Camden, etc.
+- **Utah** statewide — UCA 63F-1-506 keeps owner names off the LIR
+  sharing program. Salt Lake County confirmed. All UT counties affected.
+- **California** counties (general pattern) — LA, San Diego, Bay Area,
+  Sacramento all suppress owner names in public REST per county-assessor
+  policy. Treat all CA counties as suppressed for owners. (CA city-level
+  permit data is still wireable where the city publishes it — Sacramento
+  V486 is the working example.)
+- **New York non-NYC** — NY ORPTS-sourced county feeds strip OWNER fields.
+  Westchester confirmed. Only NYC PLUTO survives for the NY owner pillar.
 
 ## Ready to Wire (confirmed endpoint + contractor field)
 <!-- Format: - CityName ST: platform resource_id, contractor_field: fieldname, tested: date -->
@@ -97,6 +141,97 @@ Monroe NY/Rochester (not in NYS public dataset).
 - Honolulu HI: Socrata data.honolulu.gov. Permits: 3fr8-2hnx (Building Permits, 2010-2016 — STALE, need to check for newer dataset). Violations: TBD. Previous dead-end entry was wrong ("no open data portal") — they have Socrata. BLITZ 2026-04-26. **V426 probe 2026-04-27: federated Socrata catalog (api.us.socrata.com?domains=data.honolulu.gov) returned 6 building-permit datasets but ALL stale: ycwt-ujqt 2025-02 (frozen 2016), 3fr8-2hnx 2025-02 (frozen 2016), 4vab-c87q "Building Permits Jan 2005 - June 30 2025" with explicit June-2025 cutoff (= 10mo stale by 2026-04). Data publishing stopped mid-2025. → STAYS dead by freshness.**
 - Greensboro NC violations: Already wired for permits. Violations: Code Compliance All Violations dataset at data.greensboro-nc.gov (2011-present). Add violations config. BLITZ 2026-04-26. **V428 re-confirmed 2026-04-27: gis.greensboro-nc.gov/.../OpenData_CC_DS/MapServer/3 schema is rich (CaseNumber/ViolationCode/ViolationDescription/IssuedDate/FullAddress) but newest IssuedDate is 2024-06-18 (~22mo stale). Hub modified-date 2026-04-20 reflects metadata edits, not records. Duplicates V363 dead-end note. → STAYS dead.**
 - Raleigh NC violations: Already wired for permits. Violations: check data-ral.opendata.arcgis.com Public Safety section for code enforcement. BLITZ 2026-04-26. **V428 probe 2026-04-27: data-ral.opendata.arcgis.com DCAT (845KB) has only "Food Inspection Violations" (fresh, but not code-enforcement) + stale "Permitted Environmental Health Compliance Facilities" (2023-05). No building code-enforcement dataset. → MOVE to Dead Ends for violations.**
+
+## Quick Wins — Tier Promotion Actions (V481/V484 Discovery Audit, 2026-05-01)
+
+These are the highest-ROI actions to move existing cities from Tier 4 → Tier 5 (ad-ready).
+Discovered during full DB audit of all 300 cities across all 5 pillars.
+
+| # | City | Missing Pillar | Fix | Effort |
+|---|------|---------------|-----|--------|
+| 1 | ~~Miami-Dade County~~ | ~~Owners show 0~~ | **DONE V482**: 81,833 rows realigned via SQL UPDATE. Cache reflects. | DONE |
+| 2 | ~~Hialeah FL~~ | ~~Violations~~ | **DEAD END (V483)**: CCVIOL_gdb has NO MUNICIPALITY field, unincorporated MDC only. Stays at 4/5. | N/A |
+| 3 | Cape Coral FL | Owners | `fl_statewide` (FL DOR NAL) is wired and covers Lee County. Verify rows landing for Cape Coral after next worker cycle. | DB verify only |
+| 4 | Orlando FL | Owners | `fl_statewide` covers Orange County. Same verify-only step as #3. | DB verify only |
+| 5 | ~~New Orleans LA~~ | ~~Owners~~ | **DONE V483b**: `orleans_new_orleans` wired against gis.nola.gov MapServer/15. SSL bypass added in V483b cleanup. | DONE |
+| 6 | Minneapolis MN | Violations | CONFIRMED DEAD — 311 data has no address field (V433d). Stays at 4/5. | N/A |
+| 7 | LA (open/closed) | Owners | CONFIRMED DEAD — CA suppresses owner names in public data. Stays at 4/5. | N/A |
+| 8 | Tucson AZ | Violations | **DONE V484**: ENGOV_CodeCases at mapdata.tucsonaz.gov (21K records, fresh today). Promotes Tucson from Tier 3 → 4. | DONE |
+| 9 | Washington DC | Violations | **DONE V484**: 311 ServiceRequests/FeatureServer/21 filtered by `ORGANIZATIONACRONYM='DOB'` (164K county-wide → ~10s of thousands DOB-only). Promotes DC from Tier 3 → 4. Annual layer rotation needed every Jan. | DONE |
+| 10 | Jacksonville FL | Owners | **DONE V484**: `duval_jacksonville` at maps.coj.net Parcels/MapServer/0 (405K daily-fresh, full mailing address segmentation). Promotes Jax from Tier 3 → 4. | DONE |
+| 11 | Spokane WA | Owners | **DONE V484**: `spokane_spokane` at gismo.spokanecounty.org SCOUT/PropertyLookup (138K nightly). Promotes Spokane from Tier 3 → 4. | DONE |
+
+**Open dead-ends (don't re-research):**
+- Portland OR violations — no public REST for code enforcement (V484 confirmed)
+- Tampa FL violations — Accela UI only (V484 confirmed)
+- Tallahassee FL violations — only inspector-area polygons, no case feed (V484 confirmed)
+- Charleston SC permits + violations — no public open-data hub (V484 confirmed)
+- Des Moines IA permits + violations — no permit datasets in DCAT (V484 confirmed)
+- Providence RI permits — Socrata data frozen at 2018 (V484 confirmed)
+- Louisville KY owners — Jefferson PVA hides names from public REST (V484 confirmed)
+- Seattle WA owners — King County Property layer omits owner field (V484 confirmed)
+- Atlanta GA permits — CSV-only frozen 2024-08; owners now wired via fulton_atlanta + dekalb_atlanta (V486 re-confirmed permits dead)
+- Memphis TN permits — no Accela hybrid path; Shelby owner data stale 2024 (V486 re-confirmed)
+- Sedgwick County KS / Wichita owners — Imperva WAF blocks REST owner endpoint (V486)
+- Knox County TN / Knoxville owners — NTLM 401 on kgis.org REST (V486 — internal-only)
+
+**V486 reversal (was dead, now LIVE):**
+- ~~Sacramento CA permits~~ — V258 probed SACOG (regional), not the city. Real permits with Contractor field at services5.arcgis.com/.../BldgPermitIssued_CurrentYear (6,089 records, fresh 2026-04-26). Now wired in V486.
+
+**Deferred (needs UX decision, not a research blocker):**
+- **Birmingham AL** (V484): no public permits feed. Owners-only via `jefferson_birmingham`
+  (88K Birmingham parcels, nightly fresh). Onboarding requires inventing
+  `no_permits_owner_only` platform pattern + decisions for owners-only city
+  page UX. Source endpoint:
+  `https://jccgis.jccal.org/server/rest/services/Basemap/Parcels/MapServer/0`.
+- **Savannah GA** (V484): permits-only (commercial + residential FeatureServer
+  layers at pub.sagis.org/.../BuildingPermit_FC, ~2.4K records, 14 days fresh).
+  Status uncertain post-V484 deploy — Code reported "✓ savannah_ga (1,811
+  residential)" but verify the commercial layer and city registry entry
+  landed in city_registry_data.py.
+
+### Full Tier Audit Results (2026-05-01, post-V484)
+
+**Tier 5 (all 5 pillars — ad-ready): 12 cities**
+Chicago, Phoenix, San Antonio, NYC, Cleveland, Austin, Cape Coral, Fort Lauderdale,
+Mesa, Orlando, St. Petersburg, **Miami-Dade (V482 promotion via owner slug fix)**
+
+**Tier 4 (4/5 pillars): 12 cities**
+Hialeah (missing: violations — dead end),
+LA (missing: owners — dead end), Minneapolis (missing: violations — dead end),
+Nashville, **New Orleans (V483b owners landed → likely Tier 5 after next stats refresh)**,
+Philadelphia, Portland OR (violations dead-end confirmed V484),
+San Jose, **Tucson (V484 violations landed)**, **DC (V484 violations landed)**,
+**Jacksonville (V484 owners landed)**, **Spokane (V484 owners landed)**
+
+**Tier 3 (3/5 pillars): 12 cities**
+Anaheim, Buffalo, Cincinnati, Denver, Henderson NV, Las Vegas,
+Louisville (owners dead-end confirmed V484), Raleigh,
+Seattle (owners dead-end confirmed V484), Syracuse,
+Tallahassee (violations dead-end V484), Tampa (violations dead-end V484)
+
+**Tier 2 (permits + some profiles): 59 cities**
+**Tier 1 (permits only or fewer): 205 cities**
+
+**Owners-only candidates (new metros, no public permit feeds available):**
+- Birmingham AL — V484 deferred. 88K Birmingham parcels via jefferson_birmingham.
+- Detroit MI — V486 wired. 378K parcels, daily fresh.
+- Toledo OH — V486 wired. 204K parcels.
+- Atlanta GA — V486 wired (Fulton + DeKalb). 617K combined Atlanta-metro parcels.
+- St. Louis County MO — V486 wired. 401K parcels (suburbs only; St. Louis CITY is a separate jurisdiction not yet covered).
+
+All five share the same UX requirement deferred from V484: a `no_permits_owner_only`
+platform pattern + city-page template variant for owners-only metros. With 5
+candidates plus Charleston (probed dead but might thaw), this is now a real
+second product SKU rather than a one-off science project.
+
+**Permits-only candidate (new metro):** Savannah GA — V484 deployed, verify post-cycle.
+
+**V486 NEW PERMIT WIN:** Sacramento CA — V258 dead-end overturned. Live
+endpoint at services5.arcgis.com/.../BldgPermitIssued_CurrentYear with real
+Contractor field. CA CSLB enrichment will lift phones once the worker cycles.
+
+See PermitGrab_City_Discovery_100.xlsx for full breakdown with per-city pillar data.
 
 ## Research Resources
 <!-- Use these to find endpoints for any queued city -->
@@ -169,7 +304,7 @@ Monroe NY/Rochester (not in NYS public dataset).
 - Cary NC: 0 ArcGIS results (V343-followup probed 2026-04-25)
 - High Point NC: only Permit Activity Dashboards (3 of them), no queryable feature service (V343-followup probed 2026-04-25)
 - Chapel Hill NC: only Ephesus-Fordham renovation density tile-services frozen 2004-2017, no live permit feed (V343-followup probed 2026-04-25)
-- Hialeah FL violations: confirmed permanent dead-end after 3rd probe — no public ArcGIS or sitemap-discoverable code-enforcement feed exists. 108 phones (largest non-ad-ready phone count) but the violations leg is unsolvable from our side; needs Hialeah IT to publish a feed.
+- Hialeah FL violations: confirmed permanent dead-end. V483 SSH-tested CCVIOL_gdb schema: fields are OBJECTID/CASE_NUM/CASE_DATE/CASE_STATUS/STAT_DESC/ADDRESS/FOLIO/PROBLEM/PROBLEM_DESC — NO MUNICIPALITY field. ADDRESS LIKE '%HIALEAH%' returns 0, ZIP filtering returns 0. CCVIOL_gdb covers unincorporated Miami-Dade County only, not incorporated municipalities like Hialeah. Hialeah would need their own code enforcement portal to publish a feed. Stays at 4/5.
 - McKinney TX: services1.arcgis.com B8MwidgHpU2dWUmv UnderConstruction/0 has NameOfBusiness field but newest IssueDate is 2023-09-26 (frozen 2.5 years) and all sample NameOfBusiness values are blank (V345 probed 2026-04-25)
 - Lewisville TX: 0 ArcGIS results (V345 probed 2026-04-25)
 - Pearland TX: 0 ArcGIS results (V345 probed 2026-04-25)
@@ -228,6 +363,19 @@ Monroe NY/Rochester (not in NYS public dataset).
 - Tulsa OK (loop V362 re-probe 2026-04-26): gis-cityoftulsa hub DCAT returns 500; gis2-cityoftulsa hub has only "Working In Neighborhoods (Nuisances)" (no FeatureServer URL exposed) and zero permit datasets. V362 dead-finding stands.
 - Long Beach CA (loop re-probe 2026-04-26): no Long Beach-specific Hub DCAT path responding; loop search misdirected to Fort Worth's services5.arcgis.com tenant (CFW_*). Long Beach permits not exposed publicly. V258 dead-finding stands.
 - Fort Worth TX (loop V363 Part B re-probe 2026-04-26): ALREADY WIRED at "fort_worth" → CFW_Open_Data_Development_Permits_View/FeatureServer/0 (V23). Schema has Owner_Full_Name + Full_Street_Address + File_Date + Use_Type + JobValue but NO contractor field. 5,862 records with File_Date > 2026-04-01 (very fresh). V362 no-contractor template fallback applies. No change needed.
+- **Portland OR violations** (V484 probed 2026-05-01): DCAT scan of gis-pdx.opendata.arcgis.com (355 datasets) returns zero violation/enforcement/code-cases. portlandmaps.com /api/permits/ returns 404, /api/ returns 403. BDS_Layers MapServer has "Non-Compliant Signs (Data From 1999)" only — historical. PortlandMaps Advanced UI surfaces enforcement cases via website but no public JSON. Skip permanently.
+- **Tampa FL violations** (V484 probed 2026-05-01): arcgis.tampagov.net/.../CodeEnforcement folder returns `{"folders":[],"services":[]}` — placeholder only. AGOL search shows "Code Enforcement Inspector Area & Parcel Lookup" web map owned by PrivateInfo_TampaGIS (non-public). Public-facing enforcement is Accela Citizen Access only. Skip permanently.
+- **Tallahassee FL violations** (V484 probed 2026-05-01): geodata-tlcgis.opendata.arcgis.com DCAT has zero case datasets. AGOL items "Private Property Code Enforcement Zones" and "Environmental Services Code Enforcement Zones" are inspector area POLYGONS, not actual cases. talgov-tlcgis.opendata.arcgis.com returns 0 datasets. maps.talgov.com/arcgis/rest 404. No public Tallahassee enforcement-case feed exists. Skip permanently.
+- **Charleston SC permits + violations** (V484 probed 2026-05-01): Tyler EnerGov SelfService at egcss.charleston-sc.gov returns generic error on /api/energov/Search/search. data.charleston-sc.gov, opendata.charleston-sc.gov, sc-charleston.opendata.arcgis.com all NXDOMAIN. gis.charleston-sc.gov has External/PDI_Data (police only) and Service_Energov_Composite (geocoder, not permits). No active open-data hub. Skip permanently.
+- **Charleston SC owners** (V484 probed 2026-05-01): Charleston County hub has Charleston_County_Addresses but no parcel-with-owner FeatureServer. License notes "SC Code 30-2-50 prohibits private use of address data." Likely paid only. Skip permanently.
+- **Des Moines IA permits + violations** (V484 probed 2026-05-01): data.dsm.city DCAT (65 datasets) has only police citations + building footprints — no permits/violations/inspections. AGOL org City_Des_Moines has 320 items, none permit/violation. opendata.dsm.city, gis.dsm.city, polkcountygis.org, gis.polkcountyiowa.gov all NXDOMAIN. No Accela tenant. Skip permanently.
+- **Des Moines IA owners** (V484 probed 2026-05-01): polkcountyiowa-policrh.hub.arcgis.com and gis-polkcountyiowa.opendata.arcgis.com return 0 datasets. Vanguard HTML assessor only — no public REST. Skip permanently.
+- **Providence RI permits + violations** (V484 probed 2026-05-01): data.providenceri.gov Socrata catalog has 297 datasets but Permits dataset (`ufmm-rbej`) was last updated 2020-01-24 with content ending 2018. Special Event Permits 2021. Active Business Licenses 2021. No fresh permit/violation data. gis.providenceri.gov NXDOMAIN. Skip permanently. Note: 2025 Property Tax Roll (`6ub4-iebe`) is fresh through 2026-04-13 and may have owner names — owners-only candidate if needed.
+- **Louisville KY owners** (V484 probed 2026-05-01): LOJIC ArcGIS at gis.lojic.org exposes PvaGis/CamaViewer/MapServer Layer 26 (Current Parcel Polygons) but schema has NO owner-name field — only `OBJECTID, REV_DATE, PARCELID, HISTORICPIN, BLOCK, LOT, LRSN, UNIT_COUNT, ...`. LojicSolutions/OpenDataDevelopment exposes only city-owned ~5K parcels (CUR_LASTNAME). Owner names are gated behind jeffersonpva.ky.gov interactive search (no REST). Skip permanently.
+- **Seattle WA owners** (V484 probed 2026-05-01): gismaps.kingcounty.gov/.../KingCo_PropertyInfo/MapServer/2 (Parcels) is queryable but `PROP_NAME` is the property name (e.g. "ZYLA COTTAGES") not owner; `PAAUNIQUENAME` is null in real rows. Owner identity is missing from the public layer. King County Assessor publishes Real Property data only via Excel/CSV annual rolls or eRealProperty interactive site. Skip permanently.
+- **Birmingham AL permits** (V484 probed 2026-05-01): data.birminghamal.gov CKAN has only "building-permits-and-valuations-2017" — frozen 2017, XLSX/CSV only. City uses Accela aca-prod.accela.com/birmingham/ (no public REST). gisweb.birminghamal.gov/arcgis/rest/services/accela/ exposes only basemap layers + geocoder. No Hub item for Birmingham permits. Owners are wirable via jefferson_birmingham (V484 deferred); no permits source available. Skip permits permanently.
+- **Birmingham AL violations** (V484 probed 2026-05-01): gisweb.birminghamal.gov/.../housing_inspections/FeatureServer/0 has 65,699 records with rich schema (CASE_NO, INSPECTION_DATE, PROPERTY_ADDRESS, OWNER_FIRST_NAME, OWNER_ADDRESS, plus 100+ violation-detail fields) BUT max EditDate is 2025-09-08 — 235 days stale. ComplaintInsp/FeatureServer/0+1 max InspDate 2025-07-18 (287 days stale). Skip by freshness.
+- **Savannah GA violations** (V484 probed 2026-05-01): pub.sagis.org has Savannah folder with 31 layers in SAVEnergov_Data but all are basemap/zone/inspection-area polygons (zoning, parcels, neighborhoods, fire-inspection-areas, trade-inspection-areas). No code-enforcement FeatureServer. PROD_Oneview311_Only2_Public has only 6 generic layers. Skip violations permanently.
 
 ## License-Enrichment Opportunities (separate platform — needs new collector path)
 <!-- Sources that ENRICH existing-city contractor profiles with license validation /
