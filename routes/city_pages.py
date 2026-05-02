@@ -1649,6 +1649,12 @@ def state_city_landing(state_slug, city_slug):
         recent_permits=recent_permits,
         permits=recent_permits,  # V230: alias city_landing_inner uses
         top_contractors=top_contractors,  # V182 PR2
+        # V488 P2 follow-up: pass the full contractor count so the
+        # stats-bar template stops falling back to top_contractors|length
+        # (capped at ~25, which rendered as "25" / "25+" on every city
+        # page). _v474_profiles_count is computed earlier from
+        # contractor_profiles WHERE source_city_key=?
+        contractor_count=_v474_profiles_count,
         permit_types=permit_types,
         trade_breakdown=permit_types,  # V230 T6: template references either
         nearby_cities=nearby_cities,
