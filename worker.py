@@ -276,17 +276,77 @@ def scheduled_collection():
             except Exception as e:
                 print(f"[WORKER] Profile refresh error (non-fatal): {e}", flush=True)
 
-        # ── Violation collection ──
+        # V488 IRONCLAD: violations + web_enrichment + staleness +
+        # stats_cache refresh have been MOVED to secondary_loop()
+        # (separate daemon thread, ~2hr cadence). Their cumulative
+        # ~3hr-per-cycle wall time was the reason permits were only
+        # refreshing every 4 hrs instead of the 30-min target — they
+        # blocked scheduled_collection's sleep math. Splitting them
+        # off lets the permit cycle return to fast cadence (≤10 min
+        # work + 30min sleep) while heavy aggregations still run
+        # often enough to keep stats_cache and violations fresh.
+
+        # ── Cycle complete ──
+        elapsed_total = time.time() - cycle_start
+        mem = get_memory_mb()
+        print(f"[WORKER] Cycle complete: {elapsed_total:.0f}s, memory: {mem:.0f}MB", flush=True)
+
+        # Force GC at end of every cycle
+        gc.collect()
+
+        # Dynamic sleep: aim for 30-min cycle cadence
+        sleep_time = max(300, 1800 - elapsed_total)  # at least 5 minutes
+        print(f"[WORKER] Sleeping {sleep_time:.0f}s until next cycle", flush=True)
+        time.sleep(sleep_time)
+
+
+# ─── Secondary loop (V488 IRONCLAD): violations + staleness + stats_cache ────
+
+def secondary_loop():
+    """V488 IRONCLAD: Run the heavy non-permit phases on their own ~2hr
+    cadence so they stop blocking the permit refresh cycle.
+
+    Was: scheduled_collection ran permits + violations + enrichment +
+    staleness + stats_cache back-to-back. Cumulative wall time hit ~3hr
+    so permits were only refreshing every ~4hrs (observed live: cycles
+    landed at 14:30 + 18:00 with nothing in between, vs the 30-min
+    target). Each cycle, only the top-15 high-volume cities got picked
+    by ORDER BY permits_last_30d DESC — same 15 every cycle while 1,742
+    other active cities went silent.
+
+    This loop runs its own 2hr sleep cadence. It still enqueues violation
+    collection, staleness audit, and stats_cache refresh, but doesn't
+    block the permit cycle from running every 30 min.
+    """
+    import db as permitdb
+
+    print(f"[SEC] Secondary loop waiting 5 min for warmup...", flush=True)
+    time.sleep(300)
+
+    while True:
+        try:
+            from license_enrichment import is_import_running
+            if is_import_running():
+                print(f"[SEC] Paused — license import in progress", flush=True)
+                time.sleep(60)
+                continue
+        except Exception:
+            pass
+
+        cycle_start = time.time()
+        print(f"[SEC] Starting secondary cycle... mem={get_memory_mb():.0f}MB", flush=True)
+
+        # ── Violations ──
         if memory_ok("violation_collection"):
             try:
                 from violation_collector import collect_violations
                 t0 = time.time()
                 results = collect_violations()
                 elapsed = time.time() - t0
-                print(f"[WORKER] Violation collection complete ({elapsed:.1f}s)", flush=True)
+                print(f"[SEC] Violation collection complete ({elapsed:.1f}s)", flush=True)
                 gc.collect()
 
-                # Log results to collection_log
+                # Log results to collection_log (same pattern as before)
                 try:
                     conn = permitdb.get_connection()
                     for slug, agg in (results or {}).items():
@@ -298,14 +358,7 @@ def scheduled_collection():
                         api_rows = agg.get('api_rows_returned') or 0
                         dupes = agg.get('duplicate_rows_skipped') or 0
                         err = agg.get('error')
-                        if err:
-                            status = 'error'
-                        elif ins > 0:
-                            status = 'success'
-                        elif api_rows > 0:
-                            status = 'caught_up'
-                        else:
-                            status = 'caught_up'  # simplified from server.py
+                        status = 'error' if err else ('success' if ins > 0 else 'caught_up')
                         conn.execute("""
                             INSERT INTO collection_log
                               (city_slug, collection_type, status,
@@ -319,21 +372,11 @@ def scheduled_collection():
                               api_rows, dupes, err))
                     conn.commit()
                 except Exception as e:
-                    print(f"[WORKER] collection_log write failed (non-fatal): {e}", flush=True)
+                    print(f"[SEC] collection_log write failed (non-fatal): {e}", flush=True)
             except Exception as e:
-                print(f"[WORKER] Violation collection error: {e}", flush=True)
+                print(f"[SEC] Violation collection error: {e}", flush=True)
 
-        # ── Web enrichment (DDG search for phones) ──
-        if memory_ok("web_enrichment"):
-            try:
-                from web_enrichment import enrich_batch
-                result = enrich_batch(limit=200)
-                print(f"[WORKER] Web enrichment cycle: {result}", flush=True)
-                gc.collect()
-            except Exception as e:
-                print(f"[WORKER] Web enrichment error (non-fatal): {e}", flush=True)
-
-        # ── Staleness check ──
+        # ── Staleness audit ──
         try:
             conn = permitdb.get_connection()
             stale_rows = conn.execute("""
@@ -349,40 +392,30 @@ def scheduled_collection():
                 ORDER BY age_days DESC
             """).fetchall()
             if stale_rows:
-                print(f"[WORKER] {len(stale_rows)} stale cities detected", flush=True)
+                print(f"[SEC] {len(stale_rows)} stale cities detected", flush=True)
         except Exception as e:
-            print(f"[WORKER] Staleness check error (non-fatal): {e}", flush=True)
+            print(f"[SEC] Staleness check error (non-fatal): {e}", flush=True)
 
-        # ── V483: Refresh the V479 stats cache at the end of each cycle ──
-        # The cache is what city pages read from (zero DB queries at render
-        # time per V479 design). When the worker collects new permits /
-        # owners / violations, the cache must be re-aggregated or the web
-        # serves stale numbers. refresh_stats_cache() lives in stats_cache.py,
-        # is plain-Python (no Flask coupling), and atomically rewrites
-        # /var/data/stats_cache.json — which the web service reads via
-        # _load_from_disk() since web + worker share the same disk.
+        # ── Stats cache refresh ──
         if memory_ok("stats_cache_refresh"):
             try:
                 from stats_cache import refresh_stats_cache
                 conn = permitdb.get_connection()
                 refresh_stats_cache(conn)
-                print(f"[WORKER] V483: stats cache refreshed", flush=True)
+                print(f"[SEC] Stats cache refreshed", flush=True)
                 gc.collect()
             except Exception as e:
-                print(f"[WORKER] V483: stats cache refresh error (non-fatal): {e}",
+                print(f"[SEC] Stats cache refresh error (non-fatal): {e}",
                       flush=True)
 
-        # ── Cycle complete ──
         elapsed_total = time.time() - cycle_start
         mem = get_memory_mb()
-        print(f"[WORKER] Cycle complete: {elapsed_total:.0f}s, memory: {mem:.0f}MB", flush=True)
+        print(f"[SEC] Secondary cycle complete: {elapsed_total:.0f}s, mem={mem:.0f}MB", flush=True)
 
-        # Force GC at end of every cycle
-        gc.collect()
-
-        # Dynamic sleep: aim for 30-min cycle cadence
-        sleep_time = max(300, 1800 - elapsed_total)  # at least 5 minutes
-        print(f"[WORKER] Sleeping {sleep_time:.0f}s until next cycle", flush=True)
+        # 2hr cadence — violations + stats are heavy and don't need
+        # 30-min freshness. If the cycle itself ran >2hrs, sleep min 5min.
+        sleep_time = max(300, 7200 - elapsed_total)
+        print(f"[SEC] Sleeping {sleep_time:.0f}s until next secondary cycle", flush=True)
         time.sleep(sleep_time)
 
 
@@ -606,6 +639,15 @@ def main():
     threads.append(t_sched)
     print(f"[WORKER] Started: scheduled_collection", flush=True)
     time.sleep(30)
+
+    # V488 IRONCLAD: Secondary loop (violations + staleness + stats_cache)
+    # — split off so it stops blocking the permit cycle.
+    t_secondary = threading.Thread(target=secondary_loop,
+                                   name='secondary_loop', daemon=True)
+    t_secondary.start()
+    threads.append(t_secondary)
+    print(f"[WORKER] Started: secondary_loop", flush=True)
+    time.sleep(15)
 
     # Enrichment daemon
     t_enrich = threading.Thread(target=enrichment_daemon,
