@@ -771,8 +771,32 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
             print(f"  [V145] sources update error: {str(src_err)[:50]}")
 
     except Exception as e:
-        # Don't let V15 logging errors break collection
-        print(f"  [V15] Logging error: {str(e)[:50]}")
+        # Don't let V15 logging errors break collection. V488 follow-up:
+        # this except has been swallowing every failure since at least
+        # 2026-05-01 12:41 with only a stdout print that nobody can see.
+        # Mirror the failure to collection_log so a SQL probe can diagnose
+        # next time without waiting for log access.
+        err_text = (type(e).__name__ + ': ' + str(e))[:300]
+        print(f"  [V15] Logging error: {err_text[:80]}", flush=True)
+        try:
+            _conn = permitdb.get_connection()
+            _conn.execute(
+                """
+                INSERT INTO collection_log
+                  (city_slug, collection_type, status,
+                   records_fetched, records_inserted,
+                   duration_seconds, error_message)
+                VALUES (?, 'permits_log_failure', 'error', 0, 0, 0, ?)
+                """,
+                (city_slug if 'city_slug' in dir() else (city_key or city_name or 'unknown'),
+                 err_text),
+            )
+            _conn.commit()
+        except Exception:
+            # Last-resort: if even collection_log write fails, give up
+            # silently to honor the original "don't break collection"
+            # guarantee. The stdout print above is the final fallback.
+            pass
 
 
 def parse_address_value(val):
