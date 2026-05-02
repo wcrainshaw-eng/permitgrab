@@ -209,6 +209,11 @@ def _get_sqlite_conn():
         _sqlite_local.conn.execute("PRAGMA synchronous=NORMAL")
         _sqlite_local.conn.execute("PRAGMA cache_size=-8000")
         _sqlite_local.conn.execute("PRAGMA busy_timeout=60000")
+        # V485 (mirror db.py P0 root-cause #2 fix): aggressive WAL
+        # auto-checkpoint to limit growth between active checkpoints
+        # by the worker heartbeat. See db.py for the full diagnosis.
+        _sqlite_local.conn.execute("PRAGMA wal_autocheckpoint=200")
+        _sqlite_local.conn.execute("PRAGMA journal_size_limit=67108864")
 
     return _sqlite_local.conn
 

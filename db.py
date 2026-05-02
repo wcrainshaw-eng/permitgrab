@@ -421,13 +421,25 @@ def get_connection():
         _local.conn.execute("PRAGMA synchronous=NORMAL")  # good durability, better perf
         _local.conn.execute("PRAGMA cache_size=-8000")  # 8MB cache (conservative for 2GB box)
         _local.conn.execute("PRAGMA busy_timeout=60000")  # wait up to 60s for locks (V35: startup cleanup takes time)
-        # V445 (P0 root-cause): WAL ballooned to 3.4 GB on 2026-04-27 because
-        # long-running reader transactions kept blocking checkpoints. The
-        # deferred_startup commit() then took minutes per call, jamming the
-        # whole daemon-spawn chain. journal_size_limit caps the WAL file size
-        # after each successful checkpoint; wal_autocheckpoint stays at the
-        # default 1000 pages but is set explicitly to surface the intent.
-        _local.conn.execute("PRAGMA wal_autocheckpoint=1000")
+        # V485 (2026-05-02 P0 root-cause #2): WAL re-ballooned to 695 MB on
+        # 2026-05-02 (V445's 3.4 GB incident on 2026-04-27 was supposedly
+        # fixed by setting journal_size_limit + wal_autocheckpoint=1000).
+        # The actual root cause: wal_autocheckpoint runs PASSIVE checkpoints
+        # which silently no-op when ANY reader holds a transaction — and
+        # with the V479 stats refresh + V483b NOLA backfill + 4 web workers
+        # × 8 threads doing constant page-render reads, there's almost
+        # always at least one open reader. Frames accumulate unbounded.
+        # journal_size_limit only kicks in WHEN a checkpoint succeeds, so
+        # it's a useless ceiling.
+        # The full cure has TWO halves:
+        #   (1) lower auto threshold from 1000 (4 MB) → 200 pages (~800 KB)
+        #       so passive checkpoints trigger 5× more often — even if 80%
+        #       are blocked, the unblocked 20% land smaller WAL flushes
+        #   (2) the worker.py heartbeat now calls
+        #       wal_checkpoint(TRUNCATE) every ~5 min — an ACTIVE checkpoint
+        #       from a thread the collector doesn't serialize against, so it
+        #       reliably shrinks the file even under read-heavy load.
+        _local.conn.execute("PRAGMA wal_autocheckpoint=200")
         _local.conn.execute("PRAGMA journal_size_limit=67108864")  # 64MB cap after checkpoint
         # V398 (CODE_V364 Part 5.4): temp tables + mmap for query speed.
         # temp_store=MEMORY keeps GROUP BY / ORDER BY working sets in RAM

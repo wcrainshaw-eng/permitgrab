@@ -458,11 +458,41 @@ def email_scheduler():
 # ─── Heartbeat ────────────────────────────────────────────────────────────────
 
 def heartbeat():
-    """Log memory + thread count every 5 minutes. Force GC when high."""
+    """Log memory + thread count every 5 minutes. Force GC when high.
+
+    V485 (2026-05-02 root-cause fix): also force a wal_checkpoint(TRUNCATE)
+    on every heartbeat. The auto-checkpoint at 200 pages (db.py) only runs
+    PASSIVE checkpoints — those silently skip when ANY reader holds a
+    transaction (V479 stats refresh, V483b NOLA backfill, the 4 web
+    workers' constant page-render reads). A skipped passive checkpoint
+    leaves the WAL file growing unbounded. The 695MB WAL freeze on
+    2026-05-02 was the third such incident in ten days; this is the
+    permanent cure: an active checkpoint from a thread (heartbeat) that
+    the collector does NOT serialize against. The worker holds no other
+    long readers, so this call almost always succeeds — and even when
+    it returns busy=1, it still flushes whatever frames it can.
+    """
     while True:
         mem = get_memory_mb()
         threads = threading.active_count()
         thread_names = [t.name for t in threading.enumerate()]
+
+        # V485: WAL maintenance — runs every heartbeat (~5 min). Cheap if
+        # WAL is small (~ms), critical if it's been growing.
+        try:
+            import db as _permitdb
+            _conn = _permitdb.get_connection()
+            _r = _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+            # _r = (busy, num_frames_in_wal, num_checkpointed)
+            import os
+            _wal_path = os.path.join(DATA_DIR, 'permitgrab.db-wal')
+            _wal_mb = os.path.getsize(_wal_path) / 1024 / 1024 if os.path.exists(_wal_path) else 0
+            if _r and (_r[1] > 1000 or _wal_mb > 32):
+                print(f"[WORKER] V485 wal_checkpoint: busy={_r[0]} frames={_r[1]} "
+                      f"checkpointed={_r[2]} wal_size={_wal_mb:.0f}MB", flush=True)
+        except Exception as e:
+            print(f"[WORKER] V485 wal_checkpoint error (non-fatal): {e}", flush=True)
+
         print(f"[WORKER] heartbeat: {mem:.0f}MB, {threads} threads: "
               f"{', '.join(thread_names)}", flush=True)
         if mem > MEMORY_LIMIT_MB:
