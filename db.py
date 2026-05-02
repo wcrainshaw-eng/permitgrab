@@ -3099,26 +3099,63 @@ def upsert_permits(permits, source_city_key=None):
     Returns:
         (new_count, updated_count)
     """
-    # V255: canonical-slug remap — pick the active city_slug from
-    # prod_cities that maps to this source_id / alt-slug. Silently fall
-    # back to the original value if no unique canonical exists. One
-    # tiny query per upsert batch, acceptable overhead.
-    if source_city_key:
+    # V485 (ironclad-slug fix): the V255 remap above only fired when the
+    # caller passed source_city_key as a function arg — but the
+    # collect_single_city code path calls upsert_permits(normalized)
+    # with no kwarg, and each row carries source_city_key=<source_id>
+    # baked in by normalize_permit(record, source_id). Result over the
+    # past 48h: 3,985 fresh permits for Atlanta / Miami-Dade / NYC /
+    # San Jose / Buffalo / Orlando / New Orleans landed under the
+    # underscore-style source_id slugs (atlanta_ga, miami_dade,
+    # new_york, etc.) instead of the canonical hyphenated slugs the
+    # pages read (atlanta, miami-dade-county, new-york-city). The
+    # user-visible damage was "Atlanta digest dated 4/30 on 5/2"
+    # despite the data being in the DB the whole time.
+    #
+    # The ironclad fix: a single canonical_slug() helper run against
+    # BOTH the function arg AND every row's source_city_key field,
+    # right before the INSERT. Cached per-call so the prod_cities
+    # lookup runs once per slug variant per batch.
+    _canonical_cache = {}
+    def _canonical_slug(s):
+        if not s:
+            return s
+        if s in _canonical_cache:
+            return _canonical_cache[s]
         try:
             _c = get_connection()
             _row = _c.execute(
                 "SELECT city_slug FROM prod_cities "
-                "WHERE status='active' AND (city_slug=? OR source_id=? "
-                "       OR source_id=REPLACE(?, '-', '_')) "
-                "ORDER BY (city_slug=?) DESC LIMIT 1",
-                (source_city_key, source_city_key, source_city_key, source_city_key),
+                "WHERE status IN ('active','paused') "
+                "  AND (city_slug=? OR source_id=? "
+                "       OR source_id=REPLACE(?, '-', '_') "
+                "       OR source_id=REPLACE(?, '_', '-')) "
+                "ORDER BY (city_slug=?) DESC, "
+                "         CASE status WHEN 'active' THEN 0 ELSE 1 END "
+                "LIMIT 1",
+                (s, s, s, s, s),
             ).fetchone()
             if _row:
                 canon = _row['city_slug'] if hasattr(_row, 'keys') else _row[0]
-                if canon and canon != source_city_key:
-                    source_city_key = canon
+                if canon:
+                    _canonical_cache[s] = canon
+                    return canon
         except Exception:
             pass
+        _canonical_cache[s] = s
+        return s
+
+    if source_city_key:
+        source_city_key = _canonical_slug(source_city_key)
+    # V485: also remap per-row source_city_key — the
+    # normalize_permit(record, source_id) chain stamps each row with
+    # the registry key, not the slug. Without this loop, the
+    # function-arg remap above is a no-op for the call sites that
+    # don't pass source_city_key.
+    for _p in permits:
+        _ps = _p.get('source_city_key')
+        if _ps:
+            _p['source_city_key'] = _canonical_slug(_ps)
 
     # V19: Apply neighborhood-to-city mapping (e.g., "Vista Park, FL" -> "Orlando, FL")
     for p in permits:
