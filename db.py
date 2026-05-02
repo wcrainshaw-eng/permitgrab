@@ -3753,6 +3753,16 @@ def get_prod_cities(status='active', min_permits=1):
     # cities_browse can render emblems and apply the bulk-misattribution filter
     # without N+1 lookups.
     if status:
+        # V488 IRONCLAD: dropped the `newest_permit_date >= -30d`
+        # WHERE filter. With it, any city that goes 30 days stale was
+        # silently REMOVED from the collection pool, guaranteeing it
+        # could never recover even if its source started publishing
+        # again. Combined with the V166 cap of 15 cities/cycle and the
+        # `permits_last_30d DESC` ORDER, the same big-volume cities got
+        # picked every cycle while 1,000+ active cities sat untouched
+        # for weeks. Now: every active+configured city stays in the
+        # pool. The collector itself decides priority via stale-first
+        # rotation (collector.py V488 IRONCLAD block).
         cursor = conn.execute("""
             SELECT city, state, city_slug, total_permits, status, last_permit_date,
                    source_type, source_id, consecutive_failures, last_error,
@@ -3760,9 +3770,6 @@ def get_prod_cities(status='active', min_permits=1):
                    population, has_enrichment, has_violations
             FROM prod_cities
             WHERE status = ? AND total_permits >= ?
-              AND (newest_permit_date >= date('now', '-30 days')
-                   OR newest_permit_date IS NULL
-                   OR total_permits = 0)
               AND source_type IS NOT NULL
             ORDER BY permits_last_30d DESC, total_permits DESC
         """, (status, min_permits))
