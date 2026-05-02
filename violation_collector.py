@@ -953,10 +953,21 @@ VIOLATION_SOURCES = {
                 'platform': 'arcgis',
                 'resource_id': 'raleigh-housing-neighborhoods',
                 'arcgis_url': 'https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Ask_Raleigh_Requests/FeatureServer/0',
-                'base_where': "CATEGORY='Housing & Neighborhoods'",
+                # V485 (CODE_V485 A2): Raleigh restructured 311 categories
+                # ~Oct 2025. The old 'Housing & Neighborhoods' bucket froze
+                # with its final entry on 2025-10-21 (504 records, all
+                # stale). Fresh code-violation records now use 'Public
+                # Nuisance' (1,216 records, newest 2026-04-30). Keep the
+                # old category in the IN-list so we don't lose historical
+                # rows that re-collect.
+                'base_where': "CATEGORY IN ('Public Nuisance','Housing & Neighborhoods')",
                 'date_field': 'APPLIED_DATE',
                 'id_field': 'NUMBER',
-                'description_field': 'REQUEST_TYPE',
+                # V485 (CODE_V485 A2): REQUEST_TYPE is NULL on the new
+                # Public-Nuisance category records. SERVICE carries the
+                # human-readable type ("Public Nuisance", "Unsafe Housing
+                # Conditions"). Swap so descriptions populate.
+                'description_field': 'SERVICE',
                 'status_field': 'STATUS',
                 'type_field': 'SERVICE',
                 'address_fields': {'full': 'ADDRESS'},
@@ -1646,9 +1657,20 @@ VIOLATION_SOURCES = {
                 'description_field': 'VIOLATION',
                 'status_field': None,
                 'type_field': 'VIOLATION',
-                'address_fields': {'number': 'STREET_NUM', 'street': 'STREET_NAM',
-                                   'prefix': 'STREET_DIR', 'suffix': 'STREET_TYP'},
-                'zip_field': 'ZIP',
+                # V485 (CODE_V485 A1): the long-name fields (STREET_NUM,
+                # STREET_NAM, STREET_DIR, STREET_TYP) are NULL on every
+                # recent record — the live ArcGIS layer populates the
+                # short-name siblings instead (STRNO, STRNAME, STRDIR,
+                # STRTYPE). ZIP is also null in fresh rows; STRZIP is the
+                # populated integer field. Result with the old map: 871
+                # records returned, every one dropped at the address-
+                # build step → 0 inserts. Sample row 2026-04-30:
+                #   STRNO=39 STRNAME=LOWERY STRTYPE=ST STRZIP=89015
+                #   CASE=CE-26-2268 VIOLATION='Obstruction of Right of
+                #   Way ,Litter'
+                'address_fields': {'number': 'STRNO', 'street': 'STRNAME',
+                                   'prefix': 'STRDIR', 'suffix': 'STRTYPE'},
+                'zip_field': 'STRZIP',
                 'lat_field': None,
                 'lng_field': None,
             },

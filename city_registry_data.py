@@ -872,6 +872,41 @@ CITY_REGISTRY = {
         "active": True,
     },
 
+    # V485 (CODE_V485 A3): Savannah COMMERCIAL layer — sibling to the
+    # residential entry above. V484 only wired layer 1; this adds
+    # layer 0 (commercial, 610 records). Same slug so both feed into
+    # the single 'savannah' city page; the V485 ironclad upsert remap
+    # canonicalizes both to slug='savannah' on insert. Identical
+    # field_map; only the endpoint differs (FeatureServer/0 vs /1).
+    "savannah_ga_commercial": {
+        "name": "Savannah",
+        "state": "GA",
+        "slug": "savannah",
+        "lat": 32.0809,
+        "lon": -81.0912,
+        "platform": "arcgis",
+        "endpoint": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0/query",
+        "dataset_id": "Savannah_BuildingPermit_Commercial",
+        "description": "Savannah Building Permits — commercial layer (SAGIS)",
+        "field_map": {
+            "permit_number": "PermitNumber",
+            "permit_type": "PermitType",
+            "work_type": "WorkClass",
+            "status": "PermitStatus",
+            "filing_date": "IssuedDate_DATE",
+            "address": "Address",
+            "contractor_name": "ApplicantName",
+            "description": "Description",
+            "estimated_cost": "Permit_Value",
+            "parcel": "PIN",
+        },
+        "date_field": "IssuedDate_DATE",
+        "date_format": "epoch_ms",
+        "limit": 2000,
+        "active": True,
+        "notes": "V485: pairs with savannah_ga residential. Same slug — V485 upsert remap merges into 'savannah'.",
+    },
+
     # V91 - Virginia Beach, VA - Added 2026-04-06 - Current data through Apr 2026
     "virginia_beach": {
         "name": "Virginia Beach",
