@@ -928,6 +928,61 @@ ASSESSOR_SOURCES = {
         'source_tag': 'assessor:spokane_spokane',
         'pagination_strategy': 'objectid',
     },
+    'mecklenburg_charlotte': {
+        # V485 (CODE_V485 A4): Mecklenburg County (Charlotte NC) Tax Parcel
+        # Owners. Probed 2026-05-01: 426,294 county-wide parcels, ~250K when
+        # filtered to municipality_desc='CHARLOTTE'. Daily updates. Full
+        # mailing-address segmentation (txt_mailaddr1 / txt_city / txt_state
+        # / txt_zipcode) — better than V474's other NC sources for
+        # absentee-owner detection. Charlotte was permits-dead but had
+        # 8K live violations + 0 owners; this jump promotes it Tier 2-3 →
+        # Tier 4 (own + violations is the home-services / motivated-seller
+        # combo). Sample row owner=BINNER ROBERT B JR, situs=2228 N BREVARD
+        # ST, mailing=2228 N BREVARD ST CHARLOTTE NC 28206-3454.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Mecklenburg County (Charlotte) Tax Parcels',
+        'endpoint': 'https://meckgis.mecklenburgcountync.gov/server/rest/services/TaxParcel_Camaownershipvalues/FeatureServer/0',
+        'where_clause': "municipality_desc='CHARLOTTE' AND full_owner_name IS NOT NULL AND full_owner_name <> ''",
+        'field_map': {
+            'parcel_id': 'pid',
+            'owner_name': 'full_owner_name',
+            'address': 'situsaddress1',
+            'owner_mailing_address': 'txt_mailaddr1',
+            'city': 'municipality_desc',
+        },
+        'state': 'NC',
+        'source_tag': 'assessor:mecklenburg_charlotte',
+        'pagination_strategy': 'objectid',
+        'default_city': 'Charlotte',
+    },
+    'hcad_houston': {
+        # V485 (CODE_V485 A5): HCAD via City of Houston ArcGIS. Probed
+        # 2026-05-01: 1.73M Harris County parcels; the
+        # `Appraised_value_COH IS NOT NULL` filter narrows to ~500K
+        # Houston-city-taxed parcels (the rest are unincorporated
+        # Harris). MapServer (NOT FeatureServer) — the existing
+        # _fetch_arcgis_page() handler already sends returnGeometry=false
+        # which MapServer requires. Sample row OWNER='LIVING WATER
+        # PLUMBING SERVICE CORP', ADDRESS='123 MAIN ST', mailing fields
+        # split across Mail_Addr_2/Mail_City/Mail_State/Mail_Zip. Houston
+        # was 0 owners + 83K violations + 0 contractors per CLAUDE.md;
+        # 500K owners makes this the largest single-city assessor source
+        # we have, second only to FL statewide.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'HCAD via City of Houston (Houston-city parcels)',
+        'endpoint': 'https://mycity2.houstontx.gov/pubgis02/rest/services/HoustonMap/Cadastral/MapServer/0',
+        'where_clause': "Appraised_value_COH IS NOT NULL AND Appraised_value_COH <> '' AND OWNER IS NOT NULL AND OWNER <> ''",
+        'field_map': {
+            'parcel_id': 'TAX_ID',
+            'owner_name': 'OWNER',
+            'address': 'ADDRESS',
+            'owner_mailing_address': 'OWNER_ADDRESS',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:hcad_houston',
+        'pagination_strategy': 'objectid',
+        'default_city': 'Houston',
+    },
     'orleans_new_orleans': {
         # V483b: Orleans Parish Assessor (New Orleans). Probed 2026-05-01:
         # apps/property3/MapServer/15 ("Property Information [Parcels]")
