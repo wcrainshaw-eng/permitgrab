@@ -38247,8 +38247,18 @@ BULK_SOURCES = {
         "date_field": "ISSUDATE",
         "date_format": "epoch_ms",
         "limit": 2000,
-        "active": True,
-        "notes": "V15: County-wide permits (no city breakdown). ArcGIS endpoint. ID is numeric.",
+        # V485 (2026-05-02): the BuildingPermit_gdb endpoint froze at
+        # 2026-04-02 (no records past that date despite daily probing).
+        # The live Miami-Dade source is the OTHER registry entry
+        # `miami_dade` (slug='miami', endpoint=miamidade_permit_data)
+        # which has data through 5/2 today. Marking active=False so the
+        # daemon stops wasting cycles on a dead source. The slug
+        # `miami-dade-fl` here is also a duplicate of the canonical
+        # `miami-dade-county` (resolved via _PERMIT_SLUG_ALIASES);
+        # any historical rows under the dead source's slug are merged
+        # into the canonical via the V485 ironclad upsert remap.
+        "active": False,
+        "notes": "V15: County-wide permits. V485: ArcGIS endpoint frozen 2026-04-02 — superseded by `miami_dade` (slug=miami, miamidade_permit_data feed).",
     },
 
     # V12.35: New bulk sources from county discovery
