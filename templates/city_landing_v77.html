@@ -1786,19 +1786,15 @@ function v328ApplyFilter(val) {
     </div>
   </div>
 </section>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {"@type":"Question","name":"How many building permits does PermitGrab track in {{ city_name }}?","acceptedAnswer":{"@type":"Answer","text":"PermitGrab currently tracks {{ permit_count|default(0) }} building permits in {{ city_name }}, {{ state_name }}. Data is pulled daily from the official municipal open-data source and includes permit number, address, permit type, contractor, status, and estimated value where available."}},
-    {"@type":"Question","name":"How fresh is the {{ city_name }} permit data?","acceptedAnswer":{"@type":"Answer","text":"Most cities refresh their open-data portals on a 24-hour cadence, so new permits typically appear in PermitGrab within 1-3 days of filing. {{ city_name }} is collected on every daemon cycle; if the upstream source has a known delay we note it on the page."}},
-    {"@type":"Question","name":"How can contractors find construction leads in {{ city_name }}?","acceptedAnswer":{"@type":"Answer","text":"Contractors find leads in {{ city_name }} by filtering PermitGrab by trade and ZIP code, then contacting the permit applicant directly. Pro subscribers get verified phone numbers and can set up saved-search email alerts."}},
-    {"@type":"Question","name":"What's included in the free trial?","acceptedAnswer":{"@type":"Answer","text":"The 14-day free trial includes full Pro access to {{ city_name }} - unlimited phone and website reveals, CSV export, trade and value-tier filters, lead scoring, and violation cross-reference flags. No credit card required."}},
-    {"@type":"Question","name":"Can I cancel anytime?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cancel any time from your account page - no contracts, no cancellation fees. Your subscription stays active through the end of the current billing period."}}
-  ]
-}
-</script>
+{# V485 B4 (CODE_V485 SEO sweep): the V283 FAQPage JSON-LD that lived
+   here ran SECOND on every city page after the V474 FAQPage emitted by
+   routes/city_pages.py:1503-1511. Google's rich-results spec allows ONE
+   FAQPage per page — when there are two, BOTH are rejected for rich
+   snippets. We've been losing FAQ rich-result eligibility on every
+   city page since V474 shipped. Removing this duplicate block; the
+   visible HTML FAQ above stays for users. The V474 route-side block
+   keeps emitting the schema.org markup (it's data-aware — only emits
+   questions when the city has the underlying data). #}
 
 {# V478 Part 2 Section D — city insights, light gray bg, 3-column grid.
    All counts come from v479_stats cache (zero DB queries at render time). #}
