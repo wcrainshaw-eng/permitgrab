@@ -631,19 +631,15 @@ def _log_v15_collection(city_key, city_name, state, permits_found, permits_inser
         if not city_slug:
             city_slug = permitdb.normalize_city_slug(city_name) if city_name else city_key.replace('_', '-')
 
-        # V100: Reclassify 'no_new' → 'empty' for cities with zero permits
-        if status == 'no_new' and city_slug:
-            try:
-                row = conn.execute(
-                    "SELECT total_permits FROM prod_cities WHERE city_slug = ?",
-                    (city_slug,)
-                ).fetchone()
-                if row:
-                    tp = row['total_permits'] if isinstance(row, dict) else row[0]
-                    if not tp or tp == 0:
-                        status = 'empty'
-            except Exception:
-                pass
+        # V100 (DISABLED V488 follow-up): the original V100 reclassification
+        # set status='empty' for zero-permit cities — but the scraper_runs
+        # CHECK constraint only allows 'success'/'error'/'no_new'/'timeout'/
+        # 'skipped'. Every 'empty' INSERT silently violated the constraint
+        # and got swallowed by the outer try/except. Result: every
+        # newly-onboarded zero-permit city's collection logged nothing,
+        # and after enough churn the table fell silent for the whole fleet.
+        # Keeping status='no_new' (which IS valid) — the empty-vs-no-new
+        # distinction can be derived from permits_found=0 anyway.
 
         # Log to scraper_runs
         permitdb.log_scraper_run(
