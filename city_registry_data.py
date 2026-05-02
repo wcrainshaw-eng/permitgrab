@@ -37991,41 +37991,12 @@ CITY_REGISTRY = {
         "notes": "V92: First MA source. CKAN platform. Rich data with fees, sq_feet, lat/lon.",
     },
 
-    "cincinnati": {
-        "name": "Cincinnati",
-        "state": "OH",
-        "slug": "cincinnati",
-        "lat": 39.103,
-        "lon": -84.512,
-        "platform": "socrata",
-        "endpoint": "https://data.cincinnati-oh.gov/resource/cfkj-xb9y.json",
-        "dataset_id": "cfkj-xb9y",
-        "description": "City of Cincinnati Building Permits",
-        "field_map": {
-            "permit_number": "permitnum",
-            "permit_type": "permittype",
-            "address": "originaladdress1",
-            "city": "originalcity",
-            "zip": "originalzip",
-            "filing_date": "issueddate",
-            "expiration_date": "expiresdate",
-            "description": "description",
-            "status": "statuscurrent",
-            "estimated_cost": "estprojectcostdec",
-            "contractor_name": "companyname",
-            "work_class": "workclass",
-            "proposed_use": "proposeduse",
-            "total_sqft": "totalsqft",
-            "units": "units",
-            "latitude": "latitude",
-            "longitude": "longitude",
-            "neighborhood": "neighborhood",
-        },
-        "date_field": "issueddate",
-        "limit": 2000,
-        "active": True,
-        "notes": "V92: First OH city source. Rich data with sqft, units, neighborhood, lat/lon.",
-    },
+    # V487 (2026-05-02): cincinnati duplicate at line 37994 was the
+    # Python-dict-literal winner (last occurrence wins) but its endpoint
+    # cfkj-xb9y returned no data on probe. The shadowed entry at line ~451
+    # is the live Cincinnati source with permits through 2026-04-30.
+    # Removing this entry so the canonical (line 451) wins. Same Fort
+    # Worth pattern documented in V486.
 
     "sioux_falls": {
         "name": "Sioux Falls",
@@ -39088,18 +39059,10 @@ BULK_SOURCES = {
         "description": "Building Permits Dataset (City of Saint Paul ArcGIS)",
         "active": True,
     },
-    "johns_creek_ga": {
-        "city": "Johns Creek",
-        "state": "GA",
-        "slug": "johns-creek",
-        "lat": 34.029,
-        "lon": -84.198,
-        "platform": "arcgis",
-        "endpoint": "https://services1.arcgis.com/bqfNVPUK3HOnCFmA/arcgis/rest/services/Building_Permits_Issued/FeatureServer/0",
-        "date_field": "ISSUE_DATE",
-        "description": "Building Permits Issued (Johns Creek GA ArcGIS)",
-        "active": True,
-    },
+    # V487 (2026-05-02): johns_creek_ga duplicate at line 39091 was the
+    # Python winner but its endpoint returned no fresh data on probe.
+    # The shadowed entry at line ~8836 has permits through 2026-04-16.
+    # Same Fort-Worth shadow pattern as V486 / V487 cincinnati.
     "bend_or": {
         "city": "Bend",
         "state": "OR",
