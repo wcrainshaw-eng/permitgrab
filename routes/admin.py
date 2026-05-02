@@ -4731,11 +4731,24 @@ def admin_daemon_health():
     """
     try:
         conn = permitdb.get_connection()
-        # Last collection
-        last_coll = conn.execute("SELECT MAX(run_started_at) FROM scraper_runs").fetchone()
+        # V488 follow-up: last_collection_at + collections_last_24h were
+        # reading scraper_runs.run_started_at, but log_scraper_run() stopped
+        # firing on 2026-05-01 12:41 (post-V485 worker rewire took a path
+        # that no longer logs to scraper_runs OR collection_log). Permits
+        # ARE flowing — `permits.collected_at` is still being stamped every
+        # cycle — so the underlying signal is alive; only the logging
+        # tables are silent. Read from the source-of-truth column instead
+        # so the dashboard stops lying. The scraper_runs read remains for
+        # `errors_24h` and `top_errors` (still only-source), which will
+        # report 0 until the logger is restored.
+        last_coll = conn.execute("SELECT MAX(collected_at) FROM permits").fetchone()
         last_coll_at = last_coll[0] if last_coll else None
-        # Collections last 24h
-        colls_24h = conn.execute("SELECT COUNT(*) FROM scraper_runs WHERE run_started_at > datetime('now', '-24 hours')").fetchone()[0]
+        # Count distinct city collections in last 24h (proxy for cycle count)
+        colls_24h = conn.execute(
+            "SELECT COUNT(DISTINCT source_city_key) FROM permits "
+            "WHERE collected_at > datetime('now', '-24 hours') "
+            "AND source_city_key IS NOT NULL"
+        ).fetchone()[0]
         errors_24h = conn.execute("SELECT COUNT(*) FROM scraper_runs WHERE run_started_at > datetime('now', '-24 hours') AND status = 'error'").fetchone()[0]
         # Fresh cities
         fresh = conn.execute("SELECT COUNT(DISTINCT city) FROM permits WHERE date >= date('now', '-7 days') AND date <= date('now')").fetchone()[0]

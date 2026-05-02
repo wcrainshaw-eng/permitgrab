@@ -1150,6 +1150,108 @@ ASSESSOR_SOURCES = {
         # → 'new-orleans').
         'default_city': 'New Orleans',
     },
+
+    # V487 PR1 A1: City of St. Louis MO — 129K parcels, INDEPENDENT of
+    # St. Louis County (V486 stlouis_county_mo covers only the suburbs).
+    # Together they cover the full St. Louis metro. Probed live 2026-05-02.
+    'saint_louis_city': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'City of St. Louis MO Parcels (independent jurisdiction)',
+        'endpoint': 'https://stlgis.stlouis-mo.gov/arcgis/rest/services/public/STL_PUBLICMAP/MapServer/1',
+        'where_clause': "OWNERNAME IS NOT NULL AND SITEADDR IS NOT NULL AND SITEADDR <> ''",
+        'field_map': {
+            'parcel_id': 'HANDLE',
+            'owner_name': 'OWNERNAME',
+            'owner_secondary': 'OWNERNAME2',
+            'address': 'SITEADDR',
+            'site_address_num': 'ADDRNUM',
+            'site_zip': 'ZIP',
+            'owner_mailing_address': 'OWNERADDR',
+            'owner_mailing_city': 'OWNERCITY',
+            'owner_mailing_state': 'OWNERSTATE',
+            'owner_mailing_zip': 'OWNERZIP',
+            'neighborhood_code': 'NEIGHCODE',
+            'num_buildings': 'NUMBLDGS',
+            'building_year': 'BDG1YEAR',
+            'assessed_value': 'ASMTTOTAL',
+        },
+        'state': 'MO',
+        'source_tag': 'assessor:saint_louis_city',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'St. Louis',
+    },
+
+    # V487 PR1 A2: Hamilton County TN / Chattanooga — 166K parcels.
+    # Annual refresh (currently 2025-05 data). NEW METRO for owners.
+    # Strip trailing whitespace from OWNERNAME1 (length=150 padded).
+    # Skip first ~5K rows where OWNERNAME1='Update in Progress' (active
+    # segregations) — handled by where_clause.
+    'hamilton_chattanooga': {
+        'platform': 'arcgis_feature',
+        'service_description': 'Hamilton County TN (Chattanooga) Parcels',
+        'endpoint': 'https://services5.arcgis.com/74bZbbuf05Ctvbzv/arcgis/rest/services/Chattanooga_Parcels/FeatureServer/0',
+        'where_clause': "OWNERNAME1 IS NOT NULL AND OWNERNAME1 <> 'Update in Progress' AND ADDRESS IS NOT NULL AND ADDRESS <> ''",
+        'field_map': {
+            'parcel_id': 'PARCEL',
+            'owner_name': 'OWNERNAME1',
+            'owner_secondary': 'OWNERNAME2',
+            'address': 'ADDRESS',
+            'mailing_address_num': 'MASTNUM',
+            'mailing_address_street': 'MASTNAME',
+            'owner_mailing_city': 'MACITY',
+            'owner_mailing_state': 'MASTATE',
+            'owner_mailing_zip': 'MAZIP',
+            'tax_map_no': 'TAX_MAP_NO',
+            'neighborhood_code': 'NEIGHCODE',
+            'land_value': 'LANDVALUE',
+            'building_value': 'BUILDVALUE',
+            'appraised_value': 'APPVALUE',
+            'last_sale_date': 'SALE1DATE',
+        },
+        'state': 'TN',
+        'source_tag': 'assessor:hamilton_chattanooga',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Chattanooga',
+    },
+
+    # V487 PR1 A3: Anchorage AK — 99K parcels, daily refresh, NEW METRO.
+    # Anchorage permits are dead (V317 confirmed); pure owners-only metro
+    # similar to Detroit/Atlanta/Toledo. Skip first ~5K rows with
+    # 'UNITED AIRLINES INC' airport-parcel placeholders — handled by the
+    # default address-non-empty filter.
+    'anchorage_moa': {
+        'platform': 'arcgis_feature',
+        'service_description': 'Municipality of Anchorage Property Information',
+        'endpoint': 'https://services2.arcgis.com/Ce3DhLRthdwbHlfF/arcgis/rest/services/PropertyInformation_Hosted/FeatureServer/0',
+        'where_clause': "Owner_Name IS NOT NULL AND Parcel_Address IS NOT NULL AND Parcel_Address <> '' AND Parcel_Address <> '3 UNKNOWN ST'",
+        'field_map': {
+            'parcel_id': 'Parcel_ID',
+            'owner_name': 'Owner_Name',
+            'address': 'Parcel_Address',
+            'city': 'GIS_Site_City',
+            'site_zip': 'GIS_Site_Zipcode',
+            'owner_mailing_address': 'Owner_Address',
+            'owner_mailing_city': 'Owner_City',
+            'owner_mailing_state': 'Owner_State',
+            'owner_mailing_zip': 'Owner_Zip',
+            'property_type': 'Property_Type',
+            'property_class': 'Class',
+            'land_use': 'Land_Use',
+            'land_value': 'Appraised_Land_Value',
+            'total_value': 'Appraised_Total_Value',
+            'year_built': 'YearBuilt',
+            'lot_size': 'Lot_Size',
+            'zoning': 'Zoning_District',
+            'deed_date': 'Deed_Date',
+        },
+        'state': 'AK',
+        'source_tag': 'assessor:anchorage_moa',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Anchorage',
+    },
 }
 
 
