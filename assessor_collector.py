@@ -1170,7 +1170,7 @@ ASSESSOR_SOURCES = {
             'owner_mailing_city': 'OWNERCITY',
             'owner_mailing_state': 'OWNERSTATE',
             'owner_mailing_zip': 'OWNERZIP',
-            'neighborhood_code': 'NEIGHCODE',
+            'neighborhood_code': 'NBRHD',
             'num_buildings': 'NUMBLDGS',
             'building_year': 'BDG1YEAR',
             'assessed_value': 'ASMTTOTAL',
@@ -1188,7 +1188,7 @@ ASSESSOR_SOURCES = {
     # Skip first ~5K rows where OWNERNAME1='Update in Progress' (active
     # segregations) — handled by where_clause.
     'hamilton_chattanooga': {
-        'platform': 'arcgis_feature',
+        'platform': 'arcgis_mapserver',  # FeatureServer uses identical query API; the dispatcher only knows mapserver/carto/soda
         'service_description': 'Hamilton County TN (Chattanooga) Parcels',
         'endpoint': 'https://services5.arcgis.com/74bZbbuf05Ctvbzv/arcgis/rest/services/Chattanooga_Parcels/FeatureServer/0',
         'where_clause': "OWNERNAME1 IS NOT NULL AND OWNERNAME1 <> 'Update in Progress' AND ADDRESS IS NOT NULL AND ADDRESS <> ''",
@@ -1222,7 +1222,7 @@ ASSESSOR_SOURCES = {
     # 'UNITED AIRLINES INC' airport-parcel placeholders — handled by the
     # default address-non-empty filter.
     'anchorage_moa': {
-        'platform': 'arcgis_feature',
+        'platform': 'arcgis_mapserver',  # FeatureServer uses identical query API; the dispatcher only knows mapserver/carto/soda
         'service_description': 'Municipality of Anchorage Property Information',
         'endpoint': 'https://services2.arcgis.com/Ce3DhLRthdwbHlfF/arcgis/rest/services/PropertyInformation_Hosted/FeatureServer/0',
         'where_clause': "Owner_Name IS NOT NULL AND Parcel_Address IS NOT NULL AND Parcel_Address <> '' AND Parcel_Address <> '3 UNKNOWN ST'",
