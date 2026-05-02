@@ -38114,34 +38114,18 @@ CITY_REGISTRY = {
         "notes": "V92: Fort Lauderdale FL. ArcGIS with rich owner data.",
     },
 
-    "fort_worth": {
-        "name": "Fort Worth",
-        "state": "TX",
-        "slug": "fort-worth",
-        "lat": 32.756,
-        "lon": -97.331,
-        "platform": "socrata",
-        "endpoint": "https://permits.partner.socrata.com/resource/qy5k-jz7m.json",
-        "dataset_id": "qy5k-jz7m",
-        "description": "Fort Worth Building Permits (BLDS format)",
-        "field_map": {
-            "permit_number": "permitnum",
-            "permit_type": "permittype",
-            "address": "originaladdress1",
-            "city": "originalcity",
-            "zip": "originalzip",
-            "filing_date": "issueddate",
-            "expiration_date": "expiresdate",
-            "description": "description",
-            "status": "statuscurrent",
-            "latitude": "latitude",
-            "longitude": "longitude",
-        },
-        "date_field": "issueddate",
-        "limit": 2000,
-        "active": True,
-        "notes": "V92: Fort Worth TX via BLDS Socrata. 5th largest TX city ~960K pop.",
-    },
+    # V486 (2026-05-02 root-cause): this Socrata BLDS entry was SHADOWING
+    # the live ArcGIS CFW_Open_Data_Development_Permits_View entry at the
+    # top of this file (line ~1525). Python dict-literals silently keep
+    # the LAST occurrence of a duplicate key — so by being later in the
+    # file, this Socrata config has been the active Fort Worth source
+    # for years. Probed 2026-05-02: Socrata qy5k-jz7m returns permits
+    # dated 2015-08-21 (frozen 10 years!). The ArcGIS CFW source it was
+    # shadowing has fresh permits through 2026-04-14. Removing this
+    # entry so the canonical (line ~1525) ArcGIS config wins.
+    # See V486 commit message + the duplicate-key scanner added to
+    # _v486_warn_registry_duplicates() in server.py for the systemic
+    # fix — 85 duplicate keys total, this is the worst-impact one.
 
     "cambridge_ma": {
         "name": "Cambridge",
