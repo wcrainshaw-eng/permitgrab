@@ -94,6 +94,36 @@ def blog_post(slug):
     except Exception as _e:
         print(f"[V482] buyer persona post render failed for {slug}: {_e}", flush=True)
 
+    # V486 Part C: city × persona long-tail blog posts. 10 entries
+    # (phoenix-solar-installer-leads, miami-dade-insurance-agent-leads,
+    # chicago-motivated-seller-leads, etc). Reuses the V482 shell template;
+    # the extra city / city_slug / persona_slug fields are passed through
+    # for the optional internal-link breadcrumb the template renders when
+    # they're present.
+    try:
+        from city_persona_posts import CITY_PERSONA_POSTS
+        if slug in CITY_PERSONA_POSTS:
+            post = CITY_PERSONA_POSTS[slug]
+            # Pick 3 related: prefer same persona (different city), then
+            # same city (different persona), then anything else.
+            same_persona = [(s, p) for s, p in CITY_PERSONA_POSTS.items()
+                            if s != slug and p.get('persona_slug') == post.get('persona_slug')]
+            same_city = [(s, p) for s, p in CITY_PERSONA_POSTS.items()
+                         if s != slug and p.get('city_slug') == post.get('city_slug')
+                         and (s, p) not in same_persona]
+            others = [(s, p) for s, p in CITY_PERSONA_POSTS.items()
+                      if s != slug and (s, p) not in same_persona and (s, p) not in same_city]
+            related_posts = (same_persona + same_city + others)[:3]
+            footer_cities = get_cities_with_data()
+            return render_template(
+                'blog/persona/post.html',
+                slug=slug, post=post,
+                related_posts=related_posts,
+                footer_cities=footer_cities,
+            )
+    except Exception as _e:
+        print(f"[V486] city persona post render failed for {slug}: {_e}", flush=True)
+
     _seo = _v467_render_seo_blog_post(slug)
     if _seo is not None:
         return _seo
@@ -419,6 +449,19 @@ def sitemap_blog():
             })
     except Exception as _bp_err:
         print(f"[V482] sitemap-blog persona posts skipped: {_bp_err}", flush=True)
+
+    # V486 Part C: city × persona long-tail blog posts.
+    try:
+        from city_persona_posts import CITY_PERSONA_POSTS
+        for _slug, _post in CITY_PERSONA_POSTS.items():
+            urls.append({
+                'loc': f"{SITE_URL}/blog/{_slug}",
+                'changefreq': 'monthly',
+                'priority': '0.7',
+                'lastmod': _post.get('meta_published', '2026-05-02'),
+            })
+    except Exception as _cp_err:
+        print(f"[V486] sitemap-blog city-persona posts skipped: {_cp_err}", flush=True)
 
     for post in BLOG_POSTS:
         urls.append({
