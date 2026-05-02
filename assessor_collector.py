@@ -928,6 +928,125 @@ ASSESSOR_SOURCES = {
         'source_tag': 'assessor:spokane_spokane',
         'pagination_strategy': 'objectid',
     },
+    'wayne_detroit': {
+        # V486 A1: City of Detroit (Wayne County) parcels. Probed
+        # 2026-05-02: 378K parcels, daily refresh. Sample row:
+        # parcel_id=02000184., taxpayer_1='DETROIT CLUB HOLDINGS, LLC',
+        # taxpayer_address='712 CASS AVE', taxpayer_city='DETROIT'.
+        # Detroit permits are dead (re-confirmed V486) — onboards as an
+        # owners-only metro per the Birmingham pattern. 378K is enough
+        # to monetize the absentee-investor / motivated-seller / direct-
+        # mail playbook even without permits.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'City of Detroit parcels (current year)',
+        'endpoint': 'https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/parcel_file_current/FeatureServer/0',
+        'where_clause': "taxpayer_1 IS NOT NULL AND taxpayer_1 <> ''",
+        'field_map': {
+            'parcel_id': 'parcel_id',
+            'owner_name': 'taxpayer_1',
+            'address': 'address',
+            'zip': 'zip_code',
+            'owner_mailing_address': 'taxpayer_address',
+        },
+        'state': 'MI',
+        'source_tag': 'assessor:wayne_detroit',
+        'pagination_strategy': 'objectid',
+        'default_city': 'Detroit',
+    },
+    'lucas_toledo': {
+        # V486 A2: Lucas County (Toledo OH) parcels. Probed 2026-05-02:
+        # 204K parcels filtered to Toledo, weekly fresh. Toledo permits
+        # are also dead — same owners-only metro pattern as Detroit.
+        # property_address is single-string ("123 MAIN ST TOLEDO OH 43604")
+        # so we filter by LIKE '%TOLEDO%' to scope.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Lucas County (Toledo) parcels',
+        'endpoint': 'https://services3.arcgis.com/T8dczfwPixv79EgZ/arcgis/rest/services/Parcels_General_Land_Use_Classification_view/FeatureServer/0',
+        'where_clause': "owner IS NOT NULL AND owner <> '' AND property_address LIKE '%TOLEDO%'",
+        'field_map': {
+            'parcel_id': 'parid',
+            'owner_name': 'owner',
+            'address': 'property_address',
+            'owner_mailing_address': 'mailing_address',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:lucas_toledo',
+        'pagination_strategy': 'objectid',
+        'default_city': 'Toledo',
+    },
+    'fulton_atlanta': {
+        # V486 A3: Fulton County (Atlanta GA + suburbs). Probed 2026-05-02:
+        # 372K parcels, TaxYear=2026 filter narrows to current roll.
+        # Sample owner='CHASTAIN KRISTINA I', mailing='140 SHAMROCK IND
+        # BLVD, TYRONE GA 30290' (absentee). TaxDist=25 = City of
+        # Atlanta proper; rest is Sandy Springs / Roswell / College Park
+        # / East Point. Pair with dekalb_atlanta for full metro.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Fulton County tax parcels (Atlanta core + suburbs)',
+        'endpoint': 'https://services1.arcgis.com/AQDHTHDrZzfsFsB5/arcgis/rest/services/Tax_Parcels/FeatureServer/0',
+        'where_clause': "Owner IS NOT NULL AND Owner <> '' AND TaxYear='2026'",
+        'field_map': {
+            'parcel_id': 'ParcelID',
+            'owner_name': 'Owner',
+            'address': 'Address',
+            'owner_mailing_address': 'OwnerAddr1',
+        },
+        'state': 'GA',
+        'source_tag': 'assessor:fulton_atlanta',
+        'pagination_strategy': 'objectid',
+        'default_city': 'Atlanta',
+    },
+    'dekalb_atlanta': {
+        # V486 A4: DeKalb County GA (Atlanta-east suburbs). Probed
+        # 2026-05-02: 245K parcels, LASTUPDATE max 2026-04-30.
+        # Decatur / Brookhaven / Doraville / Tucker / Stone Mtn /
+        # Lithonia. CITY field is populated per row, so the slug
+        # derivation in stats_cache (LOWER + REPLACE) keys each row
+        # into the right sub-city. Pair with fulton_atlanta for full
+        # Atlanta-metro coverage.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'DeKalb County GA parcels (Atlanta-east suburbs)',
+        'endpoint': 'https://dcgis.dekalbcountyga.gov/hosted/rest/services/Parcels/MapServer/0',
+        'where_clause': "OWNERNME1 IS NOT NULL AND OWNERNME1 <> '' AND SITEADDRESS IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'PARCELID',
+            'owner_name': 'OWNERNME1',
+            'address': 'SITEADDRESS',
+            'owner_mailing_address': 'PSTLADDRESS',
+            'zip': 'ZIP',
+            'city': 'CITY',
+        },
+        'state': 'GA',
+        'source_tag': 'assessor:dekalb_atlanta',
+        'pagination_strategy': 'objectid',
+        'default_city': 'Decatur',
+    },
+    'stlouis_county_mo': {
+        # V486 A5: St. Louis County MO (suburbs only). Probed 2026-05-02:
+        # 401K parcels, TAXYR=2026 filter. NEW METRO — Clayton, U City,
+        # Florissant, Chesterfield, Kirkwood, etc. MUNICIPALITY field is
+        # populated ('UNINCORPORATED' or actual city); slug-derivation
+        # picks the right sub-city. NOTE: independent City of St. Louis
+        # (city='St. Louis', slug=st-louis-city) is a separate
+        # jurisdiction NOT in this feed — they have their own city portal
+        # which has no public REST per V258.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'St. Louis County MO parcels (suburbs only)',
+        'endpoint': 'https://maps.stlouisco.com/hosting/rest/services/Maps/AGS_Parcels/MapServer/0',
+        'where_clause': "OWNER_NAME IS NOT NULL AND OWNER_NAME <> '' AND TAXYR='2026'",
+        'field_map': {
+            'parcel_id': 'LOCATOR',
+            'owner_name': 'OWNER_NAME',
+            'address': 'PROP_ADD',
+            'zip': 'PROP_ZIP',
+            'owner_mailing_address': 'OWN_ADD',
+            'city': 'MUNICIPALITY',
+        },
+        'state': 'MO',
+        'source_tag': 'assessor:stlouis_county_mo',
+        'pagination_strategy': 'objectid',
+        'default_city': 'St. Louis County',
+    },
     'mecklenburg_charlotte': {
         # V485 (CODE_V485 A4): Mecklenburg County (Charlotte NC) Tax Parcel
         # Owners. Probed 2026-05-01: 426,294 county-wide parcels, ~250K when

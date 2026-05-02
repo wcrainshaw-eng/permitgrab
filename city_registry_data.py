@@ -832,6 +832,45 @@ CITY_REGISTRY = {
         "active": False,  # V99: Actually deactivated — ArcGIS endpoint dead since Jan 2026
     },
 
+    # V486 B: Sacramento CA — V258 dead-end overturned. Probed 2026-05-02:
+    # 6,089 current-year permits, newest Status_Date 2026-04-26 (6 days
+    # fresh). Real Contractor field — sample row Application='RES-2608246',
+    # Contractor='HAMMER ROOFING', Address='1824 LARKIN WAY'. The V258
+    # probe checked SACOG (regional council), which has only a yearly
+    # housing summary; the city's actual permit feed lives at
+    # services5.arcgis.com under the Sacramento CityServices ArcGIS org.
+    # Pair with CA CSLB phone enrichment (V258 wired statewide) for
+    # license/phone matches.
+    "sacramento_ca": {
+        "name": "Sacramento",
+        "state": "CA",
+        "slug": "sacramento",
+        "lat": 38.5816,
+        "lon": -121.4944,
+        "platform": "arcgis",
+        "endpoint": "https://services5.arcgis.com/54falWtcpty3V47Z/arcgis/rest/services/BldgPermitIssued_CurrentYear/FeatureServer/0/query",
+        "dataset_id": "Sacramento_BldgPermitIssued_CurrentYear",
+        "description": "Sacramento Building Permits (current year, daily refresh)",
+        "field_map": {
+            "permit_number": "Application",
+            "permit_type": "Type",
+            "work_type": "Sub_Type",
+            "status": "Current_Status",
+            "filing_date": "Status_Date",
+            "address": "Address",
+            "zip": "ZIP",
+            "contractor_name": "Contractor",
+            "description": "Work_Desc",
+            "estimated_cost": "Valuation",
+            "parcel_id": "Parcel_No",
+        },
+        "date_field": "Status_Date",
+        "date_format": "mm/dd/yyyy",
+        "limit": 2000,
+        "active": True,
+        "notes": "V486: revives V258 dead-end. Real Contractor field; pair with CA CSLB enrichment.",
+    },
+
     # V484 B6: Savannah GA — SAGIS BuildingPermit_FC. Probed 2026-05-01:
     # 1,811 residential records (FeatureServer/1) + 610 commercial
     # records (/0), newest IssuedDate 2026-04-17 (14 days fresh — passes
