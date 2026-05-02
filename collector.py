@@ -3176,10 +3176,43 @@ def collect_single_city(city_slug, days_back=7):
     platform = config.get('platform', '')
     print(f"[V64] Collecting {city_slug} via {platform}...")
 
+    # V488 follow-up: collect_single_city was missing _log_v15_collection
+    # entirely — every /api/admin/force-collection {"city_slug":...} call
+    # ran successfully but left no fingerprint in scraper_runs. Capture
+    # name/state for the log row.
+    city_name = config.get('city') or (
+        permitdb.get_connection().execute(
+            "SELECT city, state FROM prod_cities WHERE city_slug=? OR source_id=? LIMIT 1",
+            (city_slug, city_slug)
+        ).fetchone() or {}
+    )
+    if isinstance(city_name, dict):
+        state = city_name.get('state')
+        city_name = city_name.get('city') or city_slug
+    else:
+        state = None
+        if isinstance(city_name, (list, tuple)):
+            try:
+                city_name, state = city_name[0], city_name[1]
+            except Exception:
+                city_name = city_slug
+        elif not city_name:
+            city_name = city_slug
+
+    _t0 = time.time()
     try:
         raw, fetch_status = _fetch_permits_with_timeout(source_id, days_back)
 
         if fetch_status.startswith('skip'):
+            try:
+                _log_v15_collection(
+                    city_key=source_id, city_name=city_name, state=state,
+                    permits_found=0, permits_inserted=0,
+                    status='skip', error_message=fetch_status,
+                    duration_ms=int((time.time() - _t0) * 1000),
+                )
+            except Exception:
+                pass
             return {
                 'city': city_slug,
                 'source_id': source_id,
@@ -3202,6 +3235,17 @@ def collect_single_city(city_slug, days_back=7):
             new_count, updated_count = permitdb.upsert_permits(normalized)
             print(f"[V64] {city_slug}: {new_count} new, {updated_count} updated")
 
+        try:
+            _log_v15_collection(
+                city_key=source_id, city_name=city_name, state=state,
+                permits_found=len(raw), permits_inserted=len(normalized),
+                status='success' if normalized else 'no_new',
+                error_message=None,
+                duration_ms=int((time.time() - _t0) * 1000),
+            )
+        except Exception:
+            pass
+
         return {
             'city': city_slug,
             'source_id': source_id,
@@ -3212,6 +3256,15 @@ def collect_single_city(city_slug, days_back=7):
         }
     except Exception as e:
         print(f"[V64] {city_slug} collection error: {e}")
+        try:
+            _log_v15_collection(
+                city_key=source_id, city_name=city_name, state=state,
+                permits_found=0, permits_inserted=0,
+                status='error', error_message=str(e)[:200],
+                duration_ms=int((time.time() - _t0) * 1000),
+            )
+        except Exception:
+            pass
         return {
             'city': city_slug,
             'source_id': source_id,
