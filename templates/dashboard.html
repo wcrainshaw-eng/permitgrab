@@ -1570,6 +1570,53 @@ footer a:hover { color: white; }
   </div>
 </section>
 
+<!-- V488 IRONCLAD (V485 B6 deferred): "Who uses PermitGrab" 6-card section.
+     Surfaces all 6 persona pages from the homepage with site-wide internal
+     links — compounding the V485 B6 nav-dropdown fix and the V488 footer
+     Solutions column. Section sits between the Violations card and the
+     State grid so it falls in the natural scroll path. -->
+<section class="pg-section-light" style="background: var(--pg-gray-50);">
+  <div class="pg-container">
+    <div style="text-align: center; margin-bottom: 40px;">
+      <span class="pg-eyebrow">Who uses PermitGrab</span>
+      <h2 class="pg-h2">Built for six lead-gen playbooks</h2>
+      <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">One data feed, six ways to monetize it. Pick the playbook that matches what you sell.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+      <a href="/leads/real-estate-investors" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 24px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--pg-primary); font-weight: 700; margin-bottom: 6px;">Real Estate Investors</div>
+        <div style="font-weight: 700; font-size: 17px; margin-bottom: 8px;">Code violations = motivated sellers</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Out-of-state landlords with active citations. The wholesale call list, refreshed daily across {{ city_count or 100 }}+ cities.</div>
+      </a>
+      <a href="/leads/contractors" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 24px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--pg-primary); font-weight: 700; margin-bottom: 6px;">Contractors &amp; Subs</div>
+        <div style="font-weight: 700; font-size: 17px; margin-bottom: 8px;">Active GCs sourcing labor &amp; materials</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Every contractor who pulled a permit this week is buying right now. Phone numbers included where state licensing data permits.</div>
+      </a>
+      <a href="/leads/home-services" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 24px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--pg-primary); font-weight: 700; margin-bottom: 6px;">Home Service Companies</div>
+        <div style="font-weight: 700; font-size: 17px; margin-bottom: 8px;">HVAC, plumbing, warranty upsells</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">An addition or remodel signals an installation window. Reach owners while the project is still fresh, not stale aggregator-shared lists.</div>
+      </a>
+      <a href="/leads/solar-home-services" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 24px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--pg-primary); font-weight: 700; margin-bottom: 6px;">Solar Installers</div>
+        <div style="font-weight: 700; font-size: 17px; margin-bottom: 8px;">Roof permits = highest-intent solar lead</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Roof replacements and electrical upgrades flag homes that are spending on energy improvements right now. Owner-occupant filter built in.</div>
+      </a>
+      <a href="/leads/insurance" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 24px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--pg-primary); font-weight: 700; margin-bottom: 6px;">Insurance Agents</div>
+        <div style="font-weight: 700; font-size: 17px; margin-bottom: 8px;">Renovations trigger coverage updates</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Every renovation changes a dwelling's replacement cost. Address-level signal lets you reach owners before the renewal cycle.</div>
+      </a>
+      <a href="/leads/suppliers" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 24px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--pg-primary); font-weight: 700; margin-bottom: 6px;">Material Suppliers</div>
+        <div style="font-weight: 700; font-size: 17px; margin-bottom: 8px;">Every permit is a parts list</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Lumber, drywall, roofing, fixtures &mdash; route by job type, value tier, and ZIP for daily delivery planning.</div>
+      </a>
+    </div>
+  </div>
+</section>
+
 <!-- V478 Section 4: State grid -->
 <section class="pg-section">
   <div class="pg-container" style="text-align: center;">

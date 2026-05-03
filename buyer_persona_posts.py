@@ -56,6 +56,13 @@ BUYER_PERSONA_POSTS = {
 <p>PermitGrab delivers daily permit filings with property addresses, permit types, contractor details, and (where available) property owner information from county assessor records. Data is sourced from official city open data portals — the same records available at city hall, delivered to your inbox.</p>
 <p><a href="/pricing">Start your free trial</a> and see today's permits in your target cities. No per-lead fees, no contracts, cancel anytime.</p>
 <p><em>See also: <a href="/leads/solar-home-services">Solar &amp; Home Service Leads from Building Permits</a></em></p>
+
+<h3>City spotlights</h3>
+<p>Want city-specific solar lead playbooks? Read these next:</p>
+<ul>
+<li><a href="/blog/phoenix-solar-installer-leads">Phoenix solar installer leads from building permits</a> &mdash; the most solar-friendly major metro in the US, 79K+ Maricopa property owners, 1,080+ contractors with phones</li>
+<li><a href="/blog/nyc-roofing-leads">NYC roofing leads from DOB permits</a> &mdash; 12K+ active permits across 5 boroughs, refreshed daily</li>
+</ul>
 """,
         'faqs': [
             ('How do solar installers use building permit data?',
@@ -116,6 +123,15 @@ BUYER_PERSONA_POSTS = {
 <p>PermitGrab provides code violation data across 15+ cities, updated regularly from official municipal sources. Combined with building permits, contractor profiles, and property owner records, it's the most complete picture of a property's status available from a single source.</p>
 <p><a href="/pricing">Start your free trial</a> — $149/month for unlimited access to violations, permits, contractors, and property owner data. No per-record fees.</p>
 <p><em>Also read: <a href="/leads/real-estate-investors">Code Violation Property Lists for Real Estate Investors</a></em></p>
+
+<h3>City spotlights</h3>
+<p>The motivated-seller play works differently in each metro. See these city-specific guides:</p>
+<ul>
+<li><a href="/blog/chicago-motivated-seller-leads">Chicago motivated seller leads from code violations</a> &mdash; 20,670 active citations, 72K Cook County property owners</li>
+<li><a href="/blog/cleveland-motivated-seller-leads">Cleveland motivated seller leads from code violations</a> &mdash; high inventory of distressed properties, low cost basis</li>
+<li><a href="/blog/detroit-motivated-seller-leads">Detroit motivated seller leads</a> &mdash; 378K Wayne County property owners + daily blight tickets</li>
+<li><a href="/blog/atlanta-real-estate-investor-leads">Atlanta real estate investor leads</a> &mdash; Fulton + DeKalb owners with mailing addresses</li>
+</ul>
 """,
         'faqs': [
             ('How do real estate investors use code violation lists?',
@@ -169,6 +185,13 @@ BUYER_PERSONA_POSTS = {
 <p>For added context, PermitGrab also provides code violation data for many cities. A property with recent code violations <em>and</em> a new permit may signal a homeowner who's been forced to make repairs — another opportunity to discuss coverage for the updated property.</p>
 <p><a href="/pricing">Start your free trial</a> and see today's permits in your territory. $149/month, unlimited access, no per-lead fees.</p>
 <p><em>See also: <a href="/leads/insurance">Insurance Agent Leads from Building Permits</a></em></p>
+
+<h3>City spotlights</h3>
+<p>City-specific insurance lead playbooks:</p>
+<ul>
+<li><a href="/blog/miami-dade-insurance-agent-leads">Miami-Dade insurance agent leads</a> &mdash; hurricane-zone underwriting; 82K property owners, daily permit feed</li>
+<li><a href="/blog/houston-insurance-agent-leads">Houston insurance agent leads</a> &mdash; flood-zone reassessment workflow with HCAD parcel data</li>
+</ul>
 """,
         'faqs': [
             ('How do building permits help insurance agents find leads?',
@@ -219,6 +242,13 @@ BUYER_PERSONA_POSTS = {
 <p>PermitGrab is $149/month for unlimited access to all cities, all trades, all permit types, plus contractor phone numbers and property owner data. One subcontract win from a permit-sourced lead pays for years of access.</p>
 <p><a href="/pricing">Start your free trial</a> — see who's pulling permits in your city today.</p>
 <p><em>See also: <a href="/leads/contractors">New Construction Project Leads for Contractors</a></em></p>
+
+<h3>City spotlights</h3>
+<p>City-specific subcontractor lead playbooks:</p>
+<ul>
+<li><a href="/blog/austin-subcontractor-leads">Austin subcontractor leads</a> &mdash; 6,800+ active permits, Travis County owner data</li>
+<li><a href="/blog/sacramento-contractor-leads">Sacramento contractor leads</a> &mdash; revived V486 source with CA CSLB phone enrichment</li>
+</ul>
 """,
         'faqs': [
             ('How do subcontractors find new construction projects?',
@@ -270,6 +300,14 @@ BUYER_PERSONA_POSTS = {
 <p>PermitGrab provides phone numbers for a large percentage of these contractors — 93% in Miami-Dade, 83% in San Antonio, 55% in Phoenix. One call to a busy GC who needs a reliable sub for their next three projects is worth more than a hundred cold Angi leads.</p>
 <p><a href="/pricing">Start your free trial</a> — see every permit filed in your city today.</p>
 <p><em>See also: <a href="/leads/solar-home-services">Homeowner Leads for Solar, Insurance &amp; Home Services</a></em></p>
+
+<h3>City spotlights</h3>
+<p>Owner-data deep dives by metro:</p>
+<ul>
+<li><a href="/blog/atlanta-real-estate-investor-leads">Atlanta real estate investor leads</a> &mdash; Fulton + DeKalb mailing addresses, absentee-landlord filtering</li>
+<li><a href="/blog/nyc-roofing-leads">NYC roofing leads from DOB permits</a> &mdash; 5-borough coverage, daily filings</li>
+<li><a href="/blog/chicago-motivated-seller-leads">Chicago motivated seller leads</a> &mdash; pairs Cook County owner data with active code violations</li>
+</ul>
 """,
         'faqs': [
             ('How do home service companies get leads from building permits?',

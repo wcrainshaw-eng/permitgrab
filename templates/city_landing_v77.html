@@ -1866,6 +1866,47 @@ function v328ApplyFilter(val) {
   </div>
 </section>
 
+{# V488 IRONCLAD (V485 B6 deferred): "Who buys this {city} data?" persona block.
+   Adds 6 internal backlinks per city page × ~358 active city pages = ~2,148
+   crawlable internal links pointing at /leads/* persona pages. The single
+   biggest internal-link-equity opportunity per the SEO audit, and the
+   compounding fix for V485 B6's dropdown-only persona surfacing. #}
+<section class="pg-section" style="background: var(--pg-gray-50); padding: 56px 0;">
+  <div class="pg-container">
+    <div style="text-align: center; margin-bottom: 32px;">
+      <span class="pg-eyebrow">Who buys this data?</span>
+      <h2 class="pg-h2">{{ city_name }} permit & owner data, by use case</h2>
+      <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">Same data, different angle. Pick the playbook that matches what you sell.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+      <a href="/leads/real-estate-investors" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Real estate investors</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Code violations in {{ city_name }} = motivated sellers. Out-of-state landlord + active citation = top of the wholesale call list.</div>
+      </a>
+      <a href="/leads/contractors" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Contractors &amp; subs</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Every {{ city_name }} GC who pulled a permit this week is sourcing labor and materials right now. Phone numbers included.</div>
+      </a>
+      <a href="/leads/home-services" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Home service companies</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">A {{ city_name }} addition or remodel signals an HVAC, plumbing, or warranty upsell window. Reach owners while the project is fresh.</div>
+      </a>
+      <a href="/leads/solar-home-services" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Solar installers</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Roof permits and electrical upgrades in {{ city_name }} are the highest-intent solar lead signals. Owner-occupant filter built in.</div>
+      </a>
+      <a href="/leads/insurance" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Insurance agents</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">{{ city_name }} renovations trigger updated dwelling-coverage limits. Get the address-level signal before the renewal cycle does.</div>
+      </a>
+      <a href="/leads/suppliers" class="pg-card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Material suppliers</div>
+        <div style="font-size: 14px; color: var(--pg-text-gray);">Lumber, drywall, roofing, fixtures &mdash; every {{ city_name }} permit is a parts list. Build a route by job type and value tier.</div>
+      </a>
+    </div>
+  </div>
+</section>
+
 {% include 'partials/footer.html' %}
 
 {# V310 (CODE_V280b PR2): address-centric expandable detail card.
