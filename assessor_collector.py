@@ -1252,6 +1252,238 @@ ASSESSOR_SOURCES = {
         'return_geometry': False,
         'default_city': 'Anchorage',
     },
+
+    # V489 PART A1: Cobb County GA — 278K parcels, daily refresh.
+    # Atlanta metro round 2. Pairs with V486 fulton_atlanta + dekalb_atlanta
+    # to cover the full Atlanta metro for owners-only product.
+    'cobb_atlanta': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Cobb County GA Tax Assessors Daily Parcels',
+        'endpoint': 'https://gis.cobbcounty.gov/gisserver/rest/services/tax/taxassessorsdaily/MapServer/0',
+        'where_clause': "OWNER_NAM1 IS NOT NULL AND OWNER_NAM1 <> ''",
+        'field_map': {
+            'parcel_id': 'PIN',
+            'owner_name': 'OWNER_NAM1',
+            'owner_secondary': 'OWNER_NAM2',
+            'address': 'SITUS_ADDR',
+            'owner_mailing_address': 'OWNER_ADDR',
+            'owner_mailing_city': 'OWNER_CITY',
+            'owner_mailing_state': 'OWNER_STAT',
+            'owner_mailing_zip': 'OWNER_ZIP',
+            'fmv_total': 'FMV_TOTAL',
+            'property_class': 'CLASS',
+        },
+        'state': 'GA',
+        'source_tag': 'assessor:cobb_atlanta',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Marietta',
+    },
+
+    # V489 PART B1: Ramsey County MN — 164K parcels (Saint Paul + east TC).
+    # Richest schema in the V489 batch (134 fields). MetroGIS Regional Parcel.
+    'ramsey_saint_paul': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Ramsey County MN MetroGIS Regional Parcels',
+        'endpoint': 'https://maps.co.ramsey.mn.us/arcgis/rest/services/ParcelData/AttributedData/MapServer/3',
+        'where_clause': "OwnerName IS NOT NULL AND OwnerName <> '' AND SiteAddress IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'ParcelID',
+            'owner_name': 'OwnerName',
+            'owner_secondary': 'OwnerName1',
+            'owner_tertiary': 'OwnerName2',
+            'address': 'SiteAddress',
+            'owner_mailing_address': 'OwnerAddress1',
+            'owner_mailing_csz': 'OwnerCityStateZIP',
+            'city': 'SiteCityName',
+            'site_zip': 'SiteZIP5',
+            'year_built': 'YearBuilt',
+            'last_sale_date': 'LastSaleDate',
+            'last_sale_price': 'SalePrice',
+            'inspection_status': 'InspectionStatus',
+        },
+        'state': 'MN',
+        'source_tag': 'assessor:ramsey_saint_paul',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Saint Paul',
+    },
+
+    # V489 PART B2: Anoka County MN — 140K parcels (north TC suburbs).
+    # FeatureServer hit via the mapserver dispatcher (FeatureServer query
+    # API is identical). Covers Coon Rapids, Blaine, Andover, Anoka,
+    # Fridley, Ham Lake, etc.
+    'anoka_mn': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Anoka County MN Parcels',
+        'endpoint': 'https://gisservices.co.anoka.mn.us/anoka_gis/rest/services/Parcels/FeatureServer/0',
+        'where_clause': "OWNER IS NOT NULL AND OWNER <> '' AND LOC_ADDR IS NOT NULL AND LOC_ADDR <> ''",
+        'field_map': {
+            'parcel_id': 'PIN',
+            'owner_name': 'OWNER',
+            'owner_mailing_address': 'OWNERADDY',
+            'owner_mailing_city': 'OWNERCITY',
+            'owner_mailing_state': 'OWNERSTATE',
+            'owner_mailing_zip': 'OWNERZIP',
+            'taxpayer': 'TAXPAYER',
+            'address': 'LOC_ADDR',
+            'city': 'L_CITY',
+            'market_value': 'MKT_VALUE',
+            'last_sale_date': 'SALE_DATE',
+            'year_built': 'YEAR_BUILT',
+            'use_desc': 'USE_DESC',
+        },
+        'state': 'MN',
+        'source_tag': 'assessor:anoka_mn',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Coon Rapids',
+    },
+
+    # V489 PART B3: Dakota County MN — 167K parcels (south TC suburbs).
+    # MUNICIPALITY field IS populated — use it for city tagging directly.
+    'dakota_mn': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Dakota County MN Tax Parcels',
+        'endpoint': 'https://gis2.co.dakota.mn.us/arcgis/rest/services/DCGIS_OL_PropertyInformation/MapServer/71',
+        'where_clause': "FULLNAME IS NOT NULL AND FULLNAME <> ''",
+        'field_map': {
+            'parcel_id': 'TAXPIN',
+            'owner_name': 'FULLNAME',
+            'owner_secondary': 'JOINT_OWNER',
+            'address': 'SITEADDRESS',
+            'owner_mailing_address': 'OWN_ADD_L1',
+            'owner_mailing_address_2': 'OWN_ADD_L2',
+            'owner_mailing_csz': 'P_CITY_ST_ZIP',
+            'city': 'MUNICIPALITY',
+            'total_value': 'TOTALVAL',
+            'year_built': 'YEAR_BUILT',
+            'last_sale_date': 'SALE_DATE',
+            'use1_desc': 'USE1_DESC',
+            'update_date': 'Update_Date',
+        },
+        'state': 'MN',
+        'source_tag': 'assessor:dakota_mn',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Apple Valley',
+    },
+
+    # V489 PART C1: Oklahoma County OK — 337K parcels (NEW STATE/METRO).
+    # OKC + Edmond + Midwest City + Del City + Bethany + others.
+    # Note: owner_mailing_city maps to source field 'city' (sic) — that's
+    # how the source labels the mailing city; situs city is 'locationcity'.
+    'oklahoma_county_okc': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Oklahoma County OK Tax Parcels (Public View)',
+        'endpoint': 'https://services8.arcgis.com/euhkr1dAJeQBIjV0/arcgis/rest/services/TaxParcelsPublics_view/FeatureServer/0',
+        'where_clause': "name1 IS NOT NULL AND name1 <> '' AND location IS NOT NULL AND location <> ''",
+        'field_map': {
+            'parcel_id': 'accountno',
+            'parcel_pin': 'pin',
+            'owner_name': 'name1',
+            'owner_secondary': 'name2',
+            'owner_tertiary': 'name3',
+            'address': 'location',
+            'city': 'locationcity',
+            'owner_mailing_address': 'mailingaddress1',
+            'owner_mailing_city': 'city',
+            'owner_mailing_state': 'state',
+            'owner_mailing_zip': 'zipcode',
+            'market_value': 'currentmarket',
+            'last_sale_date': 'saledate',
+            'last_sale_price': 'SalePrice',
+            'neighborhood': 'nbhd',
+            'subdivision': 'subname',
+        },
+        'state': 'OK',
+        'source_tag': 'assessor:oklahoma_county_okc',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Oklahoma City',
+    },
+
+    # V489 PART C2: Tulsa County OK — 284K parcels.
+    # LoadDate 2025-03-26 — STATIC reference (~1yr stale at V489 ship). Owner
+    # names change much slower than permit data, so usable as a lookup pair
+    # but flagged static so the city page UX shows "data as of Mar 2025".
+    # Hosted by INCOG (Indian Nations Council of Governments), not the
+    # county directly. BusinessName field separate from Owner — useful for
+    # filtering commercial parcels.
+    'tulsa_county_ok': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Tulsa County OK Parcels (via INCOG, ~1yr stale)',
+        'endpoint': 'https://map11.incog.org/arcgis11wa/rest/services/Parcels_TulsaCo/FeatureServer/0',
+        'where_clause': "Owner IS NOT NULL AND Owner <> '' AND PropertyAddress IS NOT NULL AND PropertyAddress <> ''",
+        'field_map': {
+            'parcel_id': 'ACCT_NUM',
+            'owner_name': 'Owner',
+            'owner_secondary': 'Name1',
+            'owner_tertiary': 'Name2',
+            'address': 'PropertyAddress',
+            'city': 'PropertyCity',
+            'site_zip': 'PropertyZIP',
+            'owner_mailing_address': 'Address1',
+            'owner_mailing_address_2': 'Address2',
+            'owner_mailing_city': 'City',
+            'owner_mailing_state': 'State',
+            'owner_mailing_zip': 'ZIPCode',
+            'business_name': 'BusinessName',
+            'use_code': 'UseCode',
+            'year_built': 'YearBuilt',
+        },
+        'state': 'OK',
+        'source_tag': 'assessor:tulsa_county_ok',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Tulsa',
+        'freshness': 'static',  # ~1yr stale; UX should label accordingly
+    },
+
+    # V489 PART D: Cuyahoga County OH (full county-wide) — replaces the
+    # city-only cuyahoga_cleveland source. 484K total, ~340K populated
+    # after the where_clause excludes blank-geometry placeholders.
+    # Includes foreclosure_flag for motivated-seller filtering.
+    # parcel_city populated with CLEVELAND, LAKEWOOD, PARMA, BEACHWOOD,
+    # SHAKER HEIGHTS, WESTLAKE, NORTH OLMSTED, CLEVELAND HEIGHTS,
+    # STRONGSVILLE, etc. After import, deactivate cuyahoga_cleveland to
+    # avoid duplicates (manual prod_cities update OR drop from registry).
+    'cuyahoga_county_full': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Cuyahoga County OH EPV Parcels (Cleveland + 58 suburbs)',
+        'endpoint': 'https://gis.cuyahogacounty.us/server/rest/services/CCFO/EPV_Prod/FeatureServer/2',
+        'where_clause': "parcel_owner IS NOT NULL AND parcel_owner <> '' AND par_addr_all IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'parcel_id',
+            'owner_name': 'parcel_owner',
+            'owner_secondary': 'second_owner',
+            'address': 'par_addr_all',
+            'street': 'parcel_street',
+            'city': 'parcel_city',
+            'site_zip': 'parcel_zip',
+            'owner_mailing_name': 'mail_name',
+            'owner_mailing_address': 'mail_addr_street',
+            'owner_mailing_city': 'mail_city',
+            'owner_mailing_state': 'mail_state',
+            'owner_mailing_zip': 'mail_zip',
+            'last_transfer_date': 'last_transfer_date',
+            'last_sale_amount': 'last_sales_amount',
+            'market_total': 'tax_market_total',
+            'prop_class': 'prop_class_desc',
+            'school_descr': 'school_descr',
+            'zoning_code': 'zoning_code',
+            'condo_complex_id': 'condo_complex_id',
+            'lender': 'lender',
+            'tax_district_desc': 'tax_dist_desc',
+            'foreclosure_flag': 'foreclosure_flag',
+            'update_date': 'update_date',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:cuyahoga_county_full',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Cleveland',
+    },
 }
 
 
