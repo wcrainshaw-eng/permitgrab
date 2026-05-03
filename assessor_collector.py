@@ -1440,6 +1440,180 @@ ASSESSOR_SOURCES = {
         'freshness': 'static',  # ~1yr stale; UX should label accordingly
     },
 
+    # V490 PART A1: Denton County TX — 305K parcels (DFW north).
+    # NEW DFW-NORTH coverage: Denton, Lewisville, Flower Mound, The Colony,
+    # Krugerville. CITY field IS populated for direct tagging via
+    # fix-property-owner-cities.
+    'denton_dfw': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Denton County TX Parcels',
+        'endpoint': 'https://gis.dentoncounty.gov/arcgis/rest/services/Parcels/MapServer/0',
+        'where_clause': "OWNER_NAME IS NOT NULL AND OWNER_NAME <> ''",
+        'field_map': {
+            'parcel_id': 'prop_id',
+            'owner_name': 'OWNER_NAME',
+            'address': 'SITUS',
+            'address_line_1': 'ADDR_LINE1',
+            'city': 'CITY',
+            'site_zip': 'ZIP',
+            'living_area': 'LIVINGAREA',
+            'year_built': 'YR_BLT',
+            'land_sqft': 'LAND_SQFT',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:denton_dfw',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Denton',
+    },
+
+    # V490 PART A2: Tarrant County TX full county-wide view — REPLACES
+    # the city-only tarrant_fortworth source. 744K total (715K Tarrant
+    # + 29K ETJ slice from Denton/Johnson/Parker/Wise that the where_clause
+    # filters out). After import, run fix-property-owner-cities to retag
+    # from default 'Fort Worth' to actual CITYNAME (Arlington, Grand
+    # Prairie, Mansfield, Bedford, Hurst, Euless, Haltom City, North
+    # Richland Hills, etc). Post-deploy admin step: deactivate
+    # tarrant_fortworth in prod_cities to prevent duplicate writes.
+    'tarrant_county_full': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Tarrant County TX Parcels (full county incl ETJ filter)',
+        'endpoint': 'https://services5.arcgis.com/3ddLCBXe1bRt7mzj/arcgis/rest/services/Parcels_Public_Vview/FeatureServer/0',
+        'where_clause': "COUNTYNAME='Tarrant' AND OWNER_NAME IS NOT NULL AND OWNER_NAME <> ''",
+        'field_map': {
+            'parcel_id': 'TAXPIN',
+            'account': 'ACCOUNT',
+            'owner_name': 'OWNER_NAME',
+            'owner_mailing_address': 'OWNER_ADDRESS',
+            'owner_mailing_csz': 'OWNER_CITY_ST',
+            'owner_mailing_zip': 'OWNER_ZIP_CODE',
+            'address': 'SITUS_ADDR',
+            'city': 'CITYNAME',
+            'county': 'COUNTYNAME',
+            'year_built': 'YR_BUILT',
+            'land_acres': 'LAND_ACRE',
+            'appraised_value': 'APPRAISED_VALUE',
+            'market_value': 'MARKET_VALUE',
+            'last_sale_date': 'DEED_DATE',
+            'property_class': 'PROPERTY_CLASS_CODE',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:tarrant_county_full',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Fort Worth',
+    },
+
+    # V490 PART B1: Hamilton County IN — 153K parcels (Indianapolis north).
+    # NEW Indy-north suburb coverage: Carmel, Fishers, Noblesville,
+    # Westfield, Zionsville, Cicero, Sheridan. AVTAXYR=2026, EXPORTDATE
+    # 2026-04. Pairs with V486 marion_indianapolis for the full Indy metro.
+    'hamilton_indianapolis': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Hamilton County IN Parcels (Indianapolis north suburbs)',
+        'endpoint': 'https://gis1.hamiltoncounty.in.gov/arcgis/rest/services/HamCoParcelsPublic/FeatureServer/0',
+        'where_clause': "OWNNAME IS NOT NULL AND OWNNAME <> '' AND LOCADDRESS IS NOT NULL AND LOCADDRESS <> ''",
+        'field_map': {
+            'parcel_id': 'STPRCLNO',
+            'owner_name': 'OWNNAME',
+            'owner_secondary': 'DEEDEDOWNR',
+            'owner_mailing_address': 'OWNADDRESS',
+            'owner_mailing_city': 'OWNCITY',
+            'owner_mailing_state': 'OWNSTATE',
+            'owner_mailing_zip': 'OWNZIP',
+            'address': 'LOCADDRESS',
+            'city': 'LOCCITY',
+            'site_zip': 'LOCZIP',
+            'total_value': 'AVTOTGROSS',
+            'tax_year': 'AVTAXYR',
+            'year_built': 'year_built',
+            'sqft_residential': 'sq_ft_res',
+            'sqft_commercial': 'sq_ft_comm',
+            'property_class': 'PROPCLASS',
+            'property_use': 'PROPUSE',
+            'last_transfer_date': 'LSTXFRDATE',
+        },
+        'state': 'IN',
+        'source_tag': 'assessor:hamilton_indianapolis',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Carmel',
+    },
+
+    # V490 PART C1: Lake County OH — 115K parcels (Cleveland east).
+    # NEW Cleveland-east coverage: Mentor, Willoughby, Painesville,
+    # Eastlake, Wickliffe, Kirtland, Madison, Concord, Perry, Leroy.
+    # G_FULLCITY format is "WILLOUGHBY, OH 44094" — needs a comma split
+    # at retag time to extract clean city name.
+    'lake_cleveland_east': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Lake County OH Auditor Parcels (Cleveland east)',
+        'endpoint': 'https://gis.lakecountyohio.gov/arcgis/rest/services/Auditor/Parcels_AppraisedValues_Publish/FeatureServer/0',
+        'where_clause': "A_OWNER_NAME IS NOT NULL AND A_OWNER_NAME <> '' AND G_FULLADDRESS IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'PIN',
+            'owner_name': 'A_OWNER_NAME',
+            'taxpayer_name': 'A_TAXP_NAME',
+            'address': 'G_FULLADDRESS',
+            'city': 'G_FULLCITY',
+            'owner_mailing_house_no': 'A_O_HOUSENO',
+            'owner_mailing_street': 'A_O_ST_NAME',
+            'owner_mailing_city': 'A_O_CITY',
+            'owner_mailing_state': 'A_O_STATE',
+            'owner_mailing_zip': 'A_O_ZIPCODE',
+            'total_value': 'A_VAL_TOTAL',
+            'land_value': 'A_VAL_LAND',
+            'building_value': 'A_VAL_BLDG',
+            'year_built': 'A_YEAR_BUILT',
+            'last_sale_date': 'A_SALE_DATE',
+            'last_sale_amount': 'A_SALE_AMOUNT',
+            'legal_description': 'A_LEGAL_DESC',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:lake_cleveland_east',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Mentor',
+    },
+
+    # V490 PART C2: Lorain County OH — 172K parcels (Cleveland west).
+    # NEW Cleveland-west coverage: Lorain, Elyria, Avon, North Ridgeville,
+    # Sheffield, Huntington Twp.
+    # CAVEAT: layer has no situs street address (PPAddress empty length=1).
+    # Address-matching to permits requires PIN-based join only.
+    'lorain_cleveland_west': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Lorain County OH Parcels (Cleveland west)',
+        'endpoint': 'https://services1.arcgis.com/vGBb7WYV10mOJRNM/arcgis/rest/services/parcel_joined/FeatureServer/0',
+        'where_clause': "PPOwner IS NOT NULL AND PPOwner <> ''",
+        'field_map': {
+            'parcel_id': 'Parcel',
+            'owner_name': 'PPOwner',
+            'city': 'PPComm',
+            'taxpayer_name': 'TaxPayerName',
+            'owner_mailing_address': 'TaxPayerStreet',
+            'owner_mailing_city': 'TaxPayerCity',
+            'owner_mailing_state': 'TaxPayerState',
+            'owner_mailing_zip': 'TaxPayerZip',
+            'year_built': 'PPYearBuilt',
+            'living_area': 'PPLivingArea',
+            'bedrooms': 'PPBedrooms',
+            'fullbaths': 'PPFullbaths',
+            'land_value': 'PPLandValue',
+            'improvement_value': 'PPImprValue',
+            'total_value': 'PPTotalValue',
+            'last_sale_date': 'PPSaleDate',
+            'last_sale_amount': 'PPAmount',
+            'school': 'PPSchool',
+            'class_code': 'PPClassCode',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:lorain_cleveland_west',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Lorain',
+    },
+
     # V489 PART D: Cuyahoga County OH (full county-wide) — replaces the
     # city-only cuyahoga_cleveland source. 484K total, ~340K populated
     # after the where_clause excludes blank-geometry placeholders.
