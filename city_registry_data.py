@@ -38179,7 +38179,7 @@ CITY_REGISTRY = {
     # taxjuris is populated: Charlotte/Matthews/Huntersville/Mint Hill/
     # Cornelius/Davidson/Pineville.
     "charlotte_meck": {
-        "city": "Charlotte",
+        "name": "Charlotte",
         "state": "NC",
         "slug": "charlotte-nc",
         "platform": "arcgis",
