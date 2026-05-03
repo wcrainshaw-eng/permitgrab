@@ -510,33 +510,78 @@ def email_scheduler():
         print(f"[WORKER] subscribers.json creation error: {e}", flush=True)
 
     et = pytz.timezone('America/New_York')
-    last_digest_date = None
+
+    # V488 IRONCLAD (digest-stuck-since-04-29 fix): persist last-run dates
+    # to system_state so they survive worker restarts. The old code stored
+    # last_digest_date in module-local memory — any worker restart past
+    # 7am ET would skip that day's digest because:
+    #   1. Module reload set last_digest_date = None
+    #   2. The `hour == 7` strict gate already passed
+    #   3. Worker waited until tomorrow at 7am... and then often restarted again
+    # Result: 4 days of missed digests from 2026-04-29 → 2026-05-03.
+    # Fix: persist last-run dates AND relax the gate to "hour >= 7 AND
+    # today not yet sent" so a worker restart at 8am, 11am, or 2pm
+    # still catches today's digest.
+    import db as permitdb_email
+
+    def _last_run_date(key):
+        try:
+            r = permitdb_email.get_system_state(key)
+            if r and r.get('value'):
+                from datetime import date as _date
+                return _date.fromisoformat(r['value'])
+        except Exception:
+            pass
+        return None
+
+    def _set_last_run_date(key, d):
+        try:
+            permitdb_email.set_system_state(key, d.isoformat())
+        except Exception as _se:
+            print(f"[WORKER] system_state write failed for {key}: {_se}", flush=True)
+
+    last_digest_date = _last_run_date('email_last_digest_date')
+    last_trial_date = _last_run_date('email_last_trial_date')
+    last_nudge_date = _last_run_date('email_last_nudge_date')
+
+    print(f"[WORKER] Email scheduler resumed: "
+          f"last_digest={last_digest_date} last_trial={last_trial_date} "
+          f"last_nudge={last_nudge_date}", flush=True)
 
     while True:
         try:
             now_et = datetime.now(et)
+            today = now_et.date()
 
-            # Daily digest at 7 AM ET
-            if now_et.hour == 7 and now_et.date() != last_digest_date:
-                print(f"[WORKER] Running daily digest...", flush=True)
+            # Daily digest at >= 7 AM ET (relaxed from `== 7` so a worker
+            # restart any time after 7am still catches today)
+            if now_et.hour >= 7 and today != last_digest_date:
+                print(f"[WORKER] Running daily digest "
+                      f"(now {now_et.isoformat(timespec='minutes')}, "
+                      f"last_digest_date={last_digest_date})...", flush=True)
                 try:
                     send_daily_digest()
-                    last_digest_date = now_et.date()
-                    print(f"[WORKER] Daily digest sent", flush=True)
+                    last_digest_date = today
+                    _set_last_run_date('email_last_digest_date', today)
+                    print(f"[WORKER] Daily digest sent for {today}", flush=True)
                 except Exception as e:
                     print(f"[WORKER] Daily digest error: {e}", flush=True)
 
-            # Trial lifecycle at 8 AM ET
-            if now_et.hour == 8 and now_et.minute < 5:
+            # Trial lifecycle at >= 8 AM ET, once per day
+            if now_et.hour >= 8 and today != last_trial_date:
                 try:
                     check_trial_lifecycle()
+                    last_trial_date = today
+                    _set_last_run_date('email_last_trial_date', today)
                 except Exception as e:
                     print(f"[WORKER] Trial lifecycle error: {e}", flush=True)
 
-            # Onboarding nudges at 9 AM ET
-            if now_et.hour == 9 and now_et.minute < 5:
+            # Onboarding nudges at >= 9 AM ET, once per day
+            if now_et.hour >= 9 and today != last_nudge_date:
                 try:
                     check_onboarding_nudges()
+                    last_nudge_date = today
+                    _set_last_run_date('email_last_nudge_date', today)
                 except Exception as e:
                     print(f"[WORKER] Onboarding nudge error: {e}", flush=True)
 
