@@ -39136,49 +39136,5 @@ BULK_SOURCES = {
         "date_field": "ISSUED_DATE",
         "active": True,
     },
-    # V490 PART D: Charlotte / Mecklenburg County permits — V290 dead-end
-    # overturned. Earlier probes (data.charlottenc.gov + ArcGIS Hub) missed
-    # this endpoint at meckgis.mecklenburgcountync.gov. 482K records, daily
-    # refresh, owner names included. Schema has ownname (homeowner), NOT a
-    # contractor field — useful for permit-alert / homeowner-targeted lead
-    # products (insurance, solar, home services). Pairs with V485
-    # mecklenburg_charlotte assessor source for full Charlotte coverage.
-    # taxjuris is populated: Charlotte/Matthews/Huntersville/Mint Hill/
-    # Cornelius/Davidson/Pineville.
-    "charlotte_meck": {
-        "city": "Charlotte",
-        "state": "NC",
-        "slug": "charlotte-nc",
-        "platform": "arcgis",
-        "endpoint": "https://meckgis.mecklenburgcountync.gov/server/rest/services/BuildingPermits/FeatureServer/0",
-        "field_map": {
-            "permit_number": "permitnum",
-            "permit_type": "permittype",
-            "work_type": "worktype",
-            "status": "permitstat",
-            "filing_date": "issuedate",
-            "completion_date": "compldate",
-            "address": "projadd",
-            "zip": "zipcode",
-            "parcel_id": "parcelnum",
-            "description": "workdesc",
-            "project_name": "projname",
-            "tax_jurisdiction": "taxjuris",
-            "use_description": "usdcdesc",
-            "building_type": "typeofbldg",
-            "num_units": "numunits",
-            "project_value": "bldgcost",
-            "total_sqft": "totalsqft",
-            "occupancy": "occupancy",
-            "owner_name": "ownname",
-            "owner_city": "owncity",
-            "owner_state": "ownstate",
-            "owner_zip": "ownzipcode",
-        },
-        "date_field": "issuedate",
-        "date_format": "epoch_ms",
-        "limit": 2000,
-        "active": True,
-    },
 }
 
