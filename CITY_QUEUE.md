@@ -6,9 +6,9 @@ data are STILL VIABLE: solar companies want owner/address data from permits.
 Show "No contractor data available" on the city page when contractor_name
 is absent. "Dead Ends" are cities with NO working permit API at all.
 
-## Property-Owner Sources Wired (V428–V489, 2026-05-03)
+## Property-Owner Sources Wired (V428–V487, 2026-05-02)
 
-52 owner sources now in `assessor_collector.ASSESSOR_SOURCES` (was 33 pre-V484, 42 pre-V487, 45 post-V487).
+45 owner sources now in `assessor_collector.ASSESSOR_SOURCES` (was 33 pre-V484, 42 pre-V487).
 Trigger via `POST /api/admin/collect-assessor-data {"source":"<key>"}`. After
 the import, run `POST /api/admin/fix-property-owner-cities` to retag rows
 where the source feed populates suburb names instead of the metro slug.
@@ -60,18 +60,6 @@ where the source feed populates suburb names instead of the metro slug.
 | **saint_louis_city** (V487) | City of St. Louis MO — 129K (independent jurisdiction, pairs w/ county) |
 | **hamilton_chattanooga** (V487) | Chattanooga TN — 166K (NEW METRO) |
 | **anchorage_moa** (V487) | Anchorage AK — 99K, daily refresh (NEW METRO, owners-only) |
-| **cobb_atlanta** (V489) | Marietta / Smyrna / Kennesaw — 279K, daily (Atlanta metro round 2) |
-| **ramsey_saint_paul** (V489) | Saint Paul + east TC suburbs — 164K, 134-field schema |
-| **anoka_mn** (V489) | Coon Rapids / Blaine / Fridley — 140K (TC north) |
-| **dakota_mn** (V489) | Burnsville / Eagan / Apple Valley — 167K, daily (TC south) |
-| **oklahoma_county_okc** (V489) | OKC + Edmond + suburbs — 337K, daily (NEW STATE, NEW METRO) |
-| **cuyahoga_county_full** (V489) | Cleveland + 58 OH suburbs — 484K (replaces cuyahoga_cleveland) |
-| **tulsa_county_ok** (V489) | Tulsa + Sand Springs — 284K (static, ~1yr stale, owners-only) |
-| **denton_dfw** (V490) | DFW north — Denton, Lewisville, Flower Mound, The Colony — 305K |
-| **tarrant_county_full** (V490) | DFW central — Arlington, GP, Mansfield, Bedford, Hurst — 715K (replaces tarrant_fortworth) |
-| **hamilton_indianapolis** (V490) | Indy north — Carmel, Fishers, Noblesville, Westfield, Zionsville — 153K |
-| **lake_cleveland_east** (V490) | Cleveland east — Mentor, Willoughby, Painesville — 115K |
-| **lorain_cleveland_west** (V490) | Cleveland west — Lorain, Elyria, Avon — 172K |
 
 **Confirmed structurally suppressed** (no public owner data — would need
 commercial source like DataTree/FirstAmerican/ATTOM): all California metros
@@ -82,13 +70,6 @@ Property layer omits owner field — V484 confirmed), Pittsburgh PA
 (Allegheny classifies but doesn't name), Orlando FL (OCPA web-search only;
 covered by fl_statewide statewide), Monroe NY/Rochester (not in NYS public
 dataset), Charleston SC (no public REST with owner field — V484 probed).
-
-**Atlanta-metro round 2 dead ends** (V489):
-- **Gwinnett County GA** — public ArcGIS layer omits OWNER_NAME field;
-  license forbids commercial redistribution. Don't probe.
-- **Henry County GA** — REST has no owner field; data only via Schneider
-  qpublic HTML portal.
-- **Clayton County GA** — no public REST FeatureServer with parcel data.
 
 **STATEWIDE OWNER SUPPRESSION** (V487 environmental findings — don't probe
 counties in these states for the owner pillar):
@@ -196,18 +177,6 @@ Discovered during full DB audit of all 300 cities across all 5 pillars.
 
 **V486 reversal (was dead, now LIVE):**
 - ~~Sacramento CA permits~~ — V258 probed SACOG (regional), not the city. Real permits with Contractor field at services5.arcgis.com/.../BldgPermitIssued_CurrentYear (6,089 records, fresh 2026-04-26). Now wired in V486.
-
-**V490 reversal (was dead, now LIVE):**
-- ~~Charlotte NC permits~~ — V290 + V485 probed data.charlottenc.gov +
-  ArcGIS Hub. Actual feed is at meckgis.mecklenburgcountync.gov (Mecklenburg
-  County host, not city). 482K records, daily refresh, owner names included
-  (no contractor field). Now wired in V490.
-
-**V490 dead ends confirmed (don't re-probe):**
-- Rockwall County TX owners — DNS NXDOMAIN, no public REST host
-- Hendricks County IN owners — Beacon/Schneidercorp HTML portal only
-- Indianapolis IN permits (re-confirmed) — Accela-only, no ArcGIS index for hybrid
-- Birmingham AL permits (re-confirmed) — Accela-only, no ArcGIS index for hybrid; housing_inspections feed is 8mo stale
 
 **Deferred (needs UX decision, not a research blocker):**
 - **Birmingham AL** (V484): no public permits feed. Owners-only via `jefferson_birmingham`
