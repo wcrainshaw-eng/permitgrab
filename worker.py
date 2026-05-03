@@ -408,6 +408,26 @@ def secondary_loop():
                 print(f"[SEC] Stats cache refresh error (non-fatal): {e}",
                       flush=True)
 
+        # ── V488 IRONCLAD: persona stats system_state cache refresh ──
+        # Web /leads/* pages read from this. Without periodic refresh,
+        # the system_state blob goes stale and either AdsBot/Googlebot
+        # see old numbers or the web pays the cold-start COUNT cost.
+        if memory_ok("persona_stats_refresh"):
+            try:
+                from routes.persona_pages import refresh_persona_stats_cache
+                t0 = time.time()
+                result = refresh_persona_stats_cache()
+                if result:
+                    print(f"[SEC] V488 persona_stats_cache refreshed "
+                          f"(violations={result.get('total_violations')}, "
+                          f"owners={result.get('total_owners')}, "
+                          f"contractors={result.get('total_contractors')}) "
+                          f"in {time.time()-t0:.1f}s", flush=True)
+                gc.collect()
+            except Exception as e:
+                print(f"[SEC] V488 persona_stats refresh error (non-fatal): {e}",
+                      flush=True)
+
         elapsed_total = time.time() - cycle_start
         mem = get_memory_mb()
         print(f"[SEC] Secondary cycle complete: {elapsed_total:.0f}s, mem={mem:.0f}MB", flush=True)
@@ -620,6 +640,24 @@ def main():
     except Exception as _v483_e:
         print(f"[WORKER] V483: startup stats refresh failed (non-fatal): "
               f"{_v483_e}", flush=True)
+
+    # 2c. V488 IRONCLAD: persona stats system_state cache startup refresh.
+    # The /leads/* pages read from system_state; without this, the very
+    # first request after a deploy pays the 5-COUNT cold-start cost (which
+    # is what tripped AdsBot's 10s landing-page health threshold and
+    # caused V484 ad disapprovals). secondary_loop refreshes every 2 hr,
+    # but it has a 5-min warmup sleep, so we ALSO fire one here at boot.
+    try:
+        from routes.persona_pages import refresh_persona_stats_cache as _v488_persona_refresh
+        _r = _v488_persona_refresh()
+        if _r:
+            print(f"[WORKER] V488 persona_stats startup refresh: "
+                  f"violations={_r.get('total_violations')} "
+                  f"owners={_r.get('total_owners')} "
+                  f"contractors={_r.get('total_contractors')}", flush=True)
+    except Exception as _v488_e:
+        print(f"[WORKER] V488 persona_stats startup refresh failed (non-fatal): "
+              f"{_v488_e}", flush=True)
 
     # 3. Start threads
     threads = []

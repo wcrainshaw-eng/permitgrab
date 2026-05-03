@@ -24,22 +24,41 @@ persona_bp = Blueprint('persona', __name__)
 # Cached lightly to keep page render fast under load. Counts can be a few
 # minutes stale; that's fine for SEO/marketing copy.
 # ---------------------------------------------------------------------------
-_STATS_CACHE = {'data': None, 'ts': 0}
-_STATS_TTL_SECONDS = 300  # 5 min
+# V488 IRONCLAD (V485 B2 deferred fix): persona-stats cache moved from
+# process-memory to the system_state table.
+#
+# Old behavior: in-memory dict with 5-min TTL. After every Render restart
+# (deploy or memory-bail recycle), the FIRST request to /leads/* paid the
+# cold-start cost = 5 COUNT(*)s + 3 GROUP BYs against tables totaling
+# 2.9M+ rows. That's 5-15s under load and pushed AdsBot past its 10s
+# landing-page health threshold, triggering "Destination not working"
+# disapproval — exactly the V484 incident.
+#
+# New behavior:
+#   1. Web reads from system_state (single-row SELECT, ~1ms). Cold start
+#      hits a warm cache as long as the worker has populated it once.
+#   2. Worker (secondary_loop) calls refresh_persona_stats_cache() every
+#      2 hrs and atomically writes the JSON blob.
+#   3. In-memory cache stays as a 5-min secondary layer to avoid hitting
+#      system_state on every request (still ~1ms but nonzero).
+#   4. If system_state is empty (first deploy ever) the web computes
+#      synchronously once — same as old behavior, but only on first hit
+#      of the very first deploy.
+
+_PERSONA_STATS_KEY = 'persona_stats_v488'
+_STATS_DB_TTL_SECONDS = 7200  # 2 hr — refreshed by worker secondary_loop
+_STATS_MEM_CACHE = {'data': None, 'ts': 0}
+_STATS_MEM_TTL_SECONDS = 300
 
 
-def _get_persona_stats():
-    """One round-trip to the DB for every count + top-list a persona page needs.
-    Returns a dict the templates index by name. Cached for 5 min.
+def _compute_persona_stats():
+    """Run the actual SQL. Should only be called by the worker
+    (refresh_persona_stats_cache) or as a cold-start fallback in web.
     """
-    import time as _t
-    if _STATS_CACHE['data'] and (_t.time() - _STATS_CACHE['ts']) < _STATS_TTL_SECONDS:
-        return _STATS_CACHE['data']
-
+    import json as _j
     out = {}
     conn = permitdb.get_connection()
     try:
-        # ---- top-level counts ----
         out['total_violations'] = conn.execute(
             "SELECT COUNT(*) FROM violations"
         ).fetchone()[0]
@@ -58,7 +77,6 @@ def _get_persona_stats():
             "WHERE date >= date('now','-90 days')"
         ).fetchone()[0]
 
-        # ---- top-10 violations by joined city name (handles miami-dade alias) ----
         rows = conn.execute("""
             SELECT pc.city, pc.state, COUNT(*) AS cnt
             FROM violations v
@@ -73,7 +91,6 @@ def _get_persona_stats():
             for r in rows
         ]
 
-        # ---- top-10 permit-volume cities (last 90 days) ----
         rows = conn.execute("""
             SELECT pc.city, pc.state, COUNT(*) AS cnt
             FROM permits p
@@ -89,7 +106,6 @@ def _get_persona_stats():
             for r in rows
         ]
 
-        # ---- top-10 owner-count cities ----
         rows = conn.execute("""
             SELECT city, state, COUNT(*) AS cnt
             FROM property_owners
@@ -104,9 +120,67 @@ def _get_persona_stats():
         ]
     except Exception as e:
         print(f"[V474] persona stats query failed: {e}", flush=True)
+    return out
 
-    _STATS_CACHE['data'] = out
-    _STATS_CACHE['ts'] = _t.time()
+
+def refresh_persona_stats_cache():
+    """Recompute and persist to system_state. Called by worker.secondary_loop
+    every 2 hrs and once at worker boot. Safe to call from any context.
+    """
+    import json as _j, time as _t
+    out = _compute_persona_stats()
+    if not out:
+        return None
+    try:
+        permitdb.set_system_state(_PERSONA_STATS_KEY, _j.dumps(out))
+        # Also update in-memory cache so the calling process sees the
+        # fresh value on the very next read.
+        _STATS_MEM_CACHE['data'] = out
+        _STATS_MEM_CACHE['ts'] = _t.time()
+    except Exception as e:
+        print(f"[V488] persona_stats_cache write failed: {e}", flush=True)
+    return out
+
+
+def _get_persona_stats():
+    """Read path used by /leads/* page renders. Three layers:
+      1. process-memory cache (5 min TTL) — fastest path
+      2. system_state row (2 hr TTL) — survives process restarts
+      3. compute synchronously — first-deploy-ever fallback only
+    """
+    import time as _t, json as _j
+    now = _t.time()
+
+    # Layer 1: process memory
+    if _STATS_MEM_CACHE['data'] and (now - _STATS_MEM_CACHE['ts']) < _STATS_MEM_TTL_SECONDS:
+        return _STATS_MEM_CACHE['data']
+
+    # Layer 2: system_state DB-backed cache
+    try:
+        state = permitdb.get_system_state(_PERSONA_STATS_KEY)
+    except Exception as e:
+        print(f"[V488] persona_stats system_state read failed: {e}", flush=True)
+        state = None
+    if state and state.get('value'):
+        try:
+            data = _j.loads(state['value'])
+            # Trust the DB blob — refresh staleness is the worker's job.
+            # Repopulate process memory so next request skips the DB read.
+            _STATS_MEM_CACHE['data'] = data
+            _STATS_MEM_CACHE['ts'] = now
+            return data
+        except Exception as e:
+            print(f"[V488] persona_stats JSON decode failed: {e}", flush=True)
+
+    # Layer 3: compute (cold start with empty DB cache only)
+    out = _compute_persona_stats()
+    if out:
+        try:
+            permitdb.set_system_state(_PERSONA_STATS_KEY, _j.dumps(out))
+        except Exception:
+            pass
+        _STATS_MEM_CACHE['data'] = out
+        _STATS_MEM_CACHE['ts'] = now
     return out
 
 
