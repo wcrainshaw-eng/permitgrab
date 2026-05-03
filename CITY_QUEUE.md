@@ -72,6 +72,13 @@ where the source feed populates suburb names instead of the metro slug.
 | **hamilton_indianapolis** (V490) | Indy north — Carmel, Fishers, Noblesville, Westfield, Zionsville — 153K |
 | **lake_cleveland_east** (V490) | Cleveland east — Mentor, Willoughby, Painesville — 115K |
 | **lorain_cleveland_west** (V490) | Cleveland west — Lorain, Elyria, Avon — 172K |
+| **jackson_county_mo** (V491) | KC east metro — Independence, Lee's Summit, Blue Springs — 73K (NEW STATE) |
+| **geauga_cleveland_far_east** (V491) | Chardon, Bainbridge — 102K (completes Cleveland east ring) |
+| **medina_cleveland_south** (V491) | Medina, Brunswick — 84K, daily refresh |
+| **pinellas_county_fl** (V491) | St Pete + Clearwater county-wide — 438K (supersedes saint-petersburg city-only) |
+| **pasco_county_fl** (V491) | Tampa north — Wesley Chapel, Land O'Lakes, NPR — 322K |
+| **bexar_county_full** (V491) | San Antonio full county — 711K (UPGRADE replaces bexar 5K → 142x lift) |
+| **travis_county_full** (V491) | Austin metro full county — 343K (UPGRADE replaces travis_austin 55K → 6x lift) |
 
 **Confirmed structurally suppressed** (no public owner data — would need
 commercial source like DataTree/FirstAmerican/ATTOM): all California metros
@@ -433,3 +440,4 @@ starting Phase 2 (GROW THE DATA), ALWAYS check this file first:
 1. Process all "Ready to Wire" cities before researching new ones
 2. Never investigate cities in the "Dead Ends" list
 3. After investigating a city, add it to the appropriate section
+
