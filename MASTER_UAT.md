@@ -782,6 +782,23 @@ The web UI starts demanding "Confirm it's you" after a couple of ad
 saves in a session. Use Google Ads Editor desktop app for batch
 edits — uses an API token, no session-cookie 2FA.
 
+### R8: "no credit card required" copy lie (V253 → V497)
+V253 P2 #6 added trial_period_days=14 to "honor" pricing copy that said
+"no credit card required". But Stripe Checkout Subscription mode
+always collects card up front; trial_period_days delays the charge,
+not the collection. The lie remained until V497 (2026-05-04) swapped
+all 8 instances to "no charge for 14 days, cancel anytime". If anyone
+proposes adding "no credit card required" copy back without changing
+the underlying flow (true card-less trial via in-app entitlement),
+reject the PR. Re-introducing the lie breaks customer trust at first
+impression. Higgins (May 2) and Meyer (May 1) both hit this
+contradiction — clicked "Start Free Trial" expecting no card prompt,
+got Stripe asking for a card.
+
+Verification: `grep -rn "no credit card\|no card" templates/ | grep -v
+"city_landing_v77.html:1089"` should return empty (the v77 hit is the
+free /get-alerts digest signup which IS genuinely card-free).
+
 ---
 
 <a name="how-to-run"></a>
