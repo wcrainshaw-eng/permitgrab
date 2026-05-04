@@ -3321,6 +3321,36 @@ def admin_refresh_city_stats():
         return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
 
 
+@admin_bp.route('/api/admin/email-test', methods=['POST'])
+def admin_email_test():
+    """V495 Phase 3 follow-up: smoke-test the send_sales_email() path
+    after Cloudflare Email Routing goes live for permitgrab.com.
+    Body: {"to": "wcrainshaw@gmail.com", "kind": "sales" | "alerts"}.
+    Returns provider response."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.get_json(silent=True) or {}
+    to_email = data.get('to') or 'wcrainshaw@gmail.com'
+    kind = (data.get('kind') or 'sales').lower()
+    subject = f"PermitGrab email-test ({kind}) — {datetime.now().isoformat()}"
+    body = (
+        f"<p>This is a {kind}-channel test email.</p>"
+        f"<p>If you received this in wcrainshaw@gmail.com, "
+        f"the {kind} send path is working.</p>"
+        f"<p>Reply to this email — the reply should also land in your "
+        f"gmail inbox via Cloudflare Email Routing.</p>"
+    )
+    if kind == 'sales':
+        from email_alerts import send_sales_email
+        result = send_sales_email(to_email, subject, body)
+    else:
+        from email_alerts import send_email
+        result = send_email(to_email, subject, body)
+    return jsonify({'status': 'sent', 'to': to_email,
+                    'kind': kind, 'result': str(result)})
+
+
 @admin_bp.route('/api/admin/manual-subscriber', methods=['POST'])
 def admin_manual_subscriber():
     """V494 emergency recovery: manually create or update a subscribers
