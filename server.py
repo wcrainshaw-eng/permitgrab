@@ -9128,21 +9128,27 @@ def start_collectors():
     except Exception as _e:
         print(f"[{datetime.now()}] connectivity test error (non-fatal): {_e}", flush=True)
 
-    # V492 IRONCLAD: warm city_stats system_state cache for the top 20
-    # cities at boot so AdsBot's first crawl after a deploy never hits
-    # cold-cache compute. Full pass runs at end of next scheduled
-    # collection cycle. 20 cities × ~1-2s each = ~30s, acceptable on
-    # boot (vs. ~10 min for full 700-city pass).
+    # V492 IRONCLAD: warm city_stats system_state cache.
+    # V496 2026-05-04: spawn ASYNC instead of awaiting. The full-table
+    # `LOWER(city)` scan against property_owners (2.86M rows × 20 cities)
+    # could hang for minutes under WAL contention, blocking daemon
+    # spawn and stalling the whole site post-deploy. Letting it run in
+    # background means AdsBot's first crawl might compute live (still
+    # within 30s), but the daemons come up immediately and stay up.
+    def _v492_warm_async():
+        try:
+            from routes.city_stats_cache import refresh_city_stats_cache_all as _w
+            _t0 = time.time()
+            ok, total = _w(limit=20)
+            print(f"[{datetime.now()}] V492: warm done "
+                  f"({ok}/{total} in {int(time.time()-_t0)}s)", flush=True)
+        except Exception as _e:
+            print(f"[{datetime.now()}] V492: warm failed: {_e}", flush=True)
     try:
-        from routes.city_stats_cache import refresh_city_stats_cache_all as _v492_warm
-        _v492_t0 = time.time()
-        _wn_ok, _wn_total = _v492_warm(limit=20)
-        print(f"[{datetime.now()}] V492: startup city_stats warm "
-              f"({_wn_ok}/{_wn_total} in {int(time.time()-_v492_t0)}s)",
-              flush=True)
+        threading.Thread(target=_v492_warm_async, daemon=True,
+                         name='v492_warm').start()
     except Exception as _e:
-        print(f"[{datetime.now()}] V492: startup warm failed (non-fatal): {_e}",
-              flush=True)
+        print(f"[{datetime.now()}] V492: warm thread spawn failed: {_e}", flush=True)
 
     # V75: Apply known fixes to broken city_sources configs
     print(f"[{datetime.now()}] V75: Applying known config fixes...", flush=True)
