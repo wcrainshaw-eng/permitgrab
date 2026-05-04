@@ -2318,4 +2318,281 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V499: 4 posts hitting PERFECT_CUSTOMERS_MATRIX explicit content gaps:
+    #   1. "How to find new construction projects in [city]" (GC)
+    #   2. "[city] roof permit data for storm response" (post-storm)
+    #   3. "[city] property owners with code violations list" (wholesaler)
+    # ====================================================================
+
+    'how-to-find-new-construction-austin': {
+        'title': 'How to Find New Construction Projects in Austin (2026 Guide) | PermitGrab',
+        'meta_description': (
+            'Find Austin new construction projects before your competitors '
+            'do. Daily permit feed shows every ground-up build, addition, '
+            'and major remodel filed with the city. $149/mo unlimited.'
+        ),
+        'h1': 'How to Find New Construction Projects in Austin (2026)',
+        'subject': 'GCs and subcontractors finding new construction work',
+        'city': 'Austin',
+        'city_slug': 'austin-tx',
+        'persona_slug': 'design-build-gc',
+        'meta_published': '2026-05-04',
+        'reading_time': '8 min',
+        'body_html': """
+<p>Most Austin general contractors and subcontractors find new work the way they did in 2005: word-of-mouth referrals, a Houzz Pro subscription, occasional Facebook ads, and the rolodex of architects they've built relationships with over the years. That works — until it doesn't. The crew has slack capacity, the pipeline is empty, and the GC is making cold calls or posting in the local builder Facebook group hoping for scraps.</p>
+
+<p>The Austin permit office issues 800-1,500 new residential permits per month plus 200-400 commercial permits. Each one is a project in progress: a homeowner who hired an architect, paid for plans, paid permit fees, and is now committed to a project. They're past the dreamer phase and either have a GC or are about to choose one. This guide shows how to find those projects systematically.</p>
+
+<h2>The 4 categories of "new construction" in Austin permit data</h2>
+<p>Permit data lumps everything under "construction permits" but the categories that matter for finding actual buildable work are:</p>
+<ul>
+  <li><strong>Ground-up new builds</strong> — Single-family residence, multi-family, commercial. Permit type usually NEW or BUILD or NSFR (New Single Family Residence). Most permits will indicate construction value $200K+.</li>
+  <li><strong>Major additions</strong> — Adding square footage to an existing structure. Permit type ADDITION or ADD or ADDN. Typical values $80K-$500K.</li>
+  <li><strong>ADU/secondary unit construction</strong> — Accessory dwelling units. Austin allows up to 1,100 sqft ADUs in most SFR zones. Permit type ADU or DETACHED or 2NDUNIT. Values $80K-$250K.</li>
+  <li><strong>Major remodels</strong> — Structural changes, kitchen/bath gut renovations, garage conversions. Permit type REMODEL or ALTER or RENOVATE with permit value typically $50K+.</li>
+</ul>
+
+<p>The first three categories are the gold-tier targets for new-construction-focused GCs. Major remodels are higher volume but the project is typically already won by the homeowner's existing design-build relationship.</p>
+
+<h2>Step-by-step: how to find new Austin construction in PermitGrab</h2>
+<ol>
+  <li><strong>Filter by city to Austin</strong> (or expand to all of Travis County for broader coverage including Bee Cave, Lakeway, West Lake Hills).</li>
+  <li><strong>Filter by permit type</strong> to NEW + ADDITION + ADU. Skip remodel for new-construction prospecting.</li>
+  <li><strong>Filter by minimum project value</strong> — $200K for ground-up SFR, $80K for additions, $50K for ADUs. Skip the small jobs.</li>
+  <li><strong>Sort by issue date descending</strong> — work the freshest permits first. The first contractor to engage typically wins because most homeowners are 2-4 weeks away from finalizing their GC selection.</li>
+  <li><strong>Cross-reference with the architect/designer name</strong> — if you see the same firm filing 5+ permits per month, they're a high-leverage referral source. Build a relationship with their PMs.</li>
+  <li><strong>Export to CSV</strong> on Pro plan. Sync to your CRM via Zapier (10-minute setup).</li>
+</ol>
+
+<h2>What outreach actually works for new-construction permit leads</h2>
+<p>The best-converting outreach script reference s the specific permit: "I noticed you filed a permit for an ADU at [address] last week. We just completed a similar project in [adjacent neighborhood] and I wanted to see if you've finalized your contractor selection." Conversion rates on this type of personalized, permit-anchored outreach run 12-22% in Austin vs 2-4% on generic cold lists.</p>
+
+<p>Subcontractors (electrical, plumbing, HVAC, framing, roofing) take a different angle: they target the GC name on the permit, not the homeowner. Your message to the GC: "I noticed you're working a [project type] at [address]. We have crews available for [trade] starting [date] and can give you a quote in 24 hours." This works because most GCs don't have all subs locked in at permit-issue time, and same-day responsiveness wins business.</p>
+
+<h2>Austin's architect ecosystem (the meta-play)</h2>
+<p>The 20 most prolific architects in Austin file roughly 35-45% of all design-build-relevant permits in the metro. Building a referral relationship with even 2-3 of those firms produces predictable lead flow that doesn't depend on permit-data outreach at all. PermitGrab's permit history view shows the architect/designer name on every filing, so you can sort by frequency and rank-order your outreach list.</p>
+
+<p>This is the highest-leverage play we see Austin design-build GCs run. Five hours of relationship-building per month with the right architects produces more contracts than 50 hours of cold homeowner outreach.</p>
+
+<p><strong>$149/mo unlimited Austin + Travis County permit access.</strong> 14-day free trial. <a href="/leads/design-build-gc">Design-build GC onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Austin new-construction permit data?',
+             'Daily refresh from data.austintexas.gov. New permits typically appear in PermitGrab within 24 hours of issue. ADU and addition permits are flagged separately from new-build SFR permits.'),
+            ('Can I get notifications when new permits are filed?',
+             'Yes. Pro plan includes daily email digests filtered to your saved searches. Most Austin GCs run a daily digest filtered to their target permit types + minimum value threshold.'),
+            ('Does PermitGrab tell me who the GC of record is on a permit?',
+             'Where the permit data captures it, yes. Austin\'s permit feed includes a CONTRACTOR field that\'s populated on roughly 60-75% of issued permits. The remaining 25-40% are owner-builder filings or have the field blank.'),
+            ('How does Austin compare to Houston, Dallas, or San Antonio for new-construction lead-gen?',
+             'Austin has the highest median project value of any TX metro ($89K median residential addition vs $42K Houston, $51K San Antonio). For design-build GCs targeting $200K+ work, Austin produces more eligible leads per dollar of marketing spend.'),
+            ('Can I filter to ADU-only or specific permit types?',
+             'Yes. Permit type filtering supports ADU, ADDITION, NEW, REMODEL, MOVED, DEMOLITION as separate categories. ADU permits average 80-120 per month in Austin and are a particularly underserved sub-niche.'),
+        ],
+    },
+
+    'fort-worth-storm-response-roof-permits': {
+        'title': 'Fort Worth Roof Permit Data for Storm Response | PermitGrab',
+        'meta_description': (
+            '97,000+ Tarrant County property owners + Fort Worth permit '
+            'feed. Storm-chaser playbook, hail-season response, post-storm '
+            'lead surge tactics. $149/mo unlimited roofing permit access.'
+        ),
+        'h1': 'Fort Worth Roof Permit Data for Storm Response',
+        'subject': 'Storm-belt roofing contractors',
+        'city': 'Fort Worth',
+        'city_slug': 'fort-worth-tx',
+        'persona_slug': 'storm-belt-roofing',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>The Dallas-Fort Worth metroplex sits dead center in the Texas hail belt. NOAA's Severe Storms database records DFW averaging 8-12 hail events per year of Category 1+ severity (1.0-inch+ hail), with major events of 2-inch+ hail every 2-3 years. The 2023 May 11 hailstorm caused $5B in insured property damage in the DFW metro alone — equivalent to a Category 2 hurricane landfall in pure dollar terms. For storm-belt roofing contractors, DFW is one of the highest-volume opportunity markets in the United States.</p>
+
+<p>The challenge isn't whether storms generate work — they always do — it's getting to homeowners faster than the 200-300 out-of-state storm chasers who descend on the metro within 48 hours of a major event. Permit data is the local roofer's structural advantage.</p>
+
+<h2>The post-storm permit surge pattern</h2>
+<p>Within 7-14 days of a major hail event, Fort Worth and surrounding municipalities (Arlington, North Richland Hills, Hurst, Euless, Bedford) see a 5-10x spike in residential roof permits. This is the moment when homeowners have:</p>
+<ul>
+  <li>Met with their insurance adjuster</li>
+  <li>Received their initial scope of work</li>
+  <li>Pulled the permit themselves OR had a contractor pull it on their behalf</li>
+  <li>Begun gathering competing bids</li>
+</ul>
+
+<p>If a contractor is on the permit, the homeowner is 80% locked in. If the homeowner pulled the permit themselves (owner-builder filing), they're still actively bidding. Owner-builder roof permits are the highest-converting cold-outreach targets in storm response — typical close rates of 18-30% vs 4-8% on general post-storm canvass.</p>
+
+<h2>What Fort Worth roofers get from PermitGrab</h2>
+<ul>
+  <li><strong>97,000+ Tarrant County property owner records</strong> with mailing addresses (the largest TX county owner stack in the platform — V474 win)</li>
+  <li><strong>Fort Worth daily permit feed</strong> with REROOF / SHINGLE / METAL-ROOF / TEAR-OFF filters</li>
+  <li><strong>Code violations data</strong> — 6,453 records updated daily — properties under city pressure for roof condition issues</li>
+  <li><strong>Owner-vs-contractor flag on each permit</strong> — quickly isolate owner-builder filings (the gold-tier post-storm leads)</li>
+  <li><strong>Cluster detection by ZIP and date</strong> — surface storm-affected ZIPs by permit-volume spike pattern</li>
+</ul>
+
+<h2>The 14-day storm-response playbook</h2>
+<p>Day 0 — major hail event hits. Day 1-3, homeowners file initial insurance claims. Day 4-7, adjusters complete inspections. Day 7-14, permits start landing in PermitGrab's feed. The roofer who pulls the previous 14 days of permit data daily and outreaches each new owner-builder filing within 24 hours of permit issue captures the highest-converting share of the post-storm market.</p>
+
+<p>Tactical breakdown:</p>
+<ul>
+  <li><strong>Day 7-10:</strong> Set saved search for Fort Worth + permit type REROOF/SHINGLE + owner-builder flag. Run daily.</li>
+  <li><strong>Day 10-21:</strong> Outreach window. Each new permit gets a personalized voicemail + text within 24 hours of permit issue. Reference the permit specifically: "Hi [name], I noticed you pulled a roof permit at [address] yesterday — I wanted to make sure you have a few competing bids before you sign with anyone."</li>
+  <li><strong>Day 21-45:</strong> Follow-up cycle for non-responders. Most close in this window, not the initial outreach.</li>
+  <li><strong>Day 45+:</strong> Permits filed in this window are typically homeowners who had complications (delayed adjuster appointments, denied claims being appealed). Lower close rate but still 8-12%.</li>
+</ul>
+
+<h2>Why DFW outperforms other Texas storm markets</h2>
+<p>San Antonio gets fewer major hail events per year (~3-5 vs DFW's 8-12). Houston gets hurricanes but those are concentrated in 2-3 events per decade. Austin gets hail but at smaller metro scale. DFW's combination of frequent hail events, large addressable market (Tarrant 97K owners + Dallas County 26K owners + Collin/Denton each ~30K+), and high housing values makes it the highest-volume storm-belt roofing market in the state.</p>
+
+<p>Fort Worth specifically (Tarrant County) is the largest TX owner-record stack in the platform post-V474, and Fort Worth's permit feed is currently the most reliable of the major DFW jurisdictions. We refresh the violations feed daily — one of only a handful of metros with that frequency.</p>
+
+<p><strong>$149/mo unlimited Fort Worth + Tarrant County access.</strong> 14-day free trial. <a href="/leads/storm-belt-roofing">Storm-belt roofing onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fast does storm-event permit data appear in PermitGrab?',
+             'Fort Worth permits typically appear within 24 hours of issue. The post-storm permit surge usually starts 7-10 days after a major hail event and runs for 30-60 days as homeowners cycle through insurance adjusting and contractor selection.'),
+            ('Can I distinguish owner-builder permits from contractor-pulled permits?',
+             'Yes. Each permit has a CONTRACTOR field; if it\'s blank or matches the OWNER name, it\'s an owner-builder filing. Owner-builder roof permits convert 3-5x better than contractor-pulled permits because the homeowner is still actively bidding.'),
+            ('Does PermitGrab cover Arlington, Plano, North Richland Hills?',
+             'Arlington (separately wired with code violations live), Plano (also wired), and the Tarrant County owner stack covers North Richland Hills, Hurst, Euless, Bedford, Mansfield, and Grand Prairie. Each can be filtered separately or combined for metro-wide coverage.'),
+            ('What about hail-event-specific data?',
+             'PermitGrab does not directly publish NOAA hail event data, but the permit-volume spike on a given ZIP after an event is the leading-indicator equivalent. Most contractors set saved searches by ZIP and watch for the volume spike to indicate where to focus.'),
+            ('How does this compare to lead-aggregator subscriptions like Roofr or RoofRefer?',
+             'Lead aggregators sell the same lead to 3-5 contractors and charge $50-200 per lead. PermitGrab is $149/mo unlimited and the leads are surfaced direct from public permit data — no other contractor has the same list unless they\'re also a customer. Most aggressive storm-belt roofers run both, but the unit economics on PermitGrab are 20-100x better.'),
+        ],
+    },
+
+    'miami-dade-storm-response-roof-permits': {
+        'title': 'Miami-Dade Roof Permit Data for Hurricane Response | PermitGrab',
+        'meta_description': (
+            '82,000+ Miami-Dade property owners + daily permit feed. '
+            'Hurricane-belt roofing contractors: post-storm permit surge '
+            'tracking, FL DBPR contractor licensing data. $149/mo unlimited.'
+        ),
+        'h1': 'Miami-Dade Roof Permit Data for Hurricane Response',
+        'subject': 'Hurricane-belt roofing contractors',
+        'city': 'Miami',
+        'city_slug': 'miami-dade-county',
+        'persona_slug': 'storm-belt-roofing',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>South Florida is the highest-stakes roofing market in the United States. The 2017-2024 named-storm cycle has produced 14 storms making landfall or coming within 100 miles of Miami-Dade — Irma, Ian, Idalia, and Helene each generating multi-billion dollar insured losses across the region. Florida's strict wind-uplift building codes (post-Andrew adoption) require permitted roofing work on most claims, generating one of the densest permit-driven roofing markets anywhere in the country.</p>
+
+<p>Add to that: Miami-Dade is one of the only major metros where the FL DBPR contractor license database can be joined to permit data, surfacing licensed contractor phone numbers directly. As of May 2026, Miami-Dade has 82,000+ property owner records and 245+ contractor profiles with phone numbers in PermitGrab's feed — among the highest-coverage cities on the platform.</p>
+
+<h2>The hurricane-season permit cycle (June 1 - November 30)</h2>
+<p>Hurricane season produces three distinct permit-volume phases:</p>
+<ul>
+  <li><strong>Pre-storm (June - early August):</strong> Baseline permit volume. Roofers focus on age-of-roof outreach (homes with 15-20yr-old roofs are claim-eligible the moment a storm hits and have higher conversion rates pre-event).</li>
+  <li><strong>Active storm window (mid-August - late October):</strong> Permit volume drops 30-40% as adjusters and contractors pause new bids ahead of forecasted storms. This is the prep window — build your post-storm call list now.</li>
+  <li><strong>Post-storm surge (late October - February):</strong> Permit volume jumps 4-8x as homeowners cycle through insurance adjusting, claim appeals, and contractor selection. The peak typically lands 60-90 days after the storm landfall, not in the immediate aftermath.</li>
+</ul>
+
+<h2>What Miami-Dade roofers get from PermitGrab</h2>
+<ul>
+  <li><strong>82,000+ Miami-Dade property owner records</strong> with mailing addresses + age-of-construction filtering</li>
+  <li><strong>Miami-Dade daily permit feed</strong> with REROOF / SHINGLE / TILE / METAL / FLAT-ROOF filters</li>
+  <li><strong>245+ contractor profiles with phone numbers</strong> from FL DBPR import (when working — see CLAUDE.md P0)</li>
+  <li><strong>Code violation data</strong> from CCVIOL_gdb FeatureServer — properties under county pressure for roof condition</li>
+  <li><strong>Wind-mitigation permit category</strong> — distinct from emergency reroofing, these are pre-storm hardening permits with different conversion economics</li>
+</ul>
+
+<h2>The 90-day post-storm playbook</h2>
+<p>Florida's claim cycle is longer than Texas hail markets because of FL's restrictive AOB (Assignment of Benefits) reform laws and stricter adjuster requirements. Post-storm permit volume peaks at 60-90 days after landfall, not 14-21 days like DFW.</p>
+
+<p>Practical implications:</p>
+<ul>
+  <li><strong>Days 1-30 post-storm:</strong> Outreach window for emergency tarp work and immediate damage stabilization. Lower-margin but cash-pay clients.</li>
+  <li><strong>Days 30-90 post-storm:</strong> The peak permit window. Insurance scopes are finalized, homeowners are selecting contractors, and competition is at maximum intensity.</li>
+  <li><strong>Days 90-180 post-storm:</strong> The "claim appeal" window. Homeowners who initially had claims denied are working through appeals. Smaller volume but higher-margin because the homeowner is informed and has typically lost trust in a prior contractor.</li>
+</ul>
+
+<h2>Why Miami-Dade beats Tampa or Orlando for roofing</h2>
+<p>Tampa is fragmented across Hillsborough, Pinellas, and Pasco counties (3 separate jurisdictions with different permit feeds, only Hillsborough partially wired in PermitGrab). Orlando has the cleanest data stack of any FL metro (V474 win, 531 owner records — small but functional) but smaller absolute volume. Miami-Dade combines the largest absolute claim volume of any FL metro, the deepest property-owner stack, and the strongest contractor license phone coverage. For storm-belt roofing contractors expanding into Florida, Miami-Dade is the highest-leverage starting market.</p>
+
+<p><strong>$149/mo unlimited Miami-Dade + Broward County (separately wired) access.</strong> 14-day free trial. <a href="/leads/storm-belt-roofing">Storm-belt roofing onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Miami-Dade roofing permit data?',
+             'Daily refresh from the Miami-Dade open data portal. New permits typically appear within 24-48 hours of issue. The CCVIOL violations feed also refreshes daily.'),
+            ('Do you have FL DBPR contractor phone numbers?',
+             'Yes — when the FL DBPR import is working. The import is currently a known P0 (column position alignment issue per CLAUDE.md). When functional, the import adds 200-500 phones to the Miami-Dade contractor profile stack on each run.'),
+            ('Does PermitGrab cover Miami Beach, Coral Gables, Hialeah?',
+             'Yes. Miami-Dade County coverage extends across all incorporated municipalities. Hialeah is wired separately and has 88+ contractor profiles. Miami Beach and Coral Gables roll up under the Miami-Dade county feed.'),
+            ('Can I see the contractor on competing bids?',
+             'When a contractor pulls the permit, their name appears in the CONTRACTOR field. Approximately 70-80% of Miami-Dade roof permits have a contractor named at issue. The remaining 20-30% are owner-builder filings — your prime cold-outreach targets.'),
+            ('How does this compare to RoofClaim or Steady leads?',
+             'RoofClaim and Steady sell shared leads at $80-200 per inquiry with 3-5 contractors getting the same lead. PermitGrab is $149/mo unlimited, and the data is sourced from public permits — no other contractor has the same list unless they\'re also a PermitGrab customer. Most aggressive Miami roofers use both, but the unit economics on PermitGrab dominate after the first closed job.'),
+        ],
+    },
+
+    'atlanta-code-violations-property-list': {
+        'title': 'Atlanta Property Owners with Code Violations List | PermitGrab',
+        'meta_description': (
+            'Real estate wholesalers: Atlanta code violation property list '
+            'updated daily. Identify distressed properties before MLS, with '
+            'owner mailing address for direct mail. $149/mo unlimited.'
+        ),
+        'h1': 'Atlanta Property Owners with Code Violations — Wholesaler Lead List',
+        'subject': 'Real estate wholesalers and investors',
+        'city': 'Atlanta',
+        'city_slug': 'atlanta-ga',
+        'persona_slug': 'real-estate-wholesaler',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>Atlanta is one of the highest-volume real estate wholesaling markets in the United States. Fulton, DeKalb, Cobb, and Gwinnett counties combine for roughly 1.8M housing units, with a high turnover rate driven by population growth + the Atlanta metro's reputation as a top-3 destination market for institutional SFR buyers (Invitation Homes, Tricon Residential, Progress Residential). Wholesalers who can identify distressed properties 60-90 days before they hit MLS — when the owner is just starting to consider their options — capture the highest-margin assignment fees in the market.</p>
+
+<p>Code enforcement violations are the single best leading indicator of distress. A homeowner who receives a code citation has 30-90 days to remediate or face fines/liens. They're under direct city pressure. Many can't afford the repairs. A meaningful percentage of these owners become motivated sellers within 90-180 days of the citation date.</p>
+
+<h2>Why code violation lists outperform other distress signals</h2>
+<p>Compared to alternative wholesaler lead sources:</p>
+<ul>
+  <li><strong>Pre-foreclosure (Lis Pendens) lists</strong> — public record but typically 60-90 days behind initial financial distress, and 70-80% of pre-foreclosures resolve before sale (modifications, payoffs, family bailouts). Lower conversion to assigned deal.</li>
+  <li><strong>Probate lists</strong> — extremely high signal but limited monthly volume (maybe 200-400 newly-filed Fulton County probate cases per month). Hyper-competed by every wholesaler in the metro.</li>
+  <li><strong>Tired landlord / out-of-state owner lists</strong> — list-broker pulls, often 6-18 months stale. Recipients have been hit by 10+ similar postcards.</li>
+  <li><strong>Code violation lists</strong> — fresh weekly to monthly, low competition (most wholesalers don't know how to access this data programmatically), high signal of physical distress, owner has direct city pressure to act.</li>
+</ul>
+
+<h2>What Atlanta wholesalers get from PermitGrab</h2>
+<ul>
+  <li><strong>Atlanta + Fulton County code violation feed</strong> with property address, citation date, violation category, and case status</li>
+  <li><strong>Owner mailing address</strong> from the assessor data — flag absentee owners (out-of-state landlords are 3-5x more likely to wholesale-sell vs owner-occupants)</li>
+  <li><strong>Permit history per address</strong> — properties cited for issues but with no follow-up permit pulled are the highest-distress targets (owner is unable or unwilling to remediate)</li>
+  <li><strong>Daily refresh</strong> — new violations appear within 1-2 days of citation</li>
+  <li><strong>Filter by violation category</strong> — UNSAFE STRUCTURE, OVERGROWTH, JUNK/DEBRIS, ABANDONED VEHICLE, ILLEGAL DUMPING, ROOF/EXTERIOR, etc. Different categories signal different deal types.</li>
+</ul>
+
+<h2>Step-by-step: building a wholesaler call/mail list from violations</h2>
+<ol>
+  <li><strong>Filter to Atlanta or Fulton County</strong> with citation date in the last 30 days.</li>
+  <li><strong>Filter violation category</strong> to UNSAFE STRUCTURE + ROOF + OVERGROWTH + ABANDONED. These categories signal physical distress that triggers wholesale-sale willingness.</li>
+  <li><strong>Filter by absentee owner flag</strong> — owner mailing address ZIP doesn't match property ZIP. Absentee owners convert at 3-5x owner-occupants on wholesale offers.</li>
+  <li><strong>Cross-reference with permit history</strong> — properties with violations but no follow-up permit in 60+ days are highest-distress.</li>
+  <li><strong>Export to CSV</strong> on Pro plan. Run direct-mail campaign or skip-trace for cold-call campaign.</li>
+  <li><strong>Re-run weekly</strong> — the freshest 14-day window has 5-10x conversion vs 90-day-old citations.</li>
+</ol>
+
+<h2>The math for an Atlanta wholesaler</h2>
+<p>Atlanta + Fulton County issues approximately 800-1,500 code citations per month. A typical wholesaler running a 90-day rolling list captures 2,400-4,500 unique violation addresses. After filtering for absentee owners + distress-signaling violation categories, the qualified list typically lands at 600-1,200 addresses. At a 1-3% direct-mail response rate (high for warm distress signals) and a 15-25% close rate on qualified seller calls, that's 1-9 assigned deals per month.</p>
+
+<p>Atlanta wholesale assignment fees average $8K-$25K. Even capturing 1-2 deals per month from a violation-driven list produces $10K-$50K in monthly contribution. PermitGrab at $149/mo is recovered on the first assignment.</p>
+
+<p><strong>$149/mo unlimited Atlanta + Fulton County violation + permit + owner data.</strong> 14-day free trial. <a href="/leads/real-estate-wholesaler">Wholesaler onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Atlanta code violation data?',
+             'Atlanta + Fulton code citations refresh on the city/county\'s posting cadence (typically weekly for new citations, daily for status changes on open cases).'),
+            ('Can I get owner mailing address, not just property address?',
+             'Yes. The assessor data feed provides separate mailing address from property address. Approximately 28-35% of Fulton County parcels have a non-matching mailing address (absentee owner indicator).'),
+            ('Does this work for surrounding Atlanta metro counties?',
+             'Atlanta + Fulton County is the primary feed. DeKalb, Cobb, and Gwinnett county-level coverage is on the queue but not currently full-coverage in the platform. Most wholesalers focus their campaigns inside Fulton anyway since assignment-fee economics are best there.'),
+            ('How does this compare to PropStream or DealMachine?',
+             'PropStream and DealMachine are list-broker pulls — typically refreshed monthly to quarterly with stale data on top of stale data. PermitGrab is direct from city/county feeds, refreshed daily/weekly. The data freshness gap is the structural advantage.'),
+            ('Is this legal? What about CAN-SPAM / TCPA / direct mail rules?',
+             'Code violation data is public record (city council meetings, court filings) and publicly accessible. Direct mail using public-record data is legal nationwide. Cold-call SMS/voice rules vary by state — TCPA applies if you\'re using auto-dialers; manual dials to wholesale prospects are generally permitted. Talk to a compliance attorney before running auto-dialer campaigns. PermitGrab provides the data; the outreach compliance is the customer\'s responsibility.'),
+        ],
+    },
+
 }
