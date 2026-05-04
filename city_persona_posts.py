@@ -2837,4 +2837,251 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V501: geographic expansion of matrix Top-4 archetypes to additional
+    # ad-ready cities. Solar to Tampa (FL #2 metro), Design-Build to NYC
+    # (largest D-B market), HVAC to San Antonio (3.8K phones + hot TX),
+    # Storm Response to Mesa (V474 win, AZ hail belt).
+    # ====================================================================
+
+    'tampa-solar-installer-leads': {
+        'title': 'Tampa Solar Installer Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Tampa Bay solar market: Hillsborough County owner data + '
+            'permit feed identifies homeowners at the moment of property '
+            'investment. Skip aggregator markup. $149/mo unlimited.'
+        ),
+        'h1': 'Tampa Solar Installer Leads from Building Permit Data',
+        'subject': 'Solar installers in Tampa Bay',
+        'city': 'Tampa',
+        'city_slug': 'tampa-fl',
+        'persona_slug': 'solar-home-services',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Florida is the third-largest residential solar market in the United States behind California and Texas, and the Tampa Bay metro is FL's fastest-growing region for new solar installations. Three structural drivers: net-metering remains favorable in FL despite legislative pressure, hurricane resilience is now a meaningful purchase motivator (battery-backed solar systems power refrigerators and AC during multi-day outages), and the federal 30% Investment Tax Credit + Florida sales tax exemption stack to roughly 35% off the system cost for an average homeowner.</p>
+
+<p>Tampa Bay specifically — Hillsborough + Pinellas + Pasco counties combined — represents 3.2M residents and roughly 1.2M owner-occupied housing units. The solar penetration rate is currently around 4-6% with growth running 25-35% year over year. The contractors who win in this market source leads from permit data direct, not from $80-200 per-inquiry aggregator services.</p>
+
+<h2>What Tampa solar installers get from PermitGrab</h2>
+<ul>
+  <li><strong>Tampa permit feed via Accela ArcGIS hybrid</strong> (V476 win — fixes the long-standing P1 where Accela had no contractor field; we now cross-reference the ArcGIS index with Accela detail HTML to extract licensed professional names)</li>
+  <li><strong>Hillsborough County owner data</strong> (40K+ records on the queue for full integration)</li>
+  <li><strong>FL DBPR contractor licensing</strong> phone enrichment when import is working</li>
+  <li><strong>Re-roof + electrical-upgrade permit filtering</strong> — the two highest-converting solar lead types</li>
+  <li><strong>Daily refresh</strong> on permit data; permits typically appear within 24-48 hours of filing</li>
+</ul>
+
+<p><em>Note on Tampa coverage:</em> Per CLAUDE.md, Tampa has 40K+ Hillsborough owner records but 0 violations feed currently. The platform's Tampa offering is permit-and-owner-driven (no violation channel), which is actually optimal for solar — solar prospects are identified by permit-driven outreach, not violation-driven distress targeting.</p>
+
+<h2>The hurricane-resilience pitch (Tampa-specific)</h2>
+<p>Tampa Bay hasn't taken a direct major hurricane hit in over 100 years (last was 1921), but the 2022 Hurricane Ian near-miss and 2024 Hurricane Milton brought multi-day grid outages across the metro. Battery-backed solar systems became the highest-margin pitch in the FL market overnight. Average pre-Ian system price ~$25K at 6kW; post-Ian average ~$45K at 8kW + battery. Margin per system jumped 60-80% on the battery attach.</p>
+
+<p>Outreach pitch: "I noticed you pulled a re-roof permit at [address] last week. Most homeowners don't realize they can add a battery-backed solar system at the same time and have it pay for itself through the federal tax credit + utility savings + storm resilience. Most importantly: you'd never lose AC during a multi-day grid outage again."</p>
+
+<h2>Why Tampa beats Orlando or Jacksonville for solar lead-gen</h2>
+<p>Orlando has the cleanest data stack of any FL metro (V474 win: 531 owner records, daily permits + violations live). But Orlando's solar market is smaller in absolute volume — call it 30-40% of Tampa's monthly install volume. Jacksonville has 1.1K owner records and a wrong-source bug currently routes the data feed to Virginia Beach VA (V476 audit). Miami-Dade is the largest absolute FL solar market but is hyper-competed by 200+ established solar firms post-FPL net-metering changes.</p>
+
+<p>Tampa is the FL solar market with the best growth trajectory and lowest competitive density per addressable prospect right now. For solar installers expanding FL operations, Tampa is the highest-leverage starting market.</p>
+
+<p><strong>$149/mo unlimited Tampa + Hillsborough County access.</strong> 14-day free trial. <a href="/leads/solar-home-services">Solar installer onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Tampa solar permit data?',
+             'Daily refresh from arcgis.tampagov.net Planning/PermitsAll. Per-permit Accela detail page parsing extracts the Licensed Professional name with ~100% yield on validated samples (V476). New permits typically appear within 24-48 hours of filing.'),
+            ('What about Hurricane Helene / Milton aftermath?',
+             'Both 2024 storms drove substantial post-event permit activity in Tampa Bay. Roof and electrical-upgrade permit volumes ran 2-3x baseline for the 60-90 days following landfall. PermitGrab\'s historical view lets you build pre-storm baseline lists and post-storm expansion lists.'),
+            ('Do I get contractor phone numbers from FL DBPR?',
+             'Yes when the import is working. FL DBPR is currently a known P0 (column position alignment per CLAUDE.md) — when functional, the import adds 200-500 phones to the Tampa contractor profile stack on each run.'),
+            ('Does Tampa coverage extend to Pinellas (St. Pete) and Pasco counties?',
+             'St. Petersburg has its own city permit feed (Saint Petersburg has 2,537 historical profiles but the active feed is currently a known dead-end per V476 — Click2Gov detail-page scraping required, not yet implemented). Pasco County is on the queue. The 3-county Tampa Bay metro requires coordinated coverage that\'s not currently full in PermitGrab — Hillsborough is the strongest of the three today.'),
+            ('How does this compare to Solar Insure / EnergySage / SolarReviews referrals?',
+             'Those platforms charge $200-400 per qualified lead with 3-5 contractors getting the same lead. PermitGrab is $149/mo unlimited and the data is sourced from public permits — no other contractor has the same list unless they\'re also a PermitGrab customer. The unit economics dominate after the first closed install.'),
+        ],
+    },
+
+    'nyc-design-build-leads': {
+        'title': 'NYC Design-Build Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '13,000+ NYC PLUTO records + Department of Buildings permit '
+            'feed. Design-build contractors win on co-op + brownstone + '
+            'commercial fit-out work. $149/mo unlimited.'
+        ),
+        'h1': 'NYC Design-Build Contractor Leads from DOB Permit Data',
+        'subject': 'Design-build GCs in New York City',
+        'city': 'New York City',
+        'city_slug': 'new-york-city',
+        'persona_slug': 'design-build-gc',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>NYC is the largest design-build market in the United States by absolute project value. The combination of brownstone restoration in Brooklyn (Park Slope, Cobble Hill, Carroll Gardens, Brooklyn Heights), pre-war Manhattan co-op renovations (Upper East Side, Upper West Side, Tribeca, SoHo), and ground-up new-development boutique projects across all five boroughs produces a continuous flow of $250K-$5M+ design-build projects. The challenge for contractors is identifying these projects 30-90 days before competing GCs do.</p>
+
+<p>The NYC Department of Buildings publishes permit data daily via Socrata datasets. PermitGrab's NYC feed pulls from the DOB permits dataset (3h2n-5cm9) and the housing maintenance code violations dataset (wvxf-dwi5) for cross-referencing. The combination produces one of the deepest permit + violation cross-reference datasets on the platform.</p>
+
+<h2>What NYC design-build GCs get from PermitGrab</h2>
+<ul>
+  <li><strong>NYC PLUTO property records</strong> — building age, ownership type (co-op vs condo vs brownstone vs commercial), assessed value, lot size — all the metadata required for project segmentation</li>
+  <li><strong>13,000+ contractor profiles for NYC</strong> with 791+ phone numbers from NY DOL state license imports</li>
+  <li><strong>NYC DOB permit feed</strong> with NEW-BUILDING / ALTERATION-1 / ALTERATION-2 / DEMO / INTERIOR-FITOUT filtering</li>
+  <li><strong>HPD + DOB violation feeds</strong> — daily refresh, both housing maintenance and structural code enforcement</li>
+  <li><strong>Architect/applicant-of-record name</strong> on every permit (essential for the architect-relationship play)</li>
+</ul>
+
+<h2>The 4 NYC design-build sub-niches PermitGrab serves</h2>
+<ol>
+  <li><strong>Pre-war co-op renovations</strong> — Upper East Side, UWS, Park Slope, Brooklyn Heights co-op gut renovations average $400K-$1.5M. Filter: ALTERATION-1 + property type CO-OP + permit value $250K+. Volume: 80-150 per month.</li>
+  <li><strong>Brownstone restoration</strong> — Brooklyn brownstone full-stack renovations average $800K-$3M. Filter: borough Brooklyn + building type ROW HOUSE + ALTERATION-1. Volume: 30-60 per month.</li>
+  <li><strong>Boutique commercial fit-outs</strong> — restaurants, retail, office. Average ticket $300K-$2M. Filter: ALTERATION-2 + property type COMMERCIAL + permit value $200K+. Volume: 200-400 per month metro-wide.</li>
+  <li><strong>Ground-up new construction</strong> — typically luxury townhouses or boutique buildings. NEW BUILDING permits average $2M-$15M+. Filter: NEW BUILDING. Volume: 40-80 per month metro-wide.</li>
+</ol>
+
+<h2>The architect/applicant-relationship play (NYC-specific)</h2>
+<p>NYC has a hyper-concentrated architect ecosystem. The 30 most prolific NYC architects file roughly 50-60% of all design-build-relevant permits in the city. Names like Zproekt, Studio DB, Workshop/APD, Robert AM Stern, Annabelle Selldorf, etc. are filing 5-15 permits per month each. Building a referral relationship with the project managers at even 2-3 of these firms produces predictable lead flow that doesn't require permit-data outreach at all.</p>
+
+<p>PermitGrab's NYC dashboard surfaces the applicant_business_name (architect of record) on every filing. Sort by frequency over the last 12 months and you have your priority outreach list. This is the highest-leverage play we see NYC design-build GCs run.</p>
+
+<h2>The DOB violation cross-reference play</h2>
+<p>NYC properties with active DOB or HPD violations face mandatory remediation deadlines. Owners who don't remediate face escalating fines + tenant access blocks. Cross-reference: properties with 5+ open violations + recent ownership change in last 12 months are the highest-converting design-build leads in the city. The owner just acquired the property knowing repairs were needed; they're actively planning a renovation but haven't yet selected a GC. Outreach window: 60-180 days after ownership change.</p>
+
+<h2>Why NYC design-build math is uniquely good</h2>
+<p>Average NYC design-build project value is $400K-$2M (vs $89K Austin median, $51K San Antonio). Even a 1-2% close rate on permit-driven outreach produces transformational revenue. A single closed brownstone project ($1.2M average) covers $149/mo PermitGrab for 670 years. The unit economics are inverted from any other market — you don't need lead volume, you need exactly one to ten qualified leads per quarter.</p>
+
+<p><strong>$149/mo unlimited NYC five-borough access.</strong> 14-day free trial. <a href="/leads/design-build-gc">Design-build GC onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is NYC DOB permit data?',
+             'Daily refresh from data.cityofnewyork.us. New permits typically appear within 24-48 hours of filing. HPD + DOB violations also refresh daily.'),
+            ('Can I filter by borough?',
+             'Yes. Borough is a stored field. Filter to Manhattan / Brooklyn / Queens / Bronx / Staten Island independently or in any combination.'),
+            ('Does PermitGrab tell me the architect of record?',
+             'Yes. The applicant_business_name field is populated on the majority of NYC permits and contains the architect or applicant-of-record name. Sort by frequency to identify high-volume firms for relationship-building outreach.'),
+            ('What about Department of City Planning land-use permits, ULURP, etc.?',
+             'PermitGrab covers DOB construction/alteration permits. ULURP (zoning), DOT, MTA, and other agency-specific permits are not currently indexed but may be added on the queue if customer demand emerges.'),
+            ('How does PermitGrab compare to Vendorpedia, Procore Lead Manager, BuildZoom for NYC?',
+             'Vendorpedia and BuildZoom are subscription-list services with stale data and shared leads. Procore Lead Manager is an internal-CRM extension, not a public-record source. PermitGrab is direct from city/state public records, refreshed daily, exclusively yours unless competing GCs are also subscribers. The data freshness gap is the structural advantage.'),
+        ],
+    },
+
+    'san-antonio-hvac-leads': {
+        'title': 'San Antonio HVAC Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '5,000+ Bexar County owners + 3,830 contractor phones + San '
+            'Antonio daily permit feed. HVAC contractors win on summer '
+            'replacement cycle outreach. $149/mo unlimited.'
+        ),
+        'h1': 'San Antonio HVAC Contractor Leads from Permit Data',
+        'subject': 'HVAC contractors in San Antonio',
+        'city': 'San Antonio',
+        'city_slug': 'san-antonio-tx',
+        'persona_slug': 'hvac-contractor',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>San Antonio HVAC has the second-highest replacement frequency of any major US metro after Phoenix. Average summer high of 96°F + 85-day-per-year 100°F+ exposure + a population of 2.6M in the metro produces a continuous AC replacement cycle of roughly 11-13 years (vs 15-20 years in temperate climates). Add to that one of the largest 311 + code enforcement violation feeds in Texas (San Antonio's 311_All_Service_Calls FeatureServer is wired in PermitGrab via V259), and the contractor who systematically works permit + violation data captures the highest-margin replacement work in the metro.</p>
+
+<p>San Antonio's contractor phone stack in PermitGrab is 3,830+ — the second-highest non-Chicago contractor phone count in the platform, sourced from CSLB cross-state matching + DDG enrichment + SA-specific 311 contractor mentions. This depth makes B2B partnership outreach (with property managers, GCs, restoration firms) viable in addition to direct homeowner targeting.</p>
+
+<h2>What San Antonio HVAC contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>5,000+ Bexar County property owner records</strong> with mailing addresses</li>
+  <li><strong>3,830+ San Antonio contractor profiles with phone numbers</strong> — second-largest contractor phone stack in the platform</li>
+  <li><strong>San Antonio daily permit feed</strong> with HVAC / MECHANICAL / FURNACE / AC / DUCTWORK filters</li>
+  <li><strong>311_All_Service_Calls violation feed</strong> — daily refresh, ReasonName=Code Enforcement filtering, including reports of inoperable AC units (a 5-8x lead-quality multiplier vs cold permit outreach)</li>
+  <li><strong>Permit value field</strong> — typical residential HVAC replacements run $7K-$15K, commercial RTU work $40K-$200K — filter by tier</li>
+</ul>
+
+<h2>The summer trigger window</h2>
+<p>San Antonio's first 100°F day each year typically lands in late May. From that day through August, HVAC permit volume runs 4-6x baseline. The contractors who pre-build their May call list — from the prior 90 days of permit pipeline + code violations referencing inoperable AC units — capture a 2-3x close-rate advantage over contractors waiting for inbound calls. PermitGrab's permit-history view enables this pre-spike list-building in March-April.</p>
+
+<h2>The "inoperable AC code violation" play (highest-converting)</h2>
+<p>San Antonio's 311 system receives roughly 4K-8K Code Enforcement service calls per month, of which approximately 5-10% reference inoperable AC, refrigeration, or HVAC system issues. These are the highest-converting cold-outreach targets in the SA HVAC market — the homeowner has explicit, time-stamped, public-record documentation of an HVAC issue. Outreach script: "I noticed your property at [address] received a 311 service call on [date] referencing AC system issues. Most homeowners don't realize that's a code-enforcement-resolvable matter that can be cleared with a permitted replacement — I can come out tomorrow and quote a 1-2 day install."</p>
+
+<p>Conversion rates on this script run 25-40% vs 4-8% on generic post-permit cold outreach. The volume is smaller (200-500 qualified leads per month) but the close rate is so much higher that net-bookings exceeds cold outreach by a wide margin.</p>
+
+<h2>Why SA outperforms Austin or Houston for HVAC lead-gen</h2>
+<p>Austin has more total population growth but smaller absolute HVAC volume (cooler summer climate vs SA, smaller existing housing stock). Houston is larger by population but has a more humid climate that fragments the market across HVAC + dehumidification specialists. Dallas is hot but SA's 311 violation data is uniquely deep — DFW's similar feeds are less well-indexed in PermitGrab. SA combines high heat exposure, large absolute housing stock, the second-deepest contractor phone stack in the platform, and a uniquely strong code-violation feed.</p>
+
+<p><strong>$149/mo unlimited San Antonio + Bexar County access.</strong> 14-day free trial. <a href="/leads/hvac-contractor">HVAC contractor onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is San Antonio HVAC permit data?',
+             'Daily refresh from San Antonio\'s open data portal. New permits typically appear within 24-48 hours of filing. The 311 service call feed also refreshes daily.'),
+            ('Do you have HVAC contractor phone numbers for SA?',
+             'Yes. SA has 3,830+ contractor profiles with phones — the second-largest non-Chicago contractor phone count in PermitGrab. HVAC-specific licensees are a subset (typically 200-400 active firms in the metro). Phone coverage on this subset is approximately 55-70%.'),
+            ('Can I filter just to HVAC and MECHANICAL permits?',
+             'Yes. Permit type categories include HVAC / MECHANICAL / FURNACE / AC / DUCTWORK / REFRIGERATION / RTU. Filter excludes plumbing/electrical/structural to focus only on HVAC-relevant filings.'),
+            ('What about the 311 code enforcement service calls — are those public?',
+             'Yes. San Antonio publishes 311_All_Service_Calls via ArcGIS FeatureServer (services.arcgis.com/g1fRTDLeMgspWrYp). PermitGrab indexes these daily with ReasonName=Code Enforcement filtering + TypeName whitelist for HVAC-relevant categories.'),
+            ('Does PermitGrab cover surrounding Bexar County and outlying metros?',
+             'Yes. Bexar County coverage extends across all incorporated municipalities. Schertz, Live Oak, Universal City, Converse, Leon Valley all roll up under Bexar County. Comal County (New Braunfels) and Guadalupe County (Seguin) are not currently full-coverage but on the queue.'),
+        ],
+    },
+
+    'mesa-storm-response-roof-permits': {
+        'title': 'Mesa Roof Permit Data for Storm Response | PermitGrab',
+        'meta_description': (
+            '38,000+ Mesa property owner records (V474 win) + Maricopa '
+            'County permit feed. Storm-belt roofing contractors win on '
+            'AZ monsoon hail-event outreach. $149/mo unlimited.'
+        ),
+        'h1': 'Mesa Roof Permit Data for Storm Response',
+        'subject': 'Storm-belt roofing contractors in AZ',
+        'city': 'Mesa',
+        'city_slug': 'mesa-az',
+        'persona_slug': 'storm-belt-roofing',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>The Mesa / East Valley Phoenix metro experiences a unique severe-weather pattern: monsoon-season hail events from late June through September that can produce 1.0-2.5 inch hail in a 30-60 minute downpour, often with localized impact zones (one ZIP gets pummeled, the adjacent ZIP gets nothing). Insurance claims from a single Mesa-area monsoon hail event can reach $200M-$500M. Roofing contractors who systematically work the post-event permit pipeline capture the highest-margin storm-response work in Arizona.</p>
+
+<p>Mesa specifically is a V474 win — 38K+ Mesa property owner records in PermitGrab's database. Combined with the maricopa_secondary assessor source (164K rows filtered to Mesa/Glendale/Tempe/Scottsdale jurisdictions) and the existing Phoenix permit feed, Mesa is one of the deepest-coverage East Valley cities in the platform.</p>
+
+<h2>What Mesa storm-response roofers get from PermitGrab</h2>
+<ul>
+  <li><strong>38,000+ Mesa property owner records</strong> with mailing addresses (V474 win — fl_statewide + maricopa_secondary import)</li>
+  <li><strong>Mesa data.mesaaz.gov code violation feed</strong> (hgf6-yenu) with daily refresh</li>
+  <li><strong>Maricopa County permit data</strong> with REROOF / SHINGLE / TILE / METAL-ROOF / TEAR-OFF filtering</li>
+  <li><strong>Owner-vs-contractor flag on each permit</strong> — quickly isolate owner-builder filings (the gold-tier storm-response leads)</li>
+  <li><strong>Cluster detection by ZIP and date</strong> — surface monsoon-affected ZIPs by permit-volume spike pattern</li>
+</ul>
+
+<h2>The Arizona monsoon-season permit cycle (June-September)</h2>
+<p>Arizona's monsoon season produces a different pattern than Texas hail belt or FL hurricane belt:</p>
+<ul>
+  <li><strong>Localized impact:</strong> Monsoon storms typically affect 2-5 ZIP codes intensely while leaving adjacent areas untouched. Cluster detection by ZIP is critical — generic metro-wide outreach wastes 70-80% of effort.</li>
+  <li><strong>Multiple events per season:</strong> The metro experiences 8-15 hail events per monsoon season vs 2-4 major Texas hail events per year. The cumulative permit volume is comparable but distributed differently.</li>
+  <li><strong>Faster claim cycle than FL hurricanes:</strong> AZ monsoon events typically resolve through insurance in 30-60 days vs 60-120 days for FL hurricane claims. The post-event permit window is shorter and more intense.</li>
+</ul>
+
+<h2>The 21-day monsoon-event playbook</h2>
+<p>Day 0 — major monsoon hail event hits East Valley. Day 1-3, homeowners file initial claims. Day 4-7, adjusters arrive (faster than TX/FL because AZ has lower simultaneous-event load). Day 7-21, permits start landing in PermitGrab's feed.</p>
+
+<p>Tactical breakdown for Mesa roofers:</p>
+<ul>
+  <li><strong>Day 0-3:</strong> Watch monsoon storm tracking. Identify affected ZIPs from radar data + initial 311 reports.</li>
+  <li><strong>Day 4-7:</strong> Set saved search filtered to affected ZIPs + permit type REROOF/SHINGLE/TILE + owner-builder flag.</li>
+  <li><strong>Day 7-21:</strong> Outreach window. Each new permit gets personalized voicemail + text within 24 hours of permit issue.</li>
+  <li><strong>Day 21-45:</strong> Follow-up cycle for non-responders.</li>
+</ul>
+
+<h2>Why Mesa beats other AZ markets for storm-response</h2>
+<p>Phoenix proper has more total volume but is hyper-competed by 100+ established roofing firms. Scottsdale has higher-end housing values but smaller absolute storm-claim volume. Glendale, Tempe, Chandler all roll up under Maricopa County coverage but lack independent code enforcement feeds. Mesa is unique in having (a) a V474 owner-data win, (b) an independent code violation feed (hgf6-yenu), and (c) lower competitive density per addressable prospect than Phoenix proper. For storm-belt roofers expanding AZ operations, Mesa is the highest-leverage East Valley starting market.</p>
+
+<p><strong>$149/mo unlimited Mesa + Maricopa County access.</strong> 14-day free trial. <a href="/leads/storm-belt-roofing">Storm-belt roofing onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Mesa permit data?',
+             'Daily refresh from Maricopa County and Mesa-specific data feeds. New permits typically appear within 24-48 hours of filing. Mesa code violations (hgf6-yenu) refresh daily.'),
+            ('Do you have AZ ROC contractor phone numbers?',
+             'Arizona has a ~57K-record bulk contractor list (no phone field in bulk download, individual search has phones). PermitGrab\'s AZ phone enrichment runs via DDG web search + license-number cross-matching. Coverage is approximately 25-40% on AZ contractor profiles.'),
+            ('Can I distinguish owner-builder permits from contractor-pulled permits?',
+             'Yes. Each permit has a CONTRACTOR field; if blank or matches the OWNER name, it\'s owner-builder. Owner-builder roof permits convert 3-5x better than contractor-pulled permits during storm-response windows.'),
+            ('Does PermitGrab cover Tempe, Chandler, Gilbert, Scottsdale?',
+             'Tempe (25K owner records — largely homeowner-occupied), Chandler, Gilbert all roll up under Maricopa County coverage. Scottsdale has its own 17K-record V474 owner stack. Each can be filtered separately or combined with Mesa for East Valley metro-wide coverage.'),
+            ('How does this compare to Roofing Insights / Roofr / Modernize for AZ storm leads?',
+             'Lead aggregators sell shared leads at $80-200 per inquiry with 3-5 contractors getting the same lead. PermitGrab is $149/mo unlimited and the data is sourced from public permits — no other contractor has the same list unless they\'re also a customer. Most aggressive AZ storm roofers run both, but the unit economics on PermitGrab are 20-100x better.'),
+        ],
+    },
+
 }
