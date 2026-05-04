@@ -3289,6 +3289,72 @@ def admin_collect_assessor_data():
         return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
 
 
+@admin_bp.route('/api/admin/staleness-report', methods=['GET'])
+def admin_staleness_report():
+    """V493 IRONCLAD: which active cities haven't been collected lately.
+    Slow query (68K-row scraper_runs JOIN), so NOT in the health probe.
+    Hit on demand to investigate stale cities.
+
+    Returns bucketed counts and the worst-offender list.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    conn = permitdb.get_connection()
+    try:
+        bucket_rows = conn.execute("""
+            SELECT
+              CASE
+                WHEN sr.last_run > datetime('now','-6 hours') THEN '0_last_6h'
+                WHEN sr.last_run > datetime('now','-24 hours') THEN '1_last_24h'
+                WHEN sr.last_run > datetime('now','-3 days') THEN '2_last_3d'
+                WHEN sr.last_run > datetime('now','-7 days') THEN '3_last_7d'
+                WHEN sr.last_run > datetime('now','-30 days') THEN '4_last_30d'
+                WHEN sr.last_run IS NOT NULL THEN '5_older_than_30d'
+                ELSE '6_never'
+              END AS bucket,
+              COUNT(*) AS n_cities
+            FROM prod_cities pc
+            LEFT JOIN (
+              SELECT source_name, MAX(run_started_at) AS last_run
+              FROM scraper_runs GROUP BY source_name
+            ) sr ON sr.source_name = pc.source_id
+            WHERE pc.status='active' AND pc.source_id IS NOT NULL
+            GROUP BY bucket ORDER BY bucket
+        """).fetchall()
+        buckets = {r[0]: r[1] for r in bucket_rows}
+
+        worst_rows = conn.execute("""
+            SELECT pc.city_slug, pc.source_id, sr.last_run,
+                   pc.consecutive_failures, pc.last_error
+            FROM prod_cities pc
+            LEFT JOIN (
+              SELECT source_name, MAX(run_started_at) AS last_run
+              FROM scraper_runs GROUP BY source_name
+            ) sr ON sr.source_name = pc.source_id
+            WHERE pc.status='active' AND pc.source_id IS NOT NULL
+            ORDER BY (sr.last_run IS NULL) DESC, sr.last_run ASC
+            LIMIT 30
+        """).fetchall()
+        worst = [
+            {
+                'city_slug': r[0],
+                'source_id': r[1],
+                'last_run': r[2],
+                'consecutive_failures': r[3],
+                'last_error': (r[4] or '')[:120],
+            }
+            for r in worst_rows
+        ]
+        return jsonify({
+            'status': 'ok',
+            'buckets': buckets,
+            'worst_30': worst,
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
+
+
 @admin_bp.route('/api/admin/prune-noise', methods=['POST'])
 def admin_prune_noise():
     """V493 IRONCLAD pt.2: pause prod_cities entries that are pure noise.
@@ -5112,26 +5178,29 @@ def admin_daemon_health():
         except Exception:
             pass
 
-        never_pulled_cities = None
-        cities_stale_30d = None
+        # V493 IRONCLAD: cheap counts only on the health probe — Render
+        # hits this every ~60s so an expensive 68K-row scraper_runs JOIN
+        # is a non-starter. The expensive JOIN moved to a separate
+        # /api/admin/staleness-report endpoint that you hit on demand.
+        active_cities = None
+        active_with_source = None
+        active_chronic_failures = None
         try:
-            _np_row = conn.execute("""
-                SELECT
-                  SUM(CASE WHEN sr.last_run IS NULL THEN 1 ELSE 0 END) AS never_pulled,
-                  SUM(CASE WHEN sr.last_run IS NOT NULL
-                            AND sr.last_run < datetime('now','-30 days')
-                       THEN 1 ELSE 0 END) AS stale_30d
-                FROM prod_cities pc
-                LEFT JOIN (
-                  SELECT source_name, MAX(run_started_at) AS last_run
-                  FROM scraper_runs
-                  GROUP BY source_name
-                ) sr ON sr.source_name = pc.source_id
-                WHERE pc.status='active' AND pc.source_id IS NOT NULL
-            """).fetchone()
-            if _np_row:
-                never_pulled_cities = _np_row[0] or 0
-                cities_stale_30d = _np_row[1] or 0
+            _ac = conn.execute(
+                "SELECT COUNT(*) FROM prod_cities WHERE status='active'"
+            ).fetchone()
+            active_cities = _ac[0] if _ac else None
+            _aws = conn.execute(
+                "SELECT COUNT(*) FROM prod_cities "
+                "WHERE status='active' AND source_id IS NOT NULL "
+                "AND consecutive_failures < 10"
+            ).fetchone()
+            active_with_source = _aws[0] if _aws else None
+            _af = conn.execute(
+                "SELECT COUNT(*) FROM prod_cities "
+                "WHERE status='active' AND consecutive_failures >= 10"
+            ).fetchone()
+            active_chronic_failures = _af[0] if _af else None
         except Exception:
             pass
 
@@ -5153,8 +5222,9 @@ def admin_daemon_health():
             'scheduled_cycle_completed_at': scheduled_cycle_completed_at,
             'cycle_stale_minutes': cycle_stale_minutes,
             'live_thread_names': live_thread_names,
-            'never_pulled_cities': never_pulled_cities,
-            'cities_stale_30d': cities_stale_30d,
+            'active_cities': active_cities,
+            'active_with_source': active_with_source,
+            'active_chronic_failures': active_chronic_failures,
         }
         if self_healed:
             payload['self_heal_triggered'] = True
