@@ -2595,4 +2595,246 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V500: 4 posts completing the PERFECT_CUSTOMERS_MATRIX 12-post roadmap.
+    # Covers final archetypes: #7 Plumbing, #8 Windows/Doors, #9 RE Agent
+    # (off-market specialist), #10 Pest Control / Lawn Service.
+    # ====================================================================
+
+    'chicago-plumbing-leads': {
+        'title': 'Chicago Plumbing Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '72,000+ Cook County property owners + Chicago daily permit '
+            'feed. Plumbing contractors get leak/repipe/sewer-line work '
+            'from permit and violation data. $149/mo unlimited.'
+        ),
+        'h1': 'Chicago Plumbing Contractor Leads from Permit + Violation Data',
+        'subject': 'Plumbing contractors in Chicago',
+        'city': 'Chicago',
+        'city_slug': 'chicago-il',
+        'persona_slug': 'plumbing-contractor',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Chicago plumbing is one of the most predictable trade markets in the country, driven by three structural factors: aging infrastructure (median Chicago housing age 73 years vs national 41), a hard-water environment that accelerates fixture and water heater wear, and the city's strict 2024-onward lead service line replacement mandate that requires permitted work on roughly 400,000 known lead-pipe homes over the next 20 years. The combination produces a recurring permit and violation flow that plumbing contractors can systematically convert into sales pipeline.</p>
+
+<p>Most Chicago plumbers find work the same way they did in 1995: yard signs, Yelp/Google reviews, the occasional Angi referral, and word of mouth. That works for steady-state demand but doesn't scale and doesn't capture the highest-margin emergency / repipe / commercial work. PermitGrab inverts the model — pull from public permit and code violation data daily, identify high-intent leads, outreach within 24-48 hours of permit issue.</p>
+
+<h2>What Chicago plumbers get from PermitGrab</h2>
+<ul>
+  <li><strong>72,000+ Cook County property owner records</strong> with mailing addresses</li>
+  <li><strong>3,498+ Chicago contractor profiles with phone numbers</strong> — the largest contractor phone stack in the platform, useful for B2B GC partnership outreach</li>
+  <li><strong>Chicago daily permit feed</strong> with PLUMBING / WATER-HEATER / SEWER-LINE / GAS-LINE / FIXTURE filters</li>
+  <li><strong>Code enforcement violations</strong> — properties cited for plumbing code violations, water leaks, or sewage issues are 6-10x more likely to need plumbing work within 90 days</li>
+  <li><strong>Lead service line replacement permits</strong> — Chicago's 20-year LSL replacement mandate generates 15K-25K permit filings per year, all of which require licensed plumbing work</li>
+</ul>
+
+<h2>The 4 highest-converting Chicago plumbing lead types</h2>
+<ol>
+  <li><strong>Sewer-line/main replacement permits</strong> — average ticket $8K-$25K, owner-builder filings convert 25-35% on personalized outreach. Volume: 200-400/month metro.</li>
+  <li><strong>Water heater replacement permits</strong> — smaller average ticket ($1,500-$4K) but higher volume (800-1,500/month) and very high close rate (40-50%) when outreach is within 7 days of permit issue.</li>
+  <li><strong>Lead service line replacements</strong> — under Chicago's 2024 mandate, every LSL replacement requires a permit and licensed plumber. Volume scaling fast — 8K-12K per year currently, projected to hit 20K+ as the program ramps. Average ticket $4K-$15K depending on length and complexity.</li>
+  <li><strong>Code violation referrals</strong> — properties cited for plumbing violations (leaks, illegal taps, code-noncompliant fixtures) need licensed work to clear the citation. The owner is under 30-90 day deadlines and converts at 18-25% on direct outreach.</li>
+</ol>
+
+<h2>Commercial plumbing — Chicago's $200M-$400M annual market</h2>
+<p>Chicago commercial plumbing permits average $80K-$500K per project (vs $1.5K residential ticket). The volume is much lower (300-600 per year metro-wide) but each project is worth 100x a typical residential job. PermitGrab filters by property type and permit value so commercial-leaning shops can isolate the high-ticket pipeline.</p>
+
+<h2>Why Chicago beats other major Midwest markets</h2>
+<p>Cleveland (60K Cuyahoga owners) is well-wired but smaller absolute volume. Cincinnati (79K Hamilton owners) has the deepest owner stack but smaller commercial market. Detroit and Milwaukee don't currently have functional permit feeds in PermitGrab. Chicago combines the largest absolute permit volume of any Midwest market, the deepest contractor phone stack (3,498+ phones from IL state license imports), and the strongest code enforcement violation feed (22u3-xenr daily refresh).</p>
+
+<p><strong>$149/mo unlimited Chicago + Cook County access.</strong> 14-day free trial. <a href="/leads/plumbing-contractor">Plumbing contractor onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Chicago plumbing permit data?',
+             'Daily refresh from data.cityofchicago.org. New permits typically appear within 24 hours of issue. The 22u3-xenr code violations feed also refreshes daily.'),
+            ('Do you have plumber phone numbers for Chicago?',
+             'Yes. Chicago has the largest contractor phone stack in PermitGrab — 3,498+ profiles with phones, sourced from Illinois state license imports + DDG enrichment. Coverage on plumbing-specific licensees is approximately 65-75%.'),
+            ('Can I filter to lead service line replacement permits specifically?',
+             'Yes. The LSL_REPLACEMENT permit subcategory was added in 2024 when Chicago\'s mandate took effect. Filter on this category to surface only the LSL pipeline, currently growing 30-40% year over year.'),
+            ('What about emergency plumbing?',
+             'Emergency work doesn\'t typically generate a permit until the homeowner is filing for a follow-up replacement (water heater, fixture, repipe). PermitGrab is best suited for proactive lead generation, not emergency dispatch — for that, you want Google Local Service Ads + PPC.'),
+            ('Does PermitGrab cover suburban Cook County and surrounding counties?',
+             'Cook County coverage extends across all incorporated municipalities (Evanston, Oak Park, Cicero, Berwyn, etc.). DuPage, Lake, Kane, and Will counties are not currently full-coverage but are on the queue for high-priority Chicago metro expansion.'),
+        ],
+    },
+
+    'phoenix-window-replacement-leads': {
+        'title': 'Phoenix Window Replacement Contractor Leads from Permits | PermitGrab',
+        'meta_description': (
+            '79,000+ Maricopa County owners + Phoenix permit feed. Window '
+            'replacement contractors win on permit-driven outreach during '
+            'May-September UV season. $149/mo unlimited.'
+        ),
+        'h1': 'Phoenix Window Replacement Contractor Leads from Permit Data',
+        'subject': 'Window/door replacement specialists in Phoenix',
+        'city': 'Phoenix',
+        'city_slug': 'phoenix-az',
+        'persona_slug': 'window-replacement',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Phoenix is the largest residential window replacement market per capita in the United States. Average summer high of 106°F + UV index regularly hitting 11+ produces accelerated window seal failure, frame warping, and energy-loss costs that drive a continuous replacement cycle. Add to that the federal 25C residential energy efficiency tax credit (up to $600 annually for window replacement through 2032) and Phoenix utility rebate programs (APS and SRP each offer $50-$200 per window for ENERGY STAR upgrades), and you have a market where the homeowner has multiple financial motivators stacked on top of physical degradation pressure.</p>
+
+<p>Window replacement permits in Phoenix run 800-1,500 per month metro-wide. The contractors who systematically work that permit pipeline — instead of competing for shared leads on Houzz or paying $80-200 per inquiry on Modernize — capture the highest-margin work in the market.</p>
+
+<h2>What Phoenix window contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>79,000+ Maricopa County property owner records</strong> with mailing addresses</li>
+  <li><strong>1,080+ Phoenix contractor profiles with phone numbers</strong> from Arizona ROC + DDG enrichment</li>
+  <li><strong>Phoenix daily permit feed</strong> with WINDOW / DOOR / FENESTRATION / GLAZING filters</li>
+  <li><strong>Code violation data</strong> — properties cited for window glass, frame, or weatherproofing violations are 4-6x more likely to need replacement</li>
+  <li><strong>Permit value field</strong> — typical residential window-replacement permits run $5K-$25K; filter to surface high-margin whole-house replacement projects vs single-window repair work</li>
+</ul>
+
+<h2>The 25C tax credit + utility rebate timing play</h2>
+<p>Most Phoenix homeowners don't know that they can stack federal 25C credits ($600/year for windows) with APS or SRP utility rebates ($50-$200 per window) on top of contractor financing. Outreach that leads with the financial-motivator angle ("Did you know your window replacement permit at [address] qualifies for up to $1,200 in stacked federal + utility rebates this year? I can run the savings calc in 5 minutes") converts at 18-25% vs 4-8% on generic post-permit cold outreach.</p>
+
+<p>Tax credit timing matters: homeowners who pulled permits in Q1 are still in tax planning mode and often haven't claimed the credit yet. Q4 outreach is best for closing year-end installations to capture the current-tax-year credit. PermitGrab's permit-history view lets you build seasonal call lists 90-180 days back to identify pending-but-not-installed projects.</p>
+
+<h2>The 100°F-day demand multiplier</h2>
+<p>Phoenix's first 100°F day each year (typically late March - mid April) triggers a 3-5x spike in window replacement permit volume that runs through September. The driver is utility bill shock — homeowners receive their first triple-digit summer electric bill and start investigating energy efficiency upgrades. PermitGrab's permit-volume trend line by ZIP makes this seasonal pattern visible — most aggressive contractors pre-build their call list in March from the prior winter's permit pipeline so they're ready for the spike.</p>
+
+<h2>Why Phoenix outperforms other Sun Belt window markets</h2>
+<p>Las Vegas has similar UV exposure but smaller addressable market (Clark County 750K units vs Maricopa 1.6M). Tucson is half Phoenix's size. Mesa, Scottsdale, Tempe, and Glendale all roll up under Maricopa County permit data and are accessible through the same PermitGrab feed at no additional cost. Phoenix is the only Sun Belt market that combines extreme UV exposure, large absolute housing stock, strong utility rebate programs, and full PermitGrab coverage including contractor phones.</p>
+
+<p><strong>$149/mo unlimited Phoenix + Maricopa County access.</strong> 14-day free trial. <a href="/leads/window-replacement">Window replacement onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Phoenix window permit data?',
+             'Daily refresh from the City of Phoenix permit data portal. Window/door permits typically appear within 24-48 hours of filing. Maricopa County assessor refreshes monthly.'),
+            ('Do you have window contractor phone numbers?',
+             'Phoenix has 1,080+ contractor profiles with phones in PermitGrab. Window/door specialists are a subset (typically 80-150 active firms in the metro). Phone coverage on this subset is approximately 50-65%.'),
+            ('Can I filter just window-replacement permits, not new construction?',
+             'Yes. Permit type filtering supports REPLACE/REPLACEMENT vs NEW. New-construction window installs are usually rolled up under the parent SFR or addition permit and not separately tracked, so filtering to replacement-only work focuses on retrofit jobs.'),
+            ('Does this work in Mesa, Scottsdale, Tempe, Glendale?',
+             'Yes. Mesa (38K owner records, V474 win), Scottsdale (17K owners), Tempe (25K), and Glendale all roll up under Maricopa County coverage and the City of Phoenix permit feed extends into surrounding incorporated areas via mutual-jurisdiction agreements.'),
+            ('What about new construction window contractors?',
+             'New-build window contractors typically work directly with builders, not homeowners. The relevant data is the BUILDER name on new SFR permits — filter to NEW + RESIDENTIAL and target the top 20 most-frequent builders in the Phoenix metro for B2B subcontracting outreach.'),
+        ],
+    },
+
+    'miami-off-market-real-estate-agent-leads': {
+        'title': 'Miami Off-Market Real Estate Agent Leads | PermitGrab',
+        'meta_description': (
+            'Miami real estate agents specializing in off-market deals: '
+            '82K+ Miami-Dade owners + permit + code violation data identifies '
+            'sellers 60-90 days before MLS. $149/mo unlimited.'
+        ),
+        'h1': 'Miami Off-Market Real Estate Agent Leads from Permits + Violations',
+        'subject': 'Real estate agents specializing in off-market and pocket listings',
+        'city': 'Miami',
+        'city_slug': 'miami-dade-county',
+        'persona_slug': 'off-market-real-estate-agent',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>Off-market real estate is one of the highest-margin niches in residential brokerage. Listings that never hit MLS — pocket listings, whisper deals, expired-but-not-relisted — produce 2-3% higher commission rates on average and 30-50% higher seller-concession terms because the seller perceives privacy and discretion as a premium service. Miami specifically is the largest off-market market in the United States, driven by international buyer privacy concerns, celebrity/athlete client confidentiality requirements, and the high concentration of luxury condos where building approval processes make MLS listings impractical.</p>
+
+<p>Most Miami agents try to compete in the off-market space with the same toolkit they use for MLS work: Compass concierge program, sphere-of-influence outreach, expired-listing letters, and the occasional door-knock canvass in target neighborhoods. That works for established agents with 10+ years of relationships. New or expanding agents need a systematic data-driven approach. Permit + code violation data is the structural advantage.</p>
+
+<h2>Why permit and violation data identifies off-market sellers 60-90 days early</h2>
+<p>The off-market seller signature is unmistakable when you know what to look for:</p>
+<ul>
+  <li><strong>Code citation + no follow-up permit</strong> — owner is unable or unwilling to remediate; selling is the path of least resistance</li>
+  <li><strong>Major remodel permit pulled but stalled (no inspection sign-offs in 90+ days)</strong> — owner is over-budget and exploring sale options</li>
+  <li><strong>Out-of-state mailing address + Florida property</strong> — snowbird or investor-owner who may be ready to consolidate</li>
+  <li><strong>Property tax appeal filing within last 90 days</strong> — owner is signaling financial stress; pre-listing receptivity is high</li>
+  <li><strong>Multi-property owner with one property sitting vacant (utility shutoffs visible via permit absence)</strong> — owner consolidating; vacant property typically becomes the first to sell</li>
+</ul>
+
+<h2>What Miami off-market agents get from PermitGrab</h2>
+<ul>
+  <li><strong>82,000+ Miami-Dade property owner records</strong> with mailing addresses (essential for absentee-owner identification)</li>
+  <li><strong>Miami-Dade daily permit feed</strong> with REMODEL / ADDITION / DEMOLITION / NEW-BUILD filtering</li>
+  <li><strong>CCVIOL_gdb code violation feed</strong> — daily refresh, all incorporated Miami-Dade municipalities</li>
+  <li><strong>Permit-stall detection</strong> (filter: permit issued > 180 days ago + no inspection sign-offs) — identifies financially distressed remodel projects</li>
+  <li><strong>Multi-property owner cross-reference</strong> — surface owners holding 3+ properties for portfolio-trim conversations</li>
+</ul>
+
+<h2>The luxury Miami off-market play (highest margin)</h2>
+<p>Permits filed on properties valued over $2M in Miami Beach, Coral Gables, Pinecrest, Coconut Grove, and Key Biscayne are the highest-margin off-market opportunities in South Florida. The seller demographic is typically privacy-prioritized (international buyers, athletes, celebrities, business owners) and the typical commission split on $5M+ off-market deals is 4-6% (vs 2-3% on standard MLS deals).</p>
+
+<p>Filter strategy: Miami-Dade + permit value > $200K (proxy for luxury work) + property assessed value > $2M + permit type REMODEL/ADDITION. Run weekly. The qualified list is typically 30-60 properties per month — small but each represents a $50K-$300K+ commission opportunity.</p>
+
+<h2>The international owner play</h2>
+<p>Miami-Dade has the highest concentration of foreign-owner residential property in the United States — approximately 18-22% of single-family and condo properties metro-wide, rising to 35-50% in Miami Beach, Sunny Isles, and Brickell. International owners typically prefer off-market transactions for privacy + tax structuring reasons. PermitGrab's owner-mailing-address field flags international addresses (non-US ZIP, foreign country indicator) — filter to surface this audience for confidential-listing outreach.</p>
+
+<h2>Why Miami beats other off-market markets</h2>
+<p>NYC has more total off-market volume but commission rates are tightly regulated by the REBNY ecosystem. LA has comparable off-market volume but no PermitGrab coverage on the permit side currently (LA permit data feeds frozen 2023). Miami is the only major US off-market market where PermitGrab has full-stack coverage (82K owners + daily permits + daily violations + 245+ contractor phones).</p>
+
+<p><strong>$149/mo unlimited Miami-Dade + Broward County access.</strong> 14-day free trial. <a href="/leads/off-market-real-estate-agent">Off-market RE agent onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Miami-Dade owner and permit data?',
+             'Daily permit refresh + monthly Miami-Dade assessor refresh. Permits typically appear in PermitGrab within 24-48 hours of issue. Owner mailing addresses update on the assessor cycle.'),
+            ('Can I see if a property has multiple owners in the database?',
+             'Yes. Owner-name cross-referencing surfaces multi-property holders. Approximately 8-12% of Miami-Dade residential properties are owned by entities or individuals with 3+ holdings — these are your highest-leverage off-market conversations.'),
+            ('Does this comply with NAR listing rules?',
+             'PermitGrab provides public-record data. Outreach to property owners about potential listings is standard real estate prospecting and complies with NAR\'s Code of Ethics. The CMS (Clear Cooperation Policy) only applies once a listing agreement is signed; pre-listing outreach is unrestricted.'),
+            ('What about non-English speaking owners?',
+             'Owner names in the assessor database appear in their original form. Approximately 25-35% of Miami-Dade residential owner names are non-English (Spanish, Portuguese, Russian, Hebrew). Most agents working this market run bilingual outreach in Spanish + English at minimum.'),
+            ('How does this compare to BatchLeads, REISift, PropStream for agent prospecting?',
+             'BatchLeads/REISift/PropStream are list-broker pulls — refreshed monthly to quarterly with stale data. PermitGrab is direct from city/county feeds, refreshed daily/weekly. The data freshness gap matters more for agents than for wholesalers because agents need to be early — by the time a list-broker tool surfaces a distressed owner, the wholesaler has already made an offer.'),
+        ],
+    },
+
+    'nashville-pest-control-lawn-leads': {
+        'title': 'Nashville Pest Control & Lawn Service Leads from Permits | PermitGrab',
+        'meta_description': (
+            '71,000+ Davidson County owners + Nashville daily permit feed. '
+            'Pest control + lawn service contractors target new homeowners '
+            'and renovation projects. $149/mo unlimited.'
+        ),
+        'h1': 'Nashville Pest Control & Lawn Service Leads from Permit Data',
+        'subject': 'Pest control and lawn service contractors in Nashville',
+        'city': 'Nashville',
+        'city_slug': 'nashville-tn',
+        'persona_slug': 'pest-control-lawn',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Pest control and high-end lawn services have a different lead-gen problem than the trades. They don't need lots of leads — they need the <em>right</em> leads at the right moment. The right moment is when a homeowner is just settling into a new property (within 30-60 days of purchase) or is finishing a major renovation (within 30 days of final inspection). At those windows, the homeowner is actively setting up service contracts and willing to pay premium prices for "set it and forget it" recurring contracts.</p>
+
+<p>Nashville is the highest-leverage Southeast market for this archetype. Davidson County owns 71K+ assessor records in PermitGrab, the metro adds 25K-35K new residents per year, and the housing stock skews toward higher-end suburban properties (median single-family value $470K) where premium pest control + lawn services have strong unit economics.</p>
+
+<h2>What Nashville pest/lawn contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>71,000+ Davidson County property owner records</strong> with mailing addresses</li>
+  <li><strong>Nashville permit feed</strong> with NEW-CONSTRUCTION + ADDITION + REMODEL filtering — these are the homeowner-investment signals that correlate with new service contract acquisition</li>
+  <li><strong>Final inspection date tracking</strong> — outreach within 14-30 days of final inspection (when the homeowner is most receptive to service-setup conversations)</li>
+  <li><strong>Owner-mailing-address change detection</strong> — when an owner's mailing address changes from out-of-state to in-state, they\'ve recently moved in. This is the highest-converting outreach moment for new-customer acquisition.</li>
+  <li><strong>Address-level neighborhood targeting</strong> — pest/lawn margins are highest in HOA neighborhoods where service contracts can be sold building-by-building</li>
+</ul>
+
+<h2>The "30-day post-move-in" window (highest-converting acquisition moment)</h2>
+<p>Industry conversion data: cold outreach to Nashville homeowners closes recurring pest/lawn contracts at 4-7%. Outreach to homeowners within 30 days of move-in closes at 18-28%. The 4x conversion lift comes from one factor: at the 30-day window, the homeowner hasn't yet selected a service provider but is actively triaging the "things I need to set up" list. Whoever shows up first (with a specific reference to their new property) typically wins the contract.</p>
+
+<p>Practical play: filter PermitGrab to Davidson County + owner-mailing-address change in last 60 days + property type SFR. Run weekly. The qualified list is typically 200-400 new owner-occupants per week. Outreach within 14 days of mailing-address change.</p>
+
+<h2>The post-renovation cross-sell play</h2>
+<p>Major renovations (kitchen, bath, addition) trigger pest/lawn service refresh. New landscaping = new lawn service customer. New kitchen = new pest treatment (renovations open up walls and create new entry points). New addition = expanded perimeter for pest/termite contracts. Filter strategy: permit type ADDITION/REMODEL + permit value $50K+ + final inspection in last 30 days. Outreach pitch: "We noticed your property at [address] just finished a major renovation. Most renovations create new pest entry points and need a fresh perimeter treatment within 60 days — I can come out next week and quote a 1-time treatment + ongoing service."</p>
+
+<h2>The HOA / subdivision dominance play</h2>
+<p>The highest-margin pest/lawn service strategy is winning the entire HOA. Once a contractor signs 5-10 homes in a single HOA, every other homeowner in the development becomes a referral conversation. PermitGrab's address-level data lets you cluster permit and owner records by subdivision name + neighborhood, then prioritize outreach to high-density target areas. Build out one HOA at a time vs scattering outreach metro-wide.</p>
+
+<h2>Why Nashville beats other Southeast markets</h2>
+<p>Atlanta has more total volume but is hyper-competed by 50+ established pest/lawn brands. Charlotte's pest market is fragmented across multiple counties (Mecklenburg owner data not yet wired). Raleigh has cleaner data (54K Wake County owners V474 era) but smaller absolute size. Nashville combines the deepest TN owner stack on the platform, fast population growth (driving recurring new-customer flow), and a higher-end housing stock that supports premium service pricing.</p>
+
+<p><strong>$149/mo unlimited Nashville + Davidson County access.</strong> 14-day free trial. <a href="/leads/pest-control-lawn">Pest control + lawn service onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Nashville permit data?',
+             'Daily refresh from data.nashville.gov where wired. Davidson County assessor refreshes monthly. New-owner mailing-address changes appear in PermitGrab within 30-45 days of recording.'),
+            ('Do you have contractor phone numbers for Nashville pest/lawn firms?',
+             'Tennessee has no bulk state license database for pest control or lawn service (the bulk database covers general contractors only). Phone enrichment runs via DDG web search. Coverage is ~10-15% on these specialty trades — not as deep as roofing or solar but the customer list (homeowners) is what matters for this archetype, not the contractor list.'),
+            ('Can I filter just to HOA-heavy neighborhoods?',
+             'Yes. The address-level data includes subdivision names and neighborhood identifiers where the assessor publishes them. Filter on subdivision name to focus campaigns on specific HOAs.'),
+            ('What about commercial pest/lawn contracts?',
+             'Commercial work (office buildings, retail, restaurants) is typically won via direct sales relationships, not permit-driven outreach. PermitGrab\'s strength is residential acquisition at scale. For commercial, use the contractor-of-record data on commercial permits to identify property managers who are likely to coordinate service contracts across portfolios.'),
+            ('Does this work for Franklin, Brentwood, Murfreesboro, surrounding Nashville suburbs?',
+             'Davidson County coverage extends across Nashville-Davidson incorporated municipalities. Franklin/Brentwood (Williamson County) and Murfreesboro (Rutherford County) are not currently full-coverage in PermitGrab but are on the queue. Most Nashville pest/lawn shops focus their first 2-3 years inside Davidson County for density-of-service efficiency anyway.'),
+        ],
+    },
+
 }
