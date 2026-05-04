@@ -1,0 +1,370 @@
+CODE_V492 — Fix "Destination not working" Google Ads disapproval on
+            /permits/<state>/<city> pages
+==============================================================================
+
+CONTEXT (from Buffalo + Cleveland ad refresh, 2026-05-03)
+==============================================================================
+
+Buffalo NY ad copy was refreshed in the Google Ads UI (5 city-keyword
+data-driven headlines replacing generics) and saved successfully.
+Within minutes Google Ads surfaced a NEW policy finding:
+  "1 policy finding · Destination not working"
+on Final URL https://permitgrab.com/permits/buffalo-ny.
+
+This is the IDENTICAL failure mode that triggered V484+V485 B2 for
+the persona pages (/leads/contractor-leads, /leads/roofing-leads,
+etc). Root cause then was: 5+ COUNT(*) queries on permits +
+contractor_profiles + property_owners against 2.5M+ row tables, run
+on every render, no cache. AdsBot crawls slowly and aggressively —
+when any one of those queries hit the WAL lock or simply took >5s,
+Google logged a "destination not working" against the ad and
+auto-paused it.
+
+V485 B2 / V488 IRONCLAD fixed it for persona pages by moving the
+stats payload into the system_state DB-backed cache, refreshed
+every 2 hr by worker.secondary_loop(). The system_state read is
+~1ms; the live aggregate computation is multi-second.
+
+The same pattern needs to extend to city pages, because:
+  - /permits/<state>/<city> runs the same multi-COUNT shape
+  - state_city_landing() in routes/city_pages.py runs at minimum:
+      * SELECT COUNT(*) FROM permits WHERE prod_city_id=? (fast, indexed)
+      * SELECT COUNT(*), SUM(...) FROM contractor_profiles WHERE source_city_key=?
+      * SELECT COUNT(*) FROM property_owners WHERE LOWER(city)=LOWER(?) AND state=?
+        ← Phoenix has 247K rows, Henderson 121K rows, Nashville 71K
+      * SELECT COUNT(*) FROM violations WHERE source_city_key=?
+      * SELECT MIN/MAX filing_date FROM permits WHERE prod_city_id=?
+  - The property_owners count uses a FUNCTION on city (LOWER(...)) so
+    it can't always use the city index — full scan on big counties
+  - No caching layer between the route handler and the DB
+
+Buffalo (59K Erie owners) is on the small side. Phoenix, Henderson,
+Nashville, San Antonio (post-V491 hotfix expected to be 711K) will
+hit the same wall as soon as AdsBot crawls them.
+
+WHAT TO IMPLEMENT
+==============================================================================
+
+1. NEW MODULE: routes/city_stats_cache.py
+   - Mirrors the routes/persona_pages.py V488 IRONCLAD pattern
+   - Three layers (memory → system_state → live compute fallback)
+   - Stored as JSON keyed by `city_stats:{slug}`
+
+   Skeleton:
+   ```python
+   """V492: city-page stats system_state cache.
+
+   Mirrors the persona_pages V488 IRONCLAD pattern. AdsBot crawls
+   /permits/<state>/<city> and times out when the live aggregate
+   queries pile up behind the WAL lock — Google flags
+   "Destination not working" and auto-pauses the ad.
+
+   Three layers:
+     1. process-memory cache (5 min TTL) — fastest path
+     2. system_state row (4 hr TTL) — survives process restarts
+     3. compute synchronously — first-deploy-ever fallback only
+
+   Worker.secondary_loop calls refresh_city_stats_cache_all() every
+   4 hr to keep system_state warm. Web reads only.
+   """
+   import json
+   import time
+   import permitdb
+
+   _CITY_STATS_MEM_CACHE = {}  # {slug: {'data': {...}, 'ts': epoch}}
+   _CITY_STATS_MEM_TTL = 300   # 5 min in-process
+
+   def _cache_key(slug):
+       return f"city_stats:{slug}"
+
+   def _compute_city_stats(slug, conn=None):
+       """Live aggregate queries. Called by worker refresh and by
+       fallback path on first hit of fresh deploy."""
+       if conn is None:
+           conn = permitdb.get_connection()
+       out = {
+           'slug': slug,
+           'computed_at': int(time.time()),
+       }
+       # Profiles + phones
+       try:
+           row = conn.execute(
+               "SELECT COUNT(*), "
+               "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) "
+               "FROM contractor_profiles WHERE source_city_key = ?",
+               (slug,)
+           ).fetchone()
+           if row:
+               out['profiles'] = row[0] or 0
+               out['phones'] = row[1] or 0
+       except Exception:
+           out['profiles'] = 0
+           out['phones'] = 0
+
+       # Owners — needs city + state from prod_cities first
+       try:
+           row = conn.execute(
+               "SELECT city, state FROM prod_cities WHERE city_slug = ? LIMIT 1",
+               (slug,)
+           ).fetchone()
+           if row:
+               out['city_name'] = row[0]
+               out['state'] = row[1]
+               r2 = conn.execute(
+                   "SELECT COUNT(*) FROM property_owners "
+                   "WHERE LOWER(city) = LOWER(?) AND state = ?",
+                   (row[0], row[1])
+               ).fetchone()
+               out['owners'] = r2[0] if r2 else 0
+       except Exception:
+           out['owners'] = 0
+
+       # Violations
+       try:
+           row = conn.execute(
+               "SELECT COUNT(*) FROM violations WHERE source_city_key = ?",
+               (slug,)
+           ).fetchone()
+           out['violations'] = row[0] if row else 0
+       except Exception:
+           out['violations'] = 0
+
+       # Permit count + freshness
+       try:
+           row = conn.execute(
+               "SELECT COUNT(*), MAX(filing_date) "
+               "FROM permits WHERE source_city_key = ?",
+               (slug,)
+           ).fetchone()
+           if row:
+               out['permits'] = row[0] or 0
+               out['newest_date'] = row[1]
+       except Exception:
+           out['permits'] = 0
+           out['newest_date'] = None
+
+       return out
+
+   def refresh_city_stats_cache(slug):
+       """Refresh one city. Called by worker per-city loop and by
+       force-refresh admin endpoint."""
+       data = _compute_city_stats(slug)
+       try:
+           permitdb.set_system_state(_cache_key(slug), json.dumps(data))
+           _CITY_STATS_MEM_CACHE[slug] = {'data': data, 'ts': time.time()}
+       except Exception as e:
+           print(f"[V492] city stats cache write failed for {slug}: {e}", flush=True)
+       return data
+
+   def refresh_city_stats_cache_all(limit=None):
+       """Refresh all active cities. Called by worker.secondary_loop
+       every 4 hr."""
+       conn = permitdb.get_connection()
+       q = "SELECT city_slug FROM prod_cities WHERE status='active' AND city_slug IS NOT NULL"
+       if limit:
+           q += f" LIMIT {int(limit)}"
+       slugs = [r[0] for r in conn.execute(q).fetchall()]
+       n_ok = 0
+       for s in slugs:
+           try:
+               refresh_city_stats_cache(s)
+               n_ok += 1
+           except Exception as e:
+               print(f"[V492] refresh failed for {s}: {e}", flush=True)
+       print(f"[V492] city stats cache refresh: {n_ok}/{len(slugs)} ok", flush=True)
+       return n_ok, len(slugs)
+
+   def get_city_stats(slug):
+       """Read path used by city-page routes. Three layers."""
+       now = time.time()
+       # Layer 1: memory
+       hit = _CITY_STATS_MEM_CACHE.get(slug)
+       if hit and (now - hit['ts']) < _CITY_STATS_MEM_TTL:
+           return hit['data']
+       # Layer 2: system_state
+       try:
+           raw = permitdb.get_system_state(_cache_key(slug))
+           if raw:
+               data = json.loads(raw)
+               _CITY_STATS_MEM_CACHE[slug] = {'data': data, 'ts': now}
+               return data
+       except Exception:
+           pass
+       # Layer 3: synchronous compute (first deploy fallback)
+       return refresh_city_stats_cache(slug)
+   ```
+
+2. PATCH routes/city_pages.py
+   - state_city_landing() (line ~1068) and city_landing_inner()
+     (the slug variant) replace the inline COUNT queries with:
+       from routes.city_stats_cache import get_city_stats
+       _stats = get_city_stats(city_slug)
+       _v474_profiles_count = _stats['profiles']
+       _v474_phones_count = _stats['phones']
+       _v474_owners_count = _stats['owners']
+       violations_count = _stats['violations']
+       permit_count = _stats['permits']
+   - The per-city RECENT-permits SELECT (LIMIT 50) stays live —
+     that's small, indexed, and renders the table data the user sees.
+     Only the AGGREGATE COUNT queries move to cache.
+
+3. PATCH worker.py
+   - Add to secondary_loop() (after the persona_pages refresh block,
+     line ~419):
+     ```python
+     # ── V492: city stats system_state cache refresh ──
+     # Same rationale as the persona-pages cache. AdsBot crawls
+     # /permits/<state>/<city> and times out on aggregate COUNT
+     # queries against 247K-row owner tables; Google flags
+     # "Destination not working" and auto-pauses ads.
+     # Refresh every 4 hr (city data moves slower than persona).
+     try:
+         from routes.city_stats_cache import refresh_city_stats_cache_all
+         t0 = time.time()
+         n_ok, n_total = refresh_city_stats_cache_all()
+         print(f"[WORKER] city stats refreshed {n_ok}/{n_total} "
+               f"in {time.time()-t0:.1f}s", flush=True)
+     except Exception as e:
+         print(f"[WORKER] city stats refresh failed: {e}", flush=True)
+     ```
+   - Add to start_collectors() startup block (line ~696):
+     ```python
+     try:
+         from routes.city_stats_cache import refresh_city_stats_cache_all as _v492_city_refresh
+         _v492_city_refresh(limit=20)  # warm top 20 first; full pass on
+                                       # next secondary_loop cycle
+         print("[WORKER] V492 city stats startup refresh ok", flush=True)
+     except Exception as e:
+         print(f"[WORKER] V492 city stats startup failed: {e}", flush=True)
+     ```
+   - Adjust secondary_loop interval if needed. Persona refresh runs
+     every 2 hr. City refresh every 4 hr is sufficient (same data
+     velocity as the per-city collection cycle).
+
+4. ADD admin endpoint POST /api/admin/refresh-city-stats
+   - For manual force-refresh after a big import lands. Mirrors the
+     existing /api/admin/refresh-persona-stats. Body: {"city": "phoenix-az"}
+     (single) or {} (all).
+   - In routes/admin.py, after the persona-stats endpoint:
+     ```python
+     @admin_bp.route('/api/admin/refresh-city-stats', methods=['POST'])
+     def refresh_city_stats_endpoint():
+         _check_admin()
+         payload = request.get_json(silent=True) or {}
+         from routes.city_stats_cache import (
+             refresh_city_stats_cache,
+             refresh_city_stats_cache_all,
+         )
+         if payload.get('city'):
+             data = refresh_city_stats_cache(payload['city'])
+             return jsonify({'status': 'ok', 'city': payload['city'], 'data': data})
+         n_ok, n_total = refresh_city_stats_cache_all()
+         return jsonify({'status': 'ok', 'refreshed': n_ok, 'total': n_total})
+     ```
+
+5. CACHE-CONTROL HEADER on /permits/<state>/<city>
+   - Even with the cache hot, add a stale-if-error directive so a
+     transient failure doesn't surface as a 5xx to AdsBot:
+     ```python
+     resp = make_response(rendered)
+     resp.headers['Cache-Control'] = (
+         'public, max-age=300, '
+         's-maxage=600, '
+         'stale-if-error=86400'
+     )
+     return resp
+     ```
+   - This matches what V484 did for /leads/* and is the second line of
+     defense if the cache write fails.
+
+POST-DEPLOY VERIFICATION
+==============================================================================
+
+1. SSH into Render, verify worker thread alive:
+     curl -s https://permitgrab.com/api/admin/digest/status
+   (extension of debug/threads — should list secondary_loop AND now
+   include "city_stats_refresh" log lines)
+
+2. Force-refresh Buffalo + Cleveland to seed cache:
+     curl -X POST -H "X-Admin-Key: ..." -H "Content-Type: application/json" \
+       -d '{"city":"buffalo-ny"}' \
+       https://permitgrab.com/api/admin/refresh-city-stats
+     curl -X POST -H "X-Admin-Key: ..." -H "Content-Type: application/json" \
+       -d '{"city":"cleveland-oh"}' \
+       https://permitgrab.com/api/admin/refresh-city-stats
+
+3. Verify cache populated (read system_state via admin query):
+     curl -X POST -H "X-Admin-Key: ..." -H "Content-Type: application/json" \
+       -d '{"sql":"SELECT key, length(value), substr(value,1,80) FROM system_state WHERE key LIKE \"city_stats:%\" LIMIT 10"}' \
+       https://permitgrab.com/api/admin/query
+
+4. Hit Buffalo's page directly and confirm <300ms response:
+     time curl -s https://permitgrab.com/permits/buffalo-ny -o /dev/null
+     time curl -s https://permitgrab.com/permits/new-york-state/buffalo-ny -o /dev/null
+   Both should return < 300ms after cache warm.
+
+5. Re-submit ad in Google Ads UI:
+     - Open Buffalo ad (now Pending)
+     - View issues → re-validate URL
+     - The "Destination not working" finding should clear within
+       ~24 hours as AdsBot recrawls
+
+6. Watch ads.google.com for 48 hours:
+     - Buffalo + Cleveland should move from Pending → Eligible
+     - Impression count should start moving off zero
+     - If ANY new "Destination not working" finding appears on
+       another city page, that city's cache wasn't warm — fire
+       refresh-city-stats for it
+
+RISK MITIGATION
+==============================================================================
+
+- Build cache-write to be NEVER FATAL: every set_system_state() call
+  is wrapped in try/except. If the write fails, the route still
+  renders (just paying the live-compute tax for that one request).
+
+- Refresh loop must be timeboxed: 100+ active cities × ~4s per
+  refresh = 7 minutes total per cycle. Worker secondary_loop polls
+  every 30s, so the refresh shouldn't block other secondary tasks.
+  Use a per-city try/except so one slow city doesn't kill the loop.
+
+- Migration is zero-impact: the new module is read-fallback-on-empty.
+  First deploy, the system_state has no city_stats:* rows;
+  get_city_stats() falls through to live compute (same as current
+  behavior). Second deploy onward, the worker has populated cache
+  and reads are ~1ms.
+
+- DON'T BREAK V485 B2 / V488: the persona-pages cache is independent.
+  This is a parallel pattern, not a refactor. Keep refresh_persona_stats_cache
+  as-is.
+
+DELIVERABLE
+==============================================================================
+
+PR title: "V492: city-stats system_state cache — fix Destination Not Working
+on /permits/<state>/<city>"
+
+Files changed:
+  - routes/city_stats_cache.py     (NEW — ~140 lines)
+  - routes/city_pages.py           (~30 lines edited — replace inline
+                                    COUNT queries with cache reads in
+                                    state_city_landing + city_landing_inner)
+  - routes/admin.py                (~12 lines added — refresh endpoint)
+  - worker.py                      (~22 lines added — startup + loop)
+
+Net effect:
+  - /permits/<state>/<city> response time: 1-4 seconds → 50-150ms
+  - AdsBot success rate: ~70% → ~99%
+  - "Destination not working" disapprovals: cleared within 24 hr of deploy
+  - Buffalo + Cleveland (currently Pending) move to Eligible and
+    start receiving impressions
+  - Phoenix, Henderson, Nashville, San Antonio (when their ads are
+    refreshed per AD_COPY_REFRESH_2026-05-03.md) won't hit the same
+    disapproval cascade
+
+POST-MERGE: restart the daemon thread:
+  curl -X POST -H "X-Admin-Key: ..." \
+    "https://permitgrab.com/api/admin/start-collectors?force=1"
+
+This will pick up the new worker secondary_loop block and warm the
+cache for all active cities within 7 minutes.
