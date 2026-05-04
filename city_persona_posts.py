@@ -2107,11 +2107,7 @@ CITY_PERSONA_POSTS = {
 
     'austin-solar-installer-leads': {
         'title': 'Austin Solar Installer Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            '55,000+ Travis County property owners + Austin daily permit '
-            'feed. Solar installers skip the aggregator markup — direct '
-            'leads at the moment of property investment. $149/mo unlimited.'
-        ),
+        'meta_description': '55,000+ Travis County owners + Austin daily permit feed. Direct solar leads at the moment of property investment. $149/mo unlimited. 14-day trial.',
         'h1': 'Austin Solar Installer Leads from Building Permit Data',
         'subject': 'Solar installers in Austin',
         'city': 'Austin',
@@ -2157,11 +2153,7 @@ CITY_PERSONA_POSTS = {
 
     'austin-design-build-leads': {
         'title': 'Austin Design-Build GC Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            'Design-build general contractors in Austin: skip Houzz Pro and '
-            'Angi referral fees. Direct daily permit feed shows every '
-            'addition, ADU, and major remodel filed in Travis County. $149/mo.'
-        ),
+        'meta_description': 'Skip Houzz Pro and Angi referral fees. Daily Austin permit feed shows every addition, ADU, and major remodel. $149/mo unlimited Travis County.',
         'h1': 'Austin Design-Build Contractor Leads from Permit Data',
         'subject': 'Design-build GCs in Austin',
         'city': 'Austin',
@@ -2212,11 +2204,7 @@ CITY_PERSONA_POSTS = {
 
     'phoenix-hvac-leads': {
         'title': 'Phoenix HVAC Contractor Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            '79,000+ Maricopa County property owners + Phoenix daily '
-            'permit feed. HVAC contractors win through permit-driven '
-            'outreach during the May-October cooling season. $149/mo unlimited.'
-        ),
+        'meta_description': '79K Maricopa County owners + 1,080 Phoenix contractor phones. AC replacement permits daily. May trigger window playbook. $149/mo unlimited.',
         'h1': 'Phoenix HVAC Contractor Leads from Building Permit Data',
         'subject': 'HVAC contractors in Phoenix',
         'city': 'Phoenix',
@@ -2265,11 +2253,7 @@ CITY_PERSONA_POSTS = {
 
     'houston-restoration-leads': {
         'title': 'Houston Insurance Restoration Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            'Houston restoration contractors: hurricane-belt code violations '
-            '+ daily permit feed surface storm-damaged properties before '
-            'competitors. Skip the storm-chaser arms race. $149/mo unlimited.'
-        ),
+        'meta_description': 'Houston restoration: 83K code violations + permits, hurricane-belt timing. Skip the storm-chaser race. $149/mo unlimited Harris County.',
         'h1': 'Houston Insurance Restoration Leads from Permit Data',
         'subject': 'Insurance restoration contractors in Houston',
         'city': 'Houston',
@@ -2327,11 +2311,7 @@ CITY_PERSONA_POSTS = {
 
     'how-to-find-new-construction-austin': {
         'title': 'How to Find New Construction Projects in Austin (2026 Guide) | PermitGrab',
-        'meta_description': (
-            'Find Austin new construction projects before your competitors '
-            'do. Daily permit feed shows every ground-up build, addition, '
-            'and major remodel filed with the city. $149/mo unlimited.'
-        ),
+        'meta_description': 'Find Austin new construction projects before competitors. Daily permit feed shows ground-up builds, ADUs, additions. $149/mo unlimited Travis.',
         'h1': 'How to Find New Construction Projects in Austin (2026)',
         'subject': 'GCs and subcontractors finding new construction work',
         'city': 'Austin',
@@ -2393,11 +2373,7 @@ CITY_PERSONA_POSTS = {
 
     'fort-worth-storm-response-roof-permits': {
         'title': 'Fort Worth Roof Permit Data for Storm Response | PermitGrab',
-        'meta_description': (
-            '97,000+ Tarrant County property owners + Fort Worth permit '
-            'feed. Storm-chaser playbook, hail-season response, post-storm '
-            'lead surge tactics. $149/mo unlimited roofing permit access.'
-        ),
+        'meta_description': '97K Tarrant County owners + Fort Worth permit feed. Storm-belt roofers win on hail-season post-storm permit surge tracking. $149/mo unlimited.',
         'h1': 'Fort Worth Roof Permit Data for Storm Response',
         'subject': 'Storm-belt roofing contractors',
         'city': 'Fort Worth',
@@ -2464,11 +2440,7 @@ CITY_PERSONA_POSTS = {
 
     'miami-dade-storm-response-roof-permits': {
         'title': 'Miami-Dade Roof Permit Data for Hurricane Response | PermitGrab',
-        'meta_description': (
-            '82,000+ Miami-Dade property owners + daily permit feed. '
-            'Hurricane-belt roofing contractors: post-storm permit surge '
-            'tracking, FL DBPR contractor licensing data. $149/mo unlimited.'
-        ),
+        'meta_description': '82K Miami-Dade owners + daily permit feed. Hurricane-belt roofers track post-storm permit surge + FL DBPR contractor data. $149/mo unlimited.',
         'h1': 'Miami-Dade Roof Permit Data for Hurricane Response',
         'subject': 'Hurricane-belt roofing contractors',
         'city': 'Miami',
@@ -2529,11 +2501,7 @@ CITY_PERSONA_POSTS = {
 
     'atlanta-code-violations-property-list': {
         'title': 'Atlanta Property Owners with Code Violations List | PermitGrab',
-        'meta_description': (
-            'Real estate wholesalers: Atlanta code violation property list '
-            'updated daily. Identify distressed properties before MLS, with '
-            'owner mailing address for direct mail. $149/mo unlimited.'
-        ),
+        'meta_description': 'Atlanta code violation property list, daily refresh. Owner mailing addresses for direct mail. Wholesalers identify sellers before MLS. $149/mo.',
         'h1': 'Atlanta Property Owners with Code Violations — Wholesaler Lead List',
         'subject': 'Real estate wholesalers and investors',
         'city': 'Atlanta',
@@ -2603,11 +2571,7 @@ CITY_PERSONA_POSTS = {
 
     'chicago-plumbing-leads': {
         'title': 'Chicago Plumbing Contractor Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            '72,000+ Cook County property owners + Chicago daily permit '
-            'feed. Plumbing contractors get leak/repipe/sewer-line work '
-            'from permit and violation data. $149/mo unlimited.'
-        ),
+        'meta_description': '72K Cook County owners + 3,498 IL contractor phones. Sewer-line + LSL replacement permits. Aging Midwest plumbing market. $149/mo unlimited.',
         'h1': 'Chicago Plumbing Contractor Leads from Permit + Violation Data',
         'subject': 'Plumbing contractors in Chicago',
         'city': 'Chicago',
@@ -2661,11 +2625,7 @@ CITY_PERSONA_POSTS = {
 
     'phoenix-window-replacement-leads': {
         'title': 'Phoenix Window Replacement Contractor Leads from Permits | PermitGrab',
-        'meta_description': (
-            '79,000+ Maricopa County owners + Phoenix permit feed. Window '
-            'replacement contractors win on permit-driven outreach during '
-            'May-September UV season. $149/mo unlimited.'
-        ),
+        'meta_description': '79K Maricopa owners + Phoenix permit feed. Window contractors win on May-Sept UV season + 25C tax credit + APS rebate stack. $149/mo unlimited.',
         'h1': 'Phoenix Window Replacement Contractor Leads from Permit Data',
         'subject': 'Window/door replacement specialists in Phoenix',
         'city': 'Phoenix',
@@ -2716,11 +2676,7 @@ CITY_PERSONA_POSTS = {
 
     'miami-off-market-real-estate-agent-leads': {
         'title': 'Miami Off-Market Real Estate Agent Leads | PermitGrab',
-        'meta_description': (
-            'Miami real estate agents specializing in off-market deals: '
-            '82K+ Miami-Dade owners + permit + code violation data identifies '
-            'sellers 60-90 days before MLS. $149/mo unlimited.'
-        ),
+        'meta_description': '82K+ Miami-Dade owners + permit + violation data identifies off-market sellers 60-90 days before MLS. Luxury Miami specialty. $149/mo unlimited.',
         'h1': 'Miami Off-Market Real Estate Agent Leads from Permits + Violations',
         'subject': 'Real estate agents specializing in off-market and pocket listings',
         'city': 'Miami',
@@ -2781,11 +2737,7 @@ CITY_PERSONA_POSTS = {
 
     'nashville-pest-control-lawn-leads': {
         'title': 'Nashville Pest Control & Lawn Service Leads from Permits | PermitGrab',
-        'meta_description': (
-            '71,000+ Davidson County owners + Nashville daily permit feed. '
-            'Pest control + lawn service contractors target new homeowners '
-            'and renovation projects. $149/mo unlimited.'
-        ),
+        'meta_description': '71K Davidson County owners + Nashville permit feed. 30-day post-move-in window converts at 18-28%. HOA dominance play. $149/mo unlimited.',
         'h1': 'Nashville Pest Control & Lawn Service Leads from Permit Data',
         'subject': 'Pest control and lawn service contractors in Nashville',
         'city': 'Nashville',
@@ -2846,11 +2798,7 @@ CITY_PERSONA_POSTS = {
 
     'tampa-solar-installer-leads': {
         'title': 'Tampa Solar Installer Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            'Tampa Bay solar market: Hillsborough County owner data + '
-            'permit feed identifies homeowners at the moment of property '
-            'investment. Skip aggregator markup. $149/mo unlimited.'
-        ),
+        'meta_description': 'Tampa Bay solar: Hillsborough owner data + permit feed via V476 Accela hybrid. Hurricane-resilience pitch. $149/mo unlimited Tampa Bay metro.',
         'h1': 'Tampa Solar Installer Leads from Building Permit Data',
         'subject': 'Solar installers in Tampa Bay',
         'city': 'Tampa',
@@ -2902,11 +2850,7 @@ CITY_PERSONA_POSTS = {
 
     'nyc-design-build-leads': {
         'title': 'NYC Design-Build Contractor Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            '13,000+ NYC PLUTO records + Department of Buildings permit '
-            'feed. Design-build contractors win on co-op + brownstone + '
-            'commercial fit-out work. $149/mo unlimited.'
-        ),
+        'meta_description': '13K NYC PLUTO records + 791 contractor phones + DOB permit feed. Design-build GCs win on co-op + brownstone + commercial fit-out. $149/mo.',
         'h1': 'NYC Design-Build Contractor Leads from DOB Permit Data',
         'subject': 'Design-build GCs in New York City',
         'city': 'New York City',
@@ -2965,11 +2909,7 @@ CITY_PERSONA_POSTS = {
 
     'san-antonio-hvac-leads': {
         'title': 'San Antonio HVAC Contractor Leads from Building Permits | PermitGrab',
-        'meta_description': (
-            '5,000+ Bexar County owners + 3,830 contractor phones + San '
-            'Antonio daily permit feed. HVAC contractors win on summer '
-            'replacement cycle outreach. $149/mo unlimited.'
-        ),
+        'meta_description': '5K Bexar owners + 3,830 SA contractor phones + daily permit feed. HVAC contractors win on summer replacement cycle outreach. $149/mo unlimited.',
         'h1': 'San Antonio HVAC Contractor Leads from Permit Data',
         'subject': 'HVAC contractors in San Antonio',
         'city': 'San Antonio',
@@ -3020,11 +2960,7 @@ CITY_PERSONA_POSTS = {
 
     'mesa-storm-response-roof-permits': {
         'title': 'Mesa Roof Permit Data for Storm Response | PermitGrab',
-        'meta_description': (
-            '38,000+ Mesa property owner records (V474 win) + Maricopa '
-            'County permit feed. Storm-belt roofing contractors win on '
-            'AZ monsoon hail-event outreach. $149/mo unlimited.'
-        ),
+        'meta_description': '38K Mesa property owners (V474 win) + Maricopa permit feed. Storm-belt roofers win on AZ monsoon hail-event outreach. $149/mo unlimited.',
         'h1': 'Mesa Roof Permit Data for Storm Response',
         'subject': 'Storm-belt roofing contractors in AZ',
         'city': 'Mesa',
@@ -3091,11 +3027,7 @@ CITY_PERSONA_POSTS = {
 
     'fort-lauderdale-insurance-restoration-leads': {
         'title': 'Fort Lauderdale Insurance Restoration Leads from Permits | PermitGrab',
-        'meta_description': (
-            'Fort Lauderdale + Broward County restoration: hurricane belt '
-            'permit feed + code violations identify storm-damaged properties '
-            'before competitors. $149/mo unlimited.'
-        ),
+        'meta_description': 'Fort Lauderdale + Broward restoration: hurricane belt permits + post-Surfside recertification wave. Skip storm chasers. $149/mo unlimited.',
         'h1': 'Fort Lauderdale Insurance Restoration Leads from Permit Data',
         'subject': 'Insurance restoration contractors in Fort Lauderdale',
         'city': 'Fort Lauderdale',
@@ -3151,11 +3083,7 @@ CITY_PERSONA_POSTS = {
 
     'philadelphia-plumbing-leads': {
         'title': 'Philadelphia Plumbing Contractor Leads from Permits | PermitGrab',
-        'meta_description': (
-            '55,000+ Philadelphia property owners + daily permit feed + '
-            'aging Mid-Atlantic plumbing infrastructure. Skip Angi/Yelp '
-            'lead fees. $149/mo unlimited.'
-        ),
+        'meta_description': '55K Philadelphia owners + daily permit feed + aging Mid-Atlantic plumbing infrastructure. Skip Angi/Yelp lead fees. $149/mo unlimited Philly.',
         'h1': 'Philadelphia Plumbing Contractor Leads from Permit Data',
         'subject': 'Plumbing contractors in Philadelphia',
         'city': 'Philadelphia',
@@ -3213,11 +3141,7 @@ CITY_PERSONA_POSTS = {
 
     'chicago-window-replacement-leads': {
         'title': 'Chicago Window Replacement Contractor Leads from Permits | PermitGrab',
-        'meta_description': (
-            '72,000+ Cook County owners + Chicago daily permit feed. '
-            'Window replacement contractors win on Chicago lakefront wind '
-            '+ aging Midwest housing stock. $149/mo unlimited.'
-        ),
+        'meta_description': '72K Cook County owners + Chicago daily permit feed. Window contractors win on lakefront wind + 25C/ComEd rebate stacking. $149/mo unlimited.',
         'h1': 'Chicago Window Replacement Contractor Leads from Permit Data',
         'subject': 'Window/door replacement specialists in Chicago',
         'city': 'Chicago',
@@ -3273,11 +3197,7 @@ CITY_PERSONA_POSTS = {
 
     'atlanta-pest-control-lawn-leads': {
         'title': 'Atlanta Pest Control & Lawn Service Leads from Permits | PermitGrab',
-        'meta_description': (
-            'Atlanta pest control + lawn service contractors: target new '
-            'homeowners and post-renovation properties via daily permit '
-            'feed + Fulton County owner data. $149/mo unlimited.'
-        ),
+        'meta_description': 'Atlanta pest/lawn services: target new homeowners + post-renovation properties via daily permit feed + 60% HOA concentration. $149/mo unlimited.',
         'h1': 'Atlanta Pest Control & Lawn Service Leads from Permit Data',
         'subject': 'Pest control and lawn service contractors in Atlanta',
         'city': 'Atlanta',
