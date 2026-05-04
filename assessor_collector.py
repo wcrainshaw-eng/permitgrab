@@ -1732,7 +1732,10 @@ ASSESSOR_SOURCES = {
         },
         'state': 'FL',
         'source_tag': 'assessor:pinellas_county_fl',
-        'pagination_strategy': 'objectid',
+        # NOTE: 'objectid' pagination fails — Pinellas's OBJECTID column
+        # rejects `OBJECTID > N` with HTTP 400. PCPA_UID does work but
+        # the dispatcher hardcodes 'OBJECTID' as the column name. Falling
+        # back to resultOffset (default) which Pinellas accepts.
         'return_geometry': False,
         'default_city': 'St. Petersburg',
     },
@@ -1836,7 +1839,11 @@ ASSESSOR_SOURCES = {
         },
         'state': 'TX',
         'source_tag': 'assessor:travis_county_full',
-        'pagination_strategy': 'objectid',
+        # NOTE: 'objectid' pagination fails — TCAD has no queryable
+        # OBJECTID column ("'Invalid field: OBJECTID' parameter is invalid").
+        # Falling back to resultOffset (default) which the FeatureServer
+        # supports. The unique field is prop_id but the dispatcher hardcodes
+        # 'OBJECTID' for objectid pagination.
         'return_geometry': False,
         'default_city': 'Austin',
     },
