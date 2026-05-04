@@ -892,6 +892,26 @@ SESSION.headers.update({
     "Accept-Encoding": "gzip, deflate",
 })
 
+# V503 IRONCLAD: requests has NO default timeout. Per the 2026-05-04
+# incident, scheduled_collection hung on sock.connect() for 80+ min
+# when an upstream city's TCP handshake silently dropped. Most call
+# sites set timeout=N explicitly but it's easy to miss one — and
+# missing any single one = indefinite daemon hang. Mount a custom
+# adapter that enforces a default timeout on every request (call
+# sites that pass an explicit timeout still win).
+class _DefaultTimeoutAdapter(requests.adapters.HTTPAdapter):
+    def __init__(self, *args, **kwargs):
+        self._default_timeout = kwargs.pop('default_timeout', 60)
+        super().__init__(*args, **kwargs)
+    def send(self, request, **kwargs):
+        if kwargs.get('timeout') is None:
+            kwargs['timeout'] = self._default_timeout
+        return super().send(request, **kwargs)
+
+_v503_adapter = _DefaultTimeoutAdapter(default_timeout=60)
+SESSION.mount('https://', _v503_adapter)
+SESSION.mount('http://', _v503_adapter)
+
 # Optional: Socrata app token for higher rate limits
 SOCRATA_APP_TOKEN = os.environ.get("SOCRATA_APP_TOKEN", "")
 if SOCRATA_APP_TOKEN:
