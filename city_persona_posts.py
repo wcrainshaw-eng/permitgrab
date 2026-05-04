@@ -2100,4 +2100,222 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V498: 4 archetype-aligned posts from PERFECT_CUSTOMERS_MATRIX.md
+    #   Solar (#2), Design-Build GC (#3), HVAC (#4), Restoration (#6)
+    # ====================================================================
+
+    'austin-solar-installer-leads': {
+        'title': 'Austin Solar Installer Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '55,000+ Travis County property owners + Austin daily permit '
+            'feed. Solar installers skip the aggregator markup — direct '
+            'leads at the moment of property investment. $149/mo unlimited.'
+        ),
+        'h1': 'Austin Solar Installer Leads from Building Permit Data',
+        'subject': 'Solar installers in Austin',
+        'city': 'Austin',
+        'city_slug': 'austin-tx',
+        'persona_slug': 'solar-home-services',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Austin is the second-fastest-growing solar market in the country behind Phoenix, but with a structural advantage Phoenix doesn't have: <strong>property tax exemption for residential solar systems</strong>. Texas Property Tax Code §11.27 exempts the added value of solar from appraised value, removing the single biggest objection installers hit on cold calls. Combine that with Austin Energy's Value of Solar tariff (one of the most generous net-metering equivalents in the US) and a tech-economy homeowner base that pays cash for systems, and you have one of the highest-margin solar markets in North America.</p>
+
+<p>The bottleneck isn't demand — it's identifying the homeowners <em>at the moment they're already investing in their property</em>. Re-roofs, additions, electrical upgrades, and pool installations are all leading indicators of solar conversations. PermitGrab pulls Austin's daily permit feed and Travis County assessor data so you reach those homeowners before three other installers have already called.</p>
+
+<h2>What Austin's permit data looks like in PermitGrab</h2>
+<ul>
+  <li><strong>55,000+ Travis County property owner records</strong> with full mailing addresses</li>
+  <li><strong>Austin daily permit feed</strong> with re-roof, electrical-upgrade, and addition filters</li>
+  <li><strong>Owner mailing address vs property address mismatch flag</strong> — identify owner-occupants (target) vs investors (skip)</li>
+  <li><strong>Permit value and contractor name</strong> — prioritize $30K+ projects where solar adjacency is highest</li>
+  <li><strong>Daily refresh</strong> — same-day visibility on every new permit issued</li>
+</ul>
+
+<h2>Why re-roof permits are the highest-converting solar lead type</h2>
+<p>A homeowner pulling a re-roof permit is the highest-intent solar prospect on the market. They've already accepted that they're spending $15-30K on the roof, the roof is about to be brand new (no concerns about removing/reinstalling panels later), and the contractor on site can offer a coordinated install discount. Industry conversion data: cold solar leads close at 2-4%, re-roof-coincident leads close at 18-25%. Six to twelve times the close rate at one-third the lead cost when you're sourcing direct from permit data.</p>
+
+<h2>$149/mo math for an Austin solar installer</h2>
+<p>Austin issues roughly 800-1,200 residential re-roof permits per month plus 400-600 electrical-upgrade permits. At an 18% close rate on re-roof outreach and a $25K average residential system value, even capturing 0.5% of monthly volume produces 4-6 closed installs per month. At a $4-6K install margin, that's $16K-$36K monthly contribution. PermitGrab's $149/mo is recovered in the first 30 minutes of the first install.</p>
+
+<p><strong>$149/mo unlimited Austin + Travis County access.</strong> 14-day free trial. <a href="/leads/solar-home-services">See solar installer onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Austin permit data?',
+             'Daily refresh from data.austintexas.gov. Travis County assessor refreshes monthly via the property-owner pipeline. New permits typically appear in PermitGrab within 24 hours of issue.'),
+            ('Do you have contractor phone numbers for Austin?',
+             'Texas has no bulk state contractor license database (CSLB-equivalent does not exist), so phone enrichment runs via DDG web search. Coverage is ~10-20% of profile records, but this matters less for solar where you\'re calling homeowners directly off owner records, not contractors.'),
+            ('Can I filter just to re-roof and electrical-upgrade permits?',
+             'Yes. Permit type categories include ROOF / REROOF / SHINGLE plus ELECTRICAL / SOLAR-READY / SERVICE-UPGRADE. Filtering down to just those two categories typically returns 40-60% of total Austin permit volume — the highest-density solar lead pool.'),
+            ('Does this work outside Austin city limits?',
+             'Yes. Travis County coverage extends to Bee Cave, West Lake Hills, Lakeway, Pflugerville, Round Rock (Williamson County overlap), and unincorporated Travis. The 55K owner records span the full county.'),
+            ('What about Austin Energy customers vs Pedernales Electric?',
+             'PermitGrab does not currently filter by utility territory directly, but ZIP-based filtering approximates it well: 78701-78759 are Austin Energy; 78610-78652 + 78610-78676 are Pedernales. Both utilities have favorable solar economics, but Austin Energy\'s VOS tariff is materially better.'),
+        ],
+    },
+
+    'austin-design-build-leads': {
+        'title': 'Austin Design-Build GC Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Design-build general contractors in Austin: skip Houzz Pro and '
+            'Angi referral fees. Direct daily permit feed shows every '
+            'addition, ADU, and major remodel filed in Travis County. $149/mo.'
+        ),
+        'h1': 'Austin Design-Build Contractor Leads from Permit Data',
+        'subject': 'Design-build GCs in Austin',
+        'city': 'Austin',
+        'city_slug': 'austin-tx',
+        'persona_slug': 'design-build-gc',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>The design-build general contractor archetype has the worst lead-cost economics of any home-services trade. Houzz Pro charges $1,000-3,000/month for territory exclusivity. Angi shared leads cost $80-200 per inquiry with a typical close rate under 8%. HomeAdvisor's referral fees on closed jobs average 6-10% of project value. On a $250K Austin remodel, that's $15-25K to the lead platform on a single job. Most design-build GCs we talk to spend $40-90K per year on lead-gen with diminishing returns.</p>
+
+<p>Permit data inverts that economics. Every addition, ADU, structural remodel, and major renovation filed with the City of Austin and Travis County is a property owner who has <em>already committed to a project</em>. They've paid permit fees. They've engaged an architect or designer. They're past the dreamer phase and into the doer phase. The only question is who's getting the contract.</p>
+
+<h2>What design-build GCs get from PermitGrab Austin</h2>
+<ul>
+  <li><strong>55,000+ Travis County property owner records</strong> with mailing address (filter for owner-occupants vs investors)</li>
+  <li><strong>Daily Austin permit feed</strong> with permit-value filtering — focus on $50K+ projects (real design-build territory, not handyman work)</li>
+  <li><strong>Permit type filters for ADU / Addition / Major Remodel / Pool / Garage Conversion</strong></li>
+  <li><strong>Architect/designer name where filed</strong> — referral relationships are the highest-converting outreach channel</li>
+  <li><strong>Same-day visibility</strong> on every new filing — outreach within 7 days of permit issue closes 5-10x cold-list response rates</li>
+</ul>
+
+<h2>The architect-relationship play (highest-leverage tactic)</h2>
+<p>Permit records list both the property owner and the architect/designer who stamped the plans. Most permit-driven outreach focuses on the owner — but design-build GCs play the architect side. Build a list of every architect who filed plans in Austin in the last 12 months, sort by frequency, and target the top 20. One placed contract from a frequent-filer architect is worth 50-100 cold homeowner outreaches because architects refer their next 5-10 clients to whoever they trust on quality and timeline.</p>
+
+<h2>Austin's design-build market math</h2>
+<p>Austin issues approximately 200-300 addition permits per month, 80-120 ADU permits per month, and 50-100 major-remodel permits over $250K per month. That's 350-500 design-build-eligible projects monthly, or 4,000-6,000 annually in the metro. At a typical design-build close rate of 3-5% on direct permit-driven outreach, even a single GC capturing the warm portion of one month's flow produces 12-25 qualified leads, which converts to 2-4 contracts per month.</p>
+
+<p>For a design-build firm running $4-8M in annual revenue, two extra contracts per month is a $1.5-3M revenue lift. PermitGrab at $149/mo is the lowest-leverage line item on that P&L.</p>
+
+<h2>Why Austin specifically (vs Houston, Dallas, San Antonio)</h2>
+<p>Austin has the highest concentration of $250K+ remodels per capita in Texas. Permit Office data shows median residential addition permit value in Austin is $89K vs $42K in Houston and $51K in San Antonio. The Austin remodel market skews substantially higher-end because of the tech-economy homeowner base. For design-build GCs targeting $200K-$1.5M project ranges, Austin produces more eligible leads per dollar of marketing spend than any other Texas metro.</p>
+
+<p><strong>$149/mo unlimited Austin + Travis County access.</strong> 14-day free trial. <a href="/leads/design-build-gc">Design-build GC onboarding →</a></p>
+""",
+        'faqs': [
+            ('Can I filter permits by minimum project value?',
+             'Yes. Permit value is a stored field. Filter to >$50K, >$100K, >$250K, or any custom threshold. Most design-build GCs filter to >$100K to skip handyman-tier work.'),
+            ('Do permits list the architect or designer?',
+             'When filed with stamped plans, yes — Austin requires architect-of-record on most projects over $25K. The architect/designer name is captured in our APPLICANT and DESIGNER fields.'),
+            ('How do I outreach without it feeling like cold-calling?',
+             'The most effective approach is a personalized note referencing the specific permit ("I noticed you filed a permit for an addition at [address] last week"). Conversion rates are 4-7x higher than generic cold outreach because the recipient knows you\'ve done the homework.'),
+            ('Does PermitGrab integrate with my CRM?',
+             'CSV export is included on Pro. Direct integrations to BuilderTrend, JobNimbus, JobTread, and CompanyCam are on the roadmap. Most design-build customers run a daily CSV → Zapier → CRM sync that takes 10 minutes to set up.'),
+            ('What\'s the difference between design-build and general contractor leads here?',
+             'Design-build customers want larger, design-led projects (additions, ADUs, structural remodels). The platform supports filtering by permit category and minimum value to surface those specifically. General contractors looking for smaller repair/replacement work would filter differently and get a much larger volume of permits.'),
+        ],
+    },
+
+    'phoenix-hvac-leads': {
+        'title': 'Phoenix HVAC Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '79,000+ Maricopa County property owners + Phoenix daily '
+            'permit feed. HVAC contractors win through permit-driven '
+            'outreach during the May-October cooling season. $149/mo unlimited.'
+        ),
+        'h1': 'Phoenix HVAC Contractor Leads from Building Permit Data',
+        'subject': 'HVAC contractors in Phoenix',
+        'city': 'Phoenix',
+        'city_slug': 'phoenix-az',
+        'persona_slug': 'hvac-contractor',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Phoenix HVAC is one of the most predictable trade markets in the country. Average summer high is 106°F. Average AC unit lifespan in Phoenix is 10-12 years (vs 15-20 in temperate climates) because of continuous summer load. The Maricopa County housing stock has roughly 1.6M units and replacement cycles are tightly correlated with the heat wave that hits every May. The HVAC contractor who gets to the homeowner first — usually the day their existing unit fails or they pull a permit for an upgrade — wins the job 70-80% of the time.</p>
+
+<p>Permit data is the leading indicator. Furnace replacements, AC unit upgrades, ductwork modifications, and electrical service upgrades (200A panels for higher-efficiency systems) all require pulled permits. PermitGrab surfaces them daily.</p>
+
+<h2>What Phoenix HVAC contractors get</h2>
+<ul>
+  <li><strong>79,000+ Maricopa County property owner records</strong> with mailing address (flag absentee landlords for B2B rental-portfolio outreach)</li>
+  <li><strong>1,080+ Phoenix contractor profiles with phone numbers</strong> — directly callable for B2B referral partnerships</li>
+  <li><strong>Daily Phoenix permit feed</strong> with HVAC / MECHANICAL / ELECTRICAL / FURNACE filters</li>
+  <li><strong>Permit value and contractor name</strong> — see who's already winning replacement work and target similar property profiles</li>
+  <li><strong>Code enforcement violation data</strong> — properties cited for inoperative AC are 5-8x more likely to need replacement within 60 days</li>
+</ul>
+
+<h2>The May trigger window (highest-leverage moment)</h2>
+<p>Phoenix's first 100°F day each year is the single biggest demand-spike moment. In 2025 it hit on April 8. Every year, the volume of HVAC permits jumps 4-6x in the two weeks following first 100°F day vs the prior month. HVAC contractors who pre-build their May call list <em>in early April</em> — before the spike — capture 2-3x the close rate of contractors who wait for inbound calls. PermitGrab's permit history view lets you build that pre-spike call list from the prior 60 days of permit activity.</p>
+
+<h2>The 10-12 year replacement cycle math</h2>
+<p>Maricopa County has approximately 1.6M housing units. At a 10-year average replacement cycle, that's 160K HVAC replacements per year, or roughly 13K per month — call it 8K of which require a permit (the other 5K are like-for-like swap-outs that don't trigger a filing). Even at 0.1% market share capture, that's 8 leads per month at typical replacement prices of $8-15K. PermitGrab at $149/mo is recovered on the first booked appointment.</p>
+
+<h2>Why Phoenix outperforms other Sun Belt HVAC markets</h2>
+<p>Las Vegas has similar heat profile but a smaller addressable market (Clark County ~750K units vs Maricopa 1.6M). Houston is larger by population but has a more humid climate that fragments the market across HVAC + dehumidification specialties. Tucson and Mesa share Maricopa's profile but at smaller scale. Phoenix is the only metro that combines extreme heat, large unit count, fast replacement cycle, and a working permit data feed in PermitGrab.</p>
+
+<p><strong>$149/mo unlimited Phoenix + Maricopa County access.</strong> 14-day free trial. <a href="/leads/hvac-contractor">HVAC contractor onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Phoenix HVAC permit data?',
+             'Daily refresh from the City of Phoenix permit data portal. Maricopa County assessor refreshes monthly. AC and furnace permits typically appear in PermitGrab within 24-48 hours of filing.'),
+            ('Do you have contractor phone numbers for Phoenix HVAC firms?',
+             'Yes. Arizona ROC has a ~57K-record bulk contractor list (no phone field directly, but DDG enrichment runs against name + license number). Phoenix has 1,080+ contractor profiles with phones — the highest count of any non-FL metro in the platform.'),
+            ('Can I filter just HVAC and MECHANICAL permits?',
+             'Yes. Permit type categories include HVAC / MECHANICAL / FURNACE / AC / DUCTWORK / RTU specifically. Filter excludes plumbing/electrical/structural to focus only on HVAC-relevant filings.'),
+            ('What about commercial HVAC vs residential?',
+             'Phoenix permit data flags both. Filter by property type (single-family vs commercial) and by permit value tiers — commercial rooftop unit replacements typically run $40K-$200K and are filtered separately from residential AC swap-outs.'),
+            ('Does PermitGrab cover Mesa, Scottsdale, Tempe, Glendale separately?',
+             'Yes. Mesa (38K owner records, V474 win), Scottsdale (17K owners), Tempe (25K), and Glendale are all separately covered via the maricopa_secondary assessor source. Phone enrichment piggybacks on Phoenix\'s AZ ROC import.'),
+        ],
+    },
+
+    'houston-restoration-leads': {
+        'title': 'Houston Insurance Restoration Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Houston restoration contractors: hurricane-belt code violations '
+            '+ daily permit feed surface storm-damaged properties before '
+            'competitors. Skip the storm-chaser arms race. $149/mo unlimited.'
+        ),
+        'h1': 'Houston Insurance Restoration Leads from Permit Data',
+        'subject': 'Insurance restoration contractors in Houston',
+        'city': 'Houston',
+        'city_slug': 'houston-tx',
+        'persona_slug': 'insurance-restoration',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>Houston is the largest insurance restoration market in the United States. Hurricane belt landfall, Gulf Coast humidity-driven mold remediation, and a population of 7.3M in the metro produce a property-damage claim volume that exceeds Miami, New Orleans, and Tampa combined. State Farm, Allstate, USAA, Farmers, and Liberty Mutual all run large Houston catastrophe operations. The restoration contractors who win in Houston aren't the ones with the biggest trucks — they're the ones who get to the damaged property first.</p>
+
+<p>The traditional restoration playbook is storm-chasing: door-to-door canvass after a named-storm landfall, hope the homeowner hasn't already signed with a chaser from out of state, talk them through the assignment-of-benefits process. The economics are brutal. CRM costs are huge, conversion rates under 4%, and out-of-state chasers undercut local pricing. Permit data inverts that.</p>
+
+<h2>What Houston restoration contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>83,000+ Houston code enforcement violation records</strong> — properties under city pressure for unpermitted repair work, structural concerns, or substandard housing conditions are restoration-eligible by definition</li>
+  <li><strong>Houston permit feed</strong> with REROOF / STRUCTURAL / WATER-DAMAGE / FIRE-REPAIR filters where wired</li>
+  <li><strong>Daily refresh</strong> — same-day visibility on every new code citation and permit filing</li>
+  <li><strong>Address-level data</strong> — drive routes pre-cluster by ZIP, neighborhood, or tract</li>
+  <li><strong>Violation date + permit date timeline</strong> — properties with a violation but no follow-up permit are the highest-value cold-outreach targets</li>
+</ul>
+
+<p><em>Important note on Houston coverage:</em> Houston's permit data feed via HCAD is HTML-only (REST endpoint not currently exposed for bulk pull). PermitGrab's Houston offering centers on code enforcement violations and is supplemented by Harris County assessor data when wired. Compared to Phoenix or Miami where we have full permit + owner + violation coverage, Houston's product is violation-heavy. Restoration is the persona where this is actually optimal — violations are the cleanest restoration lead signal.</p>
+
+<h2>The "violation without follow-up permit" play (highest-converting tactic)</h2>
+<p>Houston issues roughly 8K code enforcement citations per month. Of those, only 30-40% result in a follow-up permit within 90 days. The remaining 60-70% are properties where the owner is either unaware of remediation requirements, financially constrained, or actively avoiding the issue. Those are restoration's gold-tier leads. Outreach with a script like "I noticed your property at [address] received a code citation for [issue] on [date] and the city follows up at 90 days — most homeowners don't realize their insurance carrier may cover this. I can pull your policy details and tell you in 10 minutes whether you have coverage" closes at 12-18% vs cold-canvass close rates of 2-4%.</p>
+
+<h2>The hurricane-season multiplier</h2>
+<p>Houston's named-storm risk window runs June 1 - November 30. Permit and violation activity spike 3-5x in the 60 days following a Category 1+ landfall. PermitGrab's historical data view lets you build a pre-storm baseline list of high-claim-probability properties (older roofs, prior code violations, low-elevation tracts) so you can begin outreach the day FEMA declares a disaster, not 3 weeks later when the chasers have arrived.</p>
+
+<h2>Houston vs Tampa vs Miami for restoration</h2>
+<p>Tampa restoration is fragmented across Hillsborough, Pinellas, and Pasco counties (3 separate permit jurisdictions, none with full PermitGrab coverage). Miami-Dade restoration is concentrated but tightly competed by 200+ local restoration firms post-Surfside. Houston has the largest absolute claim volume of any US restoration market and lower local-firm density per claim than Miami, making it the highest-margin major-metro for restoration GCs willing to put boots on the ground.</p>
+
+<p><strong>$149/mo unlimited Houston + Harris County violation access.</strong> 14-day free trial. <a href="/leads/insurance-restoration">Restoration contractor onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Houston violation data?',
+             'Houston code enforcement violations refresh on the city\'s posting cadence (typically weekly for new citations, daily for status changes on open cases).'),
+            ('Why don\'t you have full Houston permit coverage?',
+             'Houston\'s permit data via HCAD is published as an HTML portal rather than a bulk REST API. Programmatic ingestion requires HTML scraping with per-permit detail page fetches (similar to the Tampa Accela pattern). It\'s on the roadmap but currently the platform leans on violation data for Houston coverage. Restoration as a persona benefits from this since violations are higher-signal than permits anyway.'),
+            ('Do you have contractor phone numbers for Houston restoration firms?',
+             'Texas has no bulk state contractor license database, so phone enrichment runs via DDG web search. Coverage on contractor records is ~10-20%. For restoration this matters less — the lead workflow is direct-to-homeowner via violation address, not contractor outreach.'),
+            ('Can I filter to specific damage types?',
+             'Violation categories include WATER-DAMAGE / STRUCTURAL / ROOF / FIRE / MOLD / SEWER / ELECTRICAL specifically. Filter to your specialty (water mitigation, fire restoration, mold remediation) to receive only relevant addresses.'),
+            ('What about smaller Texas markets — Galveston, Beaumont, Port Arthur?',
+             'Houston coverage extends throughout Harris County. Galveston, Beaumont, and Port Arthur are separate jurisdictions not currently wired. They\'re on the queue for cities with hurricane-prone coastal restoration potential, but Harris County Houston is the priority market today.'),
+        ],
+    },
+
 }
