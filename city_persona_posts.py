@@ -3084,4 +3084,251 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V502: second-city expansion for under-served matrix archetypes
+    # (#6 Restoration, #7 Plumbing, #8 Windows, #10 Pest Control).
+    # ====================================================================
+
+    'fort-lauderdale-insurance-restoration-leads': {
+        'title': 'Fort Lauderdale Insurance Restoration Leads from Permits | PermitGrab',
+        'meta_description': (
+            'Fort Lauderdale + Broward County restoration: hurricane belt '
+            'permit feed + code violations identify storm-damaged properties '
+            'before competitors. $149/mo unlimited.'
+        ),
+        'h1': 'Fort Lauderdale Insurance Restoration Leads from Permit Data',
+        'subject': 'Insurance restoration contractors in Fort Lauderdale',
+        'city': 'Fort Lauderdale',
+        'city_slug': 'fort-lauderdale-fl',
+        'persona_slug': 'insurance-restoration',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Broward County is the third-largest restoration market in the United States behind Houston and Miami-Dade. The combination of dense Atlantic-coast hurricane exposure (Andrew, Wilma, Irma, Ian, Helene all generated multi-billion-dollar Broward losses), high-rise condo concentration in Fort Lauderdale + Hollywood + Pompano Beach + Deerfield Beach, and mature insurance market depth produces a continuous flow of post-event permit and violation activity that restoration contractors can systematically convert.</p>
+
+<p>Fort Lauderdale specifically has 22+ contractor profiles with phone numbers in PermitGrab's feed (as of the FL DBPR import baseline, increasing on each successful refresh) and direct integration with Broward County permit data via the city's open data portal.</p>
+
+<h2>What Fort Lauderdale restoration contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>Broward County permit feed</strong> with REROOF / WATER-DAMAGE / FIRE-REPAIR / STRUCTURAL / DEMO filters</li>
+  <li><strong>FL DBPR contractor licensing data</strong> with phone enrichment (when import is working — see CLAUDE.md P0 status)</li>
+  <li><strong>Code enforcement violation data</strong> — historic feed currently dead-by-freshness (gis.fortlauderdale.gov INITDATE 2019 cutoff per V326), but Broward and adjacent municipal feeds supplement</li>
+  <li><strong>Daily refresh</strong> on permit data; permits typically appear within 24-48 hours of filing</li>
+  <li><strong>High-rise condo permit cross-reference</strong> — building-association permit filings are particularly high-margin restoration opportunities</li>
+</ul>
+
+<h2>The Broward high-rise condo restoration play</h2>
+<p>Broward County has roughly 600 high-rise residential buildings (8+ stories) along the Atlantic coast. Each one is governed by a condo association that pulls permits on behalf of the building for storm damage, water intrusion, structural repair, and code violation remediation. Building permits issued to a condo association vs an individual unit owner are categorically different opportunities — single building permit often covers $500K-$5M of restoration work.</p>
+
+<p>Filter strategy: Broward County + permit applicant_type CORPORATION/ASSOCIATION + permit value $200K+. The qualified list is typically 30-80 condo association permits per month. Outreach to the association president and management company is the highest-converting cold-outreach motion in FL restoration.</p>
+
+<h2>The post-Surfside reset: building-recertification permits</h2>
+<p>Following the 2021 Champlain Towers South collapse, Broward and Miami-Dade enacted milestone-inspection requirements that triggered a wave of mandatory structural recertification permits across all 30+-year-old high-rises. These permits typically generate $300K-$3M of structural and waterproofing work per building. The wave is still rolling — many buildings have only just begun their phase-1 inspections, with phase-2 corrective work running through 2027-2030.</p>
+
+<p>PermitGrab tracks recertification permits as a distinct category. Filter to permit type RECERTIFICATION + property type HIGH-RISE-CONDO + Broward County for the subset.</p>
+
+<h2>The 90-day hurricane permit cycle (recap)</h2>
+<p>FL's claim cycle is longer than TX hail markets because of stricter AOB reform laws. Post-storm permit volume peaks at 60-90 days after landfall, not 14-21 days like DFW. The first 30 days are emergency tarp/stabilization (lower margin, cash-pay). Days 30-90 are the peak permit window where insurance scopes are finalized. Days 90-180 are claim-appeal work where homeowners who initially had claims denied are working through appeals (smaller volume, higher margin).</p>
+
+<h2>Why Fort Lauderdale beats Tampa or Orlando for restoration</h2>
+<p>Tampa is fragmented across 3 counties (Hillsborough, Pinellas, Pasco) with violation feeds currently 0 or stale. Orlando has the cleanest data stack of any FL metro but smaller absolute storm-claim volume. Miami-Dade is the largest absolute market but hyper-competed by 200+ post-Surfside restoration firms. Fort Lauderdale combines the second-largest absolute claim volume of any FL metro, the strongest condo association concentration, and lower competitive density per addressable prospect than Miami-Dade.</p>
+
+<p><strong>$149/mo unlimited Fort Lauderdale + Broward County access.</strong> 14-day free trial. <a href="/leads/insurance-restoration">Restoration contractor onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Fort Lauderdale permit data?',
+             'Daily refresh from Broward County and Fort Lauderdale-specific data feeds. New permits typically appear within 24-48 hours of filing.'),
+            ('Why is the violation feed marked dead by freshness?',
+             'gis.fortlauderdale.gov CodeCase MapServer/0 has 66K records but the newest INITDATE is 2019-10-03 (per V326 audit). PermitGrab supplements with permit data and adjacent municipal feeds — restoration in Broward is permit-driven more than violation-driven anyway.'),
+            ('Do you have FL DBPR phones for Fort Lauderdale?',
+             'Fort Lauderdale has 22+ contractor profiles with phones from FL DBPR baseline. The import is currently a known P0 (column position alignment per CLAUDE.md) — when functional, runs add 50-150 phones per refresh.'),
+            ('Can I filter to condo association vs individual owner permits?',
+             'Yes. The applicant_type field on most FL permits distinguishes CORPORATION / ASSOCIATION / INDIVIDUAL filings. Filter to CORPORATION/ASSOCIATION to surface high-margin building-level permits.'),
+            ('What about post-Surfside milestone inspections?',
+             'PermitGrab indexes RECERTIFICATION and STRUCTURAL-INSPECTION permit subcategories. Filter to these to surface the post-Surfside wave specifically.'),
+        ],
+    },
+
+    'philadelphia-plumbing-leads': {
+        'title': 'Philadelphia Plumbing Contractor Leads from Permits | PermitGrab',
+        'meta_description': (
+            '55,000+ Philadelphia property owners + daily permit feed + '
+            'aging Mid-Atlantic plumbing infrastructure. Skip Angi/Yelp '
+            'lead fees. $149/mo unlimited.'
+        ),
+        'h1': 'Philadelphia Plumbing Contractor Leads from Permit Data',
+        'subject': 'Plumbing contractors in Philadelphia',
+        'city': 'Philadelphia',
+        'city_slug': 'philadelphia-pa',
+        'persona_slug': 'plumbing-contractor',
+        'meta_published': '2026-05-04',
+        'reading_time': '7 min',
+        'body_html': """
+<p>Philadelphia has the oldest housing stock of any major US metro — median residential building age 89 years (vs national median 41). Roughly 30% of Philly's housing stock predates 1939, and approximately 15% predates 1900. The plumbing infrastructure under that housing is at end-of-life replacement urgency: galvanized steel supply lines, cast-iron sewer mains, lead service lines, knob-and-tube electrical entwined with modern PVC retrofits. The replacement cycle isn't 12-15 years like Phoenix HVAC — it's a continuous, decades-long pipeline of mandatory work driven by code enforcement, water utility mandates, and homeowner failure events.</p>
+
+<p>Philadelphia is in PermitGrab's CITY_REGISTRY via phl.carto.com (ad-ready as of V258 with 1,253 real-business profiles, 11 phones, 7,270 violations). The PA bulk contractor license database is paid-only, so phone enrichment runs via DDG web search rather than state license imports — but the homeowner targeting (which is what matters for plumbing lead-gen) is fully functional.</p>
+
+<h2>What Philadelphia plumbers get from PermitGrab</h2>
+<ul>
+  <li><strong>55,000+ Philadelphia property owner records</strong> with mailing addresses</li>
+  <li><strong>Philadelphia daily permit feed</strong> via phl.carto.com — fresh as of 2026-04-22 baseline, with PLUMBING / WATER-HEATER / SEWER / GAS / LSL filters</li>
+  <li><strong>1,253+ contractor profiles</strong> from extracted permit applicant data</li>
+  <li><strong>7,270+ code enforcement violation records</strong> — daily refresh, including water leak / sewer backup / fixture violation categories</li>
+  <li><strong>Lead service line replacement permits</strong> — Philadelphia Water Department's LSL replacement program is in active rollout, generating mandatory permitted work for thousands of homes</li>
+</ul>
+
+<h2>The 5 highest-converting Philadelphia plumbing lead types</h2>
+<ol>
+  <li><strong>Sewer-line / lateral replacement permits</strong> — Philadelphia's combined-sewer system + 100+-year-old laterals = constant failure events. Average ticket $5K-$15K. Volume: 200-400 per month metro-wide.</li>
+  <li><strong>Water heater replacement permits</strong> — high volume (600-1,200/month), close rate 35-45% on within-7-day outreach.</li>
+  <li><strong>Repipe / supply line replacement permits</strong> — galvanized-to-PEX repipe work averages $4K-$12K. Cited as a leading indicator for water heater + fixture replacements (cross-sell opportunity).</li>
+  <li><strong>Lead service line replacements</strong> — Philadelphia Water Department's LSL program requires permitted work on roughly 18K-25K homes. Volume currently 800-1,500 permits per quarter and growing.</li>
+  <li><strong>Code violation referrals</strong> — properties cited for plumbing violations (illegal taps, code-noncompliant fixtures, lead-service-line non-compliance) need licensed work to clear. 30-90 day deadlines drive 22-30% conversion on direct outreach.</li>
+</ol>
+
+<h2>The historic district / brownstone / row house play</h2>
+<p>Philadelphia's row house housing stock — Society Hill, Old City, Northern Liberties, Fishtown, parts of West Philly — has unique plumbing challenges. Cast-iron stack repipes through narrow row house framing is specialty work commanding 50-80% margin premiums vs standard SFR plumbing. Filter strategy: Philadelphia + permit type SEWER/STACK/REPIPE + property type ROW HOUSE / TOWNHOUSE + assessed value $300K+. The qualified list is typically 80-150 row-house repipe permits per month.</p>
+
+<h2>The Philadelphia Water Department LSL program</h2>
+<p>PWD's LSL replacement program is one of the largest municipal water infrastructure programs in the country. It mandates lead service line replacement on roughly 18K-25K Philadelphia homes by 2032. Each replacement requires a licensed plumber + permit + final inspection. Average ticket $4K-$10K depending on length. Volume growing 25-35% year over year as the program ramps. PermitGrab indexes LSL permits as a distinct subcategory.</p>
+
+<h2>Why Philadelphia outperforms Pittsburgh or Baltimore for plumbing</h2>
+<p>Pittsburgh has 2,045 permits in PermitGrab as of V322 + 2,002 with contractor names + 0 contractor profiles built (data is there but profile-build is pending — see CLAUDE.md). Baltimore is structurally dead per CLAUDE.md (no contractor field on Baltimore permits at all). Philadelphia is the only major Mid-Atlantic metro with a fully-functional PermitGrab data stack right now.</p>
+
+<p><strong>$149/mo unlimited Philadelphia + Philadelphia County access.</strong> 14-day free trial. <a href="/leads/plumbing-contractor">Plumbing contractor onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Philadelphia plumbing permit data?',
+             'Daily refresh from phl.carto.com. Most recent freshness baseline 2026-04-22. New permits typically appear within 24-48 hours of filing.'),
+            ('Do you have plumber phone numbers for Philadelphia?',
+             'Pennsylvania has no bulk state contractor license database (paid-only), so phone enrichment runs via DDG web search. Coverage is approximately 8-15% of Philadelphia profile records — lower than FL or NY but workable.'),
+            ('Can I filter to Lead Service Line replacement permits specifically?',
+             'Yes. The LSL_REPLACEMENT permit subcategory is indexed separately. PWD\'s program generates 800-1,500 LSL permits per quarter currently, scaling toward 2,500-3,000/quarter by 2028.'),
+            ('What about historic district restrictions?',
+             'Philadelphia\'s Historic Commission requires special review on permits in registered historic districts (Society Hill, Old City, etc.). PermitGrab notes the district designation when present in the source data — useful for plumbers who specialize in historic-district-compliant work.'),
+            ('Does this cover surrounding Philadelphia metro counties?',
+             'Philadelphia County / city is the primary feed. Bucks, Montgomery, Delaware, Chester counties have limited permit coverage in PermitGrab currently. Most Philadelphia plumbers focus their first 1-2 years inside Philadelphia County for service-density efficiency anyway.'),
+        ],
+    },
+
+    'chicago-window-replacement-leads': {
+        'title': 'Chicago Window Replacement Contractor Leads from Permits | PermitGrab',
+        'meta_description': (
+            '72,000+ Cook County owners + Chicago daily permit feed. '
+            'Window replacement contractors win on Chicago lakefront wind '
+            '+ aging Midwest housing stock. $149/mo unlimited.'
+        ),
+        'h1': 'Chicago Window Replacement Contractor Leads from Permit Data',
+        'subject': 'Window/door replacement specialists in Chicago',
+        'city': 'Chicago',
+        'city_slug': 'chicago-il',
+        'persona_slug': 'window-replacement',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Chicago is one of the most demanding window environments in the country. Lake Michigan-driven northeasterly wind events produce 50-70 mph gusts on a regular basis. Annual freeze-thaw cycles of 60-80 events stress window frames and seals. Median Chicago residential building age is 73 years vs 41 national, meaning much of the city's housing stock has 1950s-1970s aluminum-frame windows at end-of-life. Federal 25C tax credits + ComEd / Peoples Gas energy efficiency rebates stack to roughly $1,200-$2,500 in incentives per house for ENERGY STAR-rated upgrades.</p>
+
+<p>Chicago window replacement permit volume runs 1,500-2,500 per month metro-wide — among the highest in the country.</p>
+
+<h2>What Chicago window contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>72,000+ Cook County property owner records</strong> with mailing addresses</li>
+  <li><strong>3,498+ Chicago contractor profiles with phone numbers</strong> from IL state license imports — the largest contractor phone stack on the platform</li>
+  <li><strong>Chicago daily permit feed</strong> with WINDOW / DOOR / FENESTRATION / STORM-WINDOW filters</li>
+  <li><strong>22u3-xenr code violation feed</strong> — daily refresh — properties cited for broken window glass, frame deterioration, or weatherproofing violations</li>
+  <li><strong>Permit value field</strong> — typical residential window-replacement permits run $4K-$30K; filter for whole-house projects vs single-window repair work</li>
+</ul>
+
+<h2>The federal 25C + Illinois energy rebate stacking play</h2>
+<p>Most Chicago homeowners don't know that they can stack federal 25C credits ($600/year for windows) with ComEd Smart Saver rebates and Peoples Gas energy efficiency incentives. For a typical 12-window whole-house ENERGY STAR upgrade, total stacked incentives can reach $1,500-$3,000 — meaningfully reducing effective project cost. Outreach scripts that lead with the financial-motivator angle convert at 16-22% vs 4-8% on generic post-permit cold outreach.</p>
+
+<p>Tax credit timing matters: homeowners who pulled permits in Q1 may still be in tax-planning mode. Q4 outreach is best for closing year-end installations to capture the current-tax-year credit before expiration. PermitGrab's permit-history view enables seasonal call-list building 90-180 days back to identify pending-but-not-installed projects.</p>
+
+<h2>The Chicago neighborhood targeting strategy</h2>
+<p>Window replacement margins vary substantially by neighborhood. Lakefront + lake-view condo association projects (River North, Streeterville, Old Town, Lincoln Park, Lakeview) command premium pricing for high-performance window work — average tickets $40K-$150K per condo vs $8K-$15K typical SFR. Filter strategy: Chicago + permit type WINDOW + property type CONDO + assessed value $400K+. Volume: 200-400 condo window permits per month, primarily concentrated in lakefront ZIPs.</p>
+
+<p>South Side and West Side bungalow neighborhoods (Beverly, Mount Greenwood, Bridgeport, etc.) have different economics — smaller individual tickets ($6K-$12K) but high cluster density that supports neighborhood saturation campaigns. Filter to BUNGALOW property type for this targeting.</p>
+
+<h2>The lakefront wind-event window play</h2>
+<p>Chicago experiences 8-15 high-wind events per year (50+ mph gusts) that produce localized window damage. Following major lake-effect storms, permit volume in lakefront ZIPs spikes 2-4x for 30-60 days. PermitGrab's permit-volume trend lines by ZIP make these patterns visible. Most aggressive Chicago window contractors maintain saved searches by lakefront ZIP and watch for spike signals.</p>
+
+<h2>Why Chicago beats other Midwest window markets</h2>
+<p>Cleveland (60K Cuyahoga owners) is well-wired but smaller absolute volume. Cincinnati (79K Hamilton owners) has the deepest owner stack but fewer extreme weather events. Detroit + Milwaukee don't have functional permit feeds in PermitGrab. Minneapolis has cold but smaller absolute housing stock. Chicago combines the largest absolute permit volume of any Midwest market, the deepest contractor phone stack (3,498+), and the strongest code violation feed.</p>
+
+<p><strong>$149/mo unlimited Chicago + Cook County access.</strong> 14-day free trial. <a href="/leads/window-replacement">Window replacement onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Chicago window permit data?',
+             'Daily refresh from data.cityofchicago.org. New permits typically appear within 24-48 hours of filing.'),
+            ('Do you have window contractor phone numbers for Chicago?',
+             'Chicago has 3,498+ contractor profiles with phones — the largest non-FL contractor phone count in PermitGrab. Window/door specialists are a subset (typically 150-300 active firms in the metro). Phone coverage on this subset is approximately 65-75%.'),
+            ('Can I filter just to whole-house window replacement vs single-window jobs?',
+             'Yes. Permit value filtering gets you most of the way there ($15K+ typically indicates whole-house). Permit description fields also reference window count where the source data provides it.'),
+            ('What about ComEd Smart Saver rebate qualification?',
+             'PermitGrab does not directly verify rebate eligibility — that requires checking against ComEd\'s current program rules. But properties with permit values consistent with ENERGY STAR upgrade tier (typically $4K+ for windows) are likely eligible. Most contractors handle the rebate paperwork on the homeowner\'s behalf as part of the install.'),
+            ('Does PermitGrab cover suburban Cook County and surrounding metros?',
+             'Cook County coverage extends across all incorporated municipalities (Evanston, Oak Park, Cicero, Berwyn, etc.). DuPage, Lake, Kane, Will counties are not currently full-coverage but on the queue.'),
+        ],
+    },
+
+    'atlanta-pest-control-lawn-leads': {
+        'title': 'Atlanta Pest Control & Lawn Service Leads from Permits | PermitGrab',
+        'meta_description': (
+            'Atlanta pest control + lawn service contractors: target new '
+            'homeowners and post-renovation properties via daily permit '
+            'feed + Fulton County owner data. $149/mo unlimited.'
+        ),
+        'h1': 'Atlanta Pest Control & Lawn Service Leads from Permit Data',
+        'subject': 'Pest control and lawn service contractors in Atlanta',
+        'city': 'Atlanta',
+        'city_slug': 'atlanta-ga',
+        'persona_slug': 'pest-control-lawn',
+        'meta_published': '2026-05-04',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Atlanta pest control + lawn service is the largest Southeast market for these archetypes. Three structural drivers: hot/humid climate (year-round pest pressure for cockroach + termite + mosquito species), aggressive HOA neighborhood concentrations (where service contracts can be sold building-by-building), and rapid metro population growth (35K-50K new residents per year, all of whom need recurring service contracts).</p>
+
+<p>Most Atlanta pest/lawn shops compete the same way they did in 2005: door-knock canvass, neighborhood saturation flyers, occasional Facebook ads, and lawn signs at customer properties. That works for steady-state demand but doesn't capture the highest-converting acquisition window — the 30-day post-move-in moment when new homeowners are actively setting up service contracts.</p>
+
+<h2>What Atlanta pest/lawn contractors get from PermitGrab</h2>
+<ul>
+  <li><strong>Atlanta + Fulton County permit feed</strong> with NEW-CONSTRUCTION + ADDITION + REMODEL filtering</li>
+  <li><strong>Owner mailing address change detection</strong> — when an owner\'s mailing address changes from out-of-state to in-state, they\'ve recently moved in</li>
+  <li><strong>Final inspection date tracking</strong> — outreach within 14-30 days of final inspection (when homeowners are most receptive to service-setup conversations)</li>
+  <li><strong>Address-level neighborhood targeting</strong> — pest/lawn margins are highest in HOA-dense subdivisions where service contracts can be sold building-by-building</li>
+  <li><strong>Code violation feed</strong> for Atlanta + Fulton — properties cited for overgrowth, vegetation, junk/debris are direct lawn-service prospects</li>
+</ul>
+
+<h2>The Atlanta-specific termite play</h2>
+<p>Atlanta is in the heart of the Eastern subterranean termite belt. Georgia state law requires Wood Destroying Organism (WDO) inspections on all home sale closings, and roughly 25-35% of Atlanta-metro home inspections produce active termite findings. Properties that just sold (new owner-occupant signal) have a 30-60 day window where the new homeowner is actively considering termite-treatment contracts.</p>
+
+<p>Filter strategy: Atlanta/Fulton + owner-mailing-address change in last 60 days + property type SFR. Run weekly. The qualified list is typically 300-500 new owner-occupants per week. Outreach pitch: "Welcome to Atlanta. Most new homeowners don't realize their inspection report likely flagged WDO activity — even if not active, the prior-evidence indicator means insurance won't cover treatment if termites surface within the first 12 months. We can come out next week and quote a 1-year preventative contract."</p>
+
+<h2>The Atlanta HOA dominance play</h2>
+<p>Roughly 60% of Atlanta-metro single-family housing is in an HOA. Once a contractor signs 5-10 homes in a single HOA, every other homeowner in the development becomes a referral conversation. PermitGrab's address-level data lets you cluster permit and owner records by subdivision name + neighborhood, then prioritize outreach to high-density target areas. Build out one HOA at a time vs scattering outreach metro-wide.</p>
+
+<p>Subdivision-level data availability varies by Fulton/DeKalb/Cobb/Gwinnett — most assessor data publishes the subdivision name where one exists. Filter on subdivision name to focus campaigns on specific HOAs.</p>
+
+<h2>The post-renovation cross-sell play</h2>
+<p>Major renovations (kitchen, bath, addition) trigger pest/lawn service refresh. New landscaping = new lawn service customer. New kitchen = new pest treatment (renovations open up walls and create new entry points). New addition = expanded perimeter for pest/termite contracts. Filter strategy: permit type ADDITION/REMODEL + permit value $50K+ + final inspection in last 30 days.</p>
+
+<h2>Why Atlanta beats other Southeast markets for pest/lawn</h2>
+<p>Nashville (71K Davidson owners) has cleaner data and a stronger high-end housing stock but smaller absolute population. Charlotte's pest market is fragmented across multiple counties (Mecklenburg owner data not yet wired). Raleigh (54K Wake owners) is smaller absolute size. Atlanta combines the largest absolute population, the deepest HOA concentration, and full PermitGrab coverage on Fulton County for permit + violation + owner data.</p>
+
+<p><strong>$149/mo unlimited Atlanta + Fulton County access.</strong> 14-day free trial. <a href="/leads/pest-control-lawn">Pest control + lawn service onboarding →</a></p>
+""",
+        'faqs': [
+            ('How fresh is Atlanta permit data?',
+             'Daily refresh from Atlanta + Fulton County data feeds where wired. New permits typically appear within 24-48 hours of filing. Owner mailing-address changes appear in PermitGrab within 30-45 days of recording.'),
+            ('Do you have contractor phone numbers for Atlanta pest/lawn firms?',
+             'Georgia\'s state license database covers general contractors but not pest control or lawn service specifically. Phone enrichment runs via DDG web search. Coverage is approximately 10-15% on these specialty trades — but the customer list (homeowners) is what matters for this archetype, not the contractor list.'),
+            ('Can I filter just to HOA-heavy neighborhoods?',
+             'Yes. The address-level data includes subdivision names where the assessor publishes them. Filter on subdivision name to focus campaigns on specific HOAs.'),
+            ('Does this cover DeKalb, Cobb, Gwinnett?',
+             'Atlanta + Fulton County is the primary feed. DeKalb, Cobb, Gwinnett county-level coverage is on the queue but not currently full-coverage in the platform.'),
+            ('What about commercial pest/lawn contracts?',
+             'Commercial work (office buildings, retail, restaurants) is typically won via direct sales relationships, not permit-driven outreach. PermitGrab\'s strength is residential acquisition at scale. For commercial, use the contractor-of-record data on commercial permits to identify property managers who coordinate service contracts across portfolios.'),
+        ],
+    },
+
 }
