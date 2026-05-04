@@ -806,17 +806,57 @@ def send_daily_digest():
 
 def send_test_digest(email, city=None):
     """Send a test digest to a specific email (admin testing).
-    V22: Uses SubscriberProxy instead of User model."""
+    V22: Uses SubscriberProxy instead of User model.
+
+    V493 IRONCLAD fix: do NOT default to Chicago when no city is passed.
+    Look up the recipient's real subscriber preferences first
+    (subscribers.json + User model). Hard-coded 'Chicago' fallback was
+    sending Chicago digests to subscribers who'd asked for Atlanta /
+    Phoenix / etc. — confusing test sends and pushing bad data.
+    """
+    resolved_city = city
+    resolved_name = "Test User"
+
+    # 1. Try subscribers.json first (the active digest source-of-truth)
+    if not resolved_city:
+        try:
+            from pathlib import Path
+            import json as _j
+            sp = Path('/var/data/subscribers.json')
+            if sp.exists():
+                subs = _j.loads(sp.read_text())
+                for s in subs:
+                    if (s.get('email') or '').lower() == email.lower():
+                        resolved_city = s.get('city')
+                        resolved_name = s.get('name') or resolved_name
+                        break
+        except Exception:
+            pass
+
+    # 2. Fall back to the User model (Flask-SQLAlchemy)
+    if not resolved_city:
+        try:
+            from models import User
+            u = User.query.filter(User.email.ilike(email)).first()
+            if u:
+                resolved_city = getattr(u, 'preferred_city', None) or getattr(u, 'city', None)
+                resolved_name = getattr(u, 'name', None) or resolved_name
+        except Exception:
+            pass
+
+    # 3. Last resort — use the user-provided arg (still might be None,
+    # in which case the digest renderer will pick a sensible default
+    # city from the data itself, NOT a hard-coded Chicago).
     user = SubscriberProxy({
         "email": email,
-        "name": "Test User",
-        "city": city or "Chicago",
+        "name": resolved_name,
+        "city": resolved_city,  # may be None — renderer handles that
         "plan": "pro",
         "active": True,
         "unsubscribe_token": "test-token"
     })
     success, result = send_daily_digest_to_user(user)
-    return {'success': success, 'result': result}
+    return {'success': success, 'result': result, 'resolved_city': resolved_city}
 
 
 # =============================================================================
