@@ -3346,11 +3346,14 @@ def admin_patch_source_endpoint():
             UPDATE prod_cities SET source_endpoint = ?,
                 source_id = COALESCE(?, source_id),
                 source_type = COALESCE(?, source_type),
+                status = COALESCE(?, status),
+                pause_reason = COALESCE(?, pause_reason),
                 consecutive_failures = 0,
                 last_failure_reason = NULL
             WHERE city_slug = ?
         """, (c.get('source_endpoint'), c.get('source_id'),
-              c.get('source_type'), slug)).rowcount
+              c.get('source_type'), c.get('status'),
+              c.get('pause_reason'), slug)).rowcount
         out.append({'slug': slug, 'updated': n})
     conn.commit()
     return jsonify({'status': 'ok', 'patched': out})
