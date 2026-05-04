@@ -178,9 +178,14 @@ def dashboard_redirect():
                 "SELECT COUNT(*) AS n FROM permits WHERE source_city_key = ?",
                 (r['slug'],)
             ).fetchone()
+            # V503: was UPPER(city) AND UPPER(state) full-scanning 401K
+            # violations × 20 cities = 8M comparisons per dashboard hit.
+            # Join through prod_cities → prod_city_id (indexed). 1000x faster.
             vc = conn.execute(
-                "SELECT COUNT(*) AS n FROM violations WHERE UPPER(city) = UPPER(?) AND UPPER(state) = UPPER(?)",
-                (r['name'], r['state'])
+                "SELECT COUNT(*) AS n FROM violations v "
+                "JOIN prod_cities pc ON v.prod_city_id = pc.id "
+                "WHERE pc.city_slug = ?",
+                (r['slug'],)
             ).fetchone()
             tracked.append({
                 'slug': r['slug'], 'name': r['name'], 'state': r['state'],
