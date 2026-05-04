@@ -3289,6 +3289,38 @@ def admin_collect_assessor_data():
         return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
 
 
+@admin_bp.route('/api/admin/refresh-city-stats', methods=['POST'])
+def admin_refresh_city_stats():
+    """V492: force-refresh the city_stats system_state cache.
+
+    Body:
+      {"city": "buffalo-ny"}     # refresh ONE city
+      {}                          # refresh ALL active cities
+      {"limit": 20}               # refresh top-20 only (warm path)
+
+    Returns the count refreshed. Use after big imports (V489/V490/V491
+    drainage) so the city pages immediately reflect the new owner /
+    permit / violation totals — otherwise the cache is up to 4 hr stale
+    until worker.secondary_loop refreshes it.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    payload = request.get_json(silent=True) or {}
+    try:
+        from routes.city_stats_cache import (
+            refresh_city_stats_cache,
+            refresh_city_stats_cache_all,
+        )
+        if payload.get('city'):
+            data = refresh_city_stats_cache(payload['city'])
+            return jsonify({'status': 'ok', 'city': payload['city'], 'data': data})
+        n_ok, n_total = refresh_city_stats_cache_all(limit=payload.get('limit'))
+        return jsonify({'status': 'ok', 'refreshed': n_ok, 'total': n_total})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
+
+
 @admin_bp.route('/api/admin/manual-subscriber', methods=['POST'])
 def admin_manual_subscriber():
     """V494 emergency recovery: manually create or update a subscribers

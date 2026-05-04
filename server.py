@@ -8675,6 +8675,25 @@ def scheduled_collection():
         except Exception as _e:
             print(f"[{datetime.now()}] V479: stats refresh failed: {_e}", flush=True)
 
+        # V492 IRONCLAD: end-of-cycle city_stats system_state cache refresh.
+        # Mirrors the V488 IRONCLAD persona-stats pattern. Without this,
+        # AdsBot crawls /permits/<state>/<city> and times out on the
+        # multi-COUNT aggregate queries — Google flags "Destination not
+        # working" and auto-pauses the ad (V484/V485 B2 incident). Running
+        # in this daemon thread (NOT a request handler) so the per-city
+        # COUNT can take 0.5-2s × ~700 cities = 6-15 min without affecting
+        # page latency. Templates read system_state in < 1ms.
+        try:
+            from routes.city_stats_cache import refresh_city_stats_cache_all as _v492_refresh
+            _v492_t0 = time.time()
+            _v492_n_ok, _v492_n_total = _v492_refresh()
+            _v492_elapsed = int(time.time() - _v492_t0)
+            print(f"[{datetime.now()}] V492: city_stats refreshed "
+                  f"{_v492_n_ok}/{_v492_n_total} in {_v492_elapsed}s",
+                  flush=True)
+        except Exception as _e:
+            print(f"[{datetime.now()}] V492: city_stats refresh failed (non-fatal): {_e}", flush=True)
+
         # V493 IRONCLAD: write per-cycle heartbeat to system_state so the
         # health endpoint can detect a stuck cycle. Each successful loop
         # iteration updates 'scheduled_cycle_completed_at' with the
@@ -9108,6 +9127,22 @@ def start_collectors():
         _test_outbound_connectivity()
     except Exception as _e:
         print(f"[{datetime.now()}] connectivity test error (non-fatal): {_e}", flush=True)
+
+    # V492 IRONCLAD: warm city_stats system_state cache for the top 20
+    # cities at boot so AdsBot's first crawl after a deploy never hits
+    # cold-cache compute. Full pass runs at end of next scheduled
+    # collection cycle. 20 cities × ~1-2s each = ~30s, acceptable on
+    # boot (vs. ~10 min for full 700-city pass).
+    try:
+        from routes.city_stats_cache import refresh_city_stats_cache_all as _v492_warm
+        _v492_t0 = time.time()
+        _wn_ok, _wn_total = _v492_warm(limit=20)
+        print(f"[{datetime.now()}] V492: startup city_stats warm "
+              f"({_wn_ok}/{_wn_total} in {int(time.time()-_v492_t0)}s)",
+              flush=True)
+    except Exception as _e:
+        print(f"[{datetime.now()}] V492: startup warm failed (non-fatal): {_e}",
+              flush=True)
 
     # V75: Apply known fixes to broken city_sources configs
     print(f"[{datetime.now()}] V75: Applying known config fixes...", flush=True)

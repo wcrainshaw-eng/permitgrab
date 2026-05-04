@@ -1498,31 +1498,51 @@ def state_city_landing(state_slug, city_slug):
     # kept as a fallback for the 19 anchor cities, but every city now
     # gets a data-aware meta title/description and FAQ schema based on
     # what data is actually present (profiles / phones / violations / owners).
+    #
+    # V492 IRONCLAD: counts now come from routes/city_stats_cache.py.
+    # The 3 inline queries below — contractor_profiles COUNT, the
+    # property_owners LOWER(city) full scan, plus violations COUNT
+    # later in this function — were the AdsBot-timeout culprits. Cache
+    # serves from system_state in ~1ms; live compute only runs as a
+    # cold-start fallback inside get_city_stats() itself.
     _v474_profiles_count = 0
     _v474_phones_count = 0
     _v474_owners_count = 0
-    # V474b: positional access for safety across row_factory variants
+    _v492_cached_violations = None
     try:
-        _row = conn.execute(
-            "SELECT COUNT(*), "
-            "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) "
-            "FROM contractor_profiles WHERE source_city_key = ?",
-            (city_slug,)
-        ).fetchone()
-        if _row:
-            _v474_profiles_count = _row[0] or 0
-            _v474_phones_count = _row[1] or 0
-    except Exception as _e:
-        print(f"[V474] profiles count failed for {city_slug}: {_e}", flush=True)
-    try:
-        _row = conn.execute(
-            "SELECT COUNT(*) FROM property_owners "
-            "WHERE LOWER(city) = LOWER(?) AND state = ?",
-            (city_name, city_state)
-        ).fetchone()
-        _v474_owners_count = _row[0] if _row else 0
-    except Exception as _e:
-        print(f"[V474] owners count failed for {city_slug}: {_e}", flush=True)
+        from routes.city_stats_cache import get_city_stats as _v492_get_stats
+        _v492_stats = _v492_get_stats(city_slug)
+        _v474_profiles_count = _v492_stats.get('profiles', 0) or 0
+        _v474_phones_count = _v492_stats.get('phones', 0) or 0
+        _v474_owners_count = _v492_stats.get('owners', 0) or 0
+        _v492_cached_violations = _v492_stats.get('violations')
+    except Exception as _v492_e:
+        # Cache import or read failure — fall through to inline queries.
+        # This preserves the original behavior so the route never breaks
+        # because of a cache module bug.
+        print(f"[V492] city_stats cache unavailable for {city_slug}: {_v492_e}",
+              flush=True)
+        try:
+            _row = conn.execute(
+                "SELECT COUNT(*), "
+                "SUM(CASE WHEN phone IS NOT NULL AND phone <> '' THEN 1 ELSE 0 END) "
+                "FROM contractor_profiles WHERE source_city_key = ?",
+                (city_slug,)
+            ).fetchone()
+            if _row:
+                _v474_profiles_count = _row[0] or 0
+                _v474_phones_count = _row[1] or 0
+        except Exception as _e:
+            print(f"[V474] profiles count failed for {city_slug}: {_e}", flush=True)
+        try:
+            _row = conn.execute(
+                "SELECT COUNT(*) FROM property_owners "
+                "WHERE LOWER(city) = LOWER(?) AND state = ?",
+                (city_name, city_state)
+            ).fetchone()
+            _v474_owners_count = _row[0] if _row else 0
+        except Exception as _e:
+            print(f"[V474] owners count failed for {city_slug}: {_e}", flush=True)
 
     # V156: SEO-optimized meta for top cities, generic fallback for others
     _pc = f"{int(permit_count or 0):,}"
@@ -1708,19 +1728,24 @@ def state_city_landing(state_slug, city_slug):
     city_blog_posts = get_blog_posts_for_city(city_link)
 
     # V162: Get violation data for cities that have it
+    # V492 IRONCLAD: COUNT comes from city_stats_cache (computed in
+    # _v492_stats above); only fall through to live query if cache miss.
     violations_data = []
     violations_count = 0
     try:
-        # Try prod_city_id first (V162 schema), fall back to city name (V156 schema)
-        try:
-            if prod_city_id:
-                v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (prod_city_id,)).fetchone()
+        if _v492_cached_violations is not None:
+            violations_count = _v492_cached_violations or 0
+        else:
+            # Try prod_city_id first (V162 schema), fall back to city name (V156 schema)
+            try:
+                if prod_city_id:
+                    v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE prod_city_id = ?", (prod_city_id,)).fetchone()
+                    violations_count = v_count['cnt'] if v_count else 0
+            except Exception:
+                pass
+            if violations_count == 0:
+                v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE city = ? AND state = ?", (city_name, city_state)).fetchone()
                 violations_count = v_count['cnt'] if v_count else 0
-        except Exception:
-            pass
-        if violations_count == 0:
-            v_count = conn.execute("SELECT COUNT(*) as cnt FROM violations WHERE city = ? AND state = ?", (city_name, city_state)).fetchone()
-            violations_count = v_count['cnt'] if v_count else 0
         if violations_count > 0:
             try:
                 v_rows = conn.execute("""
@@ -1775,7 +1800,7 @@ def state_city_landing(state_slug, city_slug):
     }
     _v467_seo_blog_slug = _v467_blog_slugs.get(city_slug)
 
-    return render_template('city_landing_v77.html',
+    rendered = render_template('city_landing_v77.html',
         property_owners=_get_property_owners(display_name, city_state, limit=10),  # V284
         seo_blog_slug=_v467_seo_blog_slug,
         city_name=display_name,
@@ -1844,6 +1869,18 @@ def state_city_landing(state_slug, city_slug):
         unified_records=unified_records,
         total_records=permit_count,  # template's "showing X of Y" badge
     )
+
+    # V492 IRONCLAD: stale-if-error Cache-Control. Defense in depth on
+    # top of the city_stats_cache — even if every cache layer misses
+    # AND the live SQL fails, AdsBot can serve a cached copy and avoid
+    # the "Destination not working" finding. 5-min browser cache,
+    # 10-min CDN cache, 24-hour stale-if-error window.
+    from flask import make_response as _v492_make_response
+    _resp = _v492_make_response(rendered)
+    _resp.headers['Cache-Control'] = (
+        'public, max-age=300, s-maxage=600, stale-if-error=86400'
+    )
+    return _resp
 
 
 @city_pages_bp.route('/permits/<city_slug>/<trade_slug>')

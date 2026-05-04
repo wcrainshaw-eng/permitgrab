@@ -160,6 +160,83 @@ def send_email(to_email, subject, html_body, text_body=None):
         return False
 
 
+SALES_FROM_EMAIL = os.environ.get('SALES_FROM_EMAIL', 'sales@permitgrab.com')
+SALES_REPLY_TO = os.environ.get('SALES_REPLY_TO', 'wcrainshaw@gmail.com')
+
+
+def send_sales_email(to_email, subject, html_body, text_body=None, reply_to=None):
+    """V495 BONUS: outreach email from sales@permitgrab.com with Reply-To
+    routed to a real inbox.
+
+    Mirrors send_email() — prefers Resend, falls back to SMTP — but
+    overrides the From address to SALES_FROM_EMAIL and adds a Reply-To
+    header so customer replies route to a real inbox even if sales@
+    has no mailbox configured. Used by the Higgins/Meyer/Gomes recovery
+    flow and by all future customer-success outreach.
+
+    permitgrab.com is already a verified Resend sending domain (alerts@
+    works), so sales@ on the same domain works immediately — no DNS
+    change, no new API key.
+
+    reply_to: optional override. Defaults to SALES_REPLY_TO.
+    """
+    effective_reply_to = reply_to or SALES_REPLY_TO
+
+    # Resend path
+    resend_key = os.environ.get('RESEND_API_KEY')
+    if resend_key:
+        try:
+            import resend as _resend
+            _resend.api_key = resend_key
+            payload = {
+                'from': SALES_FROM_EMAIL,
+                'to': [to_email],
+                'subject': subject,
+                'html': html_body,
+                'reply_to': effective_reply_to,
+            }
+            if text_body:
+                payload['text'] = text_body
+            _resend.Emails.send(payload)
+            print(f"  ✓ Sent via Resend (sales) to {to_email}: {subject}")
+            return True
+        except ImportError:
+            print("  [Resend] 'resend' package not installed — falling back to SMTP")
+        except Exception as e:
+            print(f"  ✗ Resend (sales) failed, falling back to SMTP: {e}")
+
+    # SMTP fallback
+    if not SMTP_PASS:
+        print(f"  [CRITICAL] SMTP_PASS not set! Sales email to {to_email} NOT sent (dry-run mode)")
+        return True
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = SALES_FROM_EMAIL
+    msg['To'] = to_email
+    msg['Reply-To'] = effective_reply_to
+
+    if not text_body:
+        text_body = "View this email in HTML for the best experience."
+    msg.attach(MIMEText(text_body, 'plain'))
+    msg.attach(MIMEText(html_body, 'html'))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            # Note: SMTP envelope-from stays as SMTP_USER (auth credential),
+            # but the visible From: header is SALES_FROM_EMAIL. Some
+            # providers will reject if envelope-from doesn't match the
+            # auth — Resend is the path that works cleanly here.
+            server.sendmail(SALES_FROM_EMAIL, to_email, msg.as_string())
+        print(f"  ✓ Sent (sales) to {to_email}: {subject}")
+        return True
+    except Exception as e:
+        print(f"  ✗ Failed to send (sales) to {to_email}: {e}")
+        return False
+
+
 def generate_token():
     """Generate a secure random token for unsubscribe/verification links."""
     return secrets.token_urlsafe(32)
