@@ -3336,15 +3336,20 @@ def admin_prune_noise():
         """)
         results['chronic_failures'] = cur.rowcount
 
-        # 3. Configured >180d ago, never produced any permits
+        # 3. Active row that has never produced any permits AND has had
+        # no successful collection — these are configured but never
+        # actually worked. Original V493 spec used a created_at filter
+        # but prod_cities has no such column; using last_successful_collection
+        # IS NULL as the proxy (combined with zero permits + null permit
+        # date this is unambiguously "never collected anything").
         cur = conn.execute("""
             UPDATE prod_cities SET
                 status = 'paused',
                 last_error = COALESCE(last_error, 'V493: never produced data')
             WHERE status = 'active'
               AND (total_permits IS NULL OR total_permits = 0)
-              AND (newest_permit_date IS NULL)
-              AND (created_at IS NULL OR created_at < datetime('now','-180 days'))
+              AND newest_permit_date IS NULL
+              AND last_successful_collection IS NULL
         """)
         results['never_produced'] = cur.rowcount
 
