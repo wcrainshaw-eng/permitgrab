@@ -102,9 +102,14 @@ def _compute_city_stats(slug, conn=None):
         print(f"[V492] prod_cities lookup failed for {slug}: {e}", flush=True)
 
     # Violations
+    # V503 BUGFIX: violations table uses prod_city_id, not source_city_key
+    # (per CLAUDE.md feedback_violations_join_key). Old query returned 0
+    # for every city. Now joins through prod_cities to translate slug.
     try:
         row = conn.execute(
-            "SELECT COUNT(*) FROM violations WHERE source_city_key = ?",
+            "SELECT COUNT(*) FROM violations v "
+            "JOIN prod_cities pc ON v.prod_city_id = pc.id "
+            "WHERE pc.city_slug = ?",
             (slug,)
         ).fetchone()
         out['violations'] = row[0] if row else 0

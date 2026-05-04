@@ -3719,6 +3719,59 @@ def admin_query():
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/api/admin/perf-migrate', methods=['POST'])
+def admin_perf_migrate():
+    """V503: idempotent perf migrations — indexes + ANALYZE.
+
+    Hardcoded list of low-risk perf changes that aren't allowed via
+    /api/admin/execute (which forbids CREATE). Each step uses IF NOT
+    EXISTS so re-running is a no-op.
+
+    Add new entries here when you find a hot path that's full-scanning
+    a big table. Don't expose arbitrary CREATE — that's how schemas drift.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    import time
+    steps = [
+        # V496 finding: V492 city_stats compute hangs for minutes because
+        # `LOWER(city) AND state = ?` does a full scan of property_owners
+        # (2.86M rows). Index on (state, city) lets SQLite narrow to the
+        # per-state subset (typically 50-200K rows) before the LOWER scan.
+        ("idx_property_owners_state_city",
+         "CREATE INDEX IF NOT EXISTS idx_property_owners_state_city "
+         "ON property_owners (state, city)"),
+        # V503: covering index for the violations COUNT(*) per slug pattern
+        # used by city pages + V492 cache.
+        ("idx_violations_source_city_key",
+         "CREATE INDEX IF NOT EXISTS idx_violations_source_city_key "
+         "ON violations (source_city_key)"),
+        # V503: rebuild query planner stats. After V474+V487-V491 ingest
+        # of 851K+ owner rows + V496 prod_cities patches, stats are stale
+        # across multiple tables — planner may pick suboptimal indexes.
+        ("ANALYZE",
+         "ANALYZE"),
+    ]
+    out = []
+    conn = permitdb.get_connection()
+    try:
+        for name, sql in steps:
+            t0 = time.time()
+            try:
+                conn.execute(sql)
+                conn.commit()
+                out.append({'step': name, 'status': 'ok',
+                            'elapsed_s': round(time.time() - t0, 2)})
+            except Exception as e:
+                out.append({'step': name, 'status': 'error',
+                            'error': str(e)[:200],
+                            'elapsed_s': round(time.time() - t0, 2)})
+    finally:
+        conn.close()
+    return jsonify({'status': 'done', 'steps': out})
+
+
 @admin_bp.route('/api/admin/execute', methods=['POST'])
 def admin_execute():
     """V159: Run a write SQL statement (INSERT/UPDATE/DELETE).
