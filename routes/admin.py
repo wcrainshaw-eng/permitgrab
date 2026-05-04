@@ -3327,7 +3327,14 @@ def admin_patch_source_endpoint():
     drifted to NULL but the source_id still maps to a live registry
     entry. Body: {"cities": [{"slug": "cook-county",
     "source_endpoint": "https://...", "source_id": "cook_county",
-    "source_type": "socrata"}]}. Returns per-row update counts."""
+    "source_type": "socrata"}]}. Returns per-row update counts.
+
+    LESSON 2026-05-04: do NOT follow a bulk patch with parallel
+    force-collect against many of the patched cities at once. Each
+    force-collect holds a SQLite write transaction; >2 concurrent
+    plus the daemon will WAL-deadlock the gunicorn workers and
+    require a deploy to recover. Use /api/admin/force-collection
+    (background full-cycle) instead, or sequential force-collect."""
     valid, error = check_admin_key()
     if not valid:
         return error
