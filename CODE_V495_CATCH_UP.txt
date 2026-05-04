@@ -1,0 +1,471 @@
+CODE_V495 — Full catch-up: push, deploy, recover Higgins + Meyer
+==============================================================================
+
+Date: 2026-05-03
+Owner: Code (this is your work order)
+Reviewer: Wes / Cowork
+Goal: take the repo from "lots of work on disk, none of it pushed" to
+"V493 + V492 + V494 deployed, Buffalo+Cleveland ads serving, Higgins +
+Meyer recovered before their trials end (May 15 + 16)."
+
+This is a single-thread sequential plan. Do NOT skip ahead. Each step
+verifies the prior. If a step fails, stop and report — do not paper
+over a failure to keep the chain moving.
+
+==============================================================================
+PHASE 0 — BEFORE YOU TOUCH ANYTHING
+==============================================================================
+
+Read these in this order so you have full context:
+  1. CLAUDE.md (project memory + ARCHITECTURE GROUND TRUTH)
+  2. MASTER_UAT.md (the new anchor — Pre-Deploy Gates section MUST pass
+     before each deploy below)
+  3. STATUS_HANDOFF_2026-05-03.md (the "what's pending" snapshot)
+  4. CODE_V493_DAEMON_OUTAGE_FIX.txt (P0 — first deploy)
+  5. CODE_V492_FIX_DESTINATION_NOT_WORKING.txt (P1 — second deploy)
+  6. CODE_V494_PAID_FLOW_NO_CITY_CAPTURE.txt (P0 retention — third deploy)
+  7. AD_COPY_REFRESH_2026-05-03.md (informational — tells you the 7
+     remaining ad groups still need refresh)
+
+If any of these files are missing on disk, stop and tell Wes.
+
+==============================================================================
+PHASE 1 — PUSH WHAT'S ALREADY DONE
+==============================================================================
+
+The local repo is ahead of origin by 1+ commits AND has uncommitted
+work that the sandbox couldn't finish committing. Get everything
+pushed in one clean batch.
+
+Run from Wes's Mac terminal (NOT inside any sandbox — git push needs
+his GitHub creds):
+
+```
+cd ~/Documents/PermitGrab
+git status              # confirm what's staged + unstaged
+git log --oneline -10 origin/main..HEAD   # what's local-only
+```
+
+Expected uncommitted files (from the Cowork session):
+  - city_persona_posts.py       (4 new blog posts — Scottsdale,
+                                  Raleigh, Orlando, Cincinnati)
+  - CODE_V492_FIX_DESTINATION_NOT_WORKING.txt
+  - CODE_V493_DAEMON_OUTAGE_FIX.txt
+  - CODE_V494_PAID_FLOW_NO_CITY_CAPTURE.txt
+  - CODE_V495_CATCH_UP.txt   (this file)
+  - AD_COPY_REFRESH_2026-05-03.md
+  - STATUS_HANDOFF_2026-05-03.md
+  - MASTER_UAT.md
+
+Stage + commit all of them in one go:
+```
+git add city_persona_posts.py \
+        CODE_V492_FIX_DESTINATION_NOT_WORKING.txt \
+        CODE_V493_DAEMON_OUTAGE_FIX.txt \
+        CODE_V494_PAID_FLOW_NO_CITY_CAPTURE.txt \
+        CODE_V495_CATCH_UP.txt \
+        AD_COPY_REFRESH_2026-05-03.md \
+        STATUS_HANDOFF_2026-05-03.md \
+        MASTER_UAT.md
+
+git commit -m "V493/V492/V494 instruction files + MASTER_UAT anchor + 4 more blog posts
+
+- CODE_V493: P0 daemon outage fix (V481 WORKER_MODE no-op gates)
+- CODE_V492: Destination Not Working fix (city-stats system_state cache)
+- CODE_V494: paid trial flow doesn't capture city prefs (Higgins+Meyer)
+- CODE_V495: full catch-up sequencing (this PR)
+- MASTER_UAT.md: consolidated UAT anchor — every prior UAT report
+  merged + 14 historical findings + Open Findings O1-O14 + 7 Recurring
+  Regressions
+- AD_COPY_REFRESH spec for the 7 zero-impression ad groups
+- STATUS_HANDOFF for the May 3 work-in-progress
+- 4 new long-tail blog posts (Scottsdale, Raleigh, Orlando, Cincinnati
+  — push city_persona_posts.py from 22 -> 26 entries)"
+
+git push origin main
+```
+
+Wait for Render to deploy. Two services exist in render.yaml but per
+CLAUDE.md ARCHITECTURE GROUND TRUTH, only `permitgrab` (web) was
+ever actually created. Don't try to create a worker.
+
+Watch the Render dashboard for the deploy to go green. If it fails
+on boot with a Python import error or KeyError, check the latest
+crash log and fix immediately — V490 hit a `KeyError: 'name'` on
+boot recently and required a hotfix.
+
+==============================================================================
+PHASE 2 — APPLY V493 (P0 DAEMON OUTAGE)
+==============================================================================
+
+This restores collection + email digest. Everything downstream is
+useless until this is live.
+
+V493 instructions: CODE_V493_DAEMON_OUTAGE_FIX.txt
+
+Net edits:
+  - routes/admin.py — DELETE lines 1046-1062 (the V481 WORKER_MODE
+    noop guard inside admin_start_collectors)
+  - server.py — DELETE the matching guard inside start_collectors()
+    around line 9080 (about 8-12 lines including the print + return)
+  - server.py docstring above start_collectors() — append the
+    anti-regression note from CODE_V493
+
+Make the V493 changes, push, wait for deploy.
+
+Post-deploy verification:
+```
+# 1. Confirm health
+curl -s https://permitgrab.com/api/admin/health \
+  | python3 -c 'import sys,json;d=json.load(sys.stdin); \
+                print("status="+d["status"], "daemon="+str(d["daemon_running"]))'
+# Expected: status=healthy daemon=True (NOT noop, NOT unhealthy)
+
+# 2. Force-restart daemons (this is the big test — should NOT return noop)
+curl -X POST -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  "https://permitgrab.com/api/admin/start-collectors?force=1"
+# Expected: {"status": "started", "message": "Background collectors started..."}
+
+# 3. Wait 30 seconds, confirm threads alive
+curl -s -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  https://permitgrab.com/api/admin/debug/threads \
+  | grep -E "scheduled_collection|enrichment_daemon|email_scheduler"
+# Expected: all 3 thread names with is_alive=true
+
+# 4. Confirm digest scheduler
+curl -s -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  https://permitgrab.com/api/admin/digest/status \
+  | python3 -c 'import sys,json;d=json.load(sys.stdin); \
+                print("daemon_alive="+str(d["daemon_alive"]), \
+                      "thread_alive="+str(d["digest_status"]["thread_alive"]))'
+# Expected: both True
+```
+
+If any of these fail, stop. Open the Render logs. Report.
+
+==============================================================================
+PHASE 3 — APPLY V492 (CITY-PAGE CACHE)
+==============================================================================
+
+V492 prevents the "Destination not working" Google Ads disapproval
+that hit Buffalo. AdsBot times out on /permits/<state>/<city> because
+of multi-COUNT aggregate queries; V492 moves them into the
+system_state cache (mirroring V488 IRONCLAD).
+
+V492 instructions: CODE_V492_FIX_DESTINATION_NOT_WORKING.txt
+
+Net edits:
+  - NEW FILE routes/city_stats_cache.py (~140 lines, mirrors
+    routes/persona_pages.py V488 pattern)
+  - routes/city_pages.py — replace inline COUNT queries in
+    state_city_landing() and city_landing_inner() with cache reads
+  - routes/admin.py — add POST /api/admin/refresh-city-stats endpoint
+  - worker.py — add startup warm + secondary_loop refresh every 4 hr
+  - city pages — add stale-if-error Cache-Control header
+
+Make the changes, push, wait for deploy.
+
+Post-deploy:
+```
+# Force-warm cache for ad-relevant cities
+for slug in buffalo-ny cleveland-oh miami-dade-county phoenix-az \
+             new-york-city henderson nashville san-jose; do
+  curl -X POST -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+    -H "Content-Type: application/json" \
+    -d "{\"city\":\"$slug\"}" \
+    https://permitgrab.com/api/admin/refresh-city-stats
+done
+
+# Verify response time on city pages
+for slug in buffalo-ny cleveland-oh phoenix-az; do
+  echo -n "$slug: "
+  time curl -s "https://permitgrab.com/permits/$slug" -o /dev/null
+done
+# Expected: each < 300ms after warm
+```
+
+If a city page still takes > 1s after warm, the cache isn't working —
+debug before proceeding.
+
+==============================================================================
+PHASE 4 — APPLY V494 (PAID FLOW CAPTURE — RETENTION FIX)
+==============================================================================
+
+This is the biggest one. Higgins's trial ends May 16, Meyer's ends
+May 15. Both will cancel before being charged unless they start
+receiving the digest. V494 wires the funnel + adds a manual recovery
+endpoint we use TONIGHT for Higgins + Meyer.
+
+V494 instructions: CODE_V494_PAID_FLOW_NO_CITY_CAPTURE.txt
+
+Net edits:
+  - routes/city_pages.py — add GET + POST /select-cities; gate
+    /start-checkout on session.pending_cities OR existing subscribers
+    row with non-empty digest_cities
+  - routes/api.py — patch the checkout.session.completed webhook
+    handler at line 2620 to:
+      (a) UPDATE subscribers SET plan = ? WHERE LOWER(email) = ?
+          (sync plan, defensive)
+      (b) UPDATE subscribers SET active = 1
+          WHERE LOWER(email) = ? AND active = 0
+          (activate any pending row from /select-cities)
+      (c) If neither path finds a row, INSERT a new subscribers row
+          with digest_cities='[]' AND email Wes a "needs city follow-up"
+          alert
+  - routes/admin.py — add POST /api/admin/manual-subscriber for
+    emergency recovery (Higgins + Meyer)
+  - NEW FILE templates/select_cities.html — multi-select city form,
+    matches templates/get_alerts.html visual style
+  - templates/pricing.html — change "Start Free Trial" href from
+    /start-checkout?plan=X to /select-cities?plan=X&next=/start-checkout?plan=X
+  - templates/success.html — add the gtag purchase event from
+    MASTER_UAT O11:
+        gtag('event', 'purchase', {
+          transaction_id: '{{ session_id }}',
+          value: 149.00, currency: 'USD',
+          items: [{item_name: '{{ plan_name }}_monthly'}]
+        });
+    (this fixes GA4's $0 revenue blind spot at the same time)
+
+Make the changes, push, wait for deploy.
+
+Post-deploy verification (do this BEFORE running the recovery in
+PHASE 5 — confirm the new flow works for an incognito test account):
+
+```
+# 1. Open incognito, sign up new test account at /signup
+# 2. Click "Start Free Trial" on /pricing
+# 3. CONFIRM you land on /select-cities — NOT Stripe Checkout
+# 4. Pick a city, submit
+# 5. Now you land on /start-checkout, then Stripe Checkout
+# 6. Use Stripe TEST card 4242 4242 4242 4242, any future date, any CVC
+# 7. After checkout success, verify subscribers row created:
+
+curl -X POST -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  -H "Content-Type: application/json" \
+  -d '{"sql":"SELECT email, name, plan, digest_cities, active FROM subscribers ORDER BY id DESC LIMIT 5"}' \
+  https://permitgrab.com/api/admin/query
+# Expected: new row with the test email, plan='pro' (or 'trialing'),
+# digest_cities=[<city you picked>], active=1
+```
+
+If the test signup doesn't produce the row, V494 isn't wired right.
+Stop and debug.
+
+==============================================================================
+PHASE 5 — RECOVER HIGGINS + MEYER (URGENT — TRIAL CLOCK)
+==============================================================================
+
+These two are the only customers at retention risk. Their trials end
+May 15 (Meyer) and May 16 (Higgins). Each day without a digest reduces
+retention odds.
+
+Step 1: Pull their emails from Stripe Dashboard.
+  - Stripe → Developers → Events → search by event_id:
+      Meyer:   evt_1TSPEsKEO80D40NyTIxmRrJH
+      Higgins: evt_1TSl7MKEO80D40NyazciukdR
+  - Each event detail shows the customer email.
+  - OR: Stripe → Customers → filter created_at 2026-05-01 to
+    2026-05-02 (should be exactly 2 rows).
+
+Step 2: Email each one. Wes can use his personal email or yours;
+the message should look like (adapt as you see fit):
+
+  Subject: "Welcome to PermitGrab — what cities do you want?"
+
+  Hey [name],
+
+  Thanks for starting your PermitGrab trial. There's a gap in our
+  signup flow — we collected payment but didn't ask which cities you
+  want building permit alerts for. That's on us, fixing it this week.
+
+  Reply with the cities you want covered (most common picks:
+  Miami-Dade, Phoenix, Chicago, NYC, Atlanta, Houston, Charlotte,
+  Nashville). Once I have your list I'll set up your alerts and
+  you'll get tomorrow's daily digest.
+
+  Sorry for the friction.
+
+  — Wes
+
+Step 3: When each replies, manually create their subscribers row
+using the V494 emergency endpoint:
+
+```
+# For each of Higgins + Meyer:
+curl -X POST -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email":   "<their_email>",
+    "name":    "<their_name>",
+    "cities":  ["miami-dade-county", "phoenix-az"],   # whatever they replied
+    "plan":    "trialing"
+  }' \
+  https://permitgrab.com/api/admin/manual-subscriber
+```
+
+Step 4: Trigger a same-day test digest to confirm they receive it:
+```
+curl -X POST -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<their_email>"}' \
+  https://permitgrab.com/api/admin/digest/trigger
+```
+
+Then verify:
+```
+curl -X POST -H "X-Admin-Key: 122f635f639857bd9296150ba2e64419" \
+  -H "Content-Type: application/json" \
+  -d '{"sql":"SELECT id, recipient_email, status, sent_at FROM digest_log ORDER BY id DESC LIMIT 4"}' \
+  https://permitgrab.com/api/admin/query
+# Expected: 2 rows with their emails and status='sent'
+```
+
+==============================================================================
+PHASE 6 — ALSO CHECK ON GOMES
+==============================================================================
+
+Per Wes's note: Gomes's subscribers row was hand-inserted with
+digest_cities=["miami-dade-county"], guessed at insertion time.
+Confirm with him that's actually the city he wants.
+
+Step 1: Email Gomes the same way. Subject: "Quick check — is
+Miami-Dade the right city for your alerts?"
+
+Step 2: If he wants something different, update his row:
+```
+# Need a one-shot UPDATE endpoint OR direct SSH SQL — the admin
+# /api/admin/query is SELECT-only by design. Recommend adding a
+# /api/admin/update-subscriber endpoint to V494 for this case.
+```
+
+Step 3: Also fix his plan field (currently 'free' in subscribers,
+should be 'trialing' or 'pro'):
+```
+UPDATE subscribers SET plan = 'pro'
+WHERE email = 'main@onpointgb.com';
+```
+
+(After V494 ships, the next webhook event Stripe fires for him —
+even an idempotent retry — will sync this automatically.)
+
+==============================================================================
+PHASE 7 — REFRESH THE 7 ZERO-IMPRESSION AD GROUPS
+==============================================================================
+
+AD_COPY_REFRESH_2026-05-03.md has the per-ad-group spec for Henderson,
+San Jose, LA, Nashville, Phoenix, San Antonio, Buyer Intent National.
+Buffalo + Cleveland are already saved (Pending review).
+
+Best path: Google Ads Editor desktop app (avoids the 2FA wall that
+blocked the Cowork session from finishing this batch).
+  1. Get recent changes (pulls Buffalo + Cleveland's saved Pending ads)
+  2. Filter to PermitGrab - Contractor Leads Search
+  3. For each of the 7 ads in the spec, replace the 5 generic
+     headlines with the city-keyword data-driven ones from the spec
+  4. **Henderson has a URL bug** — its Final URL is currently
+     /permits/miami-dade-county. Change to /permits/henderson-nv.
+     Display path 2: miami-dade -> henderson-nv. (V494 city URL fix is
+     not related — this is a one-off ad config typo.)
+  5. Post all changes in one batch upload — no 2FA challenge
+
+Expected outcome: ad strength Poor -> Good on each, impressions move
+off zero within 24-48 hr after Google review approves.
+
+==============================================================================
+PHASE 8 — POST-DEPLOY UAT GATE
+==============================================================================
+
+Run the MASTER_UAT.md "Pre-Deploy Gates" section (top of the file).
+All 9 bullets must pass green:
+
+  ☐ Health endpoint healthy
+  ☐ Digest scheduler thread alive
+  ☐ Pricing button -> city capture -> Stripe (V494 test signup ran)
+  ☐ Webhook writes subscribers row (test signup confirmed)
+  ☐ AdsBot fetches city pages in <2s (V492 cache warm)
+  ☐ /permits/<slug> 301-redirects to /permits/<state>/<slug>
+  ☐ Visual UAT screenshot run passes
+  ☐ No 500s in last 1h scraper_runs
+  ☐ Phone counts haven't regressed on ad-ready cities
+
+Plus the new MASTER_UAT findings:
+  ☐ O11 — gtag purchase event fires on /success (check GA4 the
+         next day — Total Revenue should be non-zero)
+  ☐ O14 — manual digest trigger + password reset still 200s
+
+When all gates green, mark these MASTER_UAT findings closed:
+  - O1 (V494 paid flow no city capture)
+  - O2 (daemon outage)
+  - O3 (Buffalo destination not working — recheck Google Ads)
+  - O11 (gtag purchase event)
+
+Move them to the Closed Findings table with the version that fixed
+each, and add the watchpoint check to the relevant Pre-Deploy Gate.
+
+==============================================================================
+ROLL-BACK PLAN (if anything goes sideways)
+==============================================================================
+
+If V494 breaks the signup funnel for new users:
+  - The /start-checkout route at routes/city_pages.py:723 used to
+    skip the city capture step. Reverting just the V494 patch to
+    that file restores the OLD broken behavior. Not a great state
+    but at least signups still process payment.
+  - Better path: hot-fix forward. Most likely V494 issues are
+    template-side (select_cities.html missing) or a JS import error.
+
+If V493 daemon spawn breaks request handling:
+  - The V481 perf concern was real (daemons + request handlers
+    sharing GIL). If after V493 lands you see request latencies
+    spike, you may need to lower secondary_loop frequency from 30s
+    to 5min as a stop-gap.
+  - Long-term: actually create the permitgrab-worker Background
+    Worker service in the Render dashboard, set WORKER_MODE=1 on
+    THAT service only, and re-add the WORKER_MODE guards (this time
+    correctly).
+
+If V492 cache write fails on first deploy:
+  - The cache fallback path computes synchronously, so renders still
+    work — just slow. Worker refresh on next cycle should populate
+    system_state.
+
+==============================================================================
+DELIVERABLE CHECKLIST
+==============================================================================
+
+By the end of this work order, all of these should be true:
+
+[ ] Phase 1: All local commits pushed to origin/main
+[ ] Phase 2: V493 deployed, daemon=true, all 3 daemon threads alive
+[ ] Phase 3: V492 deployed, city pages < 300ms response
+[ ] Phase 4: V494 deployed, test signup creates subscribers row
+[ ] Phase 5: Higgins + Meyer reached out to, cities captured,
+              subscribers rows created, test digest delivered
+[ ] Phase 6: Gomes reached out to, his city confirmed, plan field
+              corrected
+[ ] Phase 7: 7 ad groups refreshed via Google Ads Editor, ad
+              strength Good on each
+[ ] Phase 8: All Pre-Deploy Gates green, O1/O2/O3/O11 moved to
+              Closed Findings
+
+If any of these aren't done, summarize the blocker and report back.
+
+==============================================================================
+NORTH STAR
+==============================================================================
+
+The point of this work order is NOT to ship a lot of code. It's to
+get the platform to a state where:
+  1. Trial users automatically receive value during their trial
+     (Higgins + Meyer + every future signup)
+  2. Ad spend produces working conversions instead of paying CPC
+     for funnel-broken signups
+  3. Daemon collection runs reliably without manual restarts
+  4. The MASTER_UAT.md anchor catches the next regression before it
+     ships, instead of after
+
+When all 4 are true, we can confidently turn ad spend back up and
+the system will hold.
+
+— End of CODE_V495 —

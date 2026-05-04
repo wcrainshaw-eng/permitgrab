@@ -1,0 +1,434 @@
+CODE_V494 — P0 RETENTION BUG: Trial signup flow doesn't capture city prefs
+==============================================================================
+
+WHAT BROKE
+==============================================================================
+
+The signup → checkout → digest pipeline has never worked end-to-end
+for any organic user since launch. Confirmed 2026-05-03 with Wes:
+
+Stripe shows 3 customers:
+  - main@onpointgb.com      (Gomes Benjamim — entered card, 14-day trial)
+  - <Meyer's email>         (started trial May 1, 22:08:50 UTC)
+  - <Higgins's email>       (started trial May 2, 21:30:32 UTC)
+
+Plus Wes himself, manually added to `users` (admin, no Stripe).
+
+The local `subscribers` table currently has 2 rows: Wes + Gomes.
+Both were INSERTED BY HAND. Gomes hit the same V494 bug as Meyer +
+Higgins — went through Stripe checkout, entered card info, no
+`subscribers` row was created automatically. Wes manually backfilled
+Gomes's row at some point with a guessed city ("miami-dade-county").
+The current `subscribers.plan='free'` for Gomes is just the value
+Wes wrote at insertion time; it doesn't reflect Stripe state.
+
+Today's digest fired and only reached Wes + Gomes — i.e. the two
+hand-curated rows. Meyer + Higgins started 14-day trials and have
+received nothing. They will cancel before being charged unless
+their cities get captured and the digest reaches them.
+
+This is not an isolated bug or a regression. It's a foundational
+gap: the funnel was never wired to the subscribers table. Every
+"customer" the platform has ever had was hand-rescued by Wes.
+
+ROOT CAUSE
+==============================================================================
+
+The current flow for a paid subscription:
+
+    /pricing
+       └─ "Start Free Trial" button
+              ↓
+    /start-checkout?plan=pro          (routes/city_pages.py:723)
+       ├─ if logged-out:
+       │     redirect /signup → /start-checkout
+       └─ if logged-in:
+              ↓
+    Stripe Checkout                    (creates subscription)
+              ↓
+    Stripe webhook (checkout.session.completed)
+              ↓
+    User row updated: plan=pro
+              ↓
+    [NO subscribers row written. No digest_cities captured.]
+
+The `/get-alerts` route (city_pages.py:805) and the `/api/subscribe`
+endpoint (api.py:871) capture city preferences — but ONLY for free
+digest signups. Paid users never go through them.
+
+The "patch" Wes mentioned (probably an earlier attempt to wire
+/get-alerts before checkout) is NOT in the live code. /start-checkout
+sends paid users straight to Stripe with no city capture step.
+
+This means:
+  - Every new paid customer enters with digest_cities=NULL
+  - The digest scheduler skips users with no digest_cities
+  - The scheduler subscriber list shows 2 users today, regardless
+    of how many people actually paid
+
+EMERGENCY RECOVERY — TONIGHT
+==============================================================================
+
+Step 1: Pull the customer emails from Stripe Dashboard.
+
+In Stripe Dashboard → Developers → Events, search by event_id:
+  - May 1: evt_1TSPEsKEO80D40NyTIxmRrJH
+           checkout.session.completed at 2026-05-01 22:08:50 UTC
+  - May 2: evt_1TSl7MKEO80D40NyazciukdR
+           checkout.session.completed at 2026-05-02 21:30:32 UTC
+
+Click each event → "Customer" field shows the email used at checkout.
+
+Alternatively: Stripe Dashboard → Customers → filter by created_at
+between 2026-05-01 and 2026-05-02. Should be exactly 2 rows.
+
+Step 2: Email both customers (template — adapt as needed).
+
+Subject: "Welcome to PermitGrab — what cities do you want alerts for?"
+
+Body:
+  Hey [name],
+
+  Thanks for signing up for PermitGrab. I noticed your account is
+  active but we don't have your city preferences captured yet —
+  that's on us, the signup flow has a bug where we collect payment
+  before asking what cities you want.
+
+  To get your daily digest started, just reply with which cities
+  you want covered. We can send alerts for any of these:
+    https://permitgrab.com/cities
+  Most popular picks: Miami-Dade, Phoenix, Chicago, NYC, Atlanta,
+  Houston, Charlotte, Nashville.
+
+  Once you tell me, I'll set up your alerts immediately and you'll
+  get tomorrow's digest. Sorry for the friction.
+
+  — Wes
+
+Step 3: When they reply, manually insert their subscribers row
+(needs admin DB write — currently blocked by SELECT-only query
+endpoint, so this requires SSH or a one-off admin POST).
+
+Add a temporary admin endpoint in routes/admin.py for this:
+
+    @admin_bp.route('/api/admin/manual-subscriber', methods=['POST'])
+    def admin_manual_subscriber():
+        """V494 emergency recovery: manually create a subscribers row
+        for a paid customer who slipped through the no-city-capture
+        signup gap. Body: {"email": "...", "name": "...", "cities":
+        ["miami-dade-county"], "plan": "pro"}.
+        Remove this endpoint once the V494 flow fix is deployed and
+        verified."""
+        valid, error = check_admin_key()
+        if not valid:
+            return error
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        name = (data.get('name') or '').strip()
+        cities = data.get('cities') or []
+        plan = data.get('plan') or 'pro'
+        if not email or not cities:
+            return jsonify({'error': 'email + cities required'}), 400
+        import json as _j
+        permitdb.execute(
+            "INSERT OR REPLACE INTO subscribers "
+            "(email, name, plan, digest_cities, active, created_at) "
+            "VALUES (?, ?, ?, ?, 1, datetime('now'))",
+            (email, name, plan, _j.dumps(cities))
+        )
+        return jsonify({'status': 'created', 'email': email,
+                        'cities': cities, 'plan': plan})
+
+Then for each missing customer:
+    curl -X POST -H "X-Admin-Key: <KEY>" -H "Content-Type: application/json" \
+      -d '{"email": "<their_email>", "name": "<name>",
+           "cities": ["miami-dade-county"], "plan": "pro"}' \
+      https://permitgrab.com/api/admin/manual-subscriber
+
+Step 4: Reach out to both customers within 24 hours. Refund or
+credit the May portion if either is upset. Goodwill > $149.
+
+THE STRUCTURAL FIX
+==============================================================================
+
+The flow has to capture city prefs BEFORE handing the user to Stripe.
+There are two viable patterns:
+
+Pattern A — pre-checkout form (recommended)
+    /pricing
+       └─ "Start Free Trial"
+              ↓
+    /signup (if logged-out) → /start-checkout
+              ↓
+    /select-cities?next=/start-checkout?plan=pro    (NEW route)
+       └─ form POST to /select-cities (NEW POST handler)
+              ↓ (form writes pending subscribers row + redirects)
+    /start-checkout (now has session.cities populated)
+              ↓
+    Stripe Checkout
+              ↓
+    webhook → activate subscribers row from session.cities
+
+Pattern B — Stripe Custom Field
+    Stripe Checkout supports custom fields. Add a "Which cities do
+    you want alerts for?" multi-select field to the Checkout Session
+    creation. The webhook then reads custom_fields off the session
+    and writes the subscribers row.
+    Cleaner UX (one less hop) but Stripe's custom field UI is plain
+    text only — no city-name validation, no autocomplete. Risky.
+
+Pattern A is the right call. Implementation:
+
+==== EDIT 1: routes/city_pages.py — add /select-cities route ====
+
+Add after /get-alerts (~line 820):
+
+    @city_pages_bp.route('/select-cities')
+    def select_cities_page():
+        """V494: city-prefs capture step that gates Stripe checkout.
+
+        Required step BEFORE /start-checkout for any paid plan.
+        Without this, paying customers land in Stripe with no
+        digest_cities captured, the webhook can't write a subscribers
+        row, and they're charged but receive no digest.
+
+        URL params:
+          plan: pro/starter/enterprise (default pro)
+          next: where to redirect after submission (default /start-checkout)
+        """
+        from flask import session
+        user = get_current_user()
+        if not user:
+            # Shouldn't reach here — /pricing button gates on /signup —
+            # but defensive in case someone deep-links.
+            from urllib.parse import quote
+            next_url = quote(request.full_path, safe='')
+            return redirect(f'/signup?next={next_url}')
+
+        plan = (request.args.get('plan') or 'pro').strip().lower()
+        next_path = request.args.get('next') or f'/start-checkout?plan={plan}'
+
+        # If they already have cities captured (returning user
+        # upgrading from free → paid), skip straight to checkout.
+        existing = permitdb.execute(
+            "SELECT digest_cities FROM subscribers WHERE email = ?",
+            (user.get('email'),)
+        ).fetchone()
+        if existing and existing[0] and existing[0] != '[]':
+            return redirect(next_path)
+
+        all_cities = get_cities_with_data()
+        cities = all_cities[:200]
+        return render_template('select_cities.html',
+                               cities=cities,
+                               plan=plan,
+                               next_path=next_path,
+                               user=user)
+
+
+    @city_pages_bp.route('/select-cities', methods=['POST'])
+    def select_cities_submit():
+        """V494: write a pending subscribers row + redirect to checkout."""
+        from flask import session
+        user = get_current_user()
+        if not user:
+            return redirect('/signup')
+
+        cities = request.form.getlist('cities')
+        if not cities:
+            return redirect('/select-cities?error=at_least_one_city_required')
+
+        plan = (request.form.get('plan') or 'pro').strip().lower()
+        next_path = request.form.get('next_path') or f'/start-checkout?plan={plan}'
+
+        # Stash in session AND write a pending subscribers row. The
+        # session is the primary path; the DB row is a backup so we
+        # can recover if the user closes the browser before completing
+        # Stripe checkout.
+        import json as _j
+        email = user.get('email')
+        name = user.get('name') or ''
+        permitdb.execute(
+            "INSERT OR REPLACE INTO subscribers "
+            "(email, name, plan, digest_cities, active, created_at) "
+            "VALUES (?, ?, ?, ?, 0, datetime('now'))",
+            (email, name, plan, _j.dumps(cities))
+        )
+        session['pending_cities'] = cities
+        session['pending_plan'] = plan
+
+        return redirect(next_path)
+
+==== EDIT 2: routes/city_pages.py — gate /start-checkout on session ====
+
+In start_checkout() (line 723), AFTER the auth check (line 740-744)
+and BEFORE the Stripe session creation (line 779), add:
+
+    # V494: city prefs are required BEFORE Stripe charges the card.
+    # Without this, paying customers land in subscribers-table-NULL
+    # state and receive no digest despite paying. Already captured
+    # in session if they came through /select-cities; otherwise route
+    # them there first.
+    from flask import session
+    if not session.get('pending_cities'):
+        # Check if subscribers table already has their cities (e.g.
+        # they free-signed-up first then upgraded).
+        existing = permitdb.execute(
+            "SELECT digest_cities FROM subscribers WHERE email = ?",
+            (user.get('email') if isinstance(user, dict)
+             else user.email,)
+        ).fetchone()
+        if not existing or not existing[0] or existing[0] == '[]':
+            from urllib.parse import quote
+            next_url = quote(f'/start-checkout?plan={plan}', safe='')
+            return redirect(f'/select-cities?plan={plan}&next={next_url}')
+
+==== EDIT 3: Stripe webhook handler — activate the pending row ====
+
+Find the webhook handler at routes/api.py:2620 (the
+`if event_type == 'checkout.session.completed':` block) and after
+the existing `user.plan = 'pro'` write (line 2640), add:
+
+    # V494: activate the pending subscribers row written by
+    # /select-cities, AND defensively sync plan on any existing
+    # row matching this email. The current `subscribers` table only
+    # contains hand-inserted rows because no real user has ever
+    # completed an organic signup-to-digest flow before; the webhook
+    # has never written to subscribers. After this patch, every
+    # checkout.session.completed event keeps Postgres (users.plan)
+    # and SQLite (subscribers.plan) in sync.
+    customer_email = (session_obj.get('customer_email') or
+                      session_obj.get('customer_details', {}).get('email') or
+                      '').strip().lower()
+    if customer_email:
+        # Sync plan on any existing subscribers row
+        # (defensive — covers free-to-paid upgrades + manual back-fills)
+        permitdb.execute(
+            "UPDATE subscribers SET plan = ?, "
+            "  last_updated = datetime('now') "
+            "WHERE LOWER(email) = ?",
+            (plan_from_metadata, customer_email)
+        )
+        # Activate any pending row from /select-cities
+        # (the primary case — net-new paid signups via the V494 flow)
+        permitdb.execute(
+            "UPDATE subscribers SET active = 1 "
+            "WHERE LOWER(email) = ? AND active = 0",
+            (customer_email,)
+        )
+        # If no pending row existed (legacy path or session lost),
+        # create one with NO cities — this signals the customer-success
+        # flow that we need to email them for their preferences.
+        existing = permitdb.execute(
+            "SELECT id FROM subscribers WHERE LOWER(email) = ?",
+            (customer_email,)
+        ).fetchone()
+        if not existing:
+            permitdb.execute(
+                "INSERT INTO subscribers "
+                "(email, name, plan, digest_cities, active, created_at) "
+                "VALUES (?, ?, ?, '[]', 1, datetime('now'))",
+                (customer_email, '', plan_from_metadata)
+            )
+            # Fire an alert email to wcrainshaw@gmail.com so we
+            # know to follow up.
+            try:
+                from email_alerts import send_admin_alert
+                send_admin_alert(
+                    subject="V494: paid customer created without city prefs",
+                    body=f"{customer_email} just paid for {plan_from_metadata} "
+                         f"but no /select-cities POST preceded checkout. "
+                         f"Reach out to capture digest_cities."
+                )
+            except Exception:
+                pass
+
+==== EDIT 4: NEW templates/select_cities.html ====
+
+Match the visual style of templates/get_alerts.html — multi-select
+city dropdown + plan badge + "Continue to Checkout" button. Form
+POSTs to /select-cities. Hidden input carries plan + next_path.
+
+The form should support multi-select (checkbox list grouped by
+state, or a multi-select dropdown). Limit to 5 cities per
+subscriber for the pro plan, 1 for starter.
+
+==== EDIT 5: pricing.html "Start Free Trial" button ====
+
+Change the href from `/start-checkout?plan=X` to `/select-cities?
+plan=X&next=/start-checkout?plan=X`. This routes new visitors
+through the city-capture step first.
+
+For users who are already logged in and already have cities, the
+/select-cities handler short-circuits straight to /start-checkout
+(see EDIT 1, line "If they already have cities captured...").
+
+DEPLOYMENT ORDER
+==============================================================================
+
+1. Deploy /api/admin/manual-subscriber endpoint FIRST (just EDIT 5
+   from the Emergency Recovery section). Use it to backfill the
+   2 missing customers tonight after Wes pulls their cities via
+   email.
+
+2. Deploy the V494 flow fix (EDITS 1-5 of the structural fix).
+
+3. Verify by signing up a test account from incognito:
+     - Go to /pricing
+     - Click "Start Free Trial"
+     - Should land on /select-cities, NOT Stripe Checkout
+     - Submit form with 1+ cities checked
+     - Lands on /start-checkout, then Stripe
+     - After Stripe success, verify subscribers row exists with
+       active=1 and digest_cities=[selected cities]
+
+4. Run the daily digest (manual trigger) and confirm test account
+   receives the email.
+
+WHY THIS HAPPENED
+==============================================================================
+
+V12.51 (a long time ago) split signup into auth (User row) and
+digest (subscribers row) but never wired the paid path through the
+digest form. The /get-alerts route exists for free digest signups
+and /pricing exists for paid signups — they were two separate funnels
+that never converged. Free digest users get city prefs because their
+ONLY entry is /get-alerts. Paid users skip /get-alerts entirely.
+
+V375 (CODE_V363) "unified" the Start Free Trial button across
+logged-in and logged-out states — but didn't fix the missing
+city-capture step.
+
+This bug has probably been silent on every paid signup since the
+free→paid divergence. Wes + Benjamin showing up correctly on the
+digest is because Wes manually configured both rows (Wes is admin
++ founder; Benjamin is a friend who signed up on the free side
+first then... probably never upgraded to pro? Worth verifying).
+
+In short: the system has been billing customers without delivering
+the product since the first paid customer joined. We just didn't
+notice because Wes was the only paid customer until very recently.
+
+DELIVERABLE
+==============================================================================
+
+PR title: "V494: P0 — gate Stripe checkout on city-prefs capture
+(paid customers were billing without city alerts)"
+
+Files changed:
+  - routes/city_pages.py    (~80 lines added — /select-cities GET+POST,
+                              /start-checkout session check)
+  - routes/api.py            (~30 lines edited — webhook handler activates
+                              pending subscribers row)
+  - templates/select_cities.html  (NEW — ~60 lines, mirror get_alerts.html)
+  - templates/pricing.html   (1 line edited — Start Free Trial href)
+  - routes/admin.py          (~30 lines added — manual-subscriber endpoint
+                              for emergency recovery)
+
+Net effect:
+  - New paid customers always have digest_cities set before Stripe
+    charges them
+  - No more silent "billed but no product" scenario
+  - Recovery path exists for the 2 May customers
+  - Webhook handler tolerates legacy paid signups (creates empty
+    subscribers row + alerts wcrainshaw@gmail.com to follow up)

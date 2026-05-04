@@ -747,6 +747,34 @@ def start_checkout():
     if is_pro(user):
         return redirect('/dashboard?already_subscribed=1')
 
+    # V494: city prefs are required BEFORE Stripe charges the card.
+    # Without this, paying customers land in subscribers-table-NULL
+    # state and receive no digest despite paying (Higgins, Meyer, Gomes
+    # all hit this since launch). Captured by /select-cities -> session
+    # OR existing subscribers row from a prior free signup.
+    from flask import session as _flask_session
+    _user_email = (user.get('email') if isinstance(user, dict)
+                   else getattr(user, 'email', None))
+    if not _flask_session.get('pending_cities'):
+        _existing = None
+        try:
+            _conn_v494 = permitdb.get_connection()
+            _existing = _conn_v494.execute(
+                "SELECT digest_cities FROM subscribers WHERE LOWER(email) = ?",
+                (_user_email.lower() if _user_email else '',)
+            ).fetchone()
+        except Exception:
+            pass
+        _has_cities = (
+            _existing
+            and _existing[0]
+            and _existing[0] not in ('', '[]', '{}')
+        )
+        if not _has_cities:
+            from urllib.parse import quote as _q
+            _next_url = _q(f'/start-checkout?plan={plan}', safe='')
+            return redirect(f'/select-cities?plan={plan}&next={_next_url}')
+
     # Logged-in free user — create the Stripe session inline.
     if not STRIPE_SECRET_KEY:
         # Stripe not configured — fall back to mailto so we at least
@@ -800,6 +828,127 @@ def start_checkout():
     except stripe.error.StripeError as e:
         print(f'[V375] Stripe checkout create failed: {e}', flush=True)
         return redirect('/pricing?checkout=stripe_error')
+
+
+@city_pages_bp.route('/select-cities')
+def select_cities_page():
+    """V494: city-prefs capture step that gates Stripe checkout for paid plans.
+
+    Required BEFORE /start-checkout. Without this, paying customers land
+    in subscribers-table-NULL state and receive no digest despite paying.
+
+    URL params:
+      plan: pro/starter/enterprise (default pro)
+      next: where to redirect after submission (default /start-checkout?plan=<plan>)
+    """
+    from flask import session as _flask_session
+    user = get_current_user()
+    if not user:
+        from urllib.parse import quote as _q
+        _next_url = _q(request.full_path, safe='')
+        return redirect(f'/signup?next={_next_url}')
+
+    plan = (request.args.get('plan') or 'pro').strip().lower()
+    if plan not in ('starter', 'pro', 'enterprise'):
+        plan = 'pro'
+    next_path = request.args.get('next') or f'/start-checkout?plan={plan}'
+
+    _user_email = (user.get('email') if isinstance(user, dict)
+                   else getattr(user, 'email', None))
+
+    # Returning user upgrading from free → paid: skip if cities already set.
+    try:
+        _conn = permitdb.get_connection()
+        existing = _conn.execute(
+            "SELECT digest_cities FROM subscribers WHERE LOWER(email) = ?",
+            (_user_email.lower() if _user_email else '',)
+        ).fetchone()
+        if existing and existing[0] and existing[0] not in ('', '[]', '{}'):
+            return redirect(next_path)
+    except Exception:
+        pass
+
+    try:
+        all_cities = get_cities_with_data()
+    except Exception:
+        all_cities = []
+    cities = (all_cities or [])[:200]
+    error_msg = request.args.get('error')
+
+    return render_template(
+        'select_cities.html',
+        cities=cities,
+        plan=plan,
+        next_path=next_path,
+        user=user,
+        error_msg=error_msg,
+    )
+
+
+@city_pages_bp.route('/select-cities', methods=['POST'])
+def select_cities_submit():
+    """V494: write a pending subscribers row + redirect to checkout."""
+    from flask import session as _flask_session
+    user = get_current_user()
+    if not user:
+        return redirect('/signup')
+
+    cities = request.form.getlist('cities')
+    if not cities:
+        plan = (request.form.get('plan') or 'pro').strip().lower()
+        next_path = request.form.get('next_path') or f'/start-checkout?plan={plan}'
+        from urllib.parse import quote as _q
+        return redirect(
+            f'/select-cities?plan={plan}'
+            f'&next={_q(next_path, safe="")}'
+            f'&error=at_least_one_city_required'
+        )
+
+    plan = (request.form.get('plan') or 'pro').strip().lower()
+    if plan not in ('starter', 'pro', 'enterprise'):
+        plan = 'pro'
+    next_path = request.form.get('next_path') or f'/start-checkout?plan={plan}'
+
+    # Per V494 spec: limit pro to 5 cities, starter to 1.
+    if plan == 'starter':
+        cities = cities[:1]
+    else:
+        cities = cities[:5]
+
+    import json as _j
+    _user_email = (user.get('email') if isinstance(user, dict)
+                   else getattr(user, 'email', None))
+    _user_name = (user.get('name') if isinstance(user, dict)
+                  else getattr(user, 'name', '')) or ''
+    if _user_email:
+        try:
+            _conn = permitdb.get_connection()
+            existing = _conn.execute(
+                "SELECT id FROM subscribers WHERE LOWER(email) = ?",
+                (_user_email.lower(),)
+            ).fetchone()
+            if existing:
+                _conn.execute(
+                    "UPDATE subscribers SET name = ?, plan = ?, "
+                    "  digest_cities = ?, active = 0 "
+                    "WHERE id = ?",
+                    (_user_name, plan, _j.dumps(cities), existing[0])
+                )
+            else:
+                _conn.execute(
+                    "INSERT INTO subscribers "
+                    "(email, name, plan, digest_cities, active, created_at) "
+                    "VALUES (?, ?, ?, ?, 0, datetime('now'))",
+                    (_user_email.lower(), _user_name, plan, _j.dumps(cities))
+                )
+            _conn.commit()
+        except Exception as _e_v494:
+            print(f"[V494] pending subscribers write failed: {_e_v494}",
+                  flush=True)
+
+    _flask_session['pending_cities'] = cities
+    _flask_session['pending_plan'] = plan
+    return redirect(next_path)
 
 
 @city_pages_bp.route('/get-alerts')

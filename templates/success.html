@@ -145,5 +145,28 @@ h1 { font-size: 34px; font-weight: 800; margin-bottom: 12px; }
   Need to unsubscribe? Every digest email has a one-click link.
 </footer>
 
+<!-- V494 / MASTER_UAT O11: fire the GA4 purchase event so revenue
+     stops showing as $0 in the Reports dashboard. Without this event
+     GA4 has no way to attribute the conversion back to the ad click
+     that drove the trial. The session_id + plan_name come from the
+     /success route handler (success_page in routes/api.py). -->
+<script>
+  if (typeof gtag === 'function') {
+    try {
+      gtag('event', 'purchase', {
+        transaction_id: '{{ session_id|default("")|e }}',
+        value: 149.00,
+        currency: 'USD',
+        items: [{
+          item_name: '{{ (plan_name|default("pro"))|e }}_monthly',
+          item_id: '{{ (plan_name|default("pro"))|e }}_monthly',
+          price: 149.00,
+          quantity: 1,
+        }],
+      });
+    } catch (e) { /* never break the success page on a tracking glitch */ }
+  }
+</script>
+
 </body>
 </html>

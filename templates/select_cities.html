@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pick Your Cities — PermitGrab</title>
+<meta name="description" content="Pick the cities you want building permit alerts for. Required step before checkout.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+{% include 'partials/analytics.html' %}
+{% include 'partials/design_v478.html' %}
+<style>
+.sc-wrap { max-width: 720px; margin: 0 auto; padding: 56px 20px; }
+.sc-hero { text-align: center; margin-bottom: 32px; }
+.sc-plan-badge {
+  display: inline-block; background: var(--pg-primary); color: white;
+  padding: 6px 16px; border-radius: 999px; font-weight: 600;
+  font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.sc-form { background: white; border: 1px solid var(--pg-border); border-radius: 12px; padding: 28px; }
+.sc-error { background: #fef2f2; border-left: 3px solid #dc2626; color: #991b1b; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; }
+.sc-help { color: var(--pg-text-gray); font-size: 14px; margin-bottom: 20px; }
+.sc-cities-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px; max-height: 440px; overflow-y: auto;
+  border: 1px solid var(--pg-border); border-radius: 8px; padding: 14px;
+}
+.sc-city-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.sc-city-row:hover { background: var(--pg-gray-50); }
+.sc-city-row input[type=checkbox] { cursor: pointer; }
+.sc-city-row .name { font-weight: 500; font-size: 14px; }
+.sc-city-row .state { color: var(--pg-text-gray); font-size: 12px; margin-left: 4px; }
+.sc-search { width: 100%; padding: 10px 14px; border: 1px solid var(--pg-border); border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+.sc-submit-row { display: flex; gap: 12px; align-items: center; margin-top: 24px; }
+.sc-counter { color: var(--pg-text-gray); font-size: 14px; flex: 1; }
+.sc-submit { padding: 12px 28px; background: var(--pg-primary); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 15px; }
+.sc-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+{% include 'partials/nav.html' %}
+
+<div class="sc-wrap">
+  <div class="sc-hero">
+    <span class="sc-plan-badge">{{ plan|upper }} plan · 14-day free trial</span>
+    <h1 class="pg-h1" style="font-size: 36px; margin-bottom: 12px;">Pick your cities</h1>
+    <p class="pg-subtitle" style="margin-left: auto; margin-right: auto;">
+      Tell us which cities you want building permit alerts for. We'll set up your daily digest before you finish checkout.
+    </p>
+  </div>
+
+  <div class="sc-form">
+    {% if error_msg == 'at_least_one_city_required' %}
+    <div class="sc-error">Pick at least one city before continuing.</div>
+    {% endif %}
+
+    <p class="sc-help">
+      {% if plan == 'starter' %}Starter plan covers 1 city.{% else %}Pro plan covers up to 5 cities.{% endif %}
+      You can change these later from your dashboard.
+    </p>
+
+    <form method="POST" action="/select-cities" id="sc-form">
+      <input type="hidden" name="plan" value="{{ plan }}">
+      <input type="hidden" name="next_path" value="{{ next_path }}">
+
+      <input type="text" id="sc-search" class="sc-search" placeholder="Filter cities...">
+
+      <div class="sc-cities-grid" id="sc-grid">
+        {% for c in cities %}
+        <label class="sc-city-row" data-city="{{ (c.name or c.city or '')|lower }}">
+          <input type="checkbox" name="cities" value="{{ c.slug or c.city_slug }}">
+          <span class="name">{{ c.name or c.city }}</span><span class="state">{{ c.state or '' }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="sc-submit-row">
+        <div class="sc-counter" id="sc-counter">0 selected · max {{ 1 if plan == 'starter' else 5 }}</div>
+        <button type="submit" class="sc-submit" id="sc-submit" disabled>Continue to checkout →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var maxCities = {{ 1 if plan == 'starter' else 5 }};
+  var grid = document.getElementById('sc-grid');
+  var counter = document.getElementById('sc-counter');
+  var submit = document.getElementById('sc-submit');
+  var search = document.getElementById('sc-search');
+
+  function update() {
+    var checks = grid.querySelectorAll('input[type=checkbox]');
+    var checked = grid.querySelectorAll('input[type=checkbox]:checked');
+    var n = checked.length;
+    counter.textContent = n + ' selected · max ' + maxCities;
+    submit.disabled = n === 0;
+    // Disable un-checked when at max
+    checks.forEach(function(c) {
+      if (!c.checked) c.disabled = (n >= maxCities);
+    });
+  }
+
+  grid.addEventListener('change', update);
+  update();
+
+  search.addEventListener('input', function() {
+    var q = this.value.toLowerCase().trim();
+    grid.querySelectorAll('label.sc-city-row').forEach(function(row) {
+      var c = row.getAttribute('data-city') || '';
+      row.style.display = (!q || c.indexOf(q) !== -1) ? '' : 'none';
+    });
+  });
+})();
+</script>
+
+{% include 'partials/footer.html' %}
+</body>
+</html>

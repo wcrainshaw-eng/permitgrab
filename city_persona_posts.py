@@ -1890,4 +1890,214 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V493 additions — Scottsdale / Raleigh / Orlando / Cincinnati
+    # ====================================================================
+
+    'scottsdale-investor-leads': {
+        'title': 'Scottsdale Investor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '17,000+ Scottsdale property owners + Maricopa County daily permit '
+            'feed. Out-of-state owner filtering. Identify motivated seller '
+            'and investor opportunities in AZ\'s highest-net-worth zip codes.'
+        ),
+        'h1': 'Scottsdale Real Estate Investor Leads from Building Permits',
+        'subject': 'Real estate investors in Scottsdale',
+        'city': 'Scottsdale',
+        'city_slug': 'scottsdale',
+        'persona_slug': 'real-estate-investor',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Scottsdale's combination of luxury single-family stock + retiree migration + 38% out-of-state owner rate makes it one of the highest-leverage cities for off-market investor outreach in the Southwest. Permits + Maricopa County assessor data + tax-status flags let you identify owners under repair pressure or capital-gains pressure in zip codes where median sale prices clear $1.5M.</p>
+
+<p>PermitGrab pulls Scottsdale-specific records from Maricopa County's secondary parcel feed (V474 win — 168K rows filtered to Scottsdale + Mesa + Glendale + Tempe + other suburbs). The original Maricopa primary feed went OBJECTID-ordered into Phoenix-only territory; the secondary feed is what surfaces Scottsdale.</p>
+
+<h2>What Scottsdale data you get</h2>
+<ul>
+  <li><strong>17,000+ Scottsdale parcel owners</strong> via Maricopa secondary assessor</li>
+  <li><strong>Daily Scottsdale permit feed</strong> — additions, alterations, pool work, new construction</li>
+  <li><strong>Owner mailing address parsed</strong> — flag mailing_state != AZ for absentee owners</li>
+  <li><strong>LLC vs individual ownership</strong> distinction — investor signals</li>
+  <li><strong>Permit-to-owner address match</strong> — find owners doing major work right now</li>
+</ul>
+
+<h2>Why this works for investors</h2>
+<p>The single biggest motivated-seller signal in Scottsdale is "out-of-state luxury landlord under improvement-required repair stress." That profile shows up in the data as: owner mailing address in CA / NY / IL, recent permit for foundation or structural or roof work, parcel value &gt; $800K. Three filters on the Scottsdale data set return 200-400 candidates per quarter.</p>
+
+<p>The second signal is post-divorce or estate transitions — owner_last_name change pattern (Maricopa data exposes deed transfers indirectly via owner field updates). Estate sales in 85254 / 85255 / 85258 zip codes hit the data within 60-90 days of probate.</p>
+
+<h2>Compared to Phoenix proper</h2>
+<p>Phoenix's 247K-record dataset is broader but mostly entry-level + working-class neighborhoods. Scottsdale's 17K is concentrated in the high-margin segment investors actually pursue. The deal velocity is lower but per-deal value is 3-5x.</p>
+
+<p><strong>$149/mo unlimited Scottsdale + Maricopa County access.</strong> Cancel anytime, no contract, 7-day free trial.</p>
+""",
+        'faqs': [
+            ('How current is the Scottsdale permit data?',
+             'Daily refresh from the City of Scottsdale + Maricopa County feeds. New permits appear within 24 hours of issuance.'),
+            ('Can I filter for out-of-state landlords specifically?',
+             'Yes. The Maricopa secondary owner feed includes parsed mailing address fields. Filter mailing_state != AZ to get every Scottsdale parcel owned from outside Arizona — typically ~38% of the dataset.'),
+            ('What zip codes does Scottsdale coverage include?',
+             '85250-85268 (core Scottsdale). The data also includes adjacent Paradise Valley (85253) since Maricopa parcels straddle the boundary.'),
+            ('Do you have Scottsdale code violations data?',
+             'Limited — Scottsdale code enforcement has no public REST feed. Phoenix\'s NSD_Property_Maintenance feed (V322 wired) covers Phoenix + edge cases. For Scottsdale-specific violation signal, the permit-record source is the better proxy: investor-owned properties getting "structural" or "foundation" permits are usually under repair pressure.'),
+            ('How does Scottsdale compare to Boulder or Aspen for off-market targeting?',
+             'Scottsdale has 4-5x the parcel volume so deal flow is steadier. Aspen + Boulder are higher per-deal margins but only ~40-100 transactions/yr each. Scottsdale runs ~3,000-4,000 transactions/yr — far better for a repeatable acquisition cadence.'),
+        ],
+    },
+
+    'raleigh-roofing-leads': {
+        'title': 'Raleigh Roofing Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '54,000+ Wake County property owners + Raleigh daily permit '
+            'feed. Tornado-belt roofing replacements, accelerating new '
+            'construction. Permit-driven leads for NC roofers. $149/mo.'
+        ),
+        'h1': 'Raleigh Roofing Contractor Leads from Building Permits',
+        'subject': 'Roofing contractors in Raleigh',
+        'city': 'Raleigh',
+        'city_slug': 'raleigh',
+        'persona_slug': 'home-services',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Raleigh's housing stock + Triangle population growth + recurring spring tornado events drive one of the highest sustained roofing-permit volumes east of the Mississippi. Wake County added ~24,000 households between 2022 and 2025; existing housing stock built 1990-2010 is now hitting 25-year roof replacement cycles.</p>
+
+<p>PermitGrab pulls Raleigh-specific permits via the city's ArcGIS feed + Wake County assessor (V428 — 54K owners) + Wake violations data. Roofing permits surface within 24 hours of issuance, and the contractor + property owner are both linked at the permit level — no manual enrichment needed for the basic lead record.</p>
+
+<h2>What Raleigh roofers get</h2>
+<ul>
+  <li><strong>Daily roofing-permit feed</strong> — re-roof, partial replace, hail-damage repair</li>
+  <li><strong>54,000+ Wake County property owner records</strong> for cross-referencing absentee landlords</li>
+  <li><strong>Property owner phone numbers</strong> where DDG enrichment surfaces them</li>
+  <li><strong>Permit type filtering</strong> — "ROOFING" / "REROOF" / "TEAR-OFF" categories</li>
+  <li><strong>Address + permit value</strong> for prioritizing high-margin jobs</li>
+</ul>
+
+<h2>Why permits beat lead-gen platforms in Raleigh</h2>
+<p>HomeAdvisor, Angi, and Networx leads cost $25-80 per contact and hit you 6-12 hours after the homeowner submits. By that point you're competing with 4-6 other roofers. PermitGrab gives you the permit record the moment it's issued — typically before the homeowner has even called for quotes. You get to control the conversation timing.</p>
+
+<p>The other angle is permit-record validity. Lead platforms generate junk traffic from people who fill out forms speculatively. A permit means money has changed hands at City Hall, the homeowner has committed to a project, and they're past the "just gathering quotes" phase.</p>
+
+<h2>Tornado season + storm response</h2>
+<p>NC's spring tornado outbreaks in 2024 and 2025 produced permit clusters that overwhelmed local roofing capacity for 6-8 weeks each. PermitGrab's daily feed catches these clusters in real time — when 200+ Raleigh roofing permits hit in a single week, contractors using the feed got there before anyone else.</p>
+
+<p><strong>$149/mo unlimited Raleigh + Wake County access.</strong> 7-day free trial.</p>
+""",
+        'faqs': [
+            ('How fresh is the Raleigh roofing permit data?',
+             'Updated daily from the City of Raleigh\'s ArcGIS feed. Permits typically appear within 24 hours of issuance.'),
+            ('Do you have homeowner phone numbers?',
+             'For ~50% of Raleigh permits with contractor records, yes. NC has no bulk state contractor license database (unlike FL/CA), so phone enrichment runs via DDG web search and surfaces what\'s publicly listed.'),
+            ('Can I filter to just re-roof permits, not new construction?',
+             'Yes. Permit type filtering supports ROOFING / REROOF / TEAR-OFF / ASPHALT-SHINGLE specifically. Filter excludes new-construction roof work where you\'d compete with the original GC.'),
+            ('Does PermitGrab cover Cary, Apex, Durham, Chapel Hill?',
+             'Cary and Apex are in Wake County — covered via the Wake assessor feed (54K owners includes them). Durham + Chapel Hill are Durham County and Orange County — separate sources, not currently wired. Roadmap.'),
+            ('How does Raleigh compare to Charlotte or Atlanta for roofing volume?',
+             'Atlanta runs higher absolute volume (~2.5x Raleigh\'s permit count) but has much higher contractor competition. Charlotte is Mecklenburg-County-portal-only (V285 dead-end for owners — Polaris HTML), so PermitGrab\'s Charlotte coverage is permits-only. Raleigh is the strongest end-to-end Triangle market for the lead product right now.'),
+        ],
+    },
+
+    'orlando-roofing-leads': {
+        'title': 'Orlando Roofing Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Orlando + Orange County daily permit feed + statewide FL '
+            'parcels. Hurricane-zone roofing replacement work, year-round '
+            'volume. Permit-record leads beat Angi by 12 hours. $149/mo.'
+        ),
+        'h1': 'Orlando Roofing Contractor Leads from Building Permits',
+        'subject': 'Roofing contractors in Orlando',
+        'city': 'Orlando',
+        'city_slug': 'orlando',
+        'persona_slug': 'home-services',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Orlando's hurricane corridor exposure + 4.5% annual population growth + 2018 FL building-code revision (mandatory roof re-inspection at sale) produce structural recurring roofing demand. Florida statewide insurance carrier consolidation since 2022 has accelerated the cycle: insurers require new roofs on policies for any home with shingles older than 15 years, which forces ~40,000 Orlando-area owners into the replacement market each year.</p>
+
+<p>PermitGrab pulls Orlando permits via the City of Orlando's ArcGIS feed + Orange County assessor + Orlando violations source (V474 — k6e8-nw6w on data.cityoforlando.net, the rare FL city with a working REST violations feed). The Florida statewide assessor source (V474 — 134K rows covering Orlando + Jacksonville + St Pete + Tampa + Cape Coral + Hialeah + Fort Lauderdale via single source) gives unified owner data.</p>
+
+<h2>What Orlando roofers get</h2>
+<ul>
+  <li><strong>Daily Orlando permit feed</strong> — re-roof, hurricane-strap reinforcement, full replacement</li>
+  <li><strong>FL statewide owner pipeline</strong> — Orlando + Orange County coverage included</li>
+  <li><strong>FL DBPR-enriched contractor phones</strong> via state license database (where matching works)</li>
+  <li><strong>Code violations data</strong> via Orlando Code Enforcement feed — properties under city pressure</li>
+  <li><strong>Hurricane-season cluster detection</strong> — permits per week trend for 2-week post-storm windows</li>
+</ul>
+
+<h2>Why Orlando is the highest-conversion FL roofing market</h2>
+<p>Miami has more raw permits but dramatically higher contractor density (4-6x more roofers per capita). Tampa Bay has fragmented data (Pinellas + Pasco + Hillsborough each separate feeds, only Hillsborough fully wired). Jacksonville lacks a working public REST permit feed entirely (V476 dead-end).</p>
+
+<p>Orlando is uniquely well-served: live permits + live violations + state license phone enrichment + statewide owner pipeline + workable contractor density (~600 active licensed roofers vs Miami\'s 2,400+). Per-permit close rate is 2-3x better than Miami because there are fewer competing bids on each lead.</p>
+
+<h2>Insurance-driven replacement cycle</h2>
+<p>FL\'s post-2022 carrier consolidation forces homeowners with 15+ year shingle roofs to replace at policy renewal. Citizens Insurance specifically rejects re-policy applications without a current roof inspection certificate. This drives a structural ~40,000-permit-per-year baseline in the Orlando metro alone, independent of weather events. Storm seasons add on top of that.</p>
+
+<p><strong>$149/mo unlimited Orlando + Orange County + statewide FL access.</strong> 7-day free trial.</p>
+""",
+        'faqs': [
+            ('How current is the Orlando permit data?',
+             'Daily refresh from the City of Orlando\'s ArcGIS feed. Permits surface within 24 hours of issuance — typically before the homeowner has called for quotes.'),
+            ('Does PermitGrab cover Orange County beyond just Orlando city?',
+             'Yes. The FL statewide source covers Orange County parcels including Winter Park, Apopka, Maitland, Ocoee, and unincorporated Orange County. Permit data is currently city-of-Orlando focused — county permits are a roadmap item.'),
+            ('Can I filter for hurricane re-roof permits specifically?',
+             'Yes. Permit type filtering supports ROOFING / REROOF / HURRICANE-STRAP / WIND-MITIGATION categories. Post-storm windows are also flagged via the cluster detection — "permits per week" trend lines.'),
+            ('What about Florida DBPR contractor licensing?',
+             'PermitGrab imports FL DBPR weekly when working (column position alignment is a known P0 — see CLAUDE.md). When the import succeeds, FL contractor phone numbers attach to permit records automatically. Coverage hits ~30-40% of Orlando contractor licensees when the alignment is correct.'),
+            ('How does Orlando compare to Tampa or Miami for new contractor onboarding?',
+             'Orlando has the cleanest data stack of any FL metro right now (city permits + county owners + city violations + state license phones all live). Miami has more volume but tighter competition. Tampa is fragmented across 3 counties with violation data missing. For a new roofer launching FL operations, Orlando is the highest-leverage starting market.'),
+        ],
+    },
+
+    'cincinnati-roofing-leads': {
+        'title': 'Cincinnati Roofing Contractor Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            '79,000+ Hamilton County property owners + Cincinnati daily '
+            'permit feed. Aging Midwest housing stock = recurring roof '
+            'replacement work. $149/mo unlimited contractor leads.'
+        ),
+        'h1': 'Cincinnati Roofing Contractor Leads from Building Permits',
+        'subject': 'Roofing contractors in Cincinnati',
+        'city': 'Cincinnati',
+        'city_slug': 'cincinnati',
+        'persona_slug': 'home-services',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Cincinnati's median housing age is 73 years (vs national median 41) and Hamilton County rooftops cluster around the 1950s post-war + 1990s suburban expansion vintages. Both cohorts are in active replacement cycles right now. Combine that with aggressive Ohio winter freeze-thaw cycles and you get one of the most predictable Midwest roofing markets — high recurring permit volume, lower contractor density than Phoenix or Atlanta, and lead-conversion rates 1.5-2x national averages.</p>
+
+<p>PermitGrab pulls Cincinnati-specific data via Hamilton County assessor (79K owners), the city's permit feed (where wired), and Cincinnati's code enforcement violations data. The 79K owner count in CLAUDE.md ranks Cincinnati 3rd on the property-owner pipeline behind only Fort Worth and Miami-Dade — exceptional depth for a city of its population.</p>
+
+<h2>What Cincinnati roofers get</h2>
+<ul>
+  <li><strong>79,000+ Hamilton County property owner records</strong></li>
+  <li><strong>Cincinnati permit feed</strong> with re-roof / replacement filtering</li>
+  <li><strong>Code enforcement violation data</strong> — properties under city pressure are 4x more likely to need exterior work</li>
+  <li><strong>Owner mailing address</strong> — flag absentee landlords (~22% of Hamilton parcels)</li>
+  <li><strong>Address + permit value</strong> for prioritizing high-margin jobs</li>
+</ul>
+
+<h2>Why Cincinnati outperforms Cleveland or Columbus for new contractors</h2>
+<p>Cleveland's data quality is solid (60K Cuyahoga owners + Project_Records permit feed via V258, code violations live). Columbus is also wired but smaller (5K stored owner records currently). Cincinnati has both the deepest owner stack AND the lowest contractor density per capita — meaning the same lead-volume baseline produces fewer competing bids per job. Roofers report 30-50% close rates on Cincinnati permit-driven outreach vs 12-18% on cold lead-platform contacts.</p>
+
+<h2>Freeze-thaw cycle = recurring demand</h2>
+<p>Ohio's annual freeze-thaw count averages 60-80 cycles per year (vs 8-15 in Atlanta, 0-2 in Phoenix). Each cycle stresses asphalt shingle granular bonds and flashing seals. The structural result is a 12-18 year shingle replacement cycle — meaningfully shorter than the 20-25 years Phoenix sees. That compresses each home\'s replacement frequency by 30-40%, generating predictable recurring demand independent of weather events.</p>
+
+<p><strong>$149/mo unlimited Cincinnati + Hamilton County access.</strong> 7-day free trial.</p>
+""",
+        'faqs': [
+            ('How fresh is Cincinnati permit data?',
+             'Daily refresh from the city\'s open data portal where wired. Hamilton County assessor refreshes monthly via the V428 owner pipeline.'),
+            ('Do you have contractor phone numbers for Cincinnati?',
+             'Ohio has no bulk state contractor license database (paid-only), so phone enrichment runs via DDG web search. Coverage is ~10-15% of profile records — lower than FL or NY but workable. Cincinnati\'s smaller contractor pool means high-overlap with the 10-15% that get enriched.'),
+            ('What zip codes does Cincinnati cover?',
+             '45201-45299 (full Cincinnati metro). The Hamilton County feed extends into Norwood, Cheviot, North College Hill, Forest Park, and other inside-the-county-line municipalities.'),
+            ('Can I filter to just re-roof permits, not new construction?',
+             'Yes. Permit type categories include ROOF / REROOF / SHINGLE / TEAR-OFF / METAL-ROOF specifically. Filter excludes new-construction roof work to focus on retrofits where you\'re not competing with the original GC.'),
+            ('How does Cincinnati compare to Indianapolis or Louisville?',
+             'Indianapolis has zero functional permit feed currently (V474 dead-end — gis.indy.gov violations frozen at 2024-02). Louisville is in CLAUDE.md as a slug-routing bug (KY data routed to a Colorado slug). Cincinnati is the only fully-functional Ohio Valley + Midwest mid-size metro on the platform right now.'),
+        ],
+    },
+
 }

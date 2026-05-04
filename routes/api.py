@@ -2656,6 +2656,70 @@ def stripe_webhook():
                     'stripe_customer_id': session_obj.get('customer')
                 }, user_id_override=user.email)
 
+            # V494: sync the SQLite subscribers table so the digest
+            # scheduler actually reaches paid customers.
+            #
+            # Pre-V494 the webhook only updated the User model (Postgres
+            # via Flask-SQLAlchemy). The subscribers SQLite table — the
+            # actual source-of-truth for daily digest sends — was never
+            # touched on checkout.session.completed. Result: every paid
+            # customer since launch landed in subscribers-table-NULL
+            # state and received no digest (Higgins May 2, Meyer May 1,
+            # Gomes earlier — all hand-rescued by Wes).
+            _wh_email = (
+                customer_email
+                or session_obj.get('customer_email')
+                or (session_obj.get('customer_details') or {}).get('email')
+                or ''
+            ).strip().lower()
+            if _wh_email:
+                try:
+                    import db as _permitdb_v494
+                    _conn_v494 = _permitdb_v494.get_connection()
+                    # 1. Sync plan on existing row(s)
+                    _conn_v494.execute(
+                        "UPDATE subscribers SET plan = ? "
+                        "WHERE LOWER(email) = ?",
+                        (plan, _wh_email)
+                    )
+                    # 2. Activate any pending row from /select-cities
+                    _conn_v494.execute(
+                        "UPDATE subscribers SET active = 1 "
+                        "WHERE LOWER(email) = ? AND active = 0",
+                        (_wh_email,)
+                    )
+                    # 3. Last-resort insert + alert if no row exists
+                    _row_check = _conn_v494.execute(
+                        "SELECT id, digest_cities FROM subscribers "
+                        "WHERE LOWER(email) = ? LIMIT 1",
+                        (_wh_email,)
+                    ).fetchone()
+                    if not _row_check:
+                        _user_name_v494 = ''
+                        try:
+                            _user_name_v494 = (
+                                (user.name if user else '')
+                                or (session_obj.get('customer_details') or {}).get('name')
+                                or ''
+                            )
+                        except Exception:
+                            pass
+                        _conn_v494.execute(
+                            "INSERT INTO subscribers "
+                            "(email, name, plan, digest_cities, active, created_at) "
+                            "VALUES (?, ?, ?, '[]', 1, datetime('now'))",
+                            (_wh_email, _user_name_v494, plan)
+                        )
+                        print(
+                            f"[V494] paid customer {_wh_email} created "
+                            f"with empty digest_cities — needs follow-up",
+                            flush=True,
+                        )
+                    _conn_v494.commit()
+                except Exception as _wh_e:
+                    print(f"[V494] subscribers webhook sync failed: {_wh_e}",
+                          flush=True)
+
         elif event_type == 'invoice.payment_failed':
             invoice = event['data']['object']
             customer_email = invoice.get('customer_email')

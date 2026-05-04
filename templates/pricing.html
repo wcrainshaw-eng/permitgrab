@@ -481,7 +481,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
    assumes the click did nothing. #}
 {% if request.args.get('payment') == 'cancelled' or request.args.get('checkout') == 'cancelled' %}
 <div style="max-width: 800px; margin: 16px auto 0; padding: 12px 16px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 8px; font-size: 14px; text-align: center;">
-  Checkout cancelled. Your card wasn't charged. <a href="/start-checkout?plan=pro" style="color: #92400e; font-weight: 600; text-decoration: underline;">Start your free trial →</a>
+  Checkout cancelled. Your card wasn't charged. <a href="/select-cities?plan=pro&next=%2Fstart-checkout%3Fplan%3Dpro" style="color: #92400e; font-weight: 600; text-decoration: underline;">Start your free trial →</a>
 </div>
 {% elif request.args.get('checkout') == 'stripe_error' %}
 <div style="max-width: 800px; margin: 16px auto 0; padding: 12px 16px; background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; border-radius: 8px; font-size: 14px; text-align: center;">
@@ -529,7 +529,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <li>Daily email alerts</li>
       <li>{{ city_count or 100 }}+ cities, 30+ states</li>
     </ul>
-    <a href="/start-checkout?plan=pro" class="pg-btn pg-btn-primary">Start Free Trial</a>
+    <a href="/select-cities?plan=pro&next=%2Fstart-checkout%3Fplan%3Dpro" class="pg-btn pg-btn-primary">Start Free Trial</a>
     <p class="fine">No credit card required to start</p>
   </div>
 </section>
@@ -639,7 +639,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
            302'd to homepage and lost). /start-checkout handles both
            auth states: logged-out → signup → checkout, logged-in →
            Stripe Checkout directly. #}
-        <a href="/start-checkout?plan=pro" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
+        <a href="/select-cities?plan=pro&next=%2Fstart-checkout%3Fplan%3Dpro" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">Start Free Trial</a>
         <p style="text-align: center; font-size: 13px; color: var(--gray-500); margin-top: 12px;">14 days free, no credit card required</p>
       </div>
 
@@ -768,7 +768,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       One $200,000 addition pays for <strong>9 years</strong>.<br>
       You only need to win <strong>one job</strong> to make it worth it.
     </p>
-    <a href="/start-checkout?plan=pro" style="display: inline-block; background: #2563eb; color: white; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; text-decoration: none; transition: background 0.2s;">Start Free Trial →</a>
+    <a href="/select-cities?plan=pro&next=%2Fstart-checkout%3Fplan%3Dpro" style="display: inline-block; background: #2563eb; color: white; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; text-decoration: none; transition: background 0.2s;">Start Free Trial →</a>
     <p style="margin-top: 12px; font-size: 13px; opacity: 0.7;">14 days free, no credit card required</p>
   </div>
 </section>

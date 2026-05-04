@@ -3289,6 +3289,71 @@ def admin_collect_assessor_data():
         return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
 
 
+@admin_bp.route('/api/admin/manual-subscriber', methods=['POST'])
+def admin_manual_subscriber():
+    """V494 emergency recovery: manually create or update a subscribers
+    row for a paid customer who slipped through the no-city-capture
+    signup gap (Higgins May 2, Meyer May 1, Gomes earlier).
+
+    Body:
+      {"email":  "...",          # required
+       "name":   "...",          # optional, default ''
+       "cities": ["miami-dade-county", "phoenix-az"],  # required, non-empty
+       "plan":   "pro"}          # optional, default 'pro'
+
+    Idempotent — uses INSERT OR REPLACE on email PK. Re-running with
+    the same email updates the existing row.
+
+    This endpoint stays in place even after V494 structural fix ships
+    (concurrent recovery + the alert-Wes-on-orphan-checkout path in
+    the webhook still benefits from a clean way to backfill).
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    name = (data.get('name') or '').strip()
+    cities = data.get('cities') or []
+    plan = (data.get('plan') or 'pro').strip().lower()
+    if not email:
+        return jsonify({'error': 'email required'}), 400
+    if not cities or not isinstance(cities, list):
+        return jsonify({'error': 'cities (non-empty list) required'}), 400
+    import json as _j
+    try:
+        conn = permitdb.get_connection()
+        # Defensive UPSERT — subscribers.email may not have a UNIQUE
+        # constraint depending on schema-migration history. Use a
+        # SELECT-then-UPDATE-OR-INSERT pattern instead of ON CONFLICT.
+        existing = conn.execute(
+            "SELECT id FROM subscribers WHERE LOWER(email) = ?",
+            (email,)
+        ).fetchone()
+        if existing:
+            sub_id = existing[0]
+            conn.execute(
+                "UPDATE subscribers SET name = ?, plan = ?, "
+                "  digest_cities = ?, active = 1 "
+                "WHERE id = ?",
+                (name, plan, _j.dumps(cities), sub_id)
+            )
+            action = 'updated'
+        else:
+            conn.execute(
+                "INSERT INTO subscribers "
+                "(email, name, plan, digest_cities, active, created_at) "
+                "VALUES (?, ?, ?, ?, 1, datetime('now'))",
+                (email, name, plan, _j.dumps(cities))
+            )
+            action = 'created'
+        conn.commit()
+        return jsonify({'status': action, 'email': email,
+                        'cities': cities, 'plan': plan})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
+
+
 @admin_bp.route('/api/admin/staleness-report', methods=['GET'])
 def admin_staleness_report():
     """V493 IRONCLAD: which active cities haven't been collected lately.
