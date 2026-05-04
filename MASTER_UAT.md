@@ -454,14 +454,28 @@ SELECT COUNT(*) FROM subscribers WHERE active = 1
   never deployed.
 - **Status:** Instruction file written, awaiting push + deploy.
 
-### O3 — Buffalo "Destination not working" (P1)
+### O3 — Buffalo "Destination not working" (P1) — CLOSED 2026-05-04
 - **Found:** 2026-05-03 after Buffalo ad save in Google Ads UI
 - **Source:** Google Ads policy finding on /permits/buffalo-ny.
   Same root cause as V485 B2 (which fixed it for persona pages):
   multi-COUNT aggregate queries time out under AdsBot crawl.
-- **Fix:** `CODE_V492_FIX_DESTINATION_NOT_WORKING.txt` — extend the
-  V488 IRONCLAD system_state cache pattern to city pages.
-- **Status:** Instruction file written.
+- **Fix shipped:** V492 (commit `4cd4571`) — three-layer city-stats
+  cache (process-mem → system_state → live compute fallback) in
+  `routes/city_stats_cache.py`, wired into `state_city_landing()`.
+  Cache-Control header `public, max-age=300, s-maxage=600,
+  stale-if-error=86400` so AdsBot's re-crawl hits the CDN edge
+  cache. End-of-cycle refresh in scheduled_collection + startup
+  warm (limit=20) keeps the system_state row pre-populated.
+- **Verification 2026-05-04 15:32 UTC:**
+  - 39 city_stats:* rows in system_state (target: ≥8)
+  - Buffalo cold-render 3.12s, warm rerender 0.94s (was 30s+)
+  - 8 priority cities all 200 OK in 1.24-2.22s
+  - Cache hit on un-warmed city (fairfax-va, mill-valley-ca)
+    auto-populates system_state row via the live-compute path
+- **Watchpoint:** Pre-Deploy Gates → after any city_pages.py
+  change, time the slowest priority city: `time curl -sko/dev/null
+  https://permitgrab.com/permits/<state>/<slug>` should be <5s.
+  If >10s, AdsBot will fail it.
 
 ### O4 — 7 ad groups still at zero impressions
 - **Found:** 2026-05-03
