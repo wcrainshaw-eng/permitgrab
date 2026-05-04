@@ -5,6 +5,14 @@ Supports: Socrata (SODA API), ArcGIS REST, CKAN, CARTO
 """
 
 import requests
+import socket as _v503_socket
+# V503 BELT+SUSPENDERS: process-wide socket default timeout. Even with
+# the SESSION adapter, indefinite sock.connect() hangs were still
+# occurring (probably retry loops or paths that bypass the adapter).
+# socket.setdefaulttimeout sets the timeout for EVERY socket the
+# process creates that doesn't explicitly settimeout()-override it.
+# Idempotent — safe to set multiple times if module is re-imported.
+_v503_socket.setdefaulttimeout(120)
 import json
 import os
 import re
