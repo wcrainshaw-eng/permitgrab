@@ -9244,6 +9244,18 @@ def _ensure_deferred_startup_spawned():
     import time. This decouples module load from worker startup, so the
     worker can re-import server.py cleanly after a V455 self-recycle
     even when blueprints do `from server import *`.
+
+    V496 2026-05-04: ALSO spawn the collection daemons here. V481's
+    decision to require a manual /api/admin/start-collectors call
+    after every deploy/recycle was based on the assumption that
+    permitgrab-worker would run them — that service was never created
+    in Render. With workers=1 (V496 Dockerfile revert) the GIL-pressure
+    objection from V481 doesn't apply (single process, single GIL —
+    request handlers and daemons share the same scheduler regardless).
+    The result: every fresh worker (cold-deploy or post-V455/V457
+    SIGTERM recycle) auto-spawns the daemons on its first request,
+    instead of staying daemonless for hours until someone hits
+    /api/admin/start-collectors externally.
     """
     global _DEFERRED_STARTUP_SPAWNED, _PRELOAD_DONE
     with _DEFERRED_STARTUP_LOCK:
@@ -9259,6 +9271,17 @@ def _ensure_deferred_startup_spawned():
     threading.Thread(
         target=_deferred_startup, daemon=True, name='deferred_startup'
     ).start()
+    # V496: also kick start_collectors() in a thread so it doesn't
+    # block the first request. start_collectors() is itself idempotent
+    # (guarded by _collector_started) so racing with the admin
+    # endpoint is safe.
+    try:
+        threading.Thread(
+            target=start_collectors, daemon=True,
+            name='deferred_start_collectors',
+        ).start()
+    except Exception as _e:
+        print(f"[V496] deferred start_collectors spawn failed: {_e}", flush=True)
 
 # V66: Module-level DB init removed — now deferred to first request via
 # _deferred_startup(). V471 PR2-prep: daemon spawn + disk preload also
