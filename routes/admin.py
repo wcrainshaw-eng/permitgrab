@@ -3289,6 +3289,86 @@ def admin_collect_assessor_data():
         return jsonify({'status': 'error', 'error': str(e)[:500]}), 500
 
 
+@admin_bp.route('/api/admin/prune-noise', methods=['POST'])
+def admin_prune_noise():
+    """V493 IRONCLAD pt.2: pause prod_cities entries that are pure noise.
+
+    Pre-prune state (sample 2026-05-04):
+      - 1,758 cities marked status='active'
+      - But only 23 are 'fresh' (collected in last 30 days)
+      - 1,020 have NO source_id at all (can't be collected — phantoms)
+      - 8 cities have 10-100 consecutive_failures and are STILL active
+        (auto-pause at 3+ exists in db.py:4078 but doesn't always fire —
+        some collection paths bypass it)
+
+    What this does (idempotent — safe to run repeatedly):
+      1. status='active' AND source_id IS NULL  →  status='paused'
+         (note: 'V493: phantom row - no source configured')
+      2. status='active' AND consecutive_failures >= 10  →  status='paused'
+         (note: 'V493: chronic failure - {N} consecutive')
+      3. status='active' AND newest_permit_date < date('now','-180 days')
+         AND total_permits = 0  →  status='paused'
+         (note: 'V493: never produced data, configured >180d ago')
+
+    Returns counts of what got paused.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    conn = permitdb.get_connection()
+    results = {}
+    try:
+        # 1. No source_id = unreachable phantom
+        cur = conn.execute("""
+            UPDATE prod_cities SET
+                status = 'paused',
+                last_error = COALESCE(last_error, 'V493: phantom row - no source configured')
+            WHERE status = 'active' AND (source_id IS NULL OR source_id = '')
+        """)
+        results['phantom_no_source'] = cur.rowcount
+
+        # 2. Chronic failure
+        cur = conn.execute("""
+            UPDATE prod_cities SET
+                status = 'paused',
+                last_error = 'V493: chronic failure - ' || consecutive_failures || ' consecutive'
+            WHERE status = 'active' AND consecutive_failures >= 10
+        """)
+        results['chronic_failures'] = cur.rowcount
+
+        # 3. Configured >180d ago, never produced any permits
+        cur = conn.execute("""
+            UPDATE prod_cities SET
+                status = 'paused',
+                last_error = COALESCE(last_error, 'V493: never produced data')
+            WHERE status = 'active'
+              AND (total_permits IS NULL OR total_permits = 0)
+              AND (newest_permit_date IS NULL)
+              AND (created_at IS NULL OR created_at < datetime('now','-180 days'))
+        """)
+        results['never_produced'] = cur.rowcount
+
+        conn.commit()
+
+        # Post-prune sanity check
+        post = conn.execute("""
+            SELECT COUNT(*) AS n FROM prod_cities WHERE status='active'
+        """).fetchone()
+        results['active_after'] = post[0] if post else None
+
+        post_clean = conn.execute("""
+            SELECT COUNT(*) AS n FROM prod_cities
+            WHERE status='active'
+              AND source_id IS NOT NULL AND source_id <> ''
+              AND consecutive_failures < 10
+        """).fetchone()
+        results['active_operational'] = post_clean[0] if post_clean else None
+
+        return jsonify({'status': 'ok', 'pruned': results})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
+
+
 @admin_bp.route('/api/admin/wal-checkpoint', methods=['POST'])
 def admin_wal_checkpoint():
     """V488 IRONCLAD: force a PRAGMA wal_checkpoint(TRUNCATE).
