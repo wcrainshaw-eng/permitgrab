@@ -4824,21 +4824,48 @@ def admin_daemon_health():
             is_healthy = daemon_running and colls_24h > 0
         self_healed = False
 
-        # V256: self-heal if daemon is down + no recent activity.
-        # V365b: Skip self-heal in WORKER_MODE — worker handles its own lifecycle.
-        if not WORKER_MODE and not daemon_running and (stale_minutes is None or stale_minutes > 15):
-            try:
-                import threading as _th
-                def _selfheal():
+        # V493 IRONCLAD self-heal: fires INSTANTLY when daemon threads
+        # are dead — no 15-min stale_minutes wait. Render hits this
+        # endpoint every ~60s, so minute-resolution recovery on:
+        #   - silent thread death (memory bail, exception, etc)
+        #   - missed start_collectors call after deploy
+        #   - any future regression that re-introduces WORKER_MODE
+        #     no-op gates (V471 PR4 / V481 / future)
+        # The OLD V256 path waited stale_minutes > 15 — but stale_minutes
+        # is computed from scraper_runs.run_started_at, which goes silent
+        # when the logger is broken even if collection runs. So V256
+        # could "self-heal" forever without ever spawning threads.
+        # V493 instead checks threading.enumerate() directly: if there
+        # is no live thread named 'scheduled_collection' — heal NOW.
+        try:
+            import threading as _th
+            _live_names = {t.name for t in _th.enumerate() if t.is_alive()}
+            _expected = {'scheduled_collection', 'enrichment_daemon', 'email_scheduler'}
+            _missing = _expected - _live_names
+            if _missing and not WORKER_MODE:
+                def _selfheal_v493():
                     try:
-                        print(f"[V256] Self-heal: daemon not running, stale_minutes={stale_minutes} — starting collectors", flush=True)
+                        print(
+                            f"[V493 IRONCLAD] Self-heal: missing threads {_missing} "
+                            f"(live={sorted(_live_names)}) — calling start_collectors()",
+                            flush=True,
+                        )
+                        # Reset _collector_started so start_collectors
+                        # actually re-runs (it's idempotent only after a
+                        # successful first spawn).
+                        try:
+                            _s._collector_started = False
+                        except Exception:
+                            pass
                         start_collectors()
                     except Exception as e:
-                        print(f"[V256] Self-heal failed: {e}", flush=True)
-                _th.Thread(target=_selfheal, daemon=True, name='v256_selfheal').start()
+                        print(f"[V493 IRONCLAD] Self-heal failed: {e}", flush=True)
+                _th.Thread(target=_selfheal_v493, daemon=True, name='v493_selfheal').start()
                 self_healed = True
-            except Exception:
-                pass
+        except Exception as _shv493_e:
+            # Never let self-heal break the health probe — Render uses
+            # this for routing.
+            print(f"[V493 IRONCLAD] self-heal guard error (non-fatal): {_shv493_e}", flush=True)
 
         # V491 IRONCLAD digest fallback: cron-tick the daily digest from
         # the WEB process via /api/admin/health. Render hits this endpoint
@@ -4973,6 +5000,56 @@ def admin_daemon_health():
         except Exception as _sw_e:
             stripe_metrics = {'error': str(_sw_e)[:120]}
 
+        # V493 IRONCLAD diagnostic surface: per-cycle heartbeat + thread
+        # inventory + never-pulled-cities count. Each piece is wrapped in
+        # try/except so a single failure doesn't break the health probe.
+        scheduled_cycle_completed_at = None
+        cycle_stale_minutes = None
+        try:
+            _hb = permitdb.get_system_state('scheduled_cycle_completed_at')
+            if _hb and _hb.get('value'):
+                scheduled_cycle_completed_at = _hb['value']
+                from datetime import datetime as _dt_h2
+                try:
+                    _delta = _dt_h2.utcnow() - _dt_h2.fromisoformat(scheduled_cycle_completed_at)
+                    cycle_stale_minutes = int(_delta.total_seconds() / 60)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        live_thread_names = []
+        try:
+            import threading as _th_h
+            live_thread_names = sorted({
+                t.name for t in _th_h.enumerate() if t.is_alive()
+            })
+        except Exception:
+            pass
+
+        never_pulled_cities = None
+        cities_stale_30d = None
+        try:
+            _np_row = conn.execute("""
+                SELECT
+                  SUM(CASE WHEN sr.last_run IS NULL THEN 1 ELSE 0 END) AS never_pulled,
+                  SUM(CASE WHEN sr.last_run IS NOT NULL
+                            AND sr.last_run < datetime('now','-30 days')
+                       THEN 1 ELSE 0 END) AS stale_30d
+                FROM prod_cities pc
+                LEFT JOIN (
+                  SELECT source_name, MAX(run_started_at) AS last_run
+                  FROM scraper_runs
+                  GROUP BY source_name
+                ) sr ON sr.source_name = pc.source_id
+                WHERE pc.status='active' AND pc.source_id IS NOT NULL
+            """).fetchone()
+            if _np_row:
+                never_pulled_cities = _np_row[0] or 0
+                cities_stale_30d = _np_row[1] or 0
+        except Exception:
+            pass
+
         payload = {
             'status': 'healthy' if is_healthy else 'unhealthy',
             'daemon_running': daemon_running,
@@ -4987,6 +5064,12 @@ def admin_daemon_health():
             'wal_size_mb': wal_size_mb,
             'auth': auth_metrics,
             'stripe': stripe_metrics,
+            # V493 IRONCLAD diagnostic surface
+            'scheduled_cycle_completed_at': scheduled_cycle_completed_at,
+            'cycle_stale_minutes': cycle_stale_minutes,
+            'live_thread_names': live_thread_names,
+            'never_pulled_cities': never_pulled_cities,
+            'cities_stale_30d': cities_stale_30d,
         }
         if self_healed:
             payload['self_heal_triggered'] = True

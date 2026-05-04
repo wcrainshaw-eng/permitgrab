@@ -8675,6 +8675,23 @@ def scheduled_collection():
         except Exception as _e:
             print(f"[{datetime.now()}] V479: stats refresh failed: {_e}", flush=True)
 
+        # V493 IRONCLAD: write per-cycle heartbeat to system_state so the
+        # health endpoint can detect a stuck cycle. Each successful loop
+        # iteration updates 'scheduled_cycle_completed_at' with the
+        # current ISO timestamp. /api/admin/health surfaces this; if it's
+        # stale > 90 min the V493 self-heal kicks start_collectors. This
+        # makes silent cycle hangs (e.g., a long-running fetch holding
+        # the GIL) recover automatically instead of waiting for someone
+        # to notice the digest didn't fire 5 days later.
+        try:
+            from datetime import datetime as _dt_h
+            permitdb.set_system_state(
+                'scheduled_cycle_completed_at',
+                _dt_h.utcnow().isoformat(timespec='seconds'),
+            )
+        except Exception as _hb_e:
+            print(f"[V493 IRONCLAD] cycle-heartbeat write failed (non-fatal): {_hb_e}", flush=True)
+
         _sleep_for = max(300, min(3600, 1800 - _duration))
         print(f"[{datetime.now()}] V229 C1: cycle took {_duration}s, "
               f"sleeping {_sleep_for}s", flush=True)
