@@ -1043,23 +1043,13 @@ def admin_start_collectors():
     if not valid:
         return error
 
-    # V481: the web process never runs daemons. Calling this endpoint on
-    # the web service would do nothing (start_collectors returns early
-    # without WORKER_MODE='1'). Surface that explicitly so dashboard
-    # buttons/scripts don't think collection started when it didn't.
-    if os.environ.get('WORKER_MODE') != '1':
-        return jsonify({
-            'status': 'noop',
-            'message': (
-                "Daemons run on the permitgrab-worker Background Worker "
-                "service, not the web process. The worker spawns "
-                "scheduled_collection / enrichment_daemon / "
-                "email_scheduler automatically on boot via worker.py. "
-                "If you need to restart them, redeploy the worker "
-                "service from the Render dashboard."
-            ),
-            'web_worker_mode': os.environ.get('WORKER_MODE', '<unset>'),
-        }), 200
+    # V493: V481's WORKER_MODE noop guard removed. The permitgrab-worker
+    # Background Worker service in render.yaml was never created on
+    # Render — see CLAUDE.md ARCHITECTURE GROUND TRUTH. With the guard
+    # in place this endpoint returned 'noop' and start_collectors itself
+    # also returned early in server.py, so collection + email digest
+    # were dead since 2026-04-29 (5 missed digests). Removing both guards
+    # restores single-process daemons (the only working state).
 
     try:
         import threading

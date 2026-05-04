@@ -9070,21 +9070,19 @@ def start_collectors():
         return
     _collector_started = True
 
-    # V481 (worker/web split): the daemons MUST only run inside the
-    # permitgrab-worker Background Worker service. The web process and
-    # the worker share the same module, but only the worker has
-    # WORKER_MODE=1 set in its Render env. If we ever spawn these
-    # threads in the web process again, the V480 wedge returns: 12
-    # gthread request handlers + 3 daemons share one Python GIL on a
-    # single vCPU and an aggregate-query refresh starves every request.
-    if os.environ.get('WORKER_MODE') != '1':
-        print(
-            f"[{datetime.now()}] V481: start_collectors no-op on web "
-            f"process (WORKER_MODE != '1'). Daemons run on the "
-            f"permitgrab-worker service via worker.py.",
-            flush=True,
-        )
-        return
+    # V493: V481's WORKER_MODE early-return removed.
+    #
+    # DO NOT GATE THIS ON WORKER_MODE without first verifying that a
+    # permitgrab-worker service exists in the Render dashboard.
+    # render.yaml's declaration is aspirational only; the service was
+    # never created. V471 PR4 and V481 both made this mistake (see
+    # CLAUDE.md ARCHITECTURE GROUND TRUTH). V473b and V493 corrected.
+    #
+    # V481's perf concern was real (12 gthread request handlers + 3
+    # daemons share one Python GIL on a single vCPU), but the right
+    # fix is to actually create the worker service — not to disable the
+    # daemons entirely on the only running process. Until the worker
+    # service exists, single-process is the only working state.
 
     os.makedirs(DATA_DIR, exist_ok=True)
 
