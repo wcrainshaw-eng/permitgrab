@@ -1,0 +1,239 @@
+CODE_V493 — P0: Restore daemon collection. Remove V481 WORKER_MODE
+            guards that no-op the only collection path we have.
+==============================================================================
+
+INCIDENT (discovered 2026-05-03 ~22:00 UTC)
+==============================================================================
+
+Health probe surfaced production outage:
+
+    GET /api/admin/health
+    {
+      "status": "unhealthy",
+      "daemon_running": false,
+      "self_heal_triggered": true,
+      "fresh_city_count": 40,
+      "last_collection_at": "2026-05-04T01:51:10",
+      ...
+    }
+
+    GET /api/admin/digest/status
+    {
+      "daemon_alive": false,
+      "thread_alive": false,
+      ...
+    }
+
+POST /api/admin/start-collectors?force=1 returns:
+    {"status": "noop",
+     "message": "Daemons run on the permitgrab-worker Background Worker
+                 service, not the web process. The worker spawns
+                 scheduled_collection / enrichment_daemon /
+                 email_scheduler automatically on boot via worker.py..."}
+
+ROOT CAUSE
+==============================================================================
+
+CLAUDE.md's ARCHITECTURE GROUND TRUTH section explicitly documents:
+
+    There is exactly ONE Render service: `permitgrab` (Docker, Oregon).
+    The Flask web server **and** the collection daemon thread run **in
+    the same process**. There is no separate worker container.
+
+    `render.yaml` declares a `permitgrab-worker` Background Worker
+    service and `worker.py` exists in the repo, **but the service was
+    never created in the actual Render project**.
+
+    `WORKER_MODE` env var is **not set** on the live web service.
+
+V481 added two WORKER_MODE-gated no-ops on the assumption that the
+worker service was running:
+
+  1. server.py line ~9080 — start_collectors() returns immediately
+     when WORKER_MODE != '1'.
+
+  2. routes/admin.py line 1050-1062 — POST /api/admin/start-collectors
+     short-circuits with a "noop" response pointing at the nonexistent
+     worker service.
+
+The route file is self-contradictory: the docstring at line 1030
+says "the permitgrab-worker Render service was never created" — and
+ten lines later the guard tells you to "redeploy the worker service
+from the Render dashboard" if collection is dead.
+
+V471 PR4 was the original mistake that V473b reverted. V481
+reintroduced the same regression with the same false premise.
+
+WHAT TO DO
+==============================================================================
+
+PR title: "V493: P0 daemon outage — remove V481 WORKER_MODE no-op gates"
+
+==== EDIT 1: routes/admin.py ====
+
+DELETE lines 1046-1062 (the V481 noop guard block):
+
+    # V481: the web process never runs daemons. Calling this endpoint on
+    # the web service would do nothing (start_collectors returns early
+    # without WORKER_MODE='1'). Surface that explicitly so dashboard
+    # buttons/scripts don't think collection started when it didn't.
+    if os.environ.get('WORKER_MODE') != '1':
+        return jsonify({
+            'status': 'noop',
+            'message': (
+                "Daemons run on the permitgrab-worker Background Worker "
+                "service, not the web process. The worker spawns "
+                "scheduled_collection / enrichment_daemon / "
+                "email_scheduler automatically on boot via worker.py. "
+                "If you need to restart them, redeploy the worker "
+                "service from the Render dashboard."
+            ),
+            'web_worker_mode': os.environ.get('WORKER_MODE', '<unset>'),
+        }), 200
+
+The remaining body (the V443/V475 zombie-daemon respawn + force=1 reset
++ live-thread probe) already does the right thing — let it run.
+
+==== EDIT 2: server.py ====
+
+Find the V481 block in start_collectors() at line ~9080:
+
+    if os.environ.get('WORKER_MODE') != '1':
+        print(
+            f"[{datetime.now()}] V481: start_collectors no-op on web "
+            f"process (WORKER_MODE != '1'). Daemons run on the "
+            f"permitgrab-worker service via worker.py.",
+            flush=True,
+        )
+        return  # or whatever the early return looks like
+
+DELETE the whole guarded block (about 8-12 lines including the print +
+return). Let start_collectors() proceed to spawn scheduled_collection,
+enrichment_daemon, and email_scheduler (the V475 fix for the email
+digest miss is still in here — make sure all THREE thread spawns
+remain).
+
+==== EDIT 3: keep WORKER_MODE constant for future-proofing ====
+
+Leave server.py:117 (`WORKER_MODE = os.environ.get('WORKER_MODE',
+'').lower() in ('1', 'true', 'yes')`) AS-IS. The variable is harmless
+when the guards above it are removed. Future migration to a real
+worker service can re-add the guards once the service actually
+exists in the Render dashboard.
+
+==== EDIT 4: add a one-line comment so this regression isn't easy
+            to reintroduce ====
+
+Just above start_collectors() in server.py, append to the existing
+docstring:
+
+    """Spawns scheduled_collection, enrichment_daemon, email_scheduler
+    daemon threads inside this process.
+
+    DO NOT GATE THIS ON WORKER_MODE without first verifying that a
+    permitgrab-worker service exists in the Render dashboard.
+    render.yaml's declaration is aspirational only; the service was
+    never created. V471 PR4 and V481 both made this mistake (see
+    CLAUDE.md ARCHITECTURE GROUND TRUTH). V473b and V493 corrected.
+    """
+
+POST-DEPLOY VERIFICATION
+==============================================================================
+
+1. Confirm the deploy went green on Render dashboard.
+
+2. Hit the start-collectors endpoint with force=1:
+     curl -X POST -H "X-Admin-Key: <KEY>" \
+       "https://permitgrab.com/api/admin/start-collectors?force=1"
+   Expected response (NOT noop):
+     {"status": "started", "message": "Background collectors started..."}
+
+3. Wait 15 seconds, then health check:
+     curl -s https://permitgrab.com/api/admin/health \
+       | python3 -c 'import sys,json;d=json.load(sys.stdin); \
+                     print("status="+d["status"], \
+                           "daemon="+str(d["daemon_running"]))'
+   Expected:
+     status=healthy daemon=True
+
+4. Digest scheduler check:
+     curl -s -H "X-Admin-Key: <KEY>" \
+       https://permitgrab.com/api/admin/digest/status \
+       | python3 -c 'import sys,json;d=json.load(sys.stdin); \
+                     print("daemon_alive="+str(d["daemon_alive"]), \
+                           "thread_alive="+str(d["digest_status"]["thread_alive"]))'
+   Expected:
+     daemon_alive=True thread_alive=True
+
+5. Thread inventory:
+     curl -s -H "X-Admin-Key: <KEY>" \
+       https://permitgrab.com/api/admin/debug/threads \
+       | grep -E "scheduled_collection|enrichment_daemon|email_scheduler"
+   Expected: all three thread names present and is_alive=True.
+
+6. Collection cycle inspection (run after ~30 min):
+     curl -X POST -H "X-Admin-Key: <KEY>" \
+       -H "Content-Type: application/json" \
+       -d '{"sql":"SELECT COUNT(*) AS n, MAX(run_started_at) AS newest FROM scraper_runs WHERE run_started_at > datetime(\"now\", \"-30 minutes\")"}' \
+       https://permitgrab.com/api/admin/query
+   Expected: n > 0 (collection cycle is firing).
+
+7. Email digest scheduler arm-window check:
+     The scheduler runs daily at 11:00 ET (~16:00 UTC). After the next
+     11:00 ET, /api/admin/digest/status should show
+     last_digest_sent != null and a fresh last_heartbeat.
+
+8. Restore Buffalo + Cleveland ad eligibility check:
+     With collection running again, the Render server is no longer
+     short-circuiting requests. AdsBot's next crawl of
+     /permits/buffalo-ny + /permits/cleveland-oh should clear the
+     "Destination not working" finding within 24 hr — but the
+     parallel CODE_V492 fix is still required for the underlying
+     query-timeout bug.
+
+PERFORMANCE WEDGE — LATER FOLLOW-UP
+==============================================================================
+
+V481's stated reason for the gates was real: "12 gthread request
+handlers + 3 daemons share one Python GIL on a single vCPU and an
+aggregate-query refresh starves every request." That perf concern
+is still valid — but the wrong fix is to disable the daemons
+entirely.
+
+Real fix path for the perf wedge (NOT this PR — separate work):
+
+  Option A (preferred): create permitgrab-worker on Render dashboard.
+    1. Render dashboard → New → Background Worker.
+    2. Use the same Docker image as permitgrab.
+    3. Set WORKER_MODE=1 env var ON the worker service ONLY.
+    4. Worker entry point: worker.py (already exists in repo).
+    5. Re-add the WORKER_MODE guards (this time correctly: ONLY when
+       the worker service exists and is running).
+
+  Option B (interim): make the daemons less aggressive in-process.
+    1. Lower secondary_loop frequency from 30s to 5min.
+    2. Timebox each collection cycle to max 60s of GIL time.
+    3. Defer expensive aggregate refreshes (V488 persona stats,
+       proposed V492 city stats) to off-peak hours (3-5 AM ET).
+
+For now (V493): single-process mode is the only working state.
+
+DELIVERABLE
+==============================================================================
+
+Files changed:
+  - routes/admin.py   (~17 lines deleted — the V481 guard block)
+  - server.py         (~12 lines deleted — the V481 in-function guard
+                       + 4 lines added — anti-regression comment)
+
+Net effect:
+  - daemon=true within seconds of deploy
+  - email digest fires at next scheduled time (11:00 ET)
+  - collection cycle resumes (~30 min cadence)
+  - "Destination not working" disapprovals can clear (paired with V492)
+  - V475 email_scheduler restoration stays intact
+  - V488 IRONCLAD persona-stats cache continues running (worker side)
+  - Future worker-service migration path stays open via Option A
+
+POST-MERGE: hit start-collectors with force=1 immediately, then verify
+all four endpoints in the verification checklist above.

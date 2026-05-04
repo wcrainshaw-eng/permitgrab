@@ -4850,6 +4850,49 @@ def admin_daemon_health():
             except Exception:
                 pass
 
+        # V491 IRONCLAD digest fallback: cron-tick the daily digest from
+        # the WEB process via /api/admin/health. Render hits this endpoint
+        # every minute, so this gives us minute-resolution scheduling
+        # without depending on the worker thread that has been sticky-
+        # broken since 2026-04-29 (system_state shows 0 email_* keys —
+        # worker.email_scheduler hasn't actually run since the V475 push).
+        #
+        # Logic: if (a) we're past 7am ET and (b) today's date != the
+        # 'web_last_digest_date' system_state key, fire send_daily_digest
+        # in a background thread. Claim the date in system_state BEFORE
+        # spawning the thread so concurrent gunicorn workers don't
+        # double-send (atomic INSERT OR REPLACE).
+        try:
+            import pytz as _pytz_h
+            _et = _pytz_h.timezone('America/New_York')
+            from datetime import datetime as _dt_h
+            _now_et = _dt_h.now(_et)
+            _today_et = _now_et.date().isoformat()
+            if _now_et.hour >= 7:
+                _state = permitdb.get_system_state('web_last_digest_date')
+                _last_sent = (_state or {}).get('value') if _state else None
+                if _last_sent != _today_et:
+                    # Claim the date BEFORE firing — prevents race
+                    permitdb.set_system_state('web_last_digest_date', _today_et)
+                    def _fire_digest():
+                        try:
+                            from email_alerts import send_daily_digest
+                            sent, failed = send_daily_digest()
+                            print(f"[V491-DIGEST] web-cron fired daily digest: sent={sent} failed={failed}", flush=True)
+                        except Exception as _de:
+                            # On failure, roll back the claim so a later probe retries
+                            try:
+                                permitdb.set_system_state('web_last_digest_date', _last_sent or '')
+                            except Exception:
+                                pass
+                            print(f"[V491-DIGEST] web-cron digest failed: {_de}", flush=True)
+                    import threading as _th2
+                    _th2.Thread(target=_fire_digest, daemon=True, name='v491_digest_cron').start()
+        except Exception as _dh_e:
+            # Never let the digest cron break the health probe — Render
+            # uses /api/admin/health for liveness routing.
+            print(f"[V491-DIGEST] cron-tick guard error (non-fatal): {_dh_e}", flush=True)
+
         status_code = 200 if is_healthy else 503
         # V398 (CODE_V364 Part 4.5): memory monitoring on the health probe.
         # The directive's P0 root-cause hypothesis was OOM kill: "the
