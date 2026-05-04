@@ -1535,4 +1535,359 @@ CITY_PERSONA_POSTS = {
         ],
     },
 
+    # ====================================================================
+    # V491 additions — San Antonio / Austin / St Petersburg / Tampa
+    # ====================================================================
+
+    'san-antonio-roofing-leads': {
+        'title': 'San Antonio Roofing Contractor Leads from Permits | PermitGrab',
+        'meta_description': (
+            '711,000+ Bexar County property owners + 5,000+ San Antonio '
+            'code violations + daily permit feed. Hail-belt roofing '
+            'replacement work, year-round volume. $149/mo unlimited.'
+        ),
+        'h1': 'San Antonio Roofing Contractor Leads from Building Permits',
+        'subject': 'Roofing contractors in San Antonio',
+        'city': 'San Antonio',
+        'city_slug': 'san-antonio',
+        'persona_slug': 'home-services',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>San Antonio's housing stock + Texas Hill Country hail patterns + accelerating new construction in the I-10 / Loop 1604 corridor make it one of the highest-volume roofing replacement markets in the country. Hail events between March and June produce permit clusters that overwhelm local roofing capacity — the contractors who get to homeowners first win.</p>
+
+<p>PermitGrab pulls San Antonio permits + Bexar County owner data + city code violations daily. The Bexar County feed was just upgraded in V491 from 5,000 city-only records to 711,000+ county-wide records (142x lift) — covering San Antonio plus all surrounding municipalities.</p>
+
+<h2>What's in the San Antonio data feed</h2>
+
+<ul>
+  <li><strong>Daily San Antonio permit feed</strong> — building, roofing, electrical, plumbing, mechanical, addition, pool permits across Bexar County + ETJ</li>
+  <li><strong>711,000+ Bexar County property owner records</strong> — full owner names, mailing addresses, year built, parcel IDs, appraised values. Covers San Antonio + Schertz + Universal City + Live Oak + Converse + Helotes + Leon Valley + Castle Hills + suburbs</li>
+  <li><strong>3,830 contractor profiles with phone numbers</strong> — biggest TX phone count in our coverage (per V484 audit)</li>
+  <li><strong>5,000+ San Antonio code violation records</strong> via the V484-wired ArcGIS feed</li>
+  <li>Pairs with V490 Travis County (Austin) for full I-35 corridor coverage</li>
+</ul>
+
+<h2>The four highest-converting San Antonio roof signals</h2>
+
+<h3>1. Hail-storm permit clusters (March-June)</h3>
+
+<p>The Hill Country hail belt produces multiple severe-weather events per year. The morning after a major storm, San Antonio sees 80-200+ roof permits cluster in a single 24-48 hour window. Roofers with overflow capacity in those windows convert at 3-5x baseline. Filter daily permits by date_filed = today-1 day, permit_type containing "Roof" or "Reroof".</p>
+
+<h3>2. Pre-1990 housing stock replacement cycle</h3>
+
+<p>San Antonio's pre-1990 single-family homes (especially in older West Side neighborhoods, Olmos Park, Alamo Heights, parts of Northwood) are now on their 2nd or 3rd roof. Filter Bexar County property_owners where year_built between 1950-1990 to surface ~250,000 properties due for current-cycle replacement.</p>
+
+<h3>3. New construction warranty work</h3>
+
+<p>San Antonio is a top-3 fastest-growing metro by new construction. The Far West Side (Westcreek, Hunters Pond), I-10 East (Schertz, Cibolo), and Northeast (Live Oak, Universal City) corridors file 100-300 new construction permits per month. Production builders use limited rosters, but warranty work + 5-7 year resurfacing cycles open up to other roofers. Pull new-construction permits filed 2018-2020 — those homes are now hitting their first warranty repair window.</p>
+
+<h3>4. Out-of-state landlords with old roofs</h3>
+
+<p>San Antonio's investor-owned single-family stock has a meaningful out-of-state presence (Texas, California, New York money). Filter Bexar County property_owners where mailing_state ≠ TX, intersect with year_built < 1990. Out-of-state landlords with old roofs are higher-conversion targets for full-replacement quotes (they don't want to fly in to coordinate piecemeal repairs).</p>
+
+<h2>How San Antonio roofers run this</h2>
+
+<p><strong>Storm-event watchlist.</strong> Cross-reference NOAA SPC severe-weather reports with San Antonio permit filings. The 24-48h after a hail event produces a measurable permit cluster — being one of the first 5 roofers to call each homeowner is the difference between 5% and 25% close rates.</p>
+
+<p><strong>Daily morning permit list.</strong> Pull San Antonio + surrounding Bexar municipalities permits filed in the last 48 hours, filter by permit_type containing "Roof". A junior estimator can call 80-120 of these per day during hail season.</p>
+
+<p><strong>Subdivision-level concentration.</strong> When 5+ roof permits file in the same neighborhood within 14 days, door-knocking becomes high-yield — neighbors talk, comparing roofers and prices. Being the 3rd or 4th roofer in a hot subdivision converts at 2-4x cold rates.</p>
+
+<h2>Bexar County coverage post-V491 upgrade</h2>
+
+<p>Before V491: only 5,000 San Antonio property records were wired (city-only path). After V491: full 711K county-wide records covering all 26 Bexar municipalities. This unlocks workflows in suburbs that were dark before:</p>
+<ul>
+  <li>Schertz / Cibolo / Selma — Northeast Bexar growth corridor</li>
+  <li>Universal City / Live Oak / Converse — older Northeast suburbs (replacement cycle)</li>
+  <li>Helotes / Leon Valley / Castle Hills — Northwest established neighborhoods</li>
+  <li>Lytle / Somerset / Atascosa — Southwest Bexar</li>
+</ul>
+
+<h2>Other Texas resources</h2>
+
+<p>Browse the live <a href="/permits/san-antonio">San Antonio permits page</a> for current contractor counts, recent filings, and code violations. The cross-city home-services playbook is in our <a href="/leads/home-services">home services lead guide</a>. For the I-35 corridor sister metro, see <a href="/blog/austin-investor-leads">Austin investor leads</a>. For DFW comparison, <a href="/blog/arlington-roofing-leads">Arlington roofing leads</a> covers the same hail-belt dynamic 200 miles north.</p>
+
+<h2>Pricing</h2>
+
+<p>$149/month for unlimited access to San Antonio, Austin, all Texas suburbs, and every other city in our coverage. <a href="/pricing">See pricing</a> or <a href="/signup">try a free week</a>.</p>
+""",
+        'faqs': [
+            ('How current is San Antonio permit data?',
+             'Daily. New permits filed with the City of San Antonio appear in the PermitGrab feed within 24 hours.'),
+            ('Does the Bexar County data cover suburbs beyond San Antonio city?',
+             'Yes — V491 upgrade added 706K new owner records covering all 26 Bexar County municipalities (Schertz, Cibolo, Universal City, Live Oak, Converse, Helotes, Leon Valley, Castle Hills, Olmos Park, Alamo Heights, etc) plus unincorporated Bexar.'),
+            ('Are hail-event permit clusters easy to identify?',
+             'Yes. Filter daily San Antonio permit pulls by date_filed = today-1 day, permit_type containing "Roof". A normal day shows 10-25 roof permits citywide; the day after a major hail event shows 80-200+. The cluster is unmistakable.'),
+            ('How does San Antonio compare to Austin for roofing prospecting?',
+             'San Antonio has higher per-capita storm exposure (more hail, more wind) and a longer replacement cycle (older housing stock). Austin has more new construction and faster permit-to-construction timelines but less storm volume. Most TX roofers serve both via I-35; PermitGrab covers both metros.'),
+            ('Can I get contractor phone numbers in San Antonio?',
+             'Yes — 3,830 San Antonio contractors have phone numbers in our feed (the largest TX phone count we have). Filter contractor_profiles by source_city_key="san-antonio" + phone IS NOT NULL.'),
+        ],
+    },
+
+    'austin-investor-leads': {
+        'title': 'Austin TX Real Estate Investor Leads | PermitGrab',
+        'meta_description': (
+            '343,000+ Travis County property owners + 6,800+ Austin '
+            'code violations + daily permit feed. Out-of-state landlord '
+            'lists, motivated-seller intel, full Austin metro coverage.'
+        ),
+        'h1': 'Austin TX Real Estate Investor Leads from Property Owner Data',
+        'subject': 'Real estate investors in Austin',
+        'city': 'Austin',
+        'city_slug': 'austin-tx',
+        'persona_slug': 'real-estate-investors',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Austin is one of the most-watched investor markets in the country, with cap-rate compression, post-pandemic out-of-state buyer migration, and a concentrated 2018-2022 buying wave that's now hitting evaluation-cycle exits. The data combination most investors haven't connected: county-wide owner records, out-of-state mailing-address filtering, and active permit + code-violation triggers.</p>
+
+<p>PermitGrab's V491 release upgraded Travis County coverage from 55,000 city-only records to 343,000 metro-wide records (6x lift) — Austin proper plus Pflugerville, Cedar Park edges, Manor, Lakeway. Combined with daily Austin city permits + 6,800+ violation records, the feed identifies investor-owned properties under enforcement pressure plus out-of-state landlords ready to exit.</p>
+
+<h2>What's in the Austin data feed</h2>
+
+<ul>
+  <li><strong>343,000 Travis County property owner records</strong> (V491 UPGRADE) — owner names, parcel IDs, mailing addresses, last sale dates, market values, taxing entities. Covers Austin + Pflugerville + Cedar Park + Manor + Lakeway + suburbs</li>
+  <li><strong>Daily Austin permit feed</strong> — 5,500+ daily-fresh permits</li>
+  <li><strong>6,800+ Austin code violations</strong> wired from data.austintexas.gov</li>
+  <li><strong>Pairs with V489 collin_plano + V490 denton_dfw + V491 bexar_county_full</strong> for full Texas Triangle (Austin + DFW + San Antonio)</li>
+</ul>
+
+<h2>The four highest-converting Austin investor signals</h2>
+
+<h3>1. Post-2020 out-of-state buyers approaching exit cycle</h3>
+
+<p>Austin saw heavy 2020-2022 California / NY / Boston buying. Those investors are at the 4-6 year mark — typical hold cycle for IRR-driven SFR investors. Filter Travis County property_owners where mailing_state ≠ TX AND last_sale_date between 2020-01-01 and 2022-12-31. Direct mail "we buy as-is, fast close" letters to this list see meaningful response rates because the seller already knows their thesis isn't playing out.</p>
+
+<h3>2. Code violation + out-of-state owner intersection</h3>
+
+<p>The single highest-conversion list in the Austin data is the intersection of (a) active code violation in last 90 days AND (b) owner mailing address out of state. These owners have a remote-management problem they can't easily solve. Direct contact via mailing address has 1.5-3x cold-list response rates.</p>
+
+<h3>3. East Austin / Manor / Pflugerville growth corridors</h3>
+
+<p>East Austin (Mueller, Govalle, Holly), Manor, and Pflugerville have seen the steepest 2020-2024 appreciation. Owners who bought before 2020 are sitting on 50-100% equity gains and ripe for portfolio repositioning. Filter Travis County property_owners by city + last_sale_date pre-2020 + total_value > $400K to find sellers with both equity and motivation.</p>
+
+<h3>4. LLC-held investor exits in the $400K-$700K band</h3>
+
+<p>Filter property_owners where owner_name contains "LLC" or "TRUST", intersect with Austin / Pflugerville / Cedar Park city tags + total_value $400K-$700K. This is the sweet spot for institutional and small-investor buy-and-hold rentals — current cap rates have compressed below the original underwriting and many are evaluating exit. Portfolio-purchase offers convert higher than per-property pitches with this cohort.</p>
+
+<h2>How Austin investors run this</h2>
+
+<p><strong>Mailing list workflow.</strong> Pull Travis County property_owners filtered to out-of-state OR LLC-held + held 4-6 years. Export 1,000-2,500 records per month. Direct mail with "we buy as-is" or portfolio-purchase offers. Response rates 0.5-2%, conversion to closed deal another 5-15% of responders. Austin deals run $300K-$700K average, so unit economics work even at 1 deal per 200-500 mailers.</p>
+
+<p><strong>Skip-trace and cold call.</strong> Travis County mailing addresses skip-trace cleanly. Cold-call conversion to appointment runs 1-3% on the well-filtered list.</p>
+
+<p><strong>Wholesaling motion.</strong> Austin's wholesale flips have a strong investor-to-investor exit market — local cash buyers paying $5,000-$20,000 in assignment fees. PermitGrab gives sourcing leverage over wholesalers working off MLS or Zillow.</p>
+
+<h2>Austin neighborhoods with high investor density</h2>
+
+<p>Investor concentration (out-of-state ownership × code violations × LLC holdings) is highest in:</p>
+<ul>
+  <li>East Austin (Mueller, Govalle, Holly, parts of MLK corridor)</li>
+  <li>St. Johns + Coronado Hills</li>
+  <li>Rundberg corridor + Anderson Mill suburb</li>
+  <li>Riverside (post-2020 conversion of older multi-family)</li>
+  <li>Southeast Austin (Onion Creek, parts of Dove Springs)</li>
+</ul>
+
+<p>Pflugerville and Manor are largely owner-occupied with less investor density — better for long-tail buy-and-hold than wholesale flip strategies.</p>
+
+<h2>Other Texas resources</h2>
+
+<p>Browse the live <a href="/permits/austin-tx">Austin data page</a> for current owner counts and recent filings. For the I-35 corridor sister metro, see <a href="/blog/san-antonio-roofing-leads">San Antonio roofing leads</a>. For DFW context, <a href="/blog/arlington-roofing-leads">Arlington</a> covers the metroplex on the same investor-data thesis. The cross-city motivated-seller playbook is in our <a href="/leads/real-estate-investors">real estate investors lead guide</a>.</p>
+
+<h2>Pricing</h2>
+
+<p>$149/month for unlimited access to Austin, San Antonio, DFW, and every other city in our coverage. <a href="/pricing">See pricing</a> or <a href="/signup">try a free week</a>.</p>
+""",
+        'faqs': [
+            ('How fresh is Austin owner data?',
+             'Annual. The Travis Central Appraisal District (TCAD) refreshes its public extract once per year post-disputation. Our latest pull is the 2025 cert roll (343K records). For day-to-day operational data, the daily Austin city permits feed handles freshness.'),
+            ('Does the V491 Travis County upgrade replace the older travis_austin source?',
+             'Yes. V491 replaces the 55K-record city-only travis_austin source with the 343K-record full-county TCAD feed. After the new feed completes its drain cycle, the old source is deactivated. Net new: 288K Austin-metro owner records.'),
+            ('Are out-of-state Austin landlords easy to identify?',
+             'Yes. The TCAD feed includes the owner\'s py_address (mailing address). Filter mailing_state != TX to get out-of-state landlords. About 12-22% of Austin-metro rental stock has out-of-state owners depending on neighborhood.'),
+            ('Can I match against my existing investor CRM?',
+             'Yes. Export the Travis County property_owners feed as CSV, match against your CRM by parcel ID or address. Most investors do this monthly using a property-address join.'),
+            ('How does Austin compare to Phoenix or Atlanta for investor exits?',
+             'Austin has the most aggressive cap-rate compression of the three (2020-2024 appreciation was sharpest), so post-2020 out-of-state buyers are most under pressure. Phoenix is similar but slightly behind. Atlanta\'s cap rates have held better, so its investor exits are slower-cycle. Austin is the highest-velocity wholesale flip market of the three right now.'),
+        ],
+    },
+
+    'st-petersburg-roofing-leads': {
+        'title': 'St. Petersburg Roofing Contractor Leads | PermitGrab',
+        'meta_description': (
+            '438,000+ Pinellas County property owners + Tampa Bay '
+            'hurricane corridor + daily permit feed. Wind-mitigation '
+            'roof replacements drive the market. $149/mo unlimited.'
+        ),
+        'h1': 'St. Petersburg FL Roofing Contractor Leads from Building Permits',
+        'subject': 'Roofing contractors in St. Petersburg + Pinellas County',
+        'city': 'St. Petersburg',
+        'city_slug': 'saint-petersburg',
+        'persona_slug': 'home-services',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>St. Petersburg and the broader Pinellas County market sit in one of the most hurricane-exposed coastal corridors in the US. Every named storm forces a wave of roof replacements; Florida's wind code makes those replacements code-compliant upgrades with insurance-driven incentives. Roofers who track permit filings, owner data, and storm patterns together find the highest-leverage prospecting layer.</p>
+
+<p>PermitGrab pulls Pinellas County's 438,000-parcel feed daily (V491 upgrade — supersedes the previous saint-petersburg city-only source which only had ~2,500 mostly-homeowner profiles). Combined with daily city permit feeds for St. Petersburg + Clearwater, that's the unified metro view most Tampa Bay roofers don't have.</p>
+
+<h2>What's in the St. Petersburg / Pinellas data feed</h2>
+
+<ul>
+  <li><strong>438,323 Pinellas County property owner records</strong> (V491) — owner names, parcel IDs, site addresses, subdivisions, latitude/longitude. Covers St. Petersburg + Clearwater + Largo + Dunedin + Palm Harbor + Tarpon Springs + Pinellas Park + suburbs</li>
+  <li><strong>Daily St. Petersburg permits feed</strong> wired in V487</li>
+  <li><strong>Pairs with V491 pasco_county_fl</strong> (322K Tampa north) and existing hillsborough_tampa (53K Tampa) for full Tampa Bay metro</li>
+  <li>Florida code-compliant roofing replacements drive 60-70% of permit volume in coastal Pinellas</li>
+</ul>
+
+<h2>The four highest-converting St. Petersburg / Pinellas roof signals</h2>
+
+<h3>1. Post-storm permit clusters (June-November)</h3>
+
+<p>Florida hurricane season produces 3-7 storm events per year that affect Pinellas. The morning after a major event, St. Petersburg + Clearwater see 100-400+ roof permits cluster within a 24-48 hour window. Roofers monitoring the daily feed during these windows convert at 4-8x baseline rates because homeowners are actively shopping while their insurance adjuster is on-site.</p>
+
+<h3>2. Wind-mitigation upgrade-eligible homes</h3>
+
+<p>Florida's wind code requires impact-resistant roofing on most replacements. A new code-compliant roof drops wind premiums 15-40% via mitigation credits. Filter Pinellas property_owners by year_built < 2002 to find pre-current-code homes (~280,000 records) — these are the homes due for code-compliant upgrades. Cross-reference with active permits to surface in-progress replacement leads.</p>
+
+<h3>3. Coastal high-value home concentration</h3>
+
+<p>Pinellas's coastal high-value-home market (Snell Isle, Old Northeast, Tierra Verde, Pass-a-Grille, Belleair, Indian Rocks Beach) supports premium roof products. Filter property_owners by site city + total_value > $750K to find ~25,000 high-value-home prospects. These owners bought premium materials originally and replace with premium materials — higher per-job ticket sizes.</p>
+
+<h3>4. Out-of-state second-home owners</h3>
+
+<p>Pinellas has a meaningful population of out-of-state second-home owners (Northeast US snowbirds, primarily). Filter property_owners by mailing_state ≠ FL to identify them. Out-of-state owners with old roofs convert well for full-replacement quotes — they don't want to fly in to coordinate piecemeal repairs and prefer a single roofing relationship.</p>
+
+<h2>How Pinellas roofers run this</h2>
+
+<p><strong>Storm-event watchlist.</strong> NOAA + NHC tracking + daily permit pulls during June-November. The 24-48h after a hurricane produces a measurable permit cluster. Roofers with overflow capacity in those windows scale aggressively.</p>
+
+<p><strong>Daily morning permit list.</strong> Pull St. Petersburg + Clearwater + Largo + Pinellas Park + Dunedin permits filed in last 48h, filter to permit_type containing "Roof" or "Reroof". A junior estimator can call 80-150 of these per day during storm season.</p>
+
+<p><strong>Pre-storm prospecting.</strong> Filter Pinellas property_owners by year_built < 2002 + ZIP codes within 5 miles of coast. Direct-mail "free wind-mitigation roof inspection" offers in May/June (pre-season). Response rates 1-3% with high conversion to estimate.</p>
+
+<h2>Tampa Bay coverage post-V491</h2>
+
+<p>Before V491, Tampa Bay coverage was Hillsborough (53K Tampa) only — Pinellas was a 2,500-record city-only stub. After V491, full metro is wired:</p>
+<ul>
+  <li>Hillsborough (Tampa) — 53K records, V428</li>
+  <li>Pinellas (St. Pete + Clearwater) — 438K records, V491</li>
+  <li>Pasco (Tampa north / Wesley Chapel / Land O'Lakes) — 322K records, V491</li>
+  <li><strong>Combined Tampa Bay metro: ~813K owner records</strong></li>
+</ul>
+
+<h2>Other Florida resources</h2>
+
+<p>Browse the live <a href="/permits/saint-petersburg">St. Petersburg data page</a> for current counts. The cross-city home-services playbook is in our <a href="/leads/home-services">home services lead guide</a>. For East Coast FL roofing dynamics see <a href="/blog/fort-lauderdale-insurance-agent-leads">Fort Lauderdale insurance agent leads</a> (insurance-side angle on the same wind-code dynamic). For Tampa Bay investor angle see <a href="/blog/tampa-investor-leads">Tampa investor leads</a>.</p>
+
+<h2>Pricing</h2>
+
+<p>$149/month for unlimited access to St. Petersburg + all Florida cities + every other city in our coverage. <a href="/pricing">See pricing</a> or <a href="/signup">try a free week</a>.</p>
+""",
+        'faqs': [
+            ('How fresh is Pinellas County owner data?',
+             'Daily — Pinellas County Property Appraiser publishes via a daily-refresh ArcGIS feed.'),
+            ('Does the V491 Pinellas upgrade replace the saint-petersburg dead-end?',
+             'Yes. The previous saint-petersburg city-only path had only ~2,500 mostly-homeowner profiles via a now-broken Click2Gov scraper. V491\'s 438K county-wide feed supersedes it entirely. The two sources are not stacked; V491 is now the canonical Pinellas owner source.'),
+            ('Are wind-mitigation eligibility filters available?',
+             'Pinellas\'s site_address_zip_city field includes ZIP. Combine with year_built (when available — Pinellas\'s public ArcGIS layer has year_built on a subset) to identify pre-2002 (pre-current-code) homes for wind-mitigation prospecting.'),
+            ('Does the data cover Clearwater + Largo + suburbs?',
+             'Yes. Pinellas County includes St. Petersburg, Clearwater, Largo, Dunedin, Palm Harbor, Pinellas Park, Tarpon Springs, Indian Rocks Beach, Belleair, and unincorporated. Filter by site city or ZIP to scope.'),
+            ('How does Pinellas compare to Miami-Dade for roofing prospecting?',
+             'Pinellas has higher per-capita storm exposure (more direct hurricane hits), older average housing stock (more wind-mitigation-eligible homes), and a more concentrated coastal high-value market. Miami-Dade has higher absolute permit volume but more roofing competition. Florida coastal roofers typically serve both via the I-275 / I-4 corridor.'),
+        ],
+    },
+
+    'tampa-investor-leads': {
+        'title': 'Tampa FL Real Estate Investor Leads from Property Records | PermitGrab',
+        'meta_description': (
+            '813,000+ Tampa Bay property owners across Hillsborough + '
+            'Pinellas + Pasco. Out-of-state landlord lists, motivated '
+            'seller intel, hurricane-driven exits. $149/mo unlimited.'
+        ),
+        'h1': 'Tampa FL Real Estate Investor Leads from Tampa Bay Property Records',
+        'subject': 'Real estate investors in Tampa Bay metro',
+        'city': 'Tampa',
+        'city_slug': 'tampa',
+        'persona_slug': 'real-estate-investors',
+        'meta_published': '2026-05-03',
+        'reading_time': '6 min',
+        'body_html': """
+<p>Tampa Bay's investor market sits at an unusual inflection: 2018-2022 out-of-state buying drove cap rates well below pre-pandemic levels, hurricane-driven insurance premium hikes have stressed cash flow, and the broader FL property-tax environment is in flux. Together, those forces produce a steady flow of investor-driven exits — and Tampa Bay's housing stock + tourism economy keep it attractive to buy-and-hold operators willing to accept the new reality.</p>
+
+<p>PermitGrab covers all three Tampa Bay metro counties post-V491 (Hillsborough + Pinellas + Pasco), totaling 813,000+ owner records with daily refresh on the V491 sources. Combined with daily Tampa city permits + 39,800+ Tampa property owner records (V428), that's the most complete Tampa Bay investor data layer available without paid commercial sources.</p>
+
+<h2>What's in the Tampa Bay data feed</h2>
+
+<ul>
+  <li><strong>53,000+ Hillsborough County records</strong> (Tampa core) — owner names, mailing addresses, parcel IDs, daily refresh (V428)</li>
+  <li><strong>438,000+ Pinellas County records</strong> (V491 — St. Petersburg + Clearwater + suburbs)</li>
+  <li><strong>322,000+ Pasco County records</strong> (V491 — Wesley Chapel + Land O'Lakes + New Port Richey + suburbs)</li>
+  <li><strong>Combined: ~813K Tampa Bay metro owner records</strong></li>
+  <li>Daily Tampa permit feed via the V476 hybrid Accela-ArcGIS scraper — real contractor names</li>
+  <li>Tampa code violations not currently available (Accela UI only, V484 confirmed)</li>
+</ul>
+
+<h2>The four highest-converting Tampa Bay investor signals</h2>
+
+<h3>1. Out-of-state buyers approaching exit cycle</h3>
+
+<p>Tampa Bay saw heavy 2020-2022 California / Northeast buying. Those investors are at the 4-6 year mark with cap rates compressed and insurance premiums up 30-60%. Filter Hillsborough + Pinellas + Pasco property_owners where mailing_state ≠ FL AND last_sale_date 2020-01-01 to 2022-12-31. Direct mail with "we buy as-is, fast close" — these owners are actively evaluating exit.</p>
+
+<h3>2. Hurricane-stressed coastal owners</h3>
+
+<p>Pinellas + parts of Hillsborough sustained meaningful damage from recent storms. Insurance-driven rebuild costs + premium increases have squeezed coastal investor cash flow harder than inland. Filter Pinellas property_owners by site ZIPs within 5 miles of coast + last_sale_date pre-2020 to find owners who are equity-rich but cash-flow-stressed — high-conversion exit candidates.</p>
+
+<h3>3. Wesley Chapel + Land O'Lakes growth corridor</h3>
+
+<p>Pasco County's growth corridor (Wesley Chapel, Land O'Lakes, parts of Lutz) saw 2018-2022 explosive appreciation in single-family rentals. Filter Pasco property_owners by city + last_sale_date pre-2020 + total_value > $400K to find sellers with both equity and motivation. Many were originally bought as buy-and-hold but are now flipping to capture gains.</p>
+
+<h3>4. LLC + Trust holdings in the $250K-$500K band</h3>
+
+<p>Filter Tampa Bay property_owners where owner_name contains "LLC" or "TRUST", intersect with city tags + total_value $250K-$500K. This is the sweet spot for institutional and small-investor SFR rentals — current cap rates have compressed below underwriting and many are evaluating exit. Portfolio-purchase offers convert higher than per-property pitches with this cohort.</p>
+
+<h2>How Tampa Bay investors run this</h2>
+
+<p><strong>The mailing list workflow.</strong> Pull all three counties' property_owners, filter to out-of-state OR LLC-held + held 4-6 years. Export 1,500-3,000 records per month. Direct mail with "we buy as-is" or portfolio-purchase offers. Tampa Bay deals run $200K-$500K average — unit economics work at 1 deal per 200-400 mailers.</p>
+
+<p><strong>Skip-trace and cold call.</strong> Tampa Bay mailing addresses skip-trace cleanly. Cold-call conversion to appointment runs 1-3% on the well-filtered list. Cold-call best suited to LLC + trust owners (vs out-of-state individuals, who skew direct-mail responsive).</p>
+
+<p><strong>Wholesaling motion.</strong> Tampa Bay has an active local cash-buyer pool willing to pay $5,000-$15,000 in assignment fees for the right deal. Active wholesale operators serve the post-storm distressed-property niche specifically — there's a quick-close premium when insurance + structural issues need a sophisticated buyer.</p>
+
+<h2>Tampa Bay neighborhoods with high investor density</h2>
+
+<p>Investor concentration is highest in:</p>
+<ul>
+  <li>East Tampa + Sulphur Springs (older SFR rental stock)</li>
+  <li>Town N Country + parts of Carrollwood (1970s-1990s suburban SFR)</li>
+  <li>St. Petersburg's Childs Park + Lealman corridor</li>
+  <li>Pinellas Park + parts of Largo (2000s build-out, current-cycle exits)</li>
+  <li>Pasco's New Port Richey + Holiday + Hudson (older snowbird stock)</li>
+</ul>
+
+<h2>Other resources</h2>
+
+<p>Browse the live <a href="/permits/tampa">Tampa data page</a> for current counts. For Pinellas-specific roofing-side angle, see <a href="/blog/st-petersburg-roofing-leads">St. Petersburg roofing leads</a>. For East Coast FL investor dynamics, <a href="/blog/miami-dade-insurance-agent-leads">Miami-Dade insurance agent leads</a> covers the insurance-driven exit playbook. The cross-city motivated-seller playbook is in our <a href="/leads/real-estate-investors">real estate investors lead guide</a>.</p>
+
+<h2>Pricing</h2>
+
+<p>$149/month for unlimited access to Tampa Bay (all 3 counties) + every other city in our coverage. <a href="/pricing">See pricing</a> or <a href="/signup">try a free week</a>.</p>
+""",
+        'faqs': [
+            ('Does PermitGrab cover all of Tampa Bay?',
+             'Yes — Hillsborough (Tampa core), Pinellas (St. Pete + Clearwater + suburbs), and Pasco (Wesley Chapel + Land O\'Lakes + New Port Richey + suburbs). Combined: ~813K owner records.'),
+            ('How fresh is the Tampa Bay owner data?',
+             'Daily for all three counties\' V491 + V428 sources. Pinellas + Pasco refresh nightly via official county Property Appraiser feeds.'),
+            ('Are out-of-state Tampa Bay landlords easy to identify?',
+             'Yes. The Pinellas, Pasco, and Hillsborough feeds all include owner mailing address (Pinellas via ADDRESS_ZIP_CITY parsing, Pasco via NAD_CITY/STATE/ZIP, Hillsborough via standard fields). Filter mailing_state != FL for each.'),
+            ('Do Tampa Bay code violations show up in the feed?',
+             'Hillsborough has fragmentary violation data. Tampa proper is Accela-only with no public REST (V484 dead-end). Pinellas + Pasco violation feeds are not currently wired. For motivated-seller signal, focus on out-of-state owner + LLC + tax data filters rather than violations.'),
+            ('How does Tampa compare to Miami-Dade for investor exits?',
+             'Tampa cap rates compressed harder during 2020-2022 (lower entry yields than Miami) so post-2020 buyers face more pressure. Miami-Dade has older investor capital and more concentrated wealth, so its investor exits skew slower. Tampa is the higher-velocity wholesale-flip market right now.'),
+        ],
+    },
+
 }

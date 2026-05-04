@@ -838,6 +838,54 @@ Each cycle of the autonomous loop should use skills:
 5. **SEO** → Read `seo-real-data/SKILL.md`, update city pages with real numbers
 6. **UAT** → Read `uat-deploy/SKILL.md`, run the full checklist after any change
 
+### Externally-installed plugins (from Claude Plugin Marketplace, May 2026)
+
+In addition to the project-local skills above, the following plugins are
+installed at the user level. ALWAYS prefer these for tasks they cover —
+they're more rigorous and battle-tested than ad-hoc approaches.
+
+| Plugin | Source | When to use it |
+|--------|--------|----------------|
+| **frontend-design** (Anthropic official) | `anthropics/claude-code` marketplace | Any UI / template / CSS work. Forces a design framework before code (purpose, audience, aesthetic) so output isn't generic AI-aesthetic. Mandatory for city-page template changes, persona-page redesigns, pricing-card tweaks, signup form work. |
+| **claude-seo** | `AgriciDaniel/claude-seo` marketplace | Run `/seo audit` before any SEO content change. 19 sub-skills cover canonicals, H1s, schema, sitemap, E-E-A-T, technical SEO, GEO/AEO, local SEO. Single entry point that attacks the "2/3,115 indexed" problem documented in the SEO section. |
+| **claude-ads** | `AgriciDaniel/claude-ads` marketplace | Mandatory before ANY Google Ads change. 250+ checks across Google/Meta/YouTube/LinkedIn/TikTok/Microsoft/Apple. Two modes: CSV upload (no API) or live MCP. "Wasted Spend Audit" sub-skill identifies recoverable spend in 2 min. Use after every campaign update + weekly. |
+| **playwright-skill** | `lackeyjb/playwright-skill` marketplace | Replaces the V248 Puppeteer UAT pipeline. Visual regression with screenshot baselines, viewport tests, console + network capture. Use for every template change BEFORE deploy. Closes the V247-V250 layout-regression hunt loop. |
+
+**Triggers:**
+- "design / UI / template / CSS / responsive / mobile" → frontend-design
+- "SEO / canonical / sitemap / schema / meta / blog / indexing" → claude-seo (`/seo audit`)
+- "ad / campaign / Google Ads / CPC / CTR / quality score / sitelink / callout" → claude-ads
+- "UAT / visual / screenshot / regression / e2e test / accessibility / Lighthouse" → playwright-skill
+
+**Install commands** (for re-install or new dev machine setup):
+```
+/plugin marketplace add anthropics/claude-code && /plugin install frontend-design@claude-code-plugins
+/plugin marketplace add AgriciDaniel/claude-seo
+/plugin marketplace add AgriciDaniel/claude-ads
+/plugin marketplace add lackeyjb/playwright-skill
+```
+
+**Backlog plugins** (not yet installed, recommended next — install commands + triggers below so the trigger map is ready the moment they're added):
+
+| Plugin | Source | Install command | When to use it |
+|--------|--------|-----------------|----------------|
+| **ui-ux-pro-max** | `nextlevelbuilder/ui-ux-pro-max-skill` | `/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill && /plugin install ui-ux-pro-max@ui-ux-pro-max-skill` | Layer on top of frontend-design after a week of use. Design system generator, 161 palettes, 99 UX rules, 25 chart types. Use for: branded design system creation, choosing color palettes for new persona pages, picking font pairings for the V478 redesign, generating data-viz styles for the Analytics dashboard. |
+| **accessibility-pro** | `CogappLabs/claude-plugins` (plugin: accessibility-pro) | `/plugin marketplace add CogappLabs/claude-plugins && /plugin install accessibility-pro@claude-plugins` | WCAG 2.1/2.2 audits via Playwright + axe-core. Critical for Google Ads Quality Score (Google scores landing-page accessibility into ad rank). Use after every persona-page or city-page template change. Mandatory before unpause spend campaigns. |
+| **web-quality-skills** | `addyosmani/web-quality-skills` | clone or symlink `~/.claude/skills/` from repo (no marketplace yet) | Core Web Vitals (LCP/INP/CLS) by Google Chrome team's Addy Osmani. 150+ Lighthouse audits framework-agnostic. Pairs with claude-seo for technical-SEO depth. Use for city-page LCP work — /permits/* pages have stat tables that risk LCP regression. |
+| **superseo-skills** | `inhouseseo/superseo-skills` | clone to `~/.claude/skills/` | Explicit anti-AI-slop ruleset from Koray Tuğberk + Lily Ray methodology. 11 skills incl page audits, link building, semantic gap analysis, E-E-A-T. Use for the 67-blog-post indexing gap (only 1 of 67 currently indexed — Google's been demoting generic AI content since the March 2024 Helpful Content Update). |
+
+**Backlog plugin triggers** (auto-route once installed):
+- "design system / palette / font pair / chart style" → ui-ux-pro-max
+- "accessibility / a11y / WCAG / contrast / screen reader / keyboard nav" → accessibility-pro
+- "Core Web Vitals / LCP / INP / CLS / Lighthouse / page speed" → web-quality-skills
+- "indexing / E-E-A-T / semantic gap / blog audit / topical authority / anti-slop" → superseo-skills
+
+**Other plugins worth evaluating later** (not yet researched in depth):
+- `airowe/claude-a11y-skill` — alternative `/a11y` command with three audit modes
+- `Community-Access/accessibility-agents` — 11 specialist agents that prevent inaccessible code at generation time
+- `coreyhaines31/marketingskills` — broader GTM stack to layer on top of the marketing plugin
+- Page CRO skill at mcpmarket.com — 7-dimension audit framework for landing pages
+
 ---
 
 ## RENDER DEPLOYMENT
