@@ -6,9 +6,9 @@ data are STILL VIABLE: solar companies want owner/address data from permits.
 Show "No contractor data available" on the city page when contractor_name
 is absent. "Dead Ends" are cities with NO working permit API at all.
 
-## Property-Owner Sources Wired (V428–V489, 2026-05-03)
+## Property-Owner Sources Wired (V428–V491, 2026-05-04)
 
-52 owner sources now in `assessor_collector.ASSESSOR_SOURCES` (was 33 pre-V484, 42 pre-V487, 45 post-V487).
+64 owner sources now in `assessor_collector.ASSESSOR_SOURCES` (was 33 pre-V484, 42 pre-V487, 45 post-V487, 52 post-V489, 57 post-V490). Effective post-V491: 62 after deactivating the bexar / travis_austin sources superseded by bexar_county_full / travis_county_full.
 Trigger via `POST /api/admin/collect-assessor-data {"source":"<key>"}`. After
 the import, run `POST /api/admin/fix-property-owner-cities` to retag rows
 where the source feed populates suburb names instead of the metro slug.
