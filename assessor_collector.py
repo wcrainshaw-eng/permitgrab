@@ -1614,6 +1614,233 @@ ASSESSOR_SOURCES = {
         'default_city': 'Lorain',
     },
 
+    # V491 PART A1: Jackson County MO — 73K parcels (KC east metro).
+    # NEW STATE for the owner pipeline. Hosted by City of Independence as
+    # a republished county-wide view. tax_year is "2025" string. ~73K is
+    # partial Jackson coverage (full county pop ~717K) — most likely east-
+    # Jackson + Independence focus. Don't assume full KCMO coverage.
+    'jackson_county_mo': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Jackson County MO Parcels (KC east metro)',
+        'endpoint': 'https://services.arcgis.com/sbDzK061dd6DNPHv/arcgis/rest/services/COI_Parcels_2_view/FeatureServer/0',
+        'where_clause': "owner IS NOT NULL AND owner <> '' AND SitusAddress IS NOT NULL AND SitusAddress <> ''",
+        'field_map': {
+            'owner_name': 'owner',
+            'owner_mailing_address': 'owneraddress',
+            'owner_mailing_city': 'ownercity',
+            'owner_mailing_state': 'ownerstate',
+            'owner_mailing_zip': 'ownerzipcode',
+            'address': 'SitusAddress',
+            'city': 'SitusCity',
+            'site_state': 'SitusState',
+            'site_zip': 'SitusZipCode',
+            'year_built': 'year_built',
+            'tax_year': 'tax_year',
+            'assessed_value': 'AssessedValue',
+            'market_value': 'Market_Value_Total',
+        },
+        'state': 'MO',
+        'source_tag': 'assessor:jackson_county_mo',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Independence',
+    },
+
+    # V491 PART B1: Geauga County OH — 102K parcels (Cleveland far east).
+    # Covers Chardon, Bainbridge, Burton, Chester Township, Auburn Township.
+    # CAVEAT: Sale_Date is string "mm-dd-yyyy" (not epoch ms) — adapter
+    # parsing required if Sale_Date is consumed downstream.
+    'geauga_cleveland_far_east': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Geauga County OH Parcels (Cleveland far east)',
+        'endpoint': 'https://services3.arcgis.com/otmFGc3Z1CITN3V3/arcgis/rest/services/Parcel_Layer/FeatureServer/0',
+        'where_clause': "Oname1 IS NOT NULL AND Oname1 <> '' AND LOCATION_A IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'PARCEL_ID',
+            'owner_name': 'Oname1',
+            'owner_secondary': 'Oname2',
+            'address': 'LOCATION_A',
+            'city': 'LOCATION_C',
+            'site_state': 'LOCATION_S',
+            'site_zip': 'LOCATION_Z',
+            'last_sale_date_str': 'Sale_Date',
+            'last_sale_year': 'Sale_Year',
+            'last_sale_amount': 'Sale_Amt',
+            'acres': 'Acres_Num',
+            'deed_number': 'Deed_Num',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:geauga_cleveland_far_east',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Chardon',
+    },
+
+    # V491 PART B2: Medina County OH — 84K parcels (Cleveland south).
+    # USE THE v2 LAYER. The non-v2 Medina_Parcel_Layer is frozen 2024-04.
+    # Daily refresh confirmed (lastEditDate updated 2026-05-03).
+    'medina_cleveland_south': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Medina County OH Parcels (Cleveland south, daily)',
+        'endpoint': 'https://services5.arcgis.com/m37BbrYBtVXq1nb8/arcgis/rest/services/Medina_Parcel_Layer_version_2/FeatureServer/0',
+        'where_clause': "Owner IS NOT NULL AND Owner <> '' AND Address IS NOT NULL AND Address <> ''",
+        'field_map': {
+            'parcel_id': 'ParcelPIN',
+            'identification_number': 'IdentificationNumber',
+            'owner_name': 'Owner',
+            'address': 'Address',
+            'city': 'City',
+            'site_zip': 'ZIP',
+            'class_code': 'ClassCode',
+            'classification': 'Classification',
+            'acres': 'Acres',
+            'total_value': 'Total_Market_Value',
+            'last_sale_date': 'SaleDate',
+            'last_sale_amount': 'SaleAmount',
+            'current_owed_taxes': 'CurrentOwedTaxes',
+            'longitude': 'Longitude',
+            'latitude': 'Latitude',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:medina_cleveland_south',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Medina',
+    },
+
+    # V491 PART C1: Pinellas County FL — 438K parcels (St Pete + Clearwater).
+    # SUPERSEDES the V476/V487 saint-petersburg dead-end (2,537 mostly
+    # homeowner profiles via the dead city-level Click2Gov path).
+    # ADDRESS_ZIP_CITY format: "550 ALT 19 PALM HARBOR, FL 34683" — needs
+    # parsing if you want to split situs city/zip explicitly.
+    'pinellas_county_fl': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Pinellas County FL Property Appraiser Parcels',
+        'endpoint': 'https://egis.pinellas.gov/pcpagis/rest/services/Pcpao_gov/PropertySearch_A/MapServer/0',
+        'where_clause': "OWNER1 IS NOT NULL AND OWNER1 <> ''",
+        'field_map': {
+            'parcel_id': 'PCPA_UID',
+            'internal_strap': 'INTERNAL_STRAP',
+            'display_strap': 'DISPLAY_STRAP',
+            'owner_name': 'OWNER1',
+            'owner_secondary': 'OWNER2',
+            'address': 'SITE_ADDRESS',
+            'site_address_zip_city': 'ADDRESS_ZIP_CITY',
+            'subdivision': 'SUBDIVISION',
+            'longitude': 'LONGITUDE',
+            'latitude': 'LATITUDE',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:pinellas_county_fl',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'St. Petersburg',
+    },
+
+    # V491 PART C2: Pasco County FL — 322K parcels (Tampa north metro).
+    # MUST USE LAYER 3 ("Parcels Clickable Info"). Layer 0 = parcel boundary
+    # only, no owner. NAD_NAME_1 sometimes contains gov entities like
+    # "PASCO COUNTY" — consider downstream filtering. PHYS_* is situs;
+    # NAD_* is taxpayer mailing.
+    'pasco_county_fl': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Pasco County FL Property Appraiser Parcels',
+        'endpoint': 'https://maps.pascopa.com/arcgis/rest/services/Parcels/MapServer/3',
+        'where_clause': "NAD_NAME_1 IS NOT NULL AND NAD_NAME_1 <> '' AND PHYS_STREET IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'ParcelID',
+            'owner_name': 'NAD_NAME_1',
+            'owner_secondary': 'NAD_NAME_2',
+            'owner_mailing_address': 'NAD_ADD_1',
+            'owner_mailing_address_2': 'NAD_ADD_2',
+            'owner_mailing_city': 'NAD_CITY',
+            'owner_mailing_state': 'NAD_STATE',
+            'owner_mailing_zip': 'NAD_ZIP',
+            'address': 'PHYS_STREET',
+            'city': 'PHYS_CITY',
+            'site_state': 'PHYS_STATE',
+            'site_zip': 'PHYS_ZIP',
+            'appraised_value': 'VAL_APPR',
+            'last_sale_year': 'SALE_YEAR',
+            'last_sale_amount': 'SALE_AMT',
+            'detail_url': 'URL',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:pasco_county_fl',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'New Port Richey',
+    },
+
+    # V491 PART D1: Bexar County TX — 711K parcels (full county replaces
+    # 5K city-only bexar source — 142x lift). After deploy + verification,
+    # deactivate the old bexar source via prod_cities UPDATE.
+    # CRITICAL: Owner and AddrLn1 contain literal 'NULL' string (not real
+    # null) for many rows — where_clause filters explicitly.
+    'bexar_county_full': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Bexar County TX Parcels (full county incl all SA suburbs)',
+        'endpoint': 'https://maps.bexar.org/arcgis/rest/services/Parcels/MapServer/0',
+        'where_clause': "Owner IS NOT NULL AND Owner <> '' AND Owner <> 'NULL' AND AddrLn1 <> 'NULL'",
+        'field_map': {
+            'parcel_id': 'PropID',
+            'account_number': 'AcctNumb',
+            'owner_name': 'Owner',
+            'dba': 'DBA',
+            'address': 'Situs',
+            'owner_mailing_address': 'AddrLn1',
+            'owner_mailing_address_2': 'AddrLn2',
+            'owner_mailing_address_3': 'AddrLn3',
+            'owner_mailing_city': 'AddrCity',
+            'owner_mailing_state': 'AddrSt',
+            'owner_mailing_zip': 'Zip',
+            'land_value': 'LandVal',
+            'improvement_value': 'ImprVal',
+            'total_value': 'TotVal',
+            'year_built': 'YrBlt',
+            'acres': 'Acres',
+            'roll': 'Roll',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:bexar_county_full',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'San Antonio',
+    },
+
+    # V491 PART D2: Travis County TX — 343K parcels (full Austin metro,
+    # replaces 55K travis_austin source — 6x lift). After deploy +
+    # verification, deactivate the old travis_austin source.
+    # NOTE: source field is py_owner_name (NOT owner_name) — common trap.
+    # py_address often has full city/state ("11502 TANGLEBRIAR TRL AUSTIN
+    # TX 78750") — split downstream as needed.
+    'travis_county_full': {
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Travis County TX TCAD Parcels (full Austin metro)',
+        'endpoint': 'https://services1.arcgis.com/HGcSYZ5bvjRswoCb/arcgis/rest/services/TCAD/FeatureServer/0',
+        'where_clause': "py_owner_name IS NOT NULL AND py_owner_name <> '' AND situs_address IS NOT NULL",
+        'field_map': {
+            'parcel_id': 'prop_id',
+            'pid_10': 'PID_10',
+            'geo_id': 'geo_id',
+            'owner_name': 'py_owner_name',
+            'owner_id': 'py_owner_id',
+            'address': 'situs_address',
+            'owner_mailing_address': 'py_address',
+            'taxing_entities': 'entities',
+            'market_value': 'market_value',
+            'appraised_value': 'appraised_val',
+            'last_sale_date': 'deed_date',
+            'deed_number': 'deed_num',
+            'gis_acres': 'GIS_acres',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:travis_county_full',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Austin',
+    },
+
     # V489 PART D: Cuyahoga County OH (full county-wide) — replaces the
     # city-only cuyahoga_cleveland source. 484K total, ~340K populated
     # after the where_clause excludes blank-geometry placeholders.
