@@ -3321,6 +3321,41 @@ def admin_refresh_city_stats():
         return jsonify({'status': 'error', 'error': str(e)[:300]}), 500
 
 
+@admin_bp.route('/api/admin/patch-source-endpoint', methods=['POST'])
+def admin_patch_source_endpoint():
+    """V496: targeted patch for prod_cities rows whose source_endpoint
+    drifted to NULL but the source_id still maps to a live registry
+    entry. Body: {"cities": [{"slug": "cook-county",
+    "source_endpoint": "https://...", "source_id": "cook_county",
+    "source_type": "socrata"}]}. Returns per-row update counts."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    payload = request.get_json(silent=True) or {}
+    cities = payload.get('cities') or []
+    if not cities:
+        return jsonify({'error': 'cities[] required'}), 400
+    conn = permitdb.get_connection()
+    out = []
+    for c in cities:
+        slug = c.get('slug')
+        if not slug:
+            out.append({'slug': None, 'updated': 0, 'error': 'missing slug'})
+            continue
+        n = conn.execute("""
+            UPDATE prod_cities SET source_endpoint = ?,
+                source_id = COALESCE(?, source_id),
+                source_type = COALESCE(?, source_type),
+                consecutive_failures = 0,
+                last_failure_reason = NULL
+            WHERE city_slug = ?
+        """, (c.get('source_endpoint'), c.get('source_id'),
+              c.get('source_type'), slug)).rowcount
+        out.append({'slug': slug, 'updated': n})
+    conn.commit()
+    return jsonify({'status': 'ok', 'patched': out})
+
+
 @admin_bp.route('/api/admin/email-test', methods=['POST'])
 def admin_email_test():
     """V495 Phase 3 follow-up: smoke-test the send_sales_email() path
