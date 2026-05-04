@@ -221,6 +221,39 @@ Verify post-deploy: `GET /api/admin/digest/status` should show
 hit `POST /api/admin/start-collectors?force=1` and check
 `/api/admin/debug/threads` for an `email_scheduler` entry.
 
+### V496 — bulk source_endpoint patch + daemon-stability rules (2026-05-04)
+- **Bug class:** prod_cities.source_endpoint had drifted to NULL on
+  ~210 active cities (including Chicago, NYC, LA, Phoenix, etc.). The
+  daemon's primary path errored with `Invalid URL '': No scheme supplied`
+  on every cycle; data was leaking in via a fragile fallback path. Fixed
+  by `/api/admin/patch-source-endpoint` (V496) — populated source_endpoint
+  from CITY_REGISTRY[source_id].endpoint for each. **Use this endpoint
+  for any future "active row but missing config" rows that appear.**
+- **DO NOT parallel-force-collect.** Each `/api/admin/force-collect`
+  holds a SQLite write transaction. >2 concurrent (3 was tested 2026-05-04)
+  plus the daemon's own writes will WAL-deadlock all gunicorn workers
+  and the site goes 502 site-wide for 5-10+ minutes until a deploy
+  recycles the workers. Use `/api/admin/force-collection` (background
+  full-cycle) for bulk work, or sequential force-collect for small batches.
+- **External healthbeat REQUIRED.** Render does not natively probe
+  `/api/admin/health`, so the V493 IRONCLAD self-heal only fires when
+  something else hits /health. Without an external pinger the daemon
+  has died silently for 4+ hours undetected on multiple occasions
+  (V481-style regressions keep recurring). The intended fix is
+  `.github/workflows/healthbeat.yml` — a 5-minute cron that pings
+  /health. **The OAuth token used by Code's gh CLI cannot push
+  workflow files; Wes must commit and push that file with his
+  PAT.** The file lives at .github/workflows/healthbeat.yml in the
+  working tree until pushed.
+- **WAL recovery procedure** if deadlock happens anyway:
+  1. `git commit --allow-empty -m "redeploy"` then `git push` (forces
+     Render to recycle gunicorn workers — usually only path that works)
+  2. After deploy completes, `POST /api/admin/start-collectors?force=1`
+  3. `POST /api/admin/wal-checkpoint` if WAL has bloated
+  4. Verify daemon via `GET /api/admin/debug/threads` — look for the
+     three named threads scheduled_collection / enrichment_daemon /
+     email_scheduler.
+
 ### ARCHITECTURE GROUND TRUTH (don't repeat the V471 PR4 mistake)
 **There is exactly ONE Render service:** `permitgrab` (Docker, Oregon).
 The Flask web server **and** the collection daemon thread run **in the
