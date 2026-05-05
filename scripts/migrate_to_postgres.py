@@ -72,12 +72,39 @@ def log(msg: str) -> None:
 
 
 def apply_schema(pg_conn) -> None:
+    """Apply schema statement-by-statement so one failure (e.g. an
+    index referring to a column that doesn't yet exist on first run)
+    doesn't roll back the table creations earlier in the batch."""
     log(f"Applying schema from {SCHEMA_SQL_PATH}")
     sql_text = SCHEMA_SQL_PATH.read_text()
-    with pg_conn.cursor() as cur:
-        cur.execute(sql_text)
-    pg_conn.commit()
-    log("Schema applied.")
+    # Strip line comments — they can contain semicolons that break naive split
+    cleaned_lines = []
+    for line in sql_text.splitlines():
+        ls = line.strip()
+        if ls.startswith("--"):
+            continue
+        cleaned_lines.append(line)
+    cleaned = "\n".join(cleaned_lines)
+    statements = [s.strip() for s in cleaned.split(";") if s.strip()]
+    log(f"  {len(statements)} statements to apply")
+    ok, fail = 0, 0
+    fails = []
+    for i, stmt in enumerate(statements):
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(stmt + ";")
+            pg_conn.commit()
+            ok += 1
+        except Exception as e:
+            pg_conn.rollback()
+            fail += 1
+            head = stmt[:80].replace("\n", " ")
+            fails.append((i, head, str(e)[:120]))
+    log(f"  schema apply: {ok} ok, {fail} failed")
+    if fails:
+        log("  FAILURES:")
+        for i, head, err in fails[:10]:
+            log(f"    #{i}: {head}... → {err}")
 
 
 def _serialize_for_copy(val) -> str:
