@@ -326,8 +326,40 @@ def _translate_sql(sql):
     # (careful not to replace ? inside strings)
     translated = sql.replace('?', '%s')
 
+    # datetime('now', '-N units') → (NOW() + INTERVAL '-N units')
+    # V525: This must come BEFORE the bare datetime('now') replacement
+    # below — otherwise the bare-form .replace() chops off the function
+    # name and leaves the (', '-7 days') tail floating, parse error.
+    # Postgres accepts negative intervals natively, so we keep the sign
+    # in the literal and use `+`.
+    import re
+    translated = re.sub(
+        r"datetime\(\s*'now'\s*,\s*'\s*([+-]?\d+\s+(?:second|minute|hour|day|week|month|year)s?)\s*'\s*\)",
+        r"(NOW() + INTERVAL '\1')",
+        translated,
+        flags=re.IGNORECASE,
+    )
+
+    # date('now', '-N units') → ((CURRENT_DATE + INTERVAL '-N units')::date::text)
+    # V525: Schema's date columns (filing_date, issued_date, date,
+    # newest_permit_date, etc.) are TEXT in 'YYYY-MM-DD' form. Cast back
+    # to date::text so '>=' against TEXT lhs keeps doing lexical compare
+    # on 'YYYY-MM-DD' strings — same semantics as SQLite's date() return.
+    translated = re.sub(
+        r"\bdate\(\s*'now'\s*,\s*'\s*([+-]?\d+\s+(?:second|minute|hour|day|week|month|year)s?)\s*'\s*\)",
+        r"((CURRENT_DATE + INTERVAL '\1')::date::text)",
+        translated,
+        flags=re.IGNORECASE,
+    )
+
     # datetime('now') → NOW()
     translated = translated.replace("datetime('now')", "NOW()")
+
+    # date('now') → CURRENT_DATE
+    # V525: pair with the bare datetime('now') translation; SQLite uses
+    # date('now') for today's date as YYYY-MM-DD. Cast back to text for
+    # consistency with the multi-arg form above.
+    translated = translated.replace("date('now')", "(CURRENT_DATE::text)")
 
     # julianday('now') - julianday(x) → EXTRACT(EPOCH FROM NOW() - x::timestamp) / 86400
     # This is complex — handle the most common pattern
