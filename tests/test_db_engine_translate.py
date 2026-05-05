@@ -170,3 +170,65 @@ def test_health_endpoint_pattern_translates():
         f"the site on USE_POSTGRES=true did not translate: {out!r}"
     )
     assert "INTERVAL" in out
+
+
+# ---------------------------------------------------------------------
+# INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+# ---------------------------------------------------------------------
+
+def test_insert_or_ignore_appends_on_conflict_do_nothing():
+    """db.py:1477/1588/3656, license_enrichment.py:949/956/962/967,
+    collector.py:2845. Without this, every PK/UNIQUE conflict on the
+    Postgres path crashes the request."""
+    out = _x("INSERT OR IGNORE INTO permit_history (address_key, permit_number) VALUES (?, ?)")
+    assert "INSERT OR IGNORE" not in out
+    assert "ON CONFLICT DO NOTHING" in out
+
+
+def test_insert_or_ignore_with_trailing_semicolon():
+    out = _x("INSERT OR IGNORE INTO foo (a) VALUES (?);")
+    assert "ON CONFLICT DO NOTHING" in out
+    assert out.rstrip().endswith(";")
+
+
+def test_insert_or_ignore_skipped_when_caller_already_has_on_conflict():
+    """Don't double-append if a caller is explicit."""
+    out = _x("INSERT OR IGNORE INTO foo (a) VALUES (?) ON CONFLICT (a) DO UPDATE SET a=excluded.a")
+    assert out.upper().count("ON CONFLICT") == 1, (
+        f"V525 regression: ON CONFLICT got duplicated: {out!r}"
+    )
+
+
+# ---------------------------------------------------------------------
+# INSERT OR REPLACE → INSERT (callsites add explicit ON CONFLICT)
+# ---------------------------------------------------------------------
+
+def test_insert_or_replace_strips_or_replace():
+    """Translator strips OR REPLACE so plain INSERT survives. The 3
+    real callsites in db.py (permits / system_state / discovered_sources)
+    are patched to use explicit ON CONFLICT (col) DO UPDATE clauses;
+    this test pins the translator-level fallback for any callsite that
+    slips through unpatched. Behavior: fail-loud (PoolError on PK
+    conflict) rather than silent-data-loss."""
+    out = _x("INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)")
+    assert "INSERT OR REPLACE" not in out
+    assert out.startswith("INSERT INTO")
+
+
+def test_patched_db_py_callsites_use_explicit_on_conflict():
+    """V525 hand-patched 3 callsites in db.py to drop OR REPLACE and
+    add explicit ON CONFLICT (col) DO UPDATE SET ... clauses. Verify
+    the file has zero remaining INSERT OR REPLACE + the new ON CONFLICT
+    clauses are present. If a future PR re-introduces INSERT OR REPLACE
+    in db.py, this test fires and the cutover-blocker pattern surfaces
+    before deploy."""
+    src = open(os.path.join(os.path.dirname(__file__), '..', 'db.py')).read()
+    assert "INSERT OR REPLACE" not in src, (
+        "V525 regression: INSERT OR REPLACE re-introduced in db.py. Use "
+        "explicit cross-dialect ON CONFLICT (col) DO UPDATE SET col2="
+        "excluded.col2 syntax instead."
+    )
+    # Each of the 3 patched targets has its ON CONFLICT (col) clause
+    assert "ON CONFLICT (permit_number) DO UPDATE SET" in src
+    assert "ON CONFLICT (key) DO UPDATE SET" in src
+    assert "ON CONFLICT (source_key) DO UPDATE SET" in src

@@ -382,12 +382,30 @@ def _translate_sql(sql):
         translated
     )
 
-    # INSERT OR REPLACE → INSERT ... ON CONFLICT DO UPDATE
-    # This one needs context-specific handling — leave for db.py to manage
-
-    # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+    # V525: INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+    # The bare INSERT-without-ON-CONFLICT would CRASH on Postgres at any
+    # PK/UNIQUE violation. Append ON CONFLICT DO NOTHING (no target needed
+    # — Postgres ignores any unique-conflict). Skip the append if the SQL
+    # already has an ON CONFLICT clause (some callsites are explicit) or
+    # if it's a multi-statement / non-INSERT translation.
+    _had_or_ignore = "INSERT OR IGNORE" in translated
     translated = translated.replace("INSERT OR IGNORE", "INSERT")
-    # We'll add ON CONFLICT DO NOTHING in db.py where needed
+    if _had_or_ignore and "ON CONFLICT" not in translated.upper():
+        # Strip any trailing whitespace + semicolon, append, restore semicolon
+        _stripped = translated.rstrip()
+        _had_semi = _stripped.endswith(";")
+        if _had_semi:
+            _stripped = _stripped[:-1].rstrip()
+        translated = _stripped + " ON CONFLICT DO NOTHING" + (";" if _had_semi else "")
+
+    # V525: INSERT OR REPLACE → INSERT (strip OR REPLACE only).
+    # The 3 known callsites in db.py:3403/4246/4335 are patched to use
+    # explicit ON CONFLICT (col) DO UPDATE SET ... clauses (cross-
+    # dialect; SQLite 3.24+ also supports this syntax). Any new
+    # INSERT OR REPLACE that slips in becomes a plain INSERT and will
+    # CRASH on PK conflict — that's fail-loud, which is what we want
+    # so the audit catches it before it causes silent data loss.
+    translated = translated.replace("INSERT OR REPLACE", "INSERT")
 
     # AUTOINCREMENT → (just remove it, Postgres SERIAL handles this)
     translated = translated.replace("AUTOINCREMENT", "")

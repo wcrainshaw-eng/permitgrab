@@ -1,0 +1,78 @@
+# PING WES — V525 SQL TRANSLATION AUDIT COMPLETE — READY FOR ATTEMPT 3
+
+## What shipped
+Two commits:
+- `ee80650` (V525): datetime('now', '-N units') / date('now', '-N units')
+  → Postgres INTERVAL translation. 15 regression tests, real-Postgres
+  end-to-end. The fix for the 503 you saw at 16:55 UTC.
+- (this commit) V525b: extends the audit per your "don't sprawl, but
+  audit everything" directive. Adds INSERT OR IGNORE / INSERT OR
+  REPLACE translation + 3 hand-patched callsites in db.py + 5 more
+  regression tests + the full audit attestation in
+  CODE_V525_SQL_AUDIT.txt.
+
+## Audit summary (full table in CODE_V525_SQL_AUDIT.txt)
+17 SQLite-vs-Postgres constructs probed. **All real risks are now
+covered by translation + tests.** One known correctness drift (LIKE
+case-sensitivity, 80 unwrapped callsites) is documented and explicitly
+deferred to V527 — it's not a crash, it's a "case-sensitive Postgres
+matches differently than case-insensitive SQLite" semantic shift.
+
+| Pattern | Status |
+|---------|--------|
+| `datetime('now', '-N units')` (19 patterns) | ✅ regex in translator |
+| `date('now', '-N units')` (9 patterns) | ✅ regex in translator |
+| `datetime(col, modifier)` | ✅ unused (0 callsites) |
+| SQL `strftime` | ✅ unused (all Python) |
+| `julianday(...)` | ✅ existing rules cover all 5 callsites |
+| `INSERT OR IGNORE` | ✅ translator appends `ON CONFLICT DO NOTHING` |
+| `INSERT OR REPLACE` | ✅ 3 callsites hand-patched + translator fallback |
+| `WITHOUT ROWID`, `'localtime'`, `'start of day'`, `printf`, `typeof` | ✅ unused |
+| `AUTOINCREMENT`, `WITHOUT ROWID`, PRAGMAs | ✅ schema-side / SQLite-only paths |
+| `LIKE` case-sensitivity | ⚠️ deferred V527 (correctness drift, not crash) |
+
+## Verification
+- 23 unit tests pass (15 datetime/date + 5 INSERT OR IGNORE/REPLACE +
+  3 V524 digest)
+- Real-Postgres end-to-end via psycopg2:
+  - 10 datetime/date queries return correct row counts
+  - 6 UPSERT queries (insert + update for permits, system_state,
+    discovered_sources) produce expected state
+  - INSERT OR IGNORE translator path handles dup INSERT without crash
+- SQLite 3.50.4 cross-dialect verified — the 3 patched callsites work
+  on both DBs
+
+## Re-cutover attempt 3 — flip whenever
+1. ✅ V523 pool fix in main (commit 61e9171, dormant)
+2. ✅ V524 digest module in main (commit f06ccc4, live)
+3. ✅ V525 datetime/date translation in main (commit ee80650)
+4. ✅ V525b INSERT OR IGNORE/REPLACE + audit (commit incoming)
+
+When you flip USE_POSTGRES=true:
+- Render redeploys ~3 min.
+- Pool monitor logs every 60s: `[DB_ENGINE] V514 pool: in_use=N idle=M max=25`
+- Daemon spawn log: `[V524] email_scheduler thread started via digest.start_thread()`
+- Watch for ~5 min: pool plateaus < maxconn, no PoolError fires,
+  daemon writes a fresh row to permits, /api/admin/digest/status still
+  returns daemon_alive:true on Postgres path.
+- Spot-check: chicago-il / miami-dade-county / phoenix-az pages render.
+
+If it cracks again, same flag-off rollback works (3 min). I'll have
+the next-layer fix queued by morning.
+
+## After successful cutover (chain order from your prior message)
+1. Step 4c GSC redirect URL audit — gated on your CSV
+2. V526: fleet-wide 1,319-stale-cities scheduling (task #33)
+3. Continue module-extraction: collectors/ next session, then
+   enrichment/, then subscriptions/. One per session, each with
+   regression tests, each shrinking server.py.
+
+## Architectural note for later
+You flagged SQLAlchemy. Pattern observation: every cutover attempt
+finds the next layer of leakage. V522 = pool, V525 = translation,
+future likely = NULL ordering / integer division / type coercion.
+Hand-rolling means we ship one fix at a time forever. SQLAlchemy Core
+would centralize via a Dialect backend. V527+ architectural decision
+when the immediate cutover is settled. Documented in CODE_V525_SQL_AUDIT.txt.
+
+— Code at ~22:08 UTC 2026-05-05

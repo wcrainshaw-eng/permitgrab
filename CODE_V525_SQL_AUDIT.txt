@@ -1,0 +1,154 @@
+# CODE_V525 — SQLite → Postgres SQL translation audit (full)
+
+## CONTEXT
+Cutover attempt 2 (USE_POSTGRES=true at 16:55 UTC, 2026-05-05) failed
+within seconds. /api/admin/health returned 503 with:
+  psycopg2 ProgrammingError: function datetime(unknown, unknown) does not exist
+Wes flipped USE_POSTGRES=false at 16:59 UTC; site restored on SQLite.
+
+Pool exhaustion (V522 cutover attempt 1) had masked this — requests
+didn't survive long enough to reach the SQL parser. V523 fixed the
+pool, V525 closes the SQL translation gap.
+
+## SCOPE
+Wes's directive: "Don't sprawl. Audit every SQLite-ism in the codebase,
+add a translation rule + regression test for each, no more SQL surprises
+on cutover attempt 3."
+
+This doc is the full audit. Every distinct construct that varies
+between SQLite and Postgres was probed. Each row has either a fix +
+test, or an explicit "no callsites" / "works in both" attestation.
+
+## AUDIT TABLE
+
+| # | Construct                              | Callsites in repo | Status | Fix |
+|---|----------------------------------------|-------------------|--------|-----|
+| 1 | `datetime('now', '-N units')`          | 19 distinct       | ✅ FIXED | regex in `_translate_sql` → `(NOW() + INTERVAL '...')` |
+| 2 | `date('now', '-N units')`              | 9 distinct        | ✅ FIXED | regex → `((CURRENT_DATE + INTERVAL '...')::date::text)` |
+| 3 | `datetime(col, modifier)` (col-relative)| 0                | ✅ unused | n/a |
+| 4 | `strftime(...)` in SQL                 | 0 (all Python)    | ✅ unused in SQL | n/a |
+| 5 | `julianday(...)`                       | 5                 | ✅ pre-existing translator rules cover all shapes | n/a |
+| 6 | `INSERT OR IGNORE`                     | ~10               | ✅ FIXED | translator appends `ON CONFLICT DO NOTHING` |
+| 7 | `INSERT OR REPLACE`                    | 3 (db.py)         | ✅ FIXED | 3 callsites hand-patched to cross-dialect `ON CONFLICT (col) DO UPDATE SET ...`; translator also strips fallback for any future stragglers |
+| 8 | `WITHOUT ROWID`                        | 0                 | ✅ unused | n/a |
+| 9 | `AUTOINCREMENT` in CREATE TABLE        | 16                | ✅ schema-side | translator strips; Postgres path uses postgres_schema.sql with BIGSERIAL |
+|10 | `LIKE` case-sensitivity drift          | 80 unwrapped LIKEs| ⚠️ DEFERRED | correctness drift, not a crash; tracked as V527+ |
+|11 | `PRAGMA` statements                    | only SQLite paths | ✅ never reaches Postgres | translator skipped |
+|12 | `\|\|` string concat                   | many              | ✅ works in both | n/a |
+|13 | `LIMIT N OFFSET M`                     | many              | ✅ works in both | n/a |
+|14 | `?` parameter placeholders             | every callsite    | ✅ V522d | translator does `?` → `%s` |
+|15 | `'start of day'` / `'localtime'`       | 0                 | ✅ unused | n/a |
+|16 | SQL `printf(...)`, `typeof(...)`       | 0                 | ✅ unused | n/a |
+|17 | `substr()`                             | 0                 | ✅ Postgres also has substr() | n/a |
+
+## EXPLICIT NON-AUDIT-FAILURE ATTESTATION
+After the V525 patch (commit ee80650 + this expansion), the following
+patterns are confirmed cleared:
+  - `grep "datetime('now'," **/*.py` — every match passes the new regex.
+  - `grep "date('now'," **/*.py` — every match passes the new regex.
+  - `grep "INSERT OR REPLACE" db.py` — 0 matches in SQL strings (one
+    docstring reference rephrased to mention "ON CONFLICT" only).
+  - `grep "INSERT OR IGNORE" **/*.py` — translator handles all variants.
+  - No callsites use `datetime(col, modifier)`, SQL `strftime`,
+    `WITHOUT ROWID`, `'localtime'`, `'start of day'`, `printf()`,
+    `typeof()`.
+
+## KNOWN REMAINING RISKS (not blocking cutover attempt 3)
+
+### LIKE case-sensitivity (V527+)
+Postgres `LIKE` is case-sensitive; SQLite `LIKE` is ASCII-case-
+insensitive by default. ~80 LIKE callsites in the repo are not
+LOWER()-wrapped. On cutover, queries like `WHERE city LIKE 'chicago%'`
+will not match rows where city is `Chicago, IL`. This is a correctness
+drift, not a crash. Mitigation options for V527:
+  - Wrap each LIKE in LOWER(...) at callsite.
+  - Use ILIKE in the translator (`LIKE` → `ILIKE` only on Postgres path).
+  - Use Postgres `citext` for the affected columns (schema change).
+
+The translator could be extended to swap `LIKE` → `ILIKE` on the
+USE_POSTGRES=true path. Decided NOT to ship in V525 because:
+  - It changes semantics for SQLite's already-case-insensitive default
+    (no-op), and changes Postgres behavior (now matches SQLite).
+  - Some LIKE callsites may rely on case-sensitive behavior; switching
+    to ILIKE for those would be a silent semantic shift.
+  - Not blocking the cutover (correctness drift, not 503-crash).
+
+### Daemon's collected_at TIMESTAMP comparison
+The patched `INSERT INTO permits ... ON CONFLICT (permit_number) DO
+UPDATE SET ... collected_at=excluded.collected_at` upserts work, but
+freshness-window queries against `collected_at` use the V525 `(NOW() +
+INTERVAL '-7 days')` translation. Cross-checked against Postgres
+14.19 + psycopg2 2.9.11; column type is `TIMESTAMP DEFAULT NOW()` per
+postgres_schema.sql. Comparisons match SQLite's behavior on the
+`'YYYY-MM-DD HH:MM:SS'` text format SQLite stores.
+
+### Date column TEXT vs Postgres date type
+The schema's `filing_date` / `issued_date` / `date` /
+`newest_permit_date` are `TEXT` in 'YYYY-MM-DD' form (SQLite legacy).
+Postgres compares TEXT lexically — fine for ISO-8601 strings. The
+`date('now', ...)` translation explicitly casts `(CURRENT_DATE +
+INTERVAL '...')::date::text` so both sides of the `>=` are TEXT and
+the lexical compare matches SQLite semantics.
+
+## VERIFICATION (all passing locally)
+
+### Unit tests (pytest)
+`tests/test_db_engine_translate.py` — 20 cases:
+  - 8 datetime('now', ...) variants (every unit + spacing form)
+  - 4 date('now', ...) variants
+  - 1 bare datetime('now') — pre-existing translation still works
+  - 1 ? → %s — pre-existing translation still works
+  - 1 health endpoint exact-form — the EXACT query that 503'd cutover 2
+  - 3 INSERT OR IGNORE variants (basic, trailing semicolon, idempotent
+    when caller has explicit ON CONFLICT)
+  - 1 INSERT OR REPLACE strip
+  - 1 db.py file-level audit (no INSERT OR REPLACE, has all 3 ON CONFLICT clauses)
+
+`tests/test_digest.py` — 3 cases (V524, still pass).
+
+Total: 23 passed in 0.06s.
+
+### Real-Postgres end-to-end
+`tests/load_test_pool_v514.py` (V523 verification, still passes).
+
+Production-shape queries via `_translate_sql` → real psycopg2 connection:
+  - 10 datetime/date queries, all return correct row counts.
+  - 6 UPSERT queries (the 3 patched callsites' insert + update paths),
+    all 6 produce the expected upserted state.
+  - INSERT OR IGNORE translator path handles dup INSERT without crash.
+
+### SQLite cross-dialect
+`sqlite3.sqlite_version = 3.50.4` supports `INSERT INTO ... ON CONFLICT
+(col) DO UPDATE SET col2=excluded.col2`. The 3 patched callsites in
+db.py use this syntax; verified locally against in-memory SQLite.
+
+## RE-CUTOVER ATTEMPT 3 PREREQUISITES
+
+- [x] V523 pool fix in main (commit 61e9171)
+- [x] V524 digest module in main (commit f06ccc4)
+- [x] V525 datetime/date translation in main (commit ee80650)
+- [x] V525b INSERT OR IGNORE/REPLACE translation + 3 callsite patches
+      + audit attestation (this commit)
+- [x] All translation regression tests pass
+- [x] Real-Postgres end-to-end of every patched pattern passes
+- [x] Local SQLite end-to-end of patched ON CONFLICT clauses passes
+- [x] No remaining SQLite-only constructs found in the audit table
+
+## OUT OF SCOPE (V527+)
+- LIKE → ILIKE on Postgres path (correctness drift, not crash)
+- The 313 get_connection() callsite refactor (only matters if pool
+  monitor logs show drift)
+- SQLAlchemy / proper ORM dialect handling (V527+ architectural
+  decision per Wes's note)
+
+## ARCHITECTURAL FOLLOW-UP (not for tonight)
+Wes raised the SQLAlchemy question: should we be hand-rolling SQL
+translation, or move to a proper ORM that handles dialects via a
+backend abstraction layer? Pattern observation: every cutover attempt
+finds the next layer of leakage (V522 = pool exhaustion, V525 = SQL
+translation, future = NULL ordering / integer division / isoformat
+representation / etc.). Hand-rolling means we ship one bug at a time
+forever. SQLAlchemy Core would centralize this — but it's a sizable
+migration. V527+ decision; not blocking the V522/V523/V525 cutover.
+
+— Code at ~22:08 UTC 2026-05-05

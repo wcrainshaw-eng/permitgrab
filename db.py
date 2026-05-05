@@ -3095,8 +3095,9 @@ def run_v93_full_cleanup(dry_run=False):
 def upsert_permits(permits, source_city_key=None):
     """
     Insert or update permits. This is the core write operation that replaces
-    all the JSON file writes. Uses INSERT OR REPLACE so duplicates by
-    permit_number are automatically handled (newer data wins).
+    all the JSON file writes. V525: uses cross-dialect INSERT ... ON CONFLICT
+    (permit_number) DO UPDATE SET ... so duplicates by permit_number are
+    upserted (newer data wins) on both SQLite 3.24+ and Postgres.
 
     V19: Also deduplicates by address+city+state+filing_date to prevent
     duplicate rows for the same physical permit with different permit numbers.
@@ -3400,7 +3401,7 @@ def upsert_permits(permits, source_city_key=None):
             new_count += 1
 
         conn.execute("""
-            INSERT OR REPLACE INTO permits (
+            INSERT INTO permits (
                 permit_number, city, state, address, zip,
                 permit_type, permit_sub_type, work_type, trade_category,
                 description, display_description, estimated_cost, value_tier,
@@ -3417,6 +3418,20 @@ def upsert_permits(permits, source_city_key=None):
                 ?, ?, ?,
                 ?, ?, ?, ?
             )
+            ON CONFLICT (permit_number) DO UPDATE SET
+                city=excluded.city, state=excluded.state, address=excluded.address, zip=excluded.zip,
+                permit_type=excluded.permit_type, permit_sub_type=excluded.permit_sub_type,
+                work_type=excluded.work_type, trade_category=excluded.trade_category,
+                description=excluded.description, display_description=excluded.display_description,
+                estimated_cost=excluded.estimated_cost, value_tier=excluded.value_tier,
+                status=excluded.status, filing_date=excluded.filing_date,
+                issued_date=excluded.issued_date, date=excluded.date,
+                contact_name=excluded.contact_name, contact_phone=excluded.contact_phone,
+                contact_email=excluded.contact_email, owner_name=excluded.owner_name,
+                contractor_name=excluded.contractor_name, square_feet=excluded.square_feet,
+                lifecycle_label=excluded.lifecycle_label,
+                source_city_key=excluded.source_city_key, collected_at=excluded.collected_at,
+                updated_at=excluded.updated_at, prod_city_id=excluded.prod_city_id
         """, (
             pn, p.get('city'), p.get('state'), p.get('address'), p.get('zip'),
             p.get('permit_type'), p.get('permit_sub_type'), p.get('work_type'), p.get('trade_category'),
@@ -4243,8 +4258,10 @@ def set_system_state(key, value):
     """V17: Set a system state value."""
     conn = get_connection()
     conn.execute("""
-        INSERT OR REPLACE INTO system_state (key, value, updated_at)
+        INSERT INTO system_state (key, value, updated_at)
         VALUES (?, ?, datetime('now'))
+        ON CONFLICT (key) DO UPDATE SET
+            value=excluded.value, updated_at=excluded.updated_at
     """, (key, value))
     conn.commit()
 
@@ -4332,10 +4349,16 @@ def upsert_discovered_source(source_config):
     field_map_json = json.dumps(source_config.get('field_map', {})) if source_config.get('field_map') else None
 
     conn.execute("""
-        INSERT OR REPLACE INTO discovered_sources
+        INSERT INTO discovered_sources
             (source_key, name, state, platform, mode, endpoint, dataset_id,
              city_field, date_field, field_map, scope, status, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (source_key) DO UPDATE SET
+            name=excluded.name, state=excluded.state, platform=excluded.platform,
+            mode=excluded.mode, endpoint=excluded.endpoint, dataset_id=excluded.dataset_id,
+            city_field=excluded.city_field, date_field=excluded.date_field,
+            field_map=excluded.field_map, scope=excluded.scope, status=excluded.status,
+            notes=excluded.notes
     """, (
         source_config.get('source_key'),
         source_config.get('name'),
