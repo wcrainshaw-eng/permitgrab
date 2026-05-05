@@ -338,53 +338,20 @@ def sitemap_cities():
 
 @seo_bp.route('/sitemap-states.xml')
 def sitemap_states():
-    """V233 P1-3: dedicated state-URL sitemap. State routes (both the
-    state hub /permits/{state} and the /permits/{state}/{city} SEO URLs)
-    were already emitted inside sitemap-cities.xml, but Cowork's audit
-    showed Google wasn't surfacing them — the cities sitemap is enormous
-    and state URLs got lost in the mix. Breaking them out into a
-    dedicated sub-sitemap gives the state pattern its own crawl budget.
-    """
+    """V506: state-hub URLs only. /permits/{state}/{city} URLs already
+    live in sitemap-cities.xml — duplicating them here just bloated the
+    file and diluted state-hub crawl budget. State pages are the hierarchy
+    Google should crawl most aggressively (priority 0.9, daily refresh)."""
     today = datetime.now().strftime('%Y-%m-%d')
     url_map = {}
-    abbrev_to_state_slug = {v['abbrev']: k for k, v in STATE_CONFIG.items()}
-
-    # State hub pages
     for state_slug in STATE_CONFIG.keys():
         loc = f"{SITE_URL}/permits/{state_slug}"
         url_map[loc] = {
             'loc': loc,
-            'changefreq': 'daily',
-            'priority': '0.85',
+            'changefreq': 'weekly',
+            'priority': '0.9',
             'lastmod': today,
         }
-
-    # /permits/{state}/{city} URLs for active cities with data
-    try:
-        conn = permitdb.get_connection()
-        active_cities = conn.execute("""
-            SELECT city_slug, state, last_collection
-            FROM prod_cities
-            WHERE status = 'active'
-              AND data_freshness != 'no_data'
-              AND total_permits > 0
-        """).fetchall()
-        for row in active_cities:
-            state_slug = abbrev_to_state_slug.get(row['state'])
-            if not state_slug:
-                continue
-            lastmod = row['last_collection'][:10] if row['last_collection'] else today
-            loc = f"{SITE_URL}/permits/{state_slug}/{row['city_slug']}"
-            if loc not in url_map:
-                url_map[loc] = {
-                    'loc': loc,
-                    'changefreq': 'daily',
-                    'priority': '0.7',
-                    'lastmod': lastmod,
-                }
-    except Exception as e:
-        print(f"[sitemap_states] state/city URL error: {e}")
-
     return Response(_generate_sitemap_xml(url_map.values()), mimetype='application/xml')
 
 
@@ -501,8 +468,46 @@ def sitemap_blog():
 
 @seo_bp.route('/robots.txt')
 def robots():
-    """V12.11: Serve robots.txt for search engines."""
-    content = f"""User-agent: *
+    """V506 update: explicit AI-crawler allows + drop Crawl-delay (Bing
+    respects it and caps crawl rate too low for our 12K+ URL site)."""
+    content = f"""# PermitGrab robots.txt
+
+# AI search engines — explicit allows for citation visibility
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Standard search engines
+User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
@@ -519,21 +524,96 @@ Disallow: /logout
 Disallow: /reset-password
 Disallow: /login
 Disallow: /signup
-# V383 (loop /CODE_V286 grind): disallow transient checkout-flow URLs.
-# /start-checkout 303-redirects to a Stripe URL or back to /pricing —
-# nothing for Google to index, and indexing the redirect dilutes
-# crawl budget that should go to city pages. /success is the
-# post-payment confirmation already noindex'd via meta tag, but
-# robots disallow makes the rule canonical.
+Disallow: /select-cities
 Disallow: /start-checkout
 Disallow: /success
 Disallow: /pricing?
 
-# Crawl-delay for polite crawling
-Crawl-delay: 1
-
 Sitemap: {SITE_URL}/sitemap.xml
 """
     return Response(content, mimetype='text/plain')
+
+
+@seo_bp.route('/<key>.txt')
+def indexnow_key_file(key):
+    """V506 FIX 10: IndexNow protocol key-file. Microsoft Bing + Yandex
+    fetch /<INDEXNOW_KEY>.txt to verify ownership before accepting URL
+    pushes. The key value comes from the INDEXNOW_KEY env var.
+
+    Generate the key once: python3 -c 'import secrets; print(secrets.token_hex(16))'
+    Set as INDEXNOW_KEY on Render.
+    """
+    # Don't accidentally serve other .txt files (robots, security, llms).
+    # Those have their own dedicated routes that take precedence.
+    import os
+    expected = os.environ.get('INDEXNOW_KEY') or ''
+    if expected and key == expected:
+        return Response(expected, mimetype='text/plain')
+    from flask import abort
+    abort(404)
+
+
+@seo_bp.route('/.well-known/security.txt')
+def security_txt():
+    """V506 FIX 7: RFC 9116 security.txt — standard contact channel."""
+    body = (
+        "Contact: mailto:wes@permitgrab.com\n"
+        "Contact: mailto:sales@permitgrab.com\n"
+        "Expires: 2027-05-04T00:00:00.000Z\n"
+        "Preferred-Languages: en\n"
+        "Canonical: https://permitgrab.com/.well-known/security.txt\n"
+    )
+    return Response(body, mimetype='text/plain')
+
+
+@seo_bp.route('/llms.txt')
+def llms_txt():
+    """V506 FIX 6: AI-search visibility signal. llms.txt is the emerging
+    standard for sites to advertise themselves to LLM crawlers /
+    citation engines (OpenAI search, Perplexity, Claude, Anthropic-ai,
+    Google-Extended)."""
+    try:
+        import os
+        path = os.path.join(os.path.dirname(__file__), '..', 'static', 'llms.txt')
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                return Response(f.read(), mimetype='text/markdown')
+    except Exception:
+        pass
+    # Fallback inline content if static file missing
+    body = """# PermitGrab
+
+> Daily building permit data, contractor leads, and code violation feeds for US cities. Built for home-services contractors (roofers, solar, HVAC, plumbers, restoration), real-estate investors and wholesalers, and design-build general contractors. $149/mo unlimited access per customer with 14-day free trial.
+
+## What we are
+
+PermitGrab pulls building permit + property owner + code enforcement data from city, county, and state public records APIs daily. We surface contractor-shaped data points (business names, phones, permit values) and homeowner data points (addresses, mailing addresses for absentee detection, code citations) for $149/mo unlimited access.
+
+## Coverage
+
+17 fully-loaded metros (permits + violations + property owners): Fort Worth, Miami-Dade, Phoenix, Cincinnati, Chicago, Nashville, Cleveland, Austin, Philadelphia, Mesa, Raleigh, Scottsdale, NYC, Columbus, San Antonio, Buffalo, Orlando. ~98 active permit-collection cities, ~947K property owner records.
+
+## Top customer archetypes
+
+1. Storm-belt roofing contractors (TX/FL/OK/CO/GA/TN)
+2. Solar installers / EPCs (CA/AZ/TX/NV/FL/NJ)
+3. Design-build general contractors (top 25 metros)
+4. HVAC contractors (Phoenix/SA/Vegas/Houston/Tampa)
+5. Real estate wholesalers (Atlanta/Chicago/Houston/Detroit/Cleveland)
+6. Insurance restoration contractors (hurricane belt + tornado alley)
+7. Plumbing contractors (Chicago/Philly/NYC)
+8. Window/door replacement specialists
+9. Real estate agents specializing in off-market listings
+10. Pest control + lawn service (high-end)
+
+## Key landing pages
+
+- /pricing — $149/mo, 14-day free trial, no charge for 14 days
+- /cities — full directory of covered metros
+- /leads/<persona> — persona-specific landing pages (15 archetypes)
+- /permits/<state>/<city> — per-city permit + violation feeds
+- /blog/<post> — long-form data-driven posts on lead-acquisition strategy
+"""
+    return Response(body, mimetype='text/markdown')
 
 

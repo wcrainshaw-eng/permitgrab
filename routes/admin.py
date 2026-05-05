@@ -3722,6 +3722,48 @@ def admin_query():
 _PERF_MIGRATE_STATE = {'running': False, 'steps': [], 'started_at': None,
                        'finished_at': None}
 
+@admin_bp.route('/api/admin/indexnow-push', methods=['POST'])
+def admin_indexnow_push():
+    """V506 FIX 10: push URLs to IndexNow protocol (Bing/Yandex/Seznam).
+
+    Body: {"urls": ["https://permitgrab.com/permits/...", ...]}
+    Or: {"slugs": ["chicago-il", ...]} → expanded to /permits/<slug>.
+
+    Returns the IndexNow API status_code (200/202 = accepted).
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    import os, requests as _ix_requests
+    key = os.environ.get('INDEXNOW_KEY')
+    if not key:
+        return jsonify({'error': 'INDEXNOW_KEY env var not set'}), 503
+    payload = request.get_json(silent=True) or {}
+    urls = payload.get('urls') or []
+    slugs = payload.get('slugs') or []
+    site = 'https://permitgrab.com'
+    for s in slugs:
+        urls.append(f'{site}/permits/{s}')
+    if not urls:
+        return jsonify({'error': 'urls or slugs required'}), 400
+    body = {
+        'host': 'permitgrab.com',
+        'key': key,
+        'keyLocation': f'{site}/{key}.txt',
+        'urlList': urls[:10000],
+    }
+    try:
+        r = _ix_requests.post(
+            'https://api.indexnow.org/indexnow', json=body,
+            headers={'Content-Type': 'application/json'},
+            timeout=15,
+        )
+        return jsonify({'status_code': r.status_code,
+                        'pushed': len(urls), 'response_text': r.text[:200]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 502
+
+
 @admin_bp.route('/api/admin/perf-migrate', methods=['POST'])
 def admin_perf_migrate():
     """V503: idempotent perf migrations — indexes + ANALYZE.

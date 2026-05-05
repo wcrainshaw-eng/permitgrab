@@ -63,3 +63,8 @@
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
 {% endif %}
+
+<!-- V506: Bing Webmaster Tools verification (set BING_VERIFICATION env var) -->
+{% if config.BING_VERIFICATION %}
+<meta name="msvalidate.01" content="{{ config.BING_VERIFICATION }}">
+{% endif %}

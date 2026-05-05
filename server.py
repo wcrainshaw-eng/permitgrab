@@ -2756,6 +2756,9 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 # V12.24: Google Analytics and Search Console from env vars
 app.config['GOOGLE_ANALYTICS_ID'] = os.environ.get('GOOGLE_ANALYTICS_ID', '')
 app.config['GOOGLE_SITE_VERIFICATION'] = os.environ.get('GOOGLE_SITE_VERIFICATION', '')
+# V506: Bing Webmaster Tools verification + IndexNow protocol key
+app.config['BING_VERIFICATION'] = os.environ.get('BING_VERIFICATION', '')
+app.config['INDEXNOW_KEY'] = os.environ.get('INDEXNOW_KEY', '')
 # V30: Remarketing pixel IDs — set these env vars on Render to activate
 app.config['GOOGLE_ADS_ID'] = os.environ.get('GOOGLE_ADS_ID', '')  # e.g. AW-XXXXXXXXX
 app.config['META_PIXEL_ID'] = os.environ.get('META_PIXEL_ID', '')   # Facebook/Meta pixel ID

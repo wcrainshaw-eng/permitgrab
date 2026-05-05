@@ -324,6 +324,388 @@ _PERSONAS = {
              'ready to talk.'),
         ],
     },
+    # V506: 10 new persona entries from PERFECT_CUSTOMERS_MATRIX archetypes.
+    # Closes 240+ broken /leads/<persona> links from V498-V502 blog posts.
+    'solar-home-services': {
+        'h1': 'Solar Installer Leads from Building Permits',
+        'meta_title': 'Solar Installer Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Daily building permit feed for solar installers + EPCs. 79K '
+            'Phoenix + 55K Austin owners. Re-roof permits convert at 18-25% '
+            'for solar. $149/mo unlimited.'
+        ),
+        'hero_kicker': 'For solar installers, EPCs, and solar-roof combo shops',
+        'hero_copy': (
+            'Skip the EnergySage and Modernize per-lead markup. Solar leads '
+            'sourced direct from public permit data — re-roof permits and '
+            'electrical-upgrade permits are the highest-converting solar lead types.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Maricopa County: 79,000+ property owner records, 1,080+ Phoenix contractor phones',
+            'Travis County (Austin): 55,000+ owners with full names + mailing addresses',
+            'Re-roof permits convert at 18–25% — they\'re already paying for the roof, solar is the upsell',
+            'Electrical service upgrade permits = homeowner is solar-ready by definition',
+        ],
+        'cta_text': 'Start Sourcing Solar Leads — $149/mo',
+        'faq': [
+            ('Why are re-roof permits the best solar leads?',
+             'A homeowner replacing a roof is the only time solar attaches '
+             'to the same install crew at near-zero incremental customer '
+             'acquisition cost. The re-roof permit pulls 6-12 months before '
+             'they\'d otherwise consider solar — perfect timing for a quote.'),
+            ('Which cities have the strongest solar economics?',
+             'Phoenix (79K Maricopa owners), Austin (55K Travis owners + '
+             'TX property tax exemption + Austin Energy VOS tariff), Tampa '
+             '(40K Hillsborough owners), Mesa (38K records). Each is in '
+             'PermitGrab\'s daily permit feed.'),
+            ('How much does this cost vs. EnergySage / Modernize?',
+             'Aggregator leads cost $50-200 per shared lead. PermitGrab is '
+             '$149/mo unlimited — pull thousands of permits exclusively '
+             '(no other contractor sees the same homeowner).'),
+        ],
+    },
+    'design-build-gc': {
+        'h1': 'Design-Build General Contractor Leads from Permit Data',
+        'meta_title': 'Design-Build GC Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Daily permit feed for design-build GCs. Skip Houzz Pro + Angi '
+            'referral fees. Architect-relationship play + ADU/addition/major '
+            'remodel filtering. $149/mo unlimited.'
+        ),
+        'hero_kicker': 'For design-build GCs, ADU specialists, custom-home builders',
+        'hero_copy': (
+            'Skip Houzz Pro $1-3K/mo + Angi referral fees. Design-build GCs '
+            'win by getting to homeowners 30-90 days after permit issue, '
+            'before they have finalized GC selection.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'NYC PLUTO: 13,000+ records with 791+ contractor phones',
+            'Travis County (Austin): 55,000+ owners; avg addition value $89K',
+            'Filter by permit type: ADU, addition, major remodel — your sweet spot',
+            'Architect relationships: see who\'s pulling permits with which architect',
+        ],
+        'cta_text': 'Start Closing Design-Build Jobs — $149/mo',
+        'faq': [
+            ('Why are permit-driven design-build leads better than referral platforms?',
+             'Houzz Pro and Angi serve homeowners shopping for ANY contractor. '
+             'Permit-driven outreach catches homeowners who already filed — '
+             'they\'re committed, just selecting their team.'),
+            ('What permit types matter most for design-build GCs?',
+             'Additions ($75-200K typical), ADUs ($150-400K), major remodels '
+             '($100K+). PermitGrab lets you filter by project_value_tier so '
+             'you only see jobs that match your minimum.'),
+            ('How fresh is the permit data?',
+             'Daily refresh. Most cities update within 24-48 hours of issue. '
+             'You get the homeowner name + address within 1-2 days of filing.'),
+        ],
+    },
+    'hvac-contractor': {
+        'h1': 'HVAC Contractor Leads from Building Permits',
+        'meta_title': 'HVAC Contractor Leads from Permit Data | PermitGrab',
+        'meta_description': (
+            'Daily permit feed for HVAC contractors. AC/furnace replacement '
+            'permits + 311 inoperable-AC violations + summer trigger window. '
+            '$149/mo unlimited.'
+        ),
+        'hero_kicker': 'For HVAC contractors and mechanical sub specialists',
+        'hero_copy': (
+            'Phoenix and San Antonio AC replacement cycles run 10-12 years. '
+            'The contractor on-permit at year 0 wins the replacement at '
+            'year 11. PermitGrab surfaces every permit + every 311 '
+            'inoperable-AC service call daily.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Phoenix: 1,080+ contractor phones, Maricopa 79K owner records',
+            'San Antonio: 3,830+ contractor phones, Bexar 5K owners',
+            'May trigger window: AC fails before 95°F days, owner panics, you call first',
+            'Filter by permit type: AC replacement, furnace, ductwork, mini-split',
+        ],
+        'cta_text': 'Start Booking HVAC Jobs — $149/mo',
+        'faq': [
+            ('Why is May the best HVAC outreach window?',
+             'Homeowners delay AC replacement until forced. May is when '
+             'first 90°F days expose failing units. Reaching them with a '
+             'replacement quote in early May beats every competitor scrambling '
+             'in July when units are dead and parts are backordered.'),
+            ('What about commercial HVAC?',
+             'PermitGrab includes commercial permits — HVAC chiller / RTU / '
+             'air-handler replacements at $50-500K each. Filter by '
+             'project_value_tier $50K+ for these.'),
+            ('How does this beat Yelp / Thumbtack lead-buy?',
+             'Per-lead leads are shared across 5-10 contractors. PermitGrab '
+             'is exclusive to your subscription, sourced from city/county '
+             'data — same homeowners, but you\'re the only one with the data.'),
+        ],
+    },
+    'plumbing-contractor': {
+        'h1': 'Plumbing Contractor Leads from Building Permits',
+        'meta_title': 'Plumbing Contractor Leads from Permit Data | PermitGrab',
+        'meta_description': (
+            'Daily permit feed for plumbing contractors. Sewer-line, water '
+            'heater, repipe, and Lead Service Line replacement permits. '
+            '3,498+ Chicago contractor phones. $149/mo.'
+        ),
+        'hero_kicker': 'For plumbing contractors, sewer specialists, repipe shops',
+        'hero_copy': (
+            'Aging Midwest + Mid-Atlantic housing stock = continuous '
+            'plumbing replacement work. Chicago LSL mandate alone generates '
+            '15-25K permits/year requiring licensed plumbers.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Cook County (Chicago): 72,000+ owners, 3,498+ contractor phones',
+            'Philadelphia: 55,000+ owners, 800-1,500 LSL replacement permits/quarter',
+            'NYC: 13,000+ PLUTO records, daily DOB permit feed',
+            'Filter by permit type: sewer line, water heater, lead service line, repipe',
+        ],
+        'cta_text': 'Start Sourcing Plumbing Jobs — $149/mo',
+        'faq': [
+            ('Why are LSL replacement permits a goldmine?',
+             'Chicago and Philadelphia have federal mandates to replace lead '
+             'service lines by 2037 and 2026 respectively. That\'s tens of '
+             'thousands of permits each requiring licensed plumbers. PermitGrab '
+             'surfaces every one daily.'),
+            ('Do you cover commercial plumbing?',
+             'Yes — commercial plumbing permits are filtered the same way. '
+             'Filter by permit_type=plumbing AND project_value_tier $25K+.'),
+            ('What about sewer line replacements?',
+             'Sewer line permits are often emergency-driven (mainline failure). '
+             'They\'re high-ticket ($8-25K) and homeowner is highly motivated. '
+             'PermitGrab surfaces these as soon as the city issues.'),
+        ],
+    },
+    'storm-belt-roofing': {
+        'h1': 'Storm-Belt Roofing Contractor Leads from Permit Data',
+        'meta_title': 'Storm-Belt Roofing Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Daily permit + violation feed for storm-belt roofers. Owner-'
+            'builder roof permits convert 3-5x better post-event. Tarrant 97K '
+            '+ Maricopa 79K + Miami 82K owners. $149/mo.'
+        ),
+        'hero_kicker': 'For storm-belt roofing contractors (TX/FL/OK/CO/GA/TN/AZ)',
+        'hero_copy': (
+            'Beat $50-200 per shared lead aggregator pricing. Permit-driven '
+            'outreach 14-21 days post-storm captures owner-builder filings — '
+            'the gold-tier leads with 18-25% close rates.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Tarrant County (Fort Worth): 97,000+ property owners',
+            'Maricopa (Phoenix/Mesa): 79,000+ owners across the metro',
+            'Miami-Dade: 82,000+ owners with daily violation feed',
+            'Filter by permit type: roof, re-roof, hail repair, storm damage',
+        ],
+        'cta_text': 'Start Closing Storm Roofs — $149/mo',
+        'faq': [
+            ('Why are owner-builder permits the best roofing leads?',
+             'Owner-builder filings mean the homeowner hasn\'t hired a '
+             'contractor yet — they\'re shopping. Reach out 14-21 days '
+             'post-storm, before they\'ve committed, and 18-25% close rates '
+             'are typical vs 2-4% on cold canvass.'),
+            ('Which cities are best for storm-belt roofers?',
+             'Fort Worth (Tarrant 97K owners), Mesa/Phoenix (Maricopa 79K), '
+             'Miami-Dade (82K), Tampa (Hillsborough 40K). All in PermitGrab\'s '
+             'daily feed.'),
+            ('Do you cover hail-only events?',
+             'Yes — wherever the city issues a roof permit post-event. '
+             'Filter by permit_type=roof AND filing_date >= storm_date.'),
+        ],
+    },
+    'real-estate-wholesaler': {
+        'h1': 'Real Estate Wholesaler Lead Lists from Public Records',
+        'meta_title': 'Real Estate Wholesaler Leads from Permits + Violations | PermitGrab',
+        'meta_description': (
+            'PropStream alternative for wholesalers. Permits + code violations '
+            '+ 947K+ property owner records identify motivated sellers 60-90 '
+            'days before MLS. $149/mo.'
+        ),
+        'hero_kicker': 'For real estate wholesalers, fix-and-flip operators, off-market dealmakers',
+        'hero_copy': (
+            'PropStream + BatchLeads charge $200-500/mo for stale list-broker '
+            'pulls. PermitGrab pulls direct from city/county public records, '
+            'refreshed daily, with permit and violation signals other tools '
+            'don\'t have.'
+        ),
+        'data_block': 'violations',
+        'value_props': [
+            'Total property owner records: 947,000+',
+            'Atlanta/Fulton, Houston (83K), NYC (HPD + DOB) violations daily refresh',
+            'Permit + violation signals = motivated-seller compound flag',
+            'Owner mailing addresses included — skip the skip-tracing tax',
+        ],
+        'cta_text': 'Start Sourcing Off-Market Deals — $149/mo',
+        'faq': [
+            ('How do violations identify wholesale-ready sellers?',
+             'Open code violations compound monthly fines. Owners often list '
+             'below market to avoid contractor bids and cumulative fines. '
+             'PermitGrab\'s violation-without-follow-up-permit play converts '
+             'at 12-18% vs 2-4% cold.'),
+            ('What\'s the difference vs PropStream?',
+             'PropStream is broker-list-resold data, often 90+ days stale. '
+             'PermitGrab pulls direct from city/county systems daily. Same '
+             'homeowner, but caught 30-90 days earlier and 1/3 the price.'),
+            ('Do you have data for my market?',
+             '50+ cities. Top markets: Atlanta, Chicago, Cleveland, Detroit, '
+             'Houston, Miami, Philadelphia. Full list at /cities.'),
+        ],
+    },
+    'insurance-restoration': {
+        'h1': 'Insurance Restoration Contractor Leads from Permits + Violations',
+        'meta_title': 'Insurance Restoration Leads from Permit Data | PermitGrab',
+        'meta_description': (
+            'Daily permit + violation feed for restoration GCs. Hurricane-'
+            'belt + tornado alley + post-Surfside recertification. 83K '
+            'Houston violations. $149/mo unlimited.'
+        ),
+        'hero_kicker': 'For insurance restoration GCs (water/fire/mold/storm)',
+        'hero_copy': (
+            'Skip the storm-chaser arms race. Permit + violation data '
+            'identifies storm-damaged properties before out-of-state chasers '
+            'descend, with the violation-without-follow-up-permit play '
+            'converting at 12-18% vs 2-4% on cold canvass.'
+        ),
+        'data_block': 'violations',
+        'value_props': [
+            'Houston: 83,000+ active code violations refreshed daily',
+            'Miami-Dade: 82,000+ owners + post-Surfside recertification mandates',
+            'Broward: 600+ high-rise condos with 40-yr inspection deadlines',
+            'Filter by permit type: water damage, fire damage, mold remediation, structural',
+        ],
+        'cta_text': 'Start Booking Restoration Jobs — $149/mo',
+        'faq': [
+            ('What is the violation-without-follow-up-permit play?',
+             'When a city issues a violation but no follow-up permit appears '
+             'in 30-60 days, the homeowner is non-compliant and likely lacks '
+             'a contractor. Cold-call them with a remediation quote — close '
+             'rate is 12-18% vs 2-4% on random canvass.'),
+            ('Do you cover Hurricane Helene / Milton areas?',
+             'Tampa (Hillsborough 40K owners), Miami-Dade (82K), Fort '
+             'Lauderdale all in daily feed. Storm-driven permits filed '
+             '14-21 days post-event are gold for restoration GCs.'),
+            ('What about water damage / mold leads outside hurricane zones?',
+             'Every city in the feed includes water damage permits. '
+             'Filter by permit_type=plumbing OR violation_type=mold for the '
+             'remediation funnel.'),
+        ],
+    },
+    'window-replacement': {
+        'h1': 'Window Replacement Contractor Leads from Permit Data',
+        'meta_title': 'Window Replacement Leads from Building Permits | PermitGrab',
+        'meta_description': (
+            'Daily permit feed for window/door replacement specialists. 25C '
+            'tax credit + utility rebate stacking pitch. Phoenix + Chicago '
+            'lead-volume leaders. $149/mo unlimited.'
+        ),
+        'hero_kicker': 'For window/door replacement specialists',
+        'hero_copy': (
+            'Renewal by Andersen + Pella Premium installers + independents '
+            'all compete on lead-buy economics. PermitGrab is direct-from-'
+            'permit data with the 25C federal tax credit + utility rebate '
+            'stacking pitch baked into the homeowner outreach script.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Phoenix: 1,080+ contractor phones + Maricopa 79K owners',
+            'Chicago: 3,498+ contractor phones + Cook County 72K owners',
+            '25C federal tax credit: $600/year homeowner incentive — sales lever',
+            'Filter by permit type: window/door, fenestration, energy upgrade',
+        ],
+        'cta_text': 'Start Booking Window Jobs — $149/mo',
+        'faq': [
+            ('How does the 25C tax credit help my pitch?',
+             'Federal 25C credit gives homeowners $600/year for energy-'
+             'efficient windows. Plus utility rebates ($50-300/window in '
+             'most states). Stacking these covers 20-40% of the homeowner\'s '
+             'cost — easy close.'),
+            ('Why permit data instead of paid lead-gen?',
+             'Renewal by Andersen leads run $80-200/lead (shared). PermitGrab '
+             'is $149/mo unlimited and exclusive — same homeowner pool, '
+             'but you\'re the only contractor with the data.'),
+            ('Which cities have the highest window-replacement demand?',
+             'Phoenix (heat-driven UV degradation), Chicago (cold-climate '
+             'efficiency upgrades), Cincinnati, Fort Worth. All in feed.'),
+        ],
+    },
+    'off-market-real-estate-agent': {
+        'h1': 'Off-Market Real Estate Agent Leads from Permits + Violations',
+        'meta_title': 'Off-Market RE Agent Leads from Permit Data | PermitGrab',
+        'meta_description': (
+            'Off-market and pocket listing intelligence for real estate '
+            'agents. Permits + violations + 82K Miami owners identify off-'
+            'market sellers 60-90 days before MLS. $149/mo.'
+        ),
+        'hero_kicker': 'For real estate agents specializing in off-market and pocket listings',
+        'hero_copy': (
+            'Off-market deals produce 2-3% higher commission rates + 30-50% '
+            'better seller-concession terms. Miami specifically has the '
+            'highest off-market concentration in the US. Permit + violation '
+            'data is the structural advantage for identifying these sellers.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Miami-Dade: 82,000+ owner records + 18-22% foreign-owner concentration',
+            'NYC PLUTO: 13,000+ records with mailing addresses for absentee owners',
+            'Permit + violation signals 60-90 days before MLS listing',
+            'Daily refresh — beat the next agent to the doorstep',
+        ],
+        'cta_text': 'Start Sourcing Off-Market Listings — $149/mo',
+        'faq': [
+            ('Why is Miami the off-market capital?',
+             '18-22% of Miami-Dade properties are foreign-owned (LATAM, EU). '
+             'Foreign owners use off-market channels to avoid public-sale '
+             'tax exposure. PermitGrab gives you the mailing-address pipeline.'),
+            ('How does permit data signal upcoming listings?',
+             'Major remodels followed by no follow-up activity 12-18 months '
+             'later = owner is staging for sale. Catch them before listing.'),
+            ('What about pocket listings I can present to my buyers?',
+             'Same data — owners who pulled permits but haven\'t sold + '
+             'show signs of completion = ready-to-sell pocket inventory. '
+             'Reach out with a buyer offer before MLS exposure.'),
+        ],
+    },
+    'pest-control-lawn': {
+        'h1': 'Pest Control + Lawn Service Leads from Permit Data',
+        'meta_title': 'Pest Control & Lawn Leads from Permits | PermitGrab',
+        'meta_description': (
+            'Daily permit + new-owner feed for pest/lawn services. 30-day '
+            'post-move-in window converts at 18-28% vs 4-7% cold. HOA '
+            'dominance + post-renovation cross-sell plays. $149/mo.'
+        ),
+        'hero_kicker': 'For pest control and high-end lawn service contractors',
+        'hero_copy': (
+            'Pest/lawn customers are recurring revenue plays — sign up once, '
+            '$1,200/year for life. The 30-day post-move-in window is where '
+            'conversion is 4x cold outreach. PermitGrab surfaces new-owner '
+            'mailing-address-changes daily.'
+        ),
+        'data_block': 'owners',
+        'value_props': [
+            'Davidson County (Nashville): 71,000+ owner records',
+            'Atlanta: HOA dominance — ~60% of metro SFR has HOA pre-approved vendor lists',
+            'Maricopa (Phoenix): 79,000+ owners + termite-belt density',
+            'Daily refresh on owner mailing-address changes (move-in detection)',
+        ],
+        'cta_text': 'Start Booking Recurring Customers — $149/mo',
+        'faq': [
+            ('Why is the 30-day post-move-in window so valuable?',
+             'New homeowners haven\'t established service relationships yet. '
+             'Reach them within 30 days of move-in (when mailing address '
+             'changes in assessor records) and conversion runs 18-28% vs '
+             '4-7% on a random canvass.'),
+            ('How do you detect new homeowners?',
+             'Property owner mailing addresses refresh in county assessor '
+             'data within 30-60 days of close. PermitGrab joins this to '
+             'permit + violation feeds. Filter by mailing_address_changed '
+             'in last 30 days.'),
+            ('Why do pest/lawn cross-sell well after permits?',
+             'Major renovation = yard disruption = need for landscaping '
+             'reset + termite/pest reinspection. Cross-sell after permit '
+             'final-inspection date converts at 25-40%.'),
+        ],
+    },
 }
 
 
@@ -437,12 +819,51 @@ def persona_home_services():
     return _render_persona('home-services')
 
 
-# V480 P0-1: external traffic + nav references both /leads/solar-home-services
-# (the persona spec uses solar as the headline use case) and /leads/home-services.
-# Render the same persona for both so neither URL 404s.
+# V506: solar-home-services now has its own dict entry — render its own
+# slug so the canonical builds correctly (was rendering 'home-services'
+# which created a deindex-signal canonical pointing at a different URL).
 @persona_bp.route('/leads/solar-home-services')
 def persona_solar_home_services():
-    return _render_persona('home-services')
+    return _render_persona('solar-home-services')
+
+
+# V506: 9 new persona routes for the matrix archetypes referenced
+# 240+ times across V498-V502 blog post bodies.
+@persona_bp.route('/leads/design-build-gc')
+def persona_design_build_gc():
+    return _render_persona('design-build-gc')
+
+@persona_bp.route('/leads/hvac-contractor')
+def persona_hvac_contractor():
+    return _render_persona('hvac-contractor')
+
+@persona_bp.route('/leads/plumbing-contractor')
+def persona_plumbing_contractor():
+    return _render_persona('plumbing-contractor')
+
+@persona_bp.route('/leads/storm-belt-roofing')
+def persona_storm_belt_roofing():
+    return _render_persona('storm-belt-roofing')
+
+@persona_bp.route('/leads/real-estate-wholesaler')
+def persona_real_estate_wholesaler():
+    return _render_persona('real-estate-wholesaler')
+
+@persona_bp.route('/leads/insurance-restoration')
+def persona_insurance_restoration():
+    return _render_persona('insurance-restoration')
+
+@persona_bp.route('/leads/window-replacement')
+def persona_window_replacement():
+    return _render_persona('window-replacement')
+
+@persona_bp.route('/leads/off-market-real-estate-agent')
+def persona_off_market_real_estate_agent():
+    return _render_persona('off-market-real-estate-agent')
+
+@persona_bp.route('/leads/pest-control-lawn')
+def persona_pest_control_lawn():
+    return _render_persona('pest-control-lawn')
 
 
 # V477 Bug 1: external links / SEO inbound traffic discovered the
