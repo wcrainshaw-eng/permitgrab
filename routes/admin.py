@@ -3768,7 +3768,7 @@ def admin_indexnow_push():
 def admin_accela_detail_test():
     """V508: smoke-test the Playwright-based Accela CapDetail scraper.
 
-    Body: {"agency": "SBCO", "permit": "26GEN-00750"}
+    Body: {"agency": "SBC", "permit": "26GEN-00750"}
     Returns whatever fields the scraper extracted, or {_error:...}.
 
     Useful for validating Chromium is installed + the URL pattern works
@@ -3777,7 +3777,7 @@ def admin_accela_detail_test():
     if not valid:
         return error
     body = request.get_json(silent=True) or {}
-    agency = body.get('agency', 'SBCO')
+    agency = body.get('agency', 'SBC')
     permit = body.get('permit', '26GEN-00750')
     try:
         from accela_playwright_collector import fetch_accela_detail_playwright
@@ -3791,7 +3791,7 @@ def admin_accela_detail_test():
 def admin_accela_detail_batch():
     """V508: backfill contractor info on stored permits via Playwright.
 
-    Body: {"slug": "san-bernardino-county", "agency": "SBCO",
+    Body: {"slug": "san-bernardino-county", "agency": "SBC",
            "limit": 25, "only_missing_contractor": true}
     """
     valid, error = check_admin_key()
@@ -3799,7 +3799,7 @@ def admin_accela_detail_batch():
         return error
     body = request.get_json(silent=True) or {}
     slug = body.get('slug', 'san-bernardino-county')
-    agency = body.get('agency', 'SBCO')
+    agency = body.get('agency', 'SBC')
     limit = min(int(body.get('limit', 25)), 100)
     only_missing = body.get('only_missing_contractor', True)
 

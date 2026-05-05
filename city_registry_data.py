@@ -6421,9 +6421,9 @@ CITY_REGISTRY = {
         "lat": 34.839,
         "lon": -116.182,
         "platform": "accela",
-        "agency_code": "SBCO",
+        "agency_code": "SBC",
         "_accela_city_key": "san_bernardino_county_ca",
-        "endpoint": "https://aca-prod.accela.com/SBCO/Cap/CapHome.aspx?module=Building&TabName=Building",
+        "endpoint": "https://aca-prod.accela.com/SBC/Cap/CapHome.aspx?module=Building&TabName=Building",
         "description": "Building Permits (Accela)",
         "date_field": "Date",
         "field_map": {
@@ -6438,7 +6438,10 @@ CITY_REGISTRY = {
         "limit": 2000,
         "active": True,
         "status": "paused",
-        "notes": "V35: San Bernardino County CA Accela portal. Agency code SBCO, module=Building.",
+        # San Bernardino County tenant on aca-prod.accela.com is /SBC/, not /SBCO/.
+        # /SBCO/ is Santa Barbara County. The old ezop.sbcounty.gov portal
+        # redirects to /SBC/ via ezpermits.sbcounty.gov.
+        "notes": "San Bernardino County CA Accela portal. Agency code SBC, module=Building.",
     },
 
     "san_antonio_tx": {

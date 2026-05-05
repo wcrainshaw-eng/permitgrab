@@ -12,7 +12,7 @@ contractor block to populate, then extracts what it can.
 
 Usage:
     from accela_playwright_collector import fetch_accela_detail_playwright
-    info = fetch_accela_detail_playwright('SBCO', '26GEN-00750')
+    info = fetch_accela_detail_playwright('SBC', '26GEN-00750')
     # info → {'contractor_name': '...', 'license_number': '...',
     #         'contractor_phone': '...', 'contractor_email': '...'}
 

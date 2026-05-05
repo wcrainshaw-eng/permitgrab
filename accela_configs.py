@@ -279,7 +279,9 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
     "san_bernardino_county_ca": {
-        "agency_code": "SBCO",
+        # /SBCO/ on aca-prod is Santa Barbara County's portal, not San Bernardino.
+        # The real San Bernardino tenant is /SBC/ (per ezpermits.sbcounty.gov redirect).
+        "agency_code": "SBC",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
@@ -2125,7 +2127,9 @@ ACCELA_CONFIGS = {
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
     },
     "sbco": {
-        "agency_code": "SBCO",
+        # Internal lookup key kept as 'sbco' for back-compat; agency_code is /SBC/.
+        # /SBCO/ on aca-prod is Santa Barbara County, not San Bernardino.
+        "agency_code": "SBC",
         "module": "Building",
         "tab_name": "Building",
         "search_url_path": "Cap/CapHome.aspx?module=Building&TabName=Building",
