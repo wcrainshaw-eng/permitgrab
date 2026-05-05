@@ -437,6 +437,28 @@ def _translate_sql(sql):
     # LIKE word, leaving NOT in place.
     translated = re.sub(r'\bLIKE\b', 'ILIKE', translated, flags=re.IGNORECASE)
 
+    # V529: NULL-ordering parity. SQLite's default puts NULLs FIRST
+    # on ASC and LAST on DESC; Postgres flips that (NULLS LAST on ASC,
+    # NULLS FIRST on DESC). The negative lookahead `(?!\s+NULLS\b)`
+    # leaves the 4 already-explicit `NULLS FIRST/LAST` callsites
+    # alone (collector.py:3339 doc, server.py:8128, city_stats_cache.py).
+    # Bare ORDER BY without explicit ASC/DESC (39 callsites — mostly
+    # interpolated `{order_by}` or function-based) is NOT translated;
+    # documented as V530+ correctness-drift gap. The dominant 138
+    # explicit-direction sites all get the right NULLS clause.
+    translated = re.sub(
+        r'\bASC\b(?!\s+NULLS\b)',
+        'ASC NULLS FIRST',
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
+        r'\bDESC\b(?!\s+NULLS\b)',
+        'DESC NULLS LAST',
+        translated,
+        flags=re.IGNORECASE,
+    )
+
     # SUBSTR → SUBSTRING (both actually work in Postgres, but be explicit)
     # Actually SUBSTR works in Postgres too, so skip this
 
