@@ -221,6 +221,39 @@ Verify post-deploy: `GET /api/admin/digest/status` should show
 hit `POST /api/admin/start-collectors?force=1` and check
 `/api/admin/debug/threads` for an `email_scheduler` entry.
 
+### V515 — digest dup-fire guard via digest_log (2026-05-05)
+On 2026-05-05 a single subscriber received two daily digests 27 min
+apart (11:02 UTC then 11:29 UTC). Email A: "50 new permits in Atlanta".
+Email B: "no new permits today, here are the most recent". Same
+subscriber, same underlying permits — just two renders with two
+different templates because the second fire happened AFTER the first
+fire had advanced subscribers.last_digest_sent_at, which made the
+"new since last digest" filter return zero records and the V22
+fallback engaged.
+
+Root cause was the dup-fire itself, not the templates. Worker A
+inserted digest_log row 36 at 11:02 UTC and updated
+system_state.digest_last_success in the same txn, then died before
+all per-subscriber timestamps persisted. Worker B booted; the V276
+bootstrap that re-seeds in-memory `last_digest_date` from
+system_state.digest_last_success failed in some race path
+(thread-spawn-before-bootstrap, WAL contention, silent exception),
+so Worker B's `last_digest_date` was None and the 7AM ET gate fired
+again at 11:29 UTC.
+
+V515 fix: query digest_log directly at the top of the digest fire
+path (server.py:8855). digest_log is durable and is written in the
+same txn as system_state, so it's the ground-truth dedup source
+regardless of which worker we're in or whether bootstrap saw it.
+Also bumped email_scheduler thread startup sleep 180s → 240s so a
+respawning worker gives any in-flight digest 60s extra to commit
+its digest_log row.
+
+**Lesson:** in-memory dedup counters bootstrapped from "system_state-
+on-thread-start" can race with worker spawn vs. concurrent INSERTs.
+Durable dedup must query the durable table directly inline at the
+fire decision point, not read a once-at-startup cached value.
+
 ### V510-V513 — wrong-tenant data + Phase 3 Accela skip (2026-05-05)
 
 - **V510 SBC tenant fix.** The codebase had San Bernardino County wired
