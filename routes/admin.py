@@ -226,6 +226,69 @@ def admin_force_collect():
         return jsonify({'error': str(e), 'city_slug': city_slug}), 500
 
 
+@admin_bp.route('/api/admin/collector-health', methods=['GET'])
+def admin_collector_health():
+    """V527: Per-platform Pass/Degraded/Fail diagnosis for every active
+    city, computed by collectors.<platform>.health_check().
+
+    Distinct from /api/admin/city-health (V226) which powers the
+    20-top-cities dashboard rollup. This endpoint inspects every
+    active city through its platform module so the future signup
+    flow / digest pipeline / scheduler can consult per-city
+    Pass/Degraded/Fail without round-tripping through the dashboard.
+
+    Optional query params:
+      - slug=foo,bar,baz  → only those slugs (default: all active)
+      - status=fail|degraded|pass  → filter result
+      - platform=socrata|arcgis|accela|ckan|csv_state  → filter
+
+    Returns:
+      {'count': N, 'by_status': {'pass': ..., 'degraded': ..., 'fail': ...},
+       'cities': [{...health_check dict..., 'slug': ...}]}
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    import collectors as _collectors
+    slugs_q = (request.args.get('slug') or '').strip()
+    status_filter = (request.args.get('status') or '').strip().lower()
+    platform_filter = (request.args.get('platform') or '').strip().lower()
+
+    if slugs_q:
+        slugs = [s.strip() for s in slugs_q.split(',') if s.strip()]
+    else:
+        try:
+            conn = permitdb.get_connection()
+            rows = conn.execute(
+                "SELECT city_slug FROM prod_cities "
+                "WHERE status='active' AND source_type IS NOT NULL "
+                "ORDER BY city_slug"
+            ).fetchall()
+            slugs = [
+                (r[0] if not hasattr(r, 'keys') else r['city_slug'])
+                for r in rows
+            ]
+        except Exception as e:
+            return jsonify({'error': f'failed to enumerate slugs: {e}'}), 500
+
+    results = _collectors.health_check_all(slugs)
+    if status_filter:
+        results = [r for r in results if r.get('status') == status_filter]
+    if platform_filter:
+        results = [r for r in results if r.get('platform') == platform_filter]
+
+    by_status = {'pass': 0, 'degraded': 0, 'fail': 0}
+    for r in results:
+        s = r.get('status')
+        if s in by_status:
+            by_status[s] += 1
+    return jsonify({
+        'count': len(results),
+        'by_status': by_status,
+        'cities': results,
+    })
+
+
 @admin_bp.route('/api/admin/city-health', methods=['GET'])
 def admin_city_health():
     """V226 T3: One-glance health status for every active top-cities entry.
