@@ -9231,51 +9231,89 @@ def start_collectors():
     except Exception as e:
         print(f"[{datetime.now()}] V475: email_scheduler failed to start: {e}", flush=True)
 
-    # V503 WATCHDOG: kill the worker if scheduled_collection stalls.
-    # Indefinite TCP-connect hangs survive both per-call timeouts AND
-    # socket.setdefaulttimeout — observed twice this evening despite
-    # both fixes. When there's been zero scraper_run progress for 8+
-    # min while the daemon is "alive", it's wedged in a syscall the
-    # GIL+timeout machinery can't interrupt cleanly. SIGTERM-self
-    # forces gunicorn to spawn a fresh worker; V496 auto-spawn brings
-    # the daemon back on the next request.
-    def _v503_watchdog():
-        import os as _wos, signal as _wsig
-        time.sleep(600)  # let initial cycle warm up before arming
-        last_scraper_run_id = -1
-        last_progress_time = time.time()
+    # V507 WATCHDOG REWRITE: file-based heartbeat instead of SQLite query.
+    #
+    # Original V503 watchdog had a chicken-and-egg bug: it used
+    # SELECT MAX(id) FROM scraper_runs to detect "no progress". When
+    # SQLite was contended (the actual failure mode causing site
+    # degradation), the watchdog's own MAX() query was BLOCKED by the
+    # same lock, so the watchdog couldn't detect the stall. Result:
+    # extended degradation while waiting for V455 RSS-recycle (which
+    # only fires if the daemon manages to complete a cycle).
+    #
+    # New design:
+    #   1. Dedicated heartbeat-writer thread `os.utime` a file every 30s.
+    #      Pure filesystem op. No SQLite. No HTTP. Releases GIL during
+    #      syscall so other threads (sock.connect etc.) don't block it.
+    #   2. Watchdog thread checks file mtime every 30s. If stale > 2min,
+    #      the worker is wedged regardless of cause (SQLite lock, sock
+    #      hang, GIL deadlock, OOM thrashing) → SIGTERM-self.
+    #   3. Belt+suspenders: 30s after SIGTERM, if heartbeat is STILL
+    #      stale (worker didn't terminate gracefully), escalate to
+    #      SIGKILL. SIGKILL bypasses every Python-level lock.
+    #
+    # This lets V455/V457 RSS recycles continue handling memory growth
+    # cleanly, while the watchdog reliably catches every other wedge
+    # mode.
+    HEARTBEAT_FILE = '/tmp/permitgrab.heartbeat'
+
+    def _v507_heartbeat_writer():
+        """V507: pure-Python heartbeat. Touches the file every 30s as
+        long as the gunicorn worker is alive. NO SQLite involvement —
+        a write lock or a network hang in scheduled_collection cannot
+        block this thread."""
+        import os as _hos
         while True:
-            time.sleep(60)
             try:
-                conn = permitdb.get_connection()
-                row = conn.execute(
-                    "SELECT MAX(id) FROM scraper_runs"
-                ).fetchone()
-                conn.close()
-                cur_id = (row and row[0]) or -1
-                if cur_id != last_scraper_run_id:
-                    last_scraper_run_id = cur_id
-                    last_progress_time = time.time()
-                    continue
-                stall = time.time() - last_progress_time
-                if stall > 480:  # 8 minutes of zero progress
+                with open(HEARTBEAT_FILE, 'w') as _f:
+                    _f.write(str(time.time()))
+            except Exception:
+                pass
+            time.sleep(30)
+
+    def _v507_watchdog():
+        """V507: SIGTERM-self if heartbeat goes stale > 2min. Then
+        SIGKILL-self if SIGTERM didn't take effect within 30s."""
+        import os as _wos, signal as _wsig
+        time.sleep(180)  # 3min warmup so heartbeat-writer can establish
+        while True:
+            time.sleep(30)
+            try:
+                mtime = _wos.path.getmtime(HEARTBEAT_FILE)
+                stall = time.time() - mtime
+                if stall > 120:  # 2min stale = wedged
                     print(
-                        f"[{datetime.now()}] V503 WATCHDOG: "
-                        f"scheduled_collection stalled {int(stall)}s with no "
-                        f"scraper_run progress. SIGTERM-self for clean recycle.",
+                        f"[{datetime.now()}] V507 WATCHDOG: heartbeat "
+                        f"{int(stall)}s stale → SIGTERM-self.",
                         flush=True,
                     )
                     _wos.kill(_wos.getpid(), _wsig.SIGTERM)
+                    # Backup: if SIGTERM gets blocked (GIL held, etc.),
+                    # SIGKILL bypasses everything 30s later.
+                    time.sleep(30)
+                    print(
+                        f"[{datetime.now()}] V507 WATCHDOG: SIGTERM not "
+                        f"effective after 30s → SIGKILL.",
+                        flush=True,
+                    )
+                    _wos.kill(_wos.getpid(), _wsig.SIGKILL)
                     return
+            except FileNotFoundError:
+                # Heartbeat-writer hasn't fired yet (cold-start race).
+                continue
             except Exception as _e:
-                print(f"[{datetime.now()}] V503 watchdog error (non-fatal): {_e}", flush=True)
+                print(f"[{datetime.now()}] V507 watchdog err (non-fatal): {_e}", flush=True)
+
     try:
         threading.Thread(
-            target=_v503_watchdog, daemon=True, name='collection_watchdog'
+            target=_v507_heartbeat_writer, daemon=True, name='heartbeat_writer'
         ).start()
-        print(f"[{datetime.now()}] V503: collection watchdog armed (8min stall ceiling)", flush=True)
+        threading.Thread(
+            target=_v507_watchdog, daemon=True, name='collection_watchdog'
+        ).start()
+        print(f"[{datetime.now()}] V507: file-based heartbeat + watchdog armed (2min stall, SIGKILL backup)", flush=True)
     except Exception as _e:
-        print(f"[{datetime.now()}] V503: watchdog spawn failed: {_e}", flush=True)
+        print(f"[{datetime.now()}] V507: watchdog spawn failed: {_e}", flush=True)
 
     print(f"[{datetime.now()}] V67: All collector threads started.", flush=True)
 
