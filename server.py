@@ -8778,8 +8778,13 @@ def schedule_email_tasks():
         print(f"[{datetime.now()}] V78: Could not create subscribers.json: {e}")
 
     # V68: Wait 3 minutes for initial startup (increased from 2)
-    print(f"[{datetime.now()}] V68: Email scheduler waiting 3 minutes for startup...")
-    time.sleep(180)
+    # V515: bumped to 4 min so a worker that respawns inside the 11:00 UTC
+    # digest window gives the prior worker's digest_log INSERT 60+ extra
+    # seconds to land before this worker's email_scheduler considers
+    # firing. Combined with the V515 digest_log dedup guard below, this
+    # eliminates the race window that produced the 2026-05-05 dup-fire.
+    print(f"[{datetime.now()}] V515: Email scheduler waiting 4 minutes for startup...")
+    time.sleep(240)
 
     et = pytz.timezone('America/New_York')
 
@@ -8852,7 +8857,33 @@ def schedule_email_tasks():
             # Check if it's time for daily tasks (7-9 AM ET window)
             if 7 <= now_et.hour <= 9:
                 # Daily digest at 7 AM ET (run once per day)
+                # V515: digest_log dup-fire guard. 2026-05-05 sent two
+                # emails 27 min apart: Worker A fired at 11:02 UTC and
+                # wrote digest_log row 36, then died before some
+                # per-subscriber updates persisted. Worker B booted;
+                # V276 bootstrap should have re-seeded last_digest_date
+                # from system_state, but in some race path it didn't,
+                # so Worker B re-fired at 11:29. digest_log is durable
+                # and written in the same txn as system_state, so query
+                # it directly as the ground-truth guard — regardless of
+                # which worker we are or what bootstrap saw.
+                _digest_already_fired = False
                 if now_et.hour == 7 and last_digest_date != today_date:
+                    try:
+                        _dup_conn = permitdb.get_connection()
+                        _dup_row = _dup_conn.execute(
+                            "SELECT 1 FROM digest_log WHERE date(sent_at) = date('now') "
+                            "AND recipient_email = 'scheduled' AND status = 'sent' LIMIT 1"
+                        ).fetchone()
+                        if _dup_row:
+                            _digest_already_fired = True
+                            last_digest_date = today_date  # sync in-memory state
+                            print(f"[{datetime.now()}] V515: digest already fired today (digest_log row present) — skipping send")
+                        _dup_conn.close()
+                    except Exception as _dup_e:
+                        print(f"[{datetime.now()}] V515: digest_log dedup query failed (proceeding to fire): {_dup_e}")
+
+                if now_et.hour == 7 and last_digest_date != today_date and not _digest_already_fired:
                     print(f"[{datetime.now()}] V78: Running daily digest...")
                     DIGEST_STATUS['last_digest_attempt'] = datetime.now().isoformat()
                     try:
