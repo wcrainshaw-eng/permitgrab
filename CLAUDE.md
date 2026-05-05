@@ -221,6 +221,56 @@ Verify post-deploy: `GET /api/admin/digest/status` should show
 hit `POST /api/admin/start-collectors?force=1` and check
 `/api/admin/debug/threads` for an `email_scheduler` entry.
 
+### V510-V513 — wrong-tenant data + Phase 3 Accela skip (2026-05-05)
+
+- **V510 SBC tenant fix.** The codebase had San Bernardino County wired
+  to `aca-prod.accela.com/SBCO/`. **/SBCO/ is Santa Barbara County's
+  portal, not San Bernardino.** Verified via tenant landing pages:
+  /SBC/ → "County of San Bernardino", /SBCO/ → "Santa Barbara County
+  Citizen Portal". Real San Bernardino tenant per ezpermits.sbcounty.gov
+  redirect = /SBC/. Fixed agency_code in `city_registry_data.py`,
+  `accela_configs.py`, and `routes/admin.py` defaults. **Lesson:** when
+  picking an Accela agency_code, hit `aca-prod.accela.com/<CODE>/Welcome.aspx`
+  and grep the body for `(County|City) of <name>` to confirm the tenant
+  is who you think it is. Do not assume the code mirrors the slug
+  (SBCO ≠ San Bernardino County; that pattern is "first letters of agency
+  name" which collides constantly).
+
+- **V511 retag endpoint.** `/api/admin/retag-permits` moves rows between
+  source_city_keys (permits + contractor_profiles). Body:
+  `{"from_slug": "...", "to_slug": "...", "dry_run": true}`. Used to
+  rescue 1,966 misidentified Santa Barbara permits out of the
+  san-bernardino-county slug into santa-barbara without losing the data.
+  Default dry_run=true so an accidental call is a no-op.
+
+- **V512 redeploy.** Empty commit pushed to recycle gunicorn after a
+  WAL deadlock from too-aggressive sequential force-collect during a
+  full-fleet sweep. **Lesson reinforced:** even `time.sleep(1.0)`
+  between sequential force-collects can deadlock if a slow city holds
+  a write txn long enough for the daemon's own writes to pile up. Use
+  `time.sleep(3-5)` between force-collects in bulk-sweep scripts, and
+  prefer `/api/admin/force-collection` (background full-cycle) for
+  fleet-wide refresh.
+
+- **V513 Phase 3 Accela-skip removal — multi-customer ingestion bug.**
+  collector.py:4220-4222 explicitly skipped `platform=='accela'` cities
+  in the Phase 3 catch-all loop, with a comment "requires browser
+  automation". That comment was stale: V162/V163 (2026-04-13) rewrote
+  `accela_portal_collector.py` from Playwright to requests+BS4, but the
+  skip in Phase 3 was never removed. **Concrete impact:** ~41 Accela
+  cities (chandler, bradenton, brownsville, kettering, palmdale, pharr,
+  sparks, adams-county-co, berkeley-ca-accela, alameda-ca, etc.) had their
+  last `scraper_runs` entry on 2026-04-14 04:08-04:15 UTC and ZERO runs
+  in the 22 days since. That timestamp is exactly when Phase 2's
+  stale-first sort first rotated them out of the top-75. Phase 3 was
+  meant to be the catch-all — but it filtered them out every cycle.
+  Force-collect on chandler today returned 100 fresh permits proving
+  the requests+BS4 scraper works fine. **Lesson:** when removing a
+  dependency or rewriting a code path, audit every existing skip /
+  filter / `if platform == X` for staleness. The comment-as-policy
+  pattern (`# Skip accela (requires browser automation)`) lies silently
+  forever after the rewrite.
+
 ### V496 — bulk source_endpoint patch + daemon-stability rules (2026-05-04)
 - **Bug class:** prod_cities.source_endpoint had drifted to NULL on
   ~210 active cities (including Chicago, NYC, LA, Phoenix, etc.). The
