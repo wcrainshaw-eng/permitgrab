@@ -2586,6 +2586,20 @@ def stripe_webhook():
         return jsonify({'error': 'Event missing type field'}), 400
     print(f"[Stripe] Received event: {event_type} ({event_id})", flush=True)
 
+    # V518 (V511): pull customer + subscription identifiers from the
+    # event so they're stored alongside the audit-row regardless of
+    # which handler runs.
+    _v518_obj = (event.get('data') or {}).get('object') or {}
+    _v518_customer_id = _v518_obj.get('customer')
+    if event_type.startswith('customer.subscription.'):
+        _v518_subscription_id = _v518_obj.get('id')
+    else:
+        _v518_subscription_id = _v518_obj.get('subscription')
+    try:
+        _v518_payload_json = json.dumps(_v518_obj)[:50000]  # cap for safety
+    except Exception:
+        _v518_payload_json = None
+
     # V218 T5C: webhook idempotency. Stripe retries on delivery failure,
     # and the current handler would re-fire payment_success emails each
     # time. Track event IDs we've already processed and no-op on repeat.
@@ -2601,9 +2615,15 @@ def stripe_webhook():
             if already:
                 print(f"[Stripe] event {event_id} already processed — skipping")
                 return jsonify({'status': 'duplicate', 'event_id': event_id})
+            # V518: persist payload + customer/subscription IDs in the
+            # idempotency-row INSERT so we have audit trail without a
+            # second write. INSERT OR IGNORE keeps existing-row safety.
             _wh_conn.execute(
-                "INSERT OR IGNORE INTO stripe_webhook_events (event_id, event_type) VALUES (?, ?)",
-                (event_id, event_type),
+                "INSERT OR IGNORE INTO stripe_webhook_events "
+                "(event_id, event_type, payload_json, customer_id, subscription_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (event_id, event_type, _v518_payload_json,
+                 _v518_customer_id, _v518_subscription_id),
             )
             _wh_conn.commit()
         except Exception as _e:
@@ -2676,6 +2696,22 @@ def stripe_webhook():
                 try:
                     import db as _permitdb_v494
                     _conn_v494 = _permitdb_v494.get_connection()
+                    # V518 (V511): also persist Stripe linkage columns so
+                    # subsequent webhook events can find this row by
+                    # stripe_customer_id / stripe_subscription_id rather
+                    # than relying on email-string matching.
+                    try:
+                        _conn_v494.execute(
+                            "UPDATE subscribers SET stripe_customer_id = ?, "
+                            "stripe_subscription_id = ? WHERE LOWER(email) = ?",
+                            (
+                                session_obj.get('customer'),
+                                session_obj.get('subscription'),
+                                _wh_email,
+                            ),
+                        )
+                    except Exception:
+                        pass  # columns may not exist yet on first deploy
                     # 1. Sync plan on existing row(s)
                     _conn_v494.execute(
                         "UPDATE subscribers SET plan = ? "
@@ -2747,9 +2783,56 @@ def stripe_webhook():
                     except Exception as e:
                         print(f"[Stripe] Renewal email failed: {e}", flush=True)
 
+        elif event_type in ('customer.subscription.created', 'customer.subscription.updated'):
+            # V518 (V511): missing-handler bug — these events were arriving
+            # but had no DB-update path, so trial→active transitions and
+            # plan changes never reflected in subscribers. Persist the
+            # current state (status, trial_end, current_period_end) into
+            # subscribers, looking up by stripe_subscription_id (preferred)
+            # or stripe_customer_id (fallback for the row that
+            # checkout.session.completed just created).
+            subscription = event['data']['object']
+            sub_id = subscription.get('id')
+            customer_id = subscription.get('customer')
+            status = subscription.get('status', '')
+            _trial_end_ts = subscription.get('trial_end')
+            _period_end_ts = subscription.get('current_period_end')
+            _trial_end_iso = (
+                datetime.fromtimestamp(_trial_end_ts).isoformat()
+                if _trial_end_ts else None
+            )
+            _period_end_iso = (
+                datetime.fromtimestamp(_period_end_ts).isoformat()
+                if _period_end_ts else None
+            )
+            try:
+                _v518_conn = permitdb.get_connection()
+                # First try by stripe_subscription_id, then by customer_id
+                _result = _v518_conn.execute(
+                    "UPDATE subscribers SET plan = ?, "
+                    "  stripe_subscription_id = ?, "
+                    "  trial_end = ?, current_period_end = ? "
+                    "WHERE stripe_subscription_id = ? OR "
+                    "  (stripe_customer_id = ? AND stripe_subscription_id IS NULL)",
+                    (status, sub_id, _trial_end_iso, _period_end_iso,
+                     sub_id, customer_id)
+                )
+                _v518_conn.commit()
+                print(f"[Stripe] V518 sub.{event_type.split('.')[-1]} customer={customer_id} sub={sub_id} status={status} updated_rows={_result.rowcount}", flush=True)
+                # Also update the SQLAlchemy User if present (parity)
+                if customer_id:
+                    user = User.query.filter_by(stripe_customer_id=customer_id).first()
+                    if user and status in ('active', 'trialing'):
+                        # leave user.plan='pro' for trialing/active — User schema
+                        # is binary (pro/free), don't downgrade
+                        pass
+            except Exception as _e518:
+                print(f"[Stripe] V518 sub.{event_type.split('.')[-1]} sync failed: {_e518}", flush=True)
+
         elif event_type == 'customer.subscription.deleted':
             subscription = event['data']['object']
             customer_id = subscription.get('customer')
+            sub_id = subscription.get('id')
             user = User.query.filter_by(stripe_customer_id=customer_id).first()
             if user:
                 user.plan = 'free'
@@ -2760,6 +2843,21 @@ def stripe_webhook():
                     send_subscription_cancelled(user)
                 except Exception as e:
                     print(f"[Stripe] Cancellation email failed: {e}", flush=True)
+            # V518 (V511): also mirror cancellation into subscribers (SQLite)
+            # so the digest scheduler stops sending after current_period_end.
+            # We set plan='cancelled' and cancelled_at=now; access continues
+            # until current_period_end (already populated by sub.updated).
+            try:
+                _v518_conn = permitdb.get_connection()
+                _v518_conn.execute(
+                    "UPDATE subscribers SET plan = 'cancelled', "
+                    "cancelled_at = datetime('now') "
+                    "WHERE stripe_subscription_id = ? OR stripe_customer_id = ?",
+                    (sub_id, customer_id)
+                )
+                _v518_conn.commit()
+            except Exception as _e518:
+                print(f"[Stripe] V518 cancellation subscribers sync failed: {_e518}", flush=True)
     except Exception as _dispatch_err:
         import traceback
         traceback.print_exc()

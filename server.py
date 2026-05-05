@@ -614,6 +614,44 @@ def _migrate_create_sources_table():
     ''')
     conn2.commit()
 
+    # V518 (V511 STRIPE_CONNECTION): add Stripe linkage columns to
+    # subscribers + stripe_webhook_events. ALTER TABLE ADD COLUMN is
+    # idempotent in the sense that we wrap each in try/except — SQLite
+    # raises if the column already exists, which is fine on subsequent
+    # boots.
+    _v518_subs_cols = [
+        ("stripe_customer_id", "TEXT"),
+        ("stripe_subscription_id", "TEXT"),
+        ("current_period_end", "TIMESTAMP"),
+        ("trial_end", "TIMESTAMP"),
+        ("cancellation_requested_at", "TIMESTAMP"),
+        ("cancelled_at", "TIMESTAMP"),
+    ]
+    for col, ctype in _v518_subs_cols:
+        try:
+            conn2.execute(f"ALTER TABLE subscribers ADD COLUMN {col} {ctype}")
+        except Exception:
+            pass  # column already exists
+    _v518_wh_cols = [
+        ("payload_json", "TEXT"),
+        ("handler_status", "TEXT"),
+        ("handler_error", "TEXT"),
+        ("customer_id", "TEXT"),
+        ("subscription_id", "TEXT"),
+    ]
+    for col, ctype in _v518_wh_cols:
+        try:
+            conn2.execute(f"ALTER TABLE stripe_webhook_events ADD COLUMN {col} {ctype}")
+        except Exception:
+            pass
+    try:
+        conn2.execute("CREATE INDEX IF NOT EXISTS idx_subscribers_stripe_customer ON subscribers(stripe_customer_id)")
+        conn2.execute("CREATE INDEX IF NOT EXISTS idx_subscribers_stripe_sub ON subscribers(stripe_subscription_id)")
+        conn2.execute("CREATE INDEX IF NOT EXISTS idx_webhook_events_customer ON stripe_webhook_events(customer_id)")
+    except Exception:
+        pass
+    conn2.commit()
+
     # V158: Ensure default subscriber exists in DB
     try:
         existing = conn2.execute("SELECT id FROM subscribers WHERE email='wcrainshaw@gmail.com'").fetchone()

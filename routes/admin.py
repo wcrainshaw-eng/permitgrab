@@ -5920,3 +5920,202 @@ def admin_run_daily_alerts():
         return jsonify({'error': str(e)}), 500
 
 
+# V518 (V511 STRIPE_CONNECTION) — diagnostic + reconciliation endpoints
+# ---------------------------------------------------------------------
+
+@admin_bp.route('/api/admin/stripe/status', methods=['GET'])
+def admin_stripe_status():
+    """V518: full subscriber + Stripe state snapshot for debugging.
+    Returns every subscribers row with its Stripe linkage columns plus
+    the 20 most recent webhook events with their dispatch outcomes."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    conn = permitdb.get_connection()
+    try:
+        rows = conn.execute("""
+            SELECT id, email, name, plan, digest_cities, active,
+                   created_at, last_digest_sent_at,
+                   stripe_customer_id, stripe_subscription_id,
+                   trial_end, current_period_end, cancelled_at
+            FROM subscribers
+            ORDER BY created_at DESC
+        """).fetchall()
+        recent_events = conn.execute("""
+            SELECT event_id, event_type, processed_at, customer_id,
+                   subscription_id, handler_status, handler_error
+            FROM stripe_webhook_events
+            ORDER BY processed_at DESC
+            LIMIT 20
+        """).fetchall()
+        plan_rows = conn.execute(
+            "SELECT plan, COUNT(*) AS n FROM subscribers GROUP BY plan"
+        ).fetchall()
+        return jsonify({
+            'subscribers': [dict(r) for r in rows],
+            'recent_webhook_events': [dict(r) for r in recent_events],
+            'subscriber_count': len(rows),
+            'plan_breakdown': {r['plan']: r['n'] for r in plan_rows},
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/admin/stripe/backfill-existing', methods=['POST'])
+def admin_stripe_backfill_existing():
+    """V518: for every subscribers row with stripe_customer_id IS NULL,
+    look up the customer in Stripe by email and populate
+    stripe_customer_id + stripe_subscription_id + trial_end +
+    current_period_end + plan."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        import os
+        import stripe
+        from datetime import datetime as _dt
+        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
+        if not stripe.api_key:
+            return jsonify({'error': 'STRIPE_SECRET_KEY not set'}), 500
+    except ImportError:
+        return jsonify({'error': 'stripe library not installed'}), 500
+
+    conn = permitdb.get_connection()
+    out = []
+    try:
+        rows = conn.execute(
+            "SELECT id, email, plan FROM subscribers WHERE stripe_customer_id IS NULL"
+        ).fetchall()
+        for row in rows:
+            email = row['email'] if isinstance(row, dict) else row[1]
+            row_id = row['id'] if isinstance(row, dict) else row[0]
+            try:
+                customers = stripe.Customer.list(email=email, limit=10).data
+            except Exception as e:
+                out.append({'email': email, 'status': 'error', 'detail': str(e)[:120]})
+                continue
+            if not customers:
+                out.append({'email': email, 'status': 'no_stripe_match'})
+                continue
+            cust = customers[0]
+            try:
+                subs = stripe.Subscription.list(customer=cust.id, status='all', limit=10).data
+            except Exception as e:
+                subs = []
+            active = [s for s in subs if s.status in ('active', 'trialing')]
+            sub = active[0] if active else (subs[0] if subs else None)
+            new_plan = sub.status if sub else 'free'
+            te = (_dt.fromtimestamp(sub.trial_end).isoformat()
+                  if sub and getattr(sub, 'trial_end', None) else None)
+            pe = (_dt.fromtimestamp(sub.current_period_end).isoformat()
+                  if sub and getattr(sub, 'current_period_end', None) else None)
+            conn.execute(
+                "UPDATE subscribers SET "
+                "  stripe_customer_id = ?, stripe_subscription_id = ?, "
+                "  plan = ?, trial_end = ?, current_period_end = ? "
+                "WHERE id = ?",
+                (cust.id, sub.id if sub else None, new_plan, te, pe, row_id)
+            )
+            out.append({
+                'email': email, 'status': 'linked',
+                'customer': cust.id,
+                'subscription': sub.id if sub else None,
+                'plan': new_plan,
+            })
+        conn.commit()
+        return jsonify({'status': 'ok', 'processed': len(out), 'results': out})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/admin/stripe/import-orphans', methods=['POST'])
+def admin_stripe_import_orphans():
+    """V518: discover Stripe customers (created within N days, default
+    60) that don't have a subscribers row at all and create one. These
+    are the pre-V494 paid signups (Higgins, Meyer) who landed in Stripe
+    but never got synced to the local digest scheduler."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    try:
+        import os
+        import stripe
+        from datetime import datetime as _dt, timedelta as _td
+        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
+        if not stripe.api_key:
+            return jsonify({'error': 'STRIPE_SECRET_KEY not set'}), 500
+    except ImportError:
+        return jsonify({'error': 'stripe library not installed'}), 500
+
+    body = request.get_json(silent=True) or {}
+    days = int(body.get('days', 60))
+    since_ts = int((_dt.utcnow() - _td(days=days)).timestamp())
+
+    conn = permitdb.get_connection()
+    out = []
+    try:
+        try:
+            customers = stripe.Customer.list(
+                limit=100, created={'gte': since_ts}
+            ).data
+        except Exception as e:
+            return jsonify({'error': f'stripe list failed: {e}'}), 500
+
+        for cust in customers:
+            email = (cust.email or '').strip().lower()
+            if not email:
+                continue
+            existing = conn.execute(
+                "SELECT 1 FROM subscribers WHERE LOWER(email) = ? "
+                "OR stripe_customer_id = ?",
+                (email, cust.id)
+            ).fetchone()
+            if existing:
+                continue
+            try:
+                subs = stripe.Subscription.list(
+                    customer=cust.id, status='all', limit=10
+                ).data
+            except Exception:
+                subs = []
+            sub = subs[0] if subs else None
+            te = (_dt.fromtimestamp(sub.trial_end).isoformat()
+                  if sub and getattr(sub, 'trial_end', None) else None)
+            pe = (_dt.fromtimestamp(sub.current_period_end).isoformat()
+                  if sub and getattr(sub, 'current_period_end', None) else None)
+            new_plan = sub.status if sub else 'free'
+            conn.execute(
+                "INSERT INTO subscribers "
+                "(email, name, plan, digest_cities, active, created_at, "
+                " stripe_customer_id, stripe_subscription_id, "
+                " trial_end, current_period_end) "
+                "VALUES (?, ?, ?, NULL, 1, ?, ?, ?, ?, ?)",
+                (
+                    email,
+                    (cust.name or email.split('@')[0].title()),
+                    new_plan,
+                    _dt.fromtimestamp(cust.created).isoformat(),
+                    cust.id,
+                    sub.id if sub else None,
+                    te, pe,
+                )
+            )
+            out.append({
+                'email': email,
+                'customer': cust.id,
+                'subscription': sub.id if sub else None,
+                'plan': new_plan,
+                'note': 'imported (digest_cities NULL — needs follow-up)',
+            })
+        conn.commit()
+        return jsonify({'status': 'ok', 'imported': len(out), 'results': out})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
