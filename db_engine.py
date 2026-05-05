@@ -136,12 +136,38 @@ class PgConnection:
     def rowcount(self):
         return self._conn.cursor().rowcount
 
+    def cursor(self, cursor_factory=None):
+        """V522d: psycopg2-style API. Many callers (V518 Stripe admin
+        endpoints, the daemon, etc.) use `conn.cursor()` followed by
+        `cur.execute()` instead of the SQLite-style `conn.execute()`.
+        Without this method the AttributeError torpedoes every request
+        the moment USE_POSTGRES=true. Returns a PgCursor wrapping a
+        RealDictCursor so fetchone/fetchall return dict-like rows
+        compatible with both `r['col']` and `r[0]` access."""
+        import psycopg2.extras
+        cf = cursor_factory or psycopg2.extras.RealDictCursor
+        cur = self._conn.cursor(cursor_factory=cf)
+        return PgCursor(cur)
+
 
 class PgCursor:
     """Wrapper for psycopg2 cursor to match SQLite cursor patterns."""
 
     def __init__(self, cursor):
         self._cursor = cursor
+
+    def execute(self, sql, params=None):
+        """V522d: support `cur = conn.cursor(); cur.execute(sql, params)`
+        pattern. SQLite uses ? placeholders, psycopg2 uses %s — translate
+        before forwarding so existing SQLite-style call sites Just Work."""
+        translated = _translate_sql(sql)
+        self._cursor.execute(translated, params)
+        return self
+
+    def executemany(self, sql, params_list):
+        translated = _translate_sql(sql)
+        self._cursor.executemany(translated, params_list)
+        return self
 
     def fetchone(self):
         row = self._cursor.fetchone()
@@ -163,6 +189,18 @@ class PgCursor:
 
     def __iter__(self):
         return (DictRow(row) for row in self._cursor)
+
+    def close(self):
+        try:
+            self._cursor.close()
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
 
 class DictRow(dict):
