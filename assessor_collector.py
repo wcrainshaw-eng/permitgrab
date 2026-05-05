@@ -1892,6 +1892,250 @@ ASSESSOR_SOURCES = {
         'return_geometry': False,
         'default_city': 'Cleveland',
     },
+
+    # ============================================================
+    # V509 BEAST — 11 new assessor sources
+    # ============================================================
+    'nys_tax_parcel_centroid': {
+        # V509 #6: HEADLINE WIN — NYS statewide centroid feed.
+        # 5,505,719 records covering every NY county with
+        # PRIMARY_OWNER + COUNTY_NAME + MUNI_NAME + PARCEL_ADDR +
+        # MAIL_ADDR. Single source unlocks Yonkers/Rochester/Albany/
+        # Schenectady/White Plains/New Rochelle/Mt Vernon plus all
+        # 5 NYC boroughs. Filter by COUNTY_NAME or MUNI_NAME at
+        # insert time per maricopa_secondary V474 pattern.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'NYS ITS Tax Parcel Centroid Points (statewide)',
+        'endpoint': 'https://gisservices.its.ny.gov/arcgis/rest/services/NYS_Tax_Parcel_Centroid_Points/FeatureServer/0',
+        'where_clause': "PRIMARY_OWNER IS NOT NULL AND PARCEL_ADDR IS NOT NULL AND PARCEL_ADDR <> ''",
+        'field_map': {
+            'owner_name': 'PRIMARY_OWNER',
+            'address': 'PARCEL_ADDR',
+            'city': 'MUNI_NAME',
+            'county': 'COUNTY_NAME',
+            'owner_mailing_address': 'MAIL_ADDR',
+            'owner_mailing_city': 'MAIL_CITY',
+            'parcel_id': 'SWIS',
+        },
+        'state': 'NY',
+        'source_tag': 'assessor:nys_tax_parcel_centroid',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        # 5.5M too big for one batch; chunk by county at insert time
+        'chunk_by': 'COUNTY_NAME',
+    },
+    'ct_statewide_cama': {
+        # V509 #7: Connecticut statewide CAMA + Parcel Layer.
+        # 1,282,833 records covering Hartford/Bridgeport/New Haven/
+        # Stamford/Waterbury/Norwalk/Danbury + 13+ smaller CT cities.
+        # CT has no bulk state license DB so phone enrichment is
+        # DDG-only, but owners alone enable SEO content.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'CT Statewide CAMA + Parcel Layer 2025',
+        'endpoint': 'https://services3.arcgis.com/3FL1kr7L4LvwA2Kb/arcgis/rest/services/Connecticut_CAMA_and_Parcel_Layer/FeatureServer/0',
+        'where_clause': "Owner IS NOT NULL AND Owner <> '' AND Full_Address IS NOT NULL",
+        'field_map': {
+            'owner_name': 'Owner',
+            'address': 'Full_Address',
+            'city': 'Town_Name',
+            'owner_mailing_address': 'Mailing_Address',
+            'owner_mailing_city': 'Mailing_City',
+            'owner_mailing_state': 'Mailing_State',
+            'owner_mailing_zip': 'Mailing_Zip',
+        },
+        'state': 'CT',
+        'source_tag': 'assessor:ct_statewide_cama',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'chunk_by': 'Town_Name',
+    },
+    'fl_statewide_parcels': {
+        # V509 #8: Florida statewide parcel feed (DOR aggregated).
+        # 10,834,415 records covering EVERY FL county. Pairs with
+        # V507's FL_Statewide and unlocks 30+ FL secondary cities
+        # (Pensacola/Tallahassee/Sarasota/Naples/Daytona/Lakeland/
+        # Brevard/Pinellas/Pasco/Volusia/etc.) at once. MUST chunk
+        # by CountyName per FIX #23 — one chunked import per county
+        # with resultRecordCount<=2000 — to avoid OOM.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'FL Statewide Parcels (DOR)',
+        'endpoint': 'https://services5.arcgis.com/GcvM6vDlR2gM4x31/arcgis/rest/services/FL_Parcels/FeatureServer/0',
+        'where_clause': "OWN_NAME IS NOT NULL AND OWN_NAME <> ''",
+        'field_map': {
+            'owner_name': 'OWN_NAME',
+            'owner_mailing_address': 'OWN_ADDR1',
+            'owner_mailing_city': 'OWN_CITY',
+            'owner_mailing_state': 'OWN_STATE',
+            'owner_mailing_zip': 'OWN_ZIPCD',
+            'county': 'CountyName',
+            'parcel_id': 'PARCEL_ID',
+        },
+        'state': 'FL',
+        'source_tag': 'assessor:fl_statewide_parcels',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'chunk_by': 'CountyName',
+    },
+    'wcad_williamson_tx': {
+        # V509 #9: Williamson County TX (WCAD) — Austin metro NE
+        # suburbs: Round Rock, Cedar Park, Leander, Hutto, Georgetown,
+        # Liberty Hill, Taylor.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'Williamson County (WCAD) Tax Parcels',
+        'endpoint': 'https://services1.arcgis.com/Xff0bbfp6vwIWmlU/arcgis/rest/services/WCAD_Tax_Parcels/FeatureServer/0',
+        'where_clause': "OWNERNME1 IS NOT NULL AND OWNERNME1 <> ''",
+        'field_map': {
+            'owner_name': 'OWNERNME1',
+            'address': 'SITEADDRESS',
+            'owner_mailing_address': 'PSTLADDRESS',
+            'owner_mailing_city': 'PSTLCITY',
+            'owner_mailing_state': 'PSTLSTATE',
+            'owner_mailing_zip': 'PSTLZIP5',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:wcad_williamson_tx',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+    },
+    'hayscad_hays_tx': {
+        # V509 #10: Hays County TX — San Marcos, Wimberley, Buda,
+        # Kyle (Austin metro SW suburbs).
+        'platform': 'arcgis_featureserver',
+        'service_description': 'Hays County (HaysCAD) Parcels',
+        'endpoint': 'https://services6.arcgis.com/j94FvPaik4etwHFk/arcgis/rest/services/HaysCADWebService1/FeatureServer/0',
+        'where_clause': "file_as_name IS NOT NULL AND file_as_name <> ''",
+        'field_map': {
+            'owner_name': 'file_as_name',
+            'address': 'situs_street',
+            'city': 'situs_city',
+            'owner_mailing_address': 'addr_line1',
+            'owner_mailing_city': 'addr_city',
+            'owner_mailing_state': 'addr_state',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:hayscad_hays_tx',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+    },
+    'fbcad_fort_bend_tx': {
+        # V509 #11: Fort Bend County TX — Sugar Land, Missouri City,
+        # Richmond, Rosenberg (Houston metro SW suburbs).
+        'platform': 'arcgis_featureserver',
+        'service_description': 'Fort Bend County (FBCAD) Parcels',
+        'endpoint': 'https://services2.arcgis.com/D4saGHECICkCeoJm/arcgis/rest/services/FBCAD_Public_Data/FeatureServer/0',
+        'where_clause': "OWNERNAME IS NOT NULL AND OWNERNAME <> ''",
+        'field_map': {
+            'owner_name': 'OWNERNAME',
+            'address': 'SITUS',
+            'owner_mailing_address': 'OADDR1',
+            'owner_mailing_city': 'OWNERCITY',
+            'owner_mailing_state': 'OWNERSTATE',
+            'owner_mailing_zip': 'OWNERZIP',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:fbcad_fort_bend_tx',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+    },
+    'denton_cad_tx': {
+        # V509 #12: Denton County TX — Denton, Lewisville, Flower
+        # Mound, Frisco-north, Krugerville. NCTCOG neighbor of
+        # Collin (V474 wired).
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Denton County (Denton CAD) Parcels',
+        'endpoint': 'https://gis.dentoncounty.gov/arcgis/rest/services/Parcels_FC/MapServer/0',
+        'where_clause': "name IS NOT NULL AND name <> ''",
+        'field_map': {
+            'owner_name': 'name',
+            'address': 'situsStreetName',
+            'city': 'situsCity',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:denton_cad_tx',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+    },
+    'tcad_travis_tx_v509': {
+        # V509 #13: Travis County TX REPLACEMENT — TCAD's Dec 2025
+        # parcel feed at the new HGcSYZ5bvjRswoCb services1 host.
+        # 382K records vs whatever existing 'travis_county' wired —
+        # this is fresher (Dec 2025) and has py_owner_name fully
+        # populated.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'Travis County (TCAD) Parcels Dec 2025',
+        'endpoint': 'https://services1.arcgis.com/HGcSYZ5bvjRswoCb/arcgis/rest/services/TCAD_Parcels_Dec_2025/FeatureServer/0',
+        'where_clause': "py_owner_name IS NOT NULL AND py_owner_name <> ''",
+        'field_map': {
+            'owner_name': 'py_owner_name',
+            'address': 'situs_address',
+            'city': 'situs_city',
+            'zip': 'situs_zip',
+            'owner_mailing_address': 'py_address',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:tcad_travis_tx_v509',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+    },
+    'lucas_county_oh_toledo': {
+        # V509 #14: Lucas County OH (Toledo). 408K records with
+        # owner field populated. CLAUDE.md V258 marked Toledo
+        # permits dead, but owners ARE live.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'Lucas County OH (Toledo) Parcels',
+        'endpoint': 'https://services3.arcgis.com/T8dczfwPixv79EgZ/arcgis/rest/services/Parcels_General_Land_Use_Classification_view/FeatureServer/0',
+        'where_clause': "owner IS NOT NULL AND owner <> ''",
+        'field_map': {
+            'owner_name': 'owner',
+            'address': 'property_address',
+            'owner_mailing_address': 'mailing_address',
+        },
+        'state': 'OH',
+        'source_tag': 'assessor:lucas_county_oh_toledo',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Toledo',
+    },
+    'jefferson_county_co_lakewood': {
+        # V509 #15: Jefferson County CO (Denver west suburbs).
+        # 248K records — Lakewood, Golden, Wheat Ridge, Arvada.
+        'platform': 'arcgis_featureserver',
+        'service_description': 'Jefferson County CO (Lakewood) Parcels',
+        'endpoint': 'https://services.arcgis.com/PFikmPaTMlt2KX1O/arcgis/rest/services/Jeffco_Parcels/FeatureServer/0',
+        'where_clause': "OWNNAM IS NOT NULL AND OWNNAM <> ''",
+        'field_map': {
+            'owner_name': 'OWNNAM',
+        },
+        'state': 'CO',
+        'source_tag': 'assessor:jefferson_county_co_lakewood',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'Lakewood',
+    },
+    'bexar_county_tx_v509': {
+        # V509 #16: Bexar County TX REPLACEMENT — V507 wired SA via
+        # services.arcgis.com/g1fRTDLeMgspWrYp's BCAD_Parcels (720K
+        # records but Owner_Name field blank in samples). Switch to
+        # maps.bexar.org's Parcels MapServer (710K records with Owner
+        # populated). Don't double-write — flag the older bexar entry
+        # paused if it exists.
+        'platform': 'arcgis_mapserver',
+        'service_description': 'Bexar County (San Antonio) Parcels — V509 replacement',
+        'endpoint': 'https://maps.bexar.org/arcgis/rest/services/Parcels/MapServer/0',
+        'where_clause': "Owner IS NOT NULL AND Owner <> ''",
+        'field_map': {
+            'owner_name': 'Owner',
+            'address': 'Situs',
+            'owner_mailing_address': 'AddrLn1',
+            'owner_mailing_city': 'AddrCity',
+            'owner_mailing_state': 'AddrSt',
+        },
+        'state': 'TX',
+        'source_tag': 'assessor:bexar_county_tx_v509',
+        'pagination_strategy': 'objectid',
+        'return_geometry': False,
+        'default_city': 'San Antonio',
+    },
 }
 
 

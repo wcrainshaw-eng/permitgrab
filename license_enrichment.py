@@ -430,6 +430,99 @@ STATE_CONFIGS = {
                        'west-palm-beach', 'clearwater', 'lakeland',
                        'palm-bay', 'brandon-fl'],
     },
+
+    # V509 BEAST — 4 new state license imports
+    'IA': {
+        # V509 #17: Iowa Active Construction Contractor Registrations.
+        # 17,156 records statewide with phone + email + NAICS class.
+        # Unlocks Des Moines, Cedar Rapids, Davenport, Sioux City,
+        # Iowa City, Waterloo, Council Bluffs, Ames, West Des Moines.
+        # Iowa cities currently 0% covered in PermitGrab.
+        'name': 'Iowa Active Construction Contractor Registrations',
+        'format': 'socrata',
+        'socrata_url': 'https://mydata.iowa.gov/resource/dpf3-iz94.json',
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'business_name',
+            'phone': 'phone',
+            'email': 'email_address',
+            'address': 'address',
+            'city': 'city',
+            'state': 'state',
+            'zip': 'zip_code',
+            'license_type': 'primary_activity',
+        },
+        'city_slugs': ['des-moines', 'des-moines-ia', 'cedar-rapids',
+                       'cedar-rapids-ia', 'davenport', 'davenport-ia',
+                       'sioux-city', 'sioux-city-ia', 'iowa-city',
+                       'waterloo-ia', 'council-bluffs', 'ames-ia',
+                       'west-des-moines', 'dubuque'],
+    },
+    'NY_MOLD': {
+        # V509 #18: NY Mold Contractor Licenses (statewide). 2,392
+        # records. Niche but profitable home-services trade. Phones
+        # often missing from the broader DOB/DOL paths.
+        'name': 'NY Mold Contractor Licenses',
+        'format': 'socrata',
+        'socrata_url': 'https://data.ny.gov/resource/ikqx-ispy.json',
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'business_name',
+            'phone': 'phone',
+            'license_type': 'license_type',
+            'city': 'city',
+            'state': 'state',
+            'zip': 'zip_code',
+        },
+        'city_slugs': ['new-york-city', 'buffalo-ny', 'rochester-ny',
+                       'syracuse-ny', 'albany-ny', 'yonkers',
+                       'long-island'],
+    },
+    'NY_ELEVATOR': {
+        # V509 #19: NY Elevator Contractor Licenses (statewide). 296
+        # records. Small but high-value (commercial elevator
+        # contractors are profitable lead segment).
+        'name': 'NY Elevator Contractor Licenses',
+        'format': 'socrata',
+        'socrata_url': 'https://data.ny.gov/resource/jrac-r9vc.json',
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'business_name',
+            'dba': 'dba_name',
+            'phone': 'phone',
+            'license_type': 'license_type',
+            'city': 'city',
+            'state': 'state',
+            'zip': 'zip_code',
+        },
+        'city_slugs': ['new-york-city', 'buffalo-ny', 'rochester-ny',
+                       'syracuse-ny', 'albany-ny', 'yonkers'],
+    },
+    'MD_MOCO_BUILDERS': {
+        # V509 #20: Maryland Montgomery County New Home Builders
+        # license registry. 2,497 records with applicant business +
+        # license number + telephone. Pairs with V509 #5 (MD MoCo
+        # Housing violations) and V507 PG County owners to enable
+        # Silver Spring, Bethesda, Rockville, Wheaton, Gaithersburg.
+        'name': 'MD Montgomery County New Home Builders',
+        'format': 'socrata',
+        'socrata_url': 'https://data.montgomerycountymd.gov/resource/rthz-p639.json',
+        'match_strategy': 'name',
+        'field_map': {
+            'business_name': 'applicant',
+            'phone': 'telephone',
+            'license_type': 'licensetype',
+            'license_number': 'licenseno',
+            'city': 'city',
+            'state': 'state',
+            'zip': 'zip',
+        },
+        'city_slugs': ['silver-spring', 'bethesda', 'rockville',
+                       'gaithersburg', 'wheaton', 'kensington',
+                       'chevy-chase', 'takoma-park', 'sandy-spring',
+                       'boyds', 'burtonsville', 'poolesville',
+                       'montgomery-village', 'montgomery-county'],
+    },
 }
 
 

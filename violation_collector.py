@@ -1794,6 +1794,73 @@ VIOLATION_SOURCES = {
             'lng_field': 'longitude',
         }],
     },
+    # V509 BEAST violation sources
+    'seattle': {
+        # V509 #3: Seattle Code Complaints and Violations.
+        # 240K records, fresh today. Probed 2026-05-05.
+        'prod_city_id': None,
+        'city': 'Seattle',
+        'state': 'WA',
+        'endpoints': [{
+            'name': 'Code Complaints and Violations',
+            'domain': 'cos-data.seattle.gov',
+            'resource_id': 'ez4a-iug7',
+            'date_field': 'opendate',
+            'id_field': 'recordnum',
+            'description_field': 'description',
+            'status_field': 'status',
+            'type_field': 'recordtypegroup',
+            'address_fields': {'full': 'originaladdress1'},
+            'zip_field': None,
+            'lat_field': None,
+            'lng_field': None,
+        }],
+    },
+    'norfolk': {
+        # V509 #4: Norfolk VA Complaints. 42K rows, daily refresh.
+        # Norfolk has no permit feed (V509 confirmed); violations alone
+        # supports SEO content for Norfolk.
+        'prod_city_id': None,
+        'city': 'Norfolk',
+        'state': 'VA',
+        'endpoints': [{
+            'name': 'Complaints',
+            'domain': 'data.norfolk.gov',
+            'resource_id': 'm9m3-wk2s',
+            'date_field': 'created_date',
+            'id_field': 'complaint_id',
+            'description_field': 'subtype',
+            'status_field': 'status',
+            'type_field': 'type',
+            'address_fields': {'full': 'address'},
+            'zip_field': None,
+            'lat_field': None,
+            'lng_field': None,
+        }],
+    },
+    'montgomery-county-md': {
+        # V509 #5: Montgomery County MD Housing Code Violations.
+        # 937K rows, fresh today. Pairs with V509 #20 MD MoCo Builders
+        # license import to enable Silver Spring, Bethesda, Rockville,
+        # Wheaton, Gaithersburg.
+        'prod_city_id': None,
+        'city': 'Montgomery County',
+        'state': 'MD',
+        'endpoints': [{
+            'name': 'Housing Code Violations',
+            'domain': 'data.montgomerycountymd.gov',
+            'resource_id': 'k9nj-z35d',
+            'date_field': 'date_filed',
+            'id_field': 'case_number',
+            'description_field': 'item',
+            'status_field': 'condition',
+            'type_field': 'item',
+            'address_fields': {'full': 'street_address'},
+            'zip_field': 'zip',
+            'lat_field': None,
+            'lng_field': None,
+        }],
+    },
 }
 
 

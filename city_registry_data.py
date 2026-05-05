@@ -39183,5 +39183,78 @@ BULK_SOURCES = {
         "date_field": "ISSUED_DATE",
         "active": True,
     },
+
+    # V509 BEAST permit sources
+    "marin_county_ca_v509": {
+        # V509 #1: Marin County CA. data.marincounty.gov has TWO live
+        # permit datasets. nits-hbvx ("Building Permits Report") chosen
+        # over mkbn-caye because mkbn-caye's issued_date is sparse-NULL
+        # on its newest records (most_recent_issued_received_date is
+        # populated but issued_date is empty), which the existing
+        # marin_county_ca config tripped over with "caught_up" 0-insert
+        # results despite source having 5/4 records. nits-hbvx has 35K
+        # rows with both issued_date AND received_date populated to
+        # 2026-05-04, simpler schema, contractor field with real
+        # business names ("METAL ROOF SYSTEMS INC", "OWNER" for owner-
+        # builder permits). Daily refresh.
+        # Wires to existing 'marin-county' slug; supplements not replaces.
+        "name": "Marin County",
+        "state": "CA",
+        "slug": "marin-county",
+        "lat": 38.012,
+        "lon": -122.704,
+        "platform": "socrata",
+        "endpoint": "https://data.marincounty.gov/resource/nits-hbvx.json",
+        "dataset_id": "nits-hbvx",
+        "description": "Marin County Building Permits Report (V509)",
+        "field_map": {
+            "permit_number": "permit_number",
+            "address": "address",
+            "city": "city_town",
+            "estimated_cost": "construction_value",
+            "filing_date": "issued_date",
+            "issue_date": "issued_date",
+            "description": "construction",
+            "permit_type": "type_permit",
+            "contractor_name": "contractor",
+            "parcel": "parcel_number",
+        },
+        "date_field": "issued_date",
+        "limit": 2000,
+        "active": True,
+        "notes": "V509: 35K records, fresh daily. Use this in preference to mkbn-caye (the older source whose issued_date is sparse-NULL on newest records).",
+    },
+
+    "new_york_city_dobnow_v509": {
+        # V509 #2: NYC DOB NOW Build Approved Permits. Newer modern
+        # 2020+ permit system that's increasingly the source of truth
+        # vs the legacy ipu4-2q9a feed. 932K records with
+        # applicant_business_name explicitly populated.
+        # Note: composes with existing 'new-york-city' slug; daemon's
+        # multi-source aggregation pattern picks up both feeds.
+        "name": "New York City — DOB NOW",
+        "state": "NY",
+        "slug": "new-york-city",
+        "lat": 40.7128,
+        "lon": -74.006,
+        "platform": "socrata",
+        "endpoint": "https://data.cityofnewyork.us/resource/rbx6-tga4.json",
+        "dataset_id": "rbx6-tga4",
+        "description": "NYC DOB NOW Build – Approved Permits (V509 supplemental to ipu4-2q9a)",
+        "field_map": {
+            "permit_number": "work_permit",
+            "filing_date": "issued_date",
+            "issue_date": "issued_date",
+            "permit_type": "work_type",
+            "estimated_cost": "estimated_job_costs",
+            "contractor_name": "applicant_business_name",
+            "owner_name": "owner_business_name",
+            "address": "house_no",
+        },
+        "date_field": "issued_date",
+        "limit": 2000,
+        "active": True,
+        "notes": "V509: 932K records. Modern DOB NOW Build feed; supplements existing legacy ipu4-2q9a NYC permits.",
+    },
 }
 
