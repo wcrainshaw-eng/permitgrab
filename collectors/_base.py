@@ -1,16 +1,58 @@
-"""V527: shared health_check() implementation used by all platform modules.
+"""V527: shared health_check() + minimal parse() helpers used by all
+platform modules.
 
 The platform-specific quirks are minimal — the actual rubric is the
 same: did the daemon visit this slug recently, did it succeed, are
 fresh permits landing? Each platform module passes its name in so the
 diagnosis can fork on platform-specific thresholds (e.g. Accela cities
 visit less often by design, so the freshness threshold is wider).
+
+apply_field_map() is the V527 Phase A normalization stand-in. It does
+JUST ENOUGH to pin the record-shape contract per platform — extract
+the permit_number + the canonical fields named in the field_map.
+Phase B will replace it with the full collector.normalize_permit
+semantics (date parsing, trade classification, value tiers, owner/
+contact fallbacks). Keeping it minimal in Phase A means fixture-
+based tests don't need to load city_configs / collector.py.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 
 import db as permitdb
+
+
+def apply_field_map(record, field_map):
+    """V527 Phase A: extract canonical fields from a raw record using
+    the source-key → canonical-key map. Returns a dict, or None if
+    the record has no permit_number (= unusable).
+
+    ArcGIS records arrive wrapped as {'attributes': {...}, 'geometry':
+    {...}}. Auto-unwrap so callers don't have to.
+    """
+    if not isinstance(record, dict):
+        return None
+    if 'attributes' in record and isinstance(record['attributes'], dict):
+        record = record['attributes']
+    if not field_map:
+        return None
+    result = {}
+    for canonical, source_key in field_map.items():
+        if not source_key:
+            continue
+        # exact match first, then case-insensitive
+        val = record.get(source_key)
+        if val is None:
+            for k, v in record.items():
+                if k.lower() == source_key.lower():
+                    val = v
+                    break
+        if val is not None:
+            # Normalize to string per the existing pipeline convention
+            result[canonical] = str(val).strip() if not isinstance(val, (dict, list)) else val
+    if not result.get('permit_number'):
+        return None
+    return result
 
 
 # Per-platform thresholds for "recent enough" visit. Tuned to the

@@ -25,30 +25,16 @@ def fetch_bulk(config, days_back=90):
 
 
 def parse(raw_records, field_map):
-    """Normalize raw Socrata records via collector.normalize_permit.
-
-    Phase A: re-export shim. Phase B will move the normalization
-    here so platform-specific quirks (e.g. Socrata's :id pseudo-
-    column, datetime ISO offsets) live with the platform.
-    """
-    from collector import normalize_permit
+    """Phase A: apply field_map to each raw Socrata record. Phase B
+    will move the full normalize_permit semantics (date parsing,
+    trade classification, value tiers) here so Socrata-specific
+    quirks live with the platform."""
+    from ._base import apply_field_map
     out = []
-    config = {'field_map': field_map} if field_map else {}
-    for record in raw_records:
-        try:
-            normalized = normalize_permit(record, source_id_or_config=config)
-            if normalized and normalized.get('permit_number'):
-                out.append(normalized)
-        except TypeError:
-            # Older signature: normalize_permit(record, city_key)
-            try:
-                normalized = normalize_permit(record, '')
-                if normalized and normalized.get('permit_number'):
-                    out.append(normalized)
-            except Exception:
-                continue
-        except Exception:
-            continue
+    for record in raw_records or []:
+        normalized = apply_field_map(record, field_map)
+        if normalized:
+            out.append(normalized)
     return out
 
 

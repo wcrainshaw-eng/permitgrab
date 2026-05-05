@@ -1,0 +1,39 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "fields": [
+    {"name": "OBJECTID", "type": "esriFieldTypeOID"},
+    {"name": "PERMITNUMBER", "type": "esriFieldTypeString", "length": 50},
+    {"name": "PERMITTYPE", "type": "esriFieldTypeString", "length": 100},
+    {"name": "DESCRIPTION", "type": "esriFieldTypeString", "length": 500},
+    {"name": "ADDRESS", "type": "esriFieldTypeString", "length": 250},
+    {"name": "CONTRACTOR", "type": "esriFieldTypeString", "length": 250},
+    {"name": "ISSUEDATE", "type": "esriFieldTypeDate"},
+    {"name": "VALUATION", "type": "esriFieldTypeDouble"}
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 8821456,
+        "PERMITNUMBER": "BLDR-26-0008891",
+        "PERMITTYPE": "BUILDING - RESIDENTIAL",
+        "DESCRIPTION": "POOL AND SPA",
+        "ADDRESS": "3401 E SUNNYSIDE DR, PHOENIX, AZ 85028",
+        "CONTRACTOR": "DESERT WAVE POOLS LLC",
+        "ISSUEDATE": 1746468000000,
+        "VALUATION": 62000.0
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 8821530,
+        "PERMITNUMBER": "BLDR-26-0008902",
+        "PERMITTYPE": "MECHANICAL",
+        "DESCRIPTION": "HVAC REPLACEMENT 5 TON",
+        "ADDRESS": "1819 E DESERT COVE AVE, PHOENIX, AZ 85020",
+        "CONTRACTOR": "AC BY J INC",
+        "ISSUEDATE": 1746554400000,
+        "VALUATION": 8800.0
+      }
+    }
+  ]
+}

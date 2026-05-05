@@ -28,26 +28,14 @@ def fetch_arcgis_hybrid(config, days_back=30):
 
 
 def parse(raw_records, field_map):
-    """Accela records are already-parsed dicts coming out of the BS4
-    scrape (see accela_portal_collector). Normalize via the same
-    normalize_permit path as the other platforms."""
-    from collector import normalize_permit
+    """Phase A: apply field_map to Accela records. Records are
+    already-parsed dicts from the BS4 scrape in accela_portal_collector."""
+    from ._base import apply_field_map
     out = []
-    config = {'field_map': field_map} if field_map else {}
-    for record in raw_records:
-        try:
-            normalized = normalize_permit(record, source_id_or_config=config)
-            if normalized and normalized.get('permit_number'):
-                out.append(normalized)
-        except TypeError:
-            try:
-                normalized = normalize_permit(record, '')
-                if normalized and normalized.get('permit_number'):
-                    out.append(normalized)
-            except Exception:
-                continue
-        except Exception:
-            continue
+    for record in raw_records or []:
+        normalized = apply_field_map(record, field_map)
+        if normalized:
+            out.append(normalized)
     return out
 
 

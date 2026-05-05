@@ -1,0 +1,48 @@
+{
+  "help": "https://data.boston.gov/api/3/action/help_show?name=datastore_search",
+  "success": true,
+  "result": {
+    "include_total": true,
+    "resource_id": "6ddcd912-32a0-43df-9908-63574f8c7e77",
+    "fields": [
+      {"type": "int", "id": "_id"},
+      {"type": "text", "id": "permitnumber"},
+      {"type": "text", "id": "worktype"},
+      {"type": "text", "id": "description"},
+      {"type": "text", "id": "address"},
+      {"type": "text", "id": "applicant"},
+      {"type": "text", "id": "owner"},
+      {"type": "text", "id": "issued_date"},
+      {"type": "numeric", "id": "declared_valuation"},
+      {"type": "text", "id": "status"}
+    ],
+    "records_format": "objects",
+    "records": [
+      {
+        "_id": 4521880,
+        "permitnumber": "ALT-2026-04-2891",
+        "worktype": "Renovations",
+        "description": "Kitchen and bath renovations 1200sf",
+        "address": "55 BAY STATE RD, BOSTON MA 02215",
+        "applicant": "Iliya Iliev",
+        "owner": "Boston University",
+        "issued_date": "2026-05-04",
+        "declared_valuation": 145000,
+        "status": "Issued"
+      },
+      {
+        "_id": 4521881,
+        "permitnumber": "ELE-2026-05-0102",
+        "worktype": "Electrical",
+        "description": "Service upgrade 100A to 200A",
+        "address": "212 NEWBURY ST, BOSTON MA 02116",
+        "applicant": "HomeWorks Energy",
+        "owner": "Newbury Properties Trust",
+        "issued_date": "2026-05-05",
+        "declared_valuation": 6500,
+        "status": "Issued"
+      }
+    ],
+    "total": 722103
+  }
+}

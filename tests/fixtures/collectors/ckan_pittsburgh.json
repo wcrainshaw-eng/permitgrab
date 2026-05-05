@@ -1,0 +1,45 @@
+{
+  "help": "https://data.wprdc.org/api/3/action/help_show?name=datastore_search",
+  "success": true,
+  "result": {
+    "include_total": true,
+    "resource_id": "f4d1177a-f597-4c32-8cbf-7885f56253f6",
+    "fields": [
+      {"type": "int", "id": "_id"},
+      {"type": "text", "id": "permit_number"},
+      {"type": "text", "id": "permit_type"},
+      {"type": "text", "id": "address"},
+      {"type": "text", "id": "contractor_name"},
+      {"type": "text", "id": "owner_name"},
+      {"type": "text", "id": "description"},
+      {"type": "text", "id": "issue_date"},
+      {"type": "numeric", "id": "estimated_cost"}
+    ],
+    "records_format": "objects",
+    "records": [
+      {
+        "_id": 78921,
+        "permit_number": "BLDR-2026-04-1107",
+        "permit_type": "Residential Alteration",
+        "address": "5532 ELLSWORTH AVE, PITTSBURGH PA 15232",
+        "contractor_name": "Phillips Heating & Air Conditioning, Inc.",
+        "owner_name": "ELLSWORTH PROPERTIES LLC",
+        "description": "FURNACE AND AC REPLACEMENT",
+        "issue_date": "2026-05-04",
+        "estimated_cost": 9800
+      },
+      {
+        "_id": 78922,
+        "permit_number": "BLDR-2026-04-1108",
+        "permit_type": "Commercial New Construction",
+        "address": "1100 LIBERTY AVE, PITTSBURGH PA 15222",
+        "contractor_name": "Johnson Controls Fire Protection LP",
+        "owner_name": "DOWNTOWN PARTNERSHIP HOLDINGS",
+        "description": "FIRE SUPPRESSION SYSTEM INSTALL",
+        "issue_date": "2026-05-05",
+        "estimated_cost": 142000
+      }
+    ],
+    "total": 2045
+  }
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "Record Number": "BLDR2026-00488",
+    "Record Type": "Residential Building Permit",
+    "Description": "RES SOLAR ROOFTOP PV 7.2KW",
+    "Address": "1820 W FRYE RD, CHANDLER, AZ 85224",
+    "Status": "Issued",
+    "Date": "05/02/2026",
+    "Filed Date": "04/28/2026",
+    "Issue Date": "05/02/2026",
+    "Licensed Professional": "SOLAR DESIGN ASSOCIATES INC",
+    "Contractor": "SOLAR DESIGN ASSOCIATES INC",
+    "Owner Name": "WILLIAMS, ROBERT",
+    "Estimated Cost": "$28,500.00"
+  },
+  {
+    "Record Number": "BLDR2026-00501",
+    "Record Type": "Commercial Building Permit",
+    "Description": "TI - 4500 SF OFFICE BUILD-OUT",
+    "Address": "2245 E GERMANN RD STE 14, CHANDLER, AZ 85249",
+    "Status": "Issued",
+    "Date": "05/03/2026",
+    "Filed Date": "04/15/2026",
+    "Issue Date": "05/03/2026",
+    "Licensed Professional": "AZTEC CONSTRUCTORS LLC",
+    "Contractor": "AZTEC CONSTRUCTORS LLC",
+    "Owner Name": "GERMANN BUSINESS PARK",
+    "Estimated Cost": "$485,000.00"
+  }
+]

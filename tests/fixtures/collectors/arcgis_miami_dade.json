@@ -1,0 +1,59 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "globalIdFieldName": "GlobalID",
+  "fields": [
+    {"name": "OBJECTID", "type": "esriFieldTypeOID", "alias": "OBJECTID"},
+    {"name": "PermitNumber", "type": "esriFieldTypeString", "alias": "Permit Number", "length": 50},
+    {"name": "OwnerName", "type": "esriFieldTypeString", "alias": "Owner Name", "length": 250},
+    {"name": "ContractorName", "type": "esriFieldTypeString", "alias": "Contractor Name", "length": 250},
+    {"name": "PermitType", "type": "esriFieldTypeString", "alias": "Permit Type", "length": 100},
+    {"name": "WorkDescription", "type": "esriFieldTypeString", "alias": "Description", "length": 500},
+    {"name": "FullAddress", "type": "esriFieldTypeString", "alias": "Address", "length": 250},
+    {"name": "IssuedDate", "type": "esriFieldTypeDate", "alias": "Issued Date"},
+    {"name": "EstimatedValue", "type": "esriFieldTypeDouble", "alias": "Estimated Value"}
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 4517823,
+        "PermitNumber": "MD-2026-04458",
+        "OwnerName": "PALMETTO BAY PROPERTIES LLC",
+        "ContractorName": "STRADA SERVICES INC",
+        "PermitType": "RESIDENTIAL ADDITION",
+        "WorkDescription": "ROOM ADDITION 540 SF + BATHROOM",
+        "FullAddress": "8430 SW 162ND ST, MIAMI, FL 33157",
+        "IssuedDate": 1746230400000,
+        "EstimatedValue": 78000.0
+      },
+      "geometry": {"x": -80.31234, "y": 25.62315}
+    },
+    {
+      "attributes": {
+        "OBJECTID": 4517901,
+        "PermitNumber": "MD-2026-04501",
+        "OwnerName": "DORAL HOLDINGS GROUP",
+        "ContractorName": "ARNOLD J ELECTRIC INC",
+        "PermitType": "ELECTRICAL",
+        "WorkDescription": "200A SERVICE UPGRADE",
+        "FullAddress": "11250 NW 41ST ST, DORAL, FL 33178",
+        "IssuedDate": 1746316800000,
+        "EstimatedValue": 4200.0
+      },
+      "geometry": {"x": -80.41789, "y": 25.81502}
+    },
+    {
+      "attributes": {
+        "OBJECTID": 4518050,
+        "PermitNumber": "MD-2026-04612",
+        "OwnerName": "JONES MARTHA",
+        "ContractorName": "SUNCOAST ROOFING & RENOVATIONS",
+        "PermitType": "RESIDENTIAL ROOF",
+        "WorkDescription": "RE-ROOF EXISTING SHINGLE 2400SF",
+        "FullAddress": "7842 NW 6TH AVE, MIAMI, FL 33150",
+        "IssuedDate": 1746403200000,
+        "EstimatedValue": 18500.0
+      },
+      "geometry": {"x": -80.21987, "y": 25.85431}
+    }
+  ]
+}
