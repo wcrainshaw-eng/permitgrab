@@ -422,6 +422,21 @@ def _translate_sql(sql):
     # GLOB → ~ (Postgres regex match)
     translated = translated.replace(" GLOB ", " ~ ")
 
+    # V528: LIKE → ILIKE for Postgres parity with SQLite's default
+    # ASCII-case-insensitive LIKE behavior. SQLite LIKE is case-
+    # insensitive by default (no PRAGMA case_sensitive_like in the
+    # codebase), so every callsite was implicitly case-insensitive
+    # for ASCII. Postgres LIKE is case-sensitive — without this
+    # translation, queries like `WHERE city LIKE 'chicago%'` silently
+    # under-match against rows where city is `Chicago, IL`. The
+    # \bLIKE\b match doesn't trip on the `LIKE` inside `ILIKE`
+    # (re.search requires a word boundary before the L, which doesn't
+    # exist between I and L), so the 5 existing ILIKE callsites in
+    # routes/admin.py:5363-5367 (bot detection) survive unchanged.
+    # NOT LIKE → NOT ILIKE comes for free since we only swap the
+    # LIKE word, leaving NOT in place.
+    translated = re.sub(r'\bLIKE\b', 'ILIKE', translated, flags=re.IGNORECASE)
+
     # SUBSTR → SUBSTRING (both actually work in Postgres, but be explicit)
     # Actually SUBSTR works in Postgres too, so skip this
 
