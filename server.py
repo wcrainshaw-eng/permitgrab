@@ -9228,6 +9228,52 @@ def start_collectors():
     except Exception as e:
         print(f"[{datetime.now()}] V475: email_scheduler failed to start: {e}", flush=True)
 
+    # V503 WATCHDOG: kill the worker if scheduled_collection stalls.
+    # Indefinite TCP-connect hangs survive both per-call timeouts AND
+    # socket.setdefaulttimeout — observed twice this evening despite
+    # both fixes. When there's been zero scraper_run progress for 8+
+    # min while the daemon is "alive", it's wedged in a syscall the
+    # GIL+timeout machinery can't interrupt cleanly. SIGTERM-self
+    # forces gunicorn to spawn a fresh worker; V496 auto-spawn brings
+    # the daemon back on the next request.
+    def _v503_watchdog():
+        import os as _wos, signal as _wsig
+        time.sleep(600)  # let initial cycle warm up before arming
+        last_scraper_run_id = -1
+        last_progress_time = time.time()
+        while True:
+            time.sleep(60)
+            try:
+                conn = permitdb.get_connection()
+                row = conn.execute(
+                    "SELECT MAX(id) FROM scraper_runs"
+                ).fetchone()
+                conn.close()
+                cur_id = (row and row[0]) or -1
+                if cur_id != last_scraper_run_id:
+                    last_scraper_run_id = cur_id
+                    last_progress_time = time.time()
+                    continue
+                stall = time.time() - last_progress_time
+                if stall > 480:  # 8 minutes of zero progress
+                    print(
+                        f"[{datetime.now()}] V503 WATCHDOG: "
+                        f"scheduled_collection stalled {int(stall)}s with no "
+                        f"scraper_run progress. SIGTERM-self for clean recycle.",
+                        flush=True,
+                    )
+                    _wos.kill(_wos.getpid(), _wsig.SIGTERM)
+                    return
+            except Exception as _e:
+                print(f"[{datetime.now()}] V503 watchdog error (non-fatal): {_e}", flush=True)
+    try:
+        threading.Thread(
+            target=_v503_watchdog, daemon=True, name='collection_watchdog'
+        ).start()
+        print(f"[{datetime.now()}] V503: collection watchdog armed (8min stall ceiling)", flush=True)
+    except Exception as _e:
+        print(f"[{datetime.now()}] V503: watchdog spawn failed: {_e}", flush=True)
+
     print(f"[{datetime.now()}] V67: All collector threads started.", flush=True)
 
 # V229 addendum K1 / V471 PR2-prep: single, lock-guarded spawner for
