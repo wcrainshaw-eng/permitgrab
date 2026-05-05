@@ -14,6 +14,11 @@ pytz==2024.1
 beautifulsoup4==4.12.3
 psutil>=5.9
 flask-compress>=1.14
+# V508: Playwright-based Accela CapDetail scraper for JS-SPA portals
+# (SBCO and similar) where static HTML returns an empty shell. Chromium
+# is installed via `playwright install --with-deps chromium` in the
+# Dockerfile build step.
+playwright==1.45.0
 # duckduckgo-search removed — causes build failures on Render, search done locally instead
 # V229 B1: removed V227's httpx/selectolax/tenacity/pybreaker too — they
 # only supported enrichment_engine.py which was never imported by server.py

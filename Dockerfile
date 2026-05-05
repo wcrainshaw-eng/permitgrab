@@ -5,6 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# V508: install Chromium + system deps for Playwright-based scraping.
+# `--with-deps` resolves the Debian apt packages Chromium needs (libnss3,
+# libxkbcommon0, libdrm2, etc.) so we don't have to maintain that list
+# manually. Adds ~150 MB to image size and ~2 min to build, but unlocks
+# JS-SPA Accela CapDetail scraping (SBCO subscriber path).
+RUN python -m playwright install --with-deps chromium
+
 COPY . .
 
 EXPOSE 5000

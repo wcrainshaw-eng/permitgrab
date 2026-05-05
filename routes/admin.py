@@ -3764,6 +3764,100 @@ def admin_indexnow_push():
         return jsonify({'error': str(e)}), 502
 
 
+@admin_bp.route('/api/admin/accela-detail-test', methods=['POST'])
+def admin_accela_detail_test():
+    """V508: smoke-test the Playwright-based Accela CapDetail scraper.
+
+    Body: {"agency": "SBCO", "permit": "26GEN-00750"}
+    Returns whatever fields the scraper extracted, or {_error:...}.
+
+    Useful for validating Chromium is installed + the URL pattern works
+    BEFORE wiring the daemon to call this for every permit."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    body = request.get_json(silent=True) or {}
+    agency = body.get('agency', 'SBCO')
+    permit = body.get('permit', '26GEN-00750')
+    try:
+        from accela_playwright_collector import fetch_accela_detail_playwright
+        info = fetch_accela_detail_playwright(agency, permit, timeout_s=40)
+        return jsonify({'agency': agency, 'permit': permit, 'info': info})
+    except Exception as e:
+        return jsonify({'error': f'{type(e).__name__}: {str(e)[:200]}'}), 500
+
+
+@admin_bp.route('/api/admin/accela-detail-batch', methods=['POST'])
+def admin_accela_detail_batch():
+    """V508: backfill contractor info on stored permits via Playwright.
+
+    Body: {"slug": "san-bernardino-county", "agency": "SBCO",
+           "limit": 25, "only_missing_contractor": true}
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    body = request.get_json(silent=True) or {}
+    slug = body.get('slug', 'san-bernardino-county')
+    agency = body.get('agency', 'SBCO')
+    limit = min(int(body.get('limit', 25)), 100)
+    only_missing = body.get('only_missing_contractor', True)
+
+    conn = permitdb.get_connection()
+    try:
+        sql = (
+            "SELECT permit_number FROM permits WHERE source_city_key = ? "
+            "AND permit_number IS NOT NULL AND permit_number != ''"
+        )
+        if only_missing:
+            sql += " AND (contractor_name IS NULL OR contractor_name = '')"
+        sql += " ORDER BY date DESC LIMIT ?"
+        rows = conn.execute(sql, (slug, limit)).fetchall()
+        permit_numbers = [r[0] if not isinstance(r, dict) else r['permit_number']
+                          for r in rows]
+    finally:
+        conn.close()
+
+    if not permit_numbers:
+        return jsonify({'status': 'no_permits', 'slug': slug})
+
+    try:
+        from accela_playwright_collector import fetch_accela_details_batch
+        results = fetch_accela_details_batch(
+            agency, permit_numbers, max_permits=limit,
+        )
+    except Exception as e:
+        return jsonify({'error': f'{type(e).__name__}: {str(e)[:200]}'}), 500
+
+    # Persist contractor info on permits where we got a name
+    updated = 0
+    if results:
+        conn = permitdb.get_connection()
+        try:
+            for pn, info in results.items():
+                cn = (info or {}).get('contractor_name')
+                if not cn:
+                    continue
+                rc = conn.execute(
+                    "UPDATE permits SET contractor_name = ? "
+                    "WHERE source_city_key = ? AND permit_number = ?",
+                    (cn, slug, pn),
+                ).rowcount
+                updated += (rc or 0)
+            conn.commit()
+        finally:
+            conn.close()
+
+    return jsonify({
+        'status': 'done',
+        'slug': slug,
+        'agency': agency,
+        'permits_processed': len(permit_numbers),
+        'permits_updated': updated,
+        'sample_results': dict(list(results.items())[:5]),
+    })
+
+
 @admin_bp.route('/api/admin/perf-migrate', methods=['POST'])
 def admin_perf_migrate():
     """V503: idempotent perf migrations — indexes + ANALYZE.
