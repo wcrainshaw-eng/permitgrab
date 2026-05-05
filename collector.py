@@ -3977,31 +3977,40 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
         # max-requests=5000 + V448 keeps daemons alive long enough that
         # all cities still get collected over a 1-2 hour window.
         #
-        # V488 IRONCLAD daily-collection rebuild:
-        # 1. The prod_cities order from get_prod_cities() is
-        #    `permits_last_30d DESC, total_permits DESC` — every cycle
-        #    picked the same top-15 high-volume cities. With 1,757 active
-        #    cities and 15/cycle, the same NYC/Chicago/Miami-Dade rotation
-        #    burned every cycle while 1,742 active cities sat untouched.
-        #    Round-robin by `permits.collected_at` ascending NULL-first
-        #    instead — every cycle picks the 75 most-stale active cities.
-        # 2. Cap raised 15 → 75 because Render plan is now Standard 2GB
-        #    (was 512MB pre-V418). The 1200MB memory bail below still
-        #    protects against runaway, but with idle baseline ~900–1100MB
-        #    we can fit 5–10 typical cities per pre-bail batch and keep
-        #    pushing through the 75-city list across the cycle's natural
-        #    duration. With ~6 cycles/day × 75 cities = 450 city-attempts/
-        #    day; full 1,757-city rotation in ~4 days, not 19 days.
+        # V488 IRONCLAD + V526 ROUND-ROBIN FIX:
+        # V488 introduced stale-first selection sorted by
+        # `MAX(permits.collected_at)`. That worked for cities where
+        # the source returns new permits regularly, but BROKE for
+        # the long tail. Cities whose source has gone idle (no new
+        # permits returned by the API for weeks) keep ageing under
+        # `MAX(collected_at)` even after a successful daemon visit.
+        # They stay perpetually "stalest" and dominate the 75-budget,
+        # while ~611 typed cities visited 21+ days ago get starved.
+        #
+        # Diagnosis (2026-05-05 cutover post-mortem):
+        #   gainesville-fl: 51 runs/24h (every 28 min)
+        #   cary, clarksville, fulton, granger: 36 runs/24h each
+        #   1,319 cities never visited in 21+ days
+        #   Same 75 cities winning every cycle while the tail starves.
+        #
+        # V526 fix: sort by `MAX(scraper_runs.run_started_at)` instead.
+        # That column advances on every visit attempt regardless of
+        # whether the source returned new permits, so cities the
+        # daemon has actually touched recently fall to the bottom of
+        # the sort and stay there until the rotation comes back around.
+        # Cities never visited (NULL last_run) go FIRST, then ascending.
+        # This restores true round-robin: 6 cycles/day × 75 = 450
+        # visits/day, full ~1,250-typed-city rotation in 2.8 days.
         try:
             _conn_rr = permitdb.get_connection()
             _stale_rows = _conn_rr.execute("""
                 SELECT pc.city_slug, pc.source_id,
-                       (SELECT MAX(collected_at) FROM permits
-                        WHERE source_city_key = pc.city_slug) AS newest
+                       (SELECT MAX(run_started_at) FROM scraper_runs
+                        WHERE city_slug = pc.city_slug) AS last_run
                 FROM prod_cities pc
                 WHERE pc.status = 'active' AND pc.source_id IS NOT NULL
                   AND pc.source_type IS NOT NULL
-                ORDER BY (newest IS NULL) DESC, newest ASC
+                ORDER BY (last_run IS NULL) DESC, last_run ASC
             """).fetchall()
             _slug_priority = {r[0]: i for i, r in enumerate(_stale_rows)}
             individual_cities.sort(
@@ -4010,7 +4019,7 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
             _stalest_summary = ', '.join(
                 f"{r[0]}({(r[2] or 'never')[:10]})" for r in _stale_rows[:5]
             )
-            print(f"    [V488 IRONCLAD] stalest 5: {_stalest_summary}", flush=True)
+            print(f"    [V526 ROUND-ROBIN] stalest 5 (by last_run): {_stalest_summary}", flush=True)
         except Exception as _rr_e:
             print(f"    [V488 IRONCLAD] stale-first sort skipped (non-fatal): {_rr_e}", flush=True)
 
