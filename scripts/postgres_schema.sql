@@ -246,8 +246,7 @@ CREATE TABLE IF NOT EXISTS enrichment_log (
             status TEXT NOT NULL,
             details TEXT,
             cost DOUBLE PRECISION DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (contractor_profile_id)
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
 
 -- permit_history
