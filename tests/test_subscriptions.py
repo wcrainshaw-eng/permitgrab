@@ -7,6 +7,7 @@ of get_user_plan + is_pro + is_enterprise + generate_unsubscribe_token.
 from __future__ import annotations
 
 from collections import namedtuple
+from datetime import datetime
 
 
 # Lightweight user mock with the attributes the rubric checks
@@ -105,8 +106,133 @@ def test_subscription_helpers_re_exported_from_server():
     a wider audit. If a future refactor breaks the re-export, the
     callsites would NameError at request time — pin it here."""
     import server
-    for name in ('get_user_plan', 'is_pro', 'is_enterprise', 'generate_unsubscribe_token'):
+    for name in ('get_user_plan', 'is_pro', 'is_enterprise',
+                 'generate_unsubscribe_token', 'subscription_required'):
         assert hasattr(server, name), (
-            f"V531 regression: server.py no longer re-exports {name!r}; "
+            f"V531/V533 regression: server.py no longer re-exports {name!r}; "
             f"existing callsites in server.py will NameError at request time."
         )
+
+
+# ---------------------------------------------------------------------
+# V533: subscription_required decorator
+# ---------------------------------------------------------------------
+
+def test_v533_decorator_redirects_to_login_when_no_session():
+    """No user_email in session → redirect to /login?next=<current>."""
+    from subscriptions import subscription_required
+    from flask import Flask
+    app = Flask(__name__)
+
+    @subscription_required
+    def protected_view():
+        return 'should not reach here'
+
+    with app.test_request_context('/permits/chicago-il'):
+        resp = protected_view()
+        assert resp.status_code in (301, 302), f'expected redirect, got {resp.status_code}'
+        assert '/login' in resp.headers['Location']
+        assert 'next=' in resp.headers['Location']
+
+
+def test_v533_decorator_allows_pro_user_through(monkeypatch):
+    """Logged-in pro user → view function runs."""
+    from subscriptions import subscription_required
+    from flask import Flask
+
+    class FakeUser:
+        plan = 'pro'
+        trial_end_date = None
+    monkeypatch.setattr('server.get_current_user_object', lambda: FakeUser())
+
+    app = Flask(__name__)
+    app.secret_key = 'test'
+
+    @subscription_required
+    def protected_view():
+        return 'OK'
+
+    with app.test_request_context('/'):
+        from flask import session as _s
+        _s['user_email'] = 'pro@example.com'
+        result = protected_view()
+        assert result == 'OK', (
+            f'V533 regression: pro user blocked from view: {result!r}'
+        )
+
+
+def test_v533_decorator_blocks_free_user(monkeypatch):
+    """Logged-in free user → redirect to /pricing?expired=1."""
+    from subscriptions import subscription_required
+    from flask import Flask
+
+    class FakeUser:
+        plan = 'free'
+        trial_end_date = None
+    monkeypatch.setattr('server.get_current_user_object', lambda: FakeUser())
+
+    app = Flask(__name__)
+    app.secret_key = 'test'
+
+    @subscription_required
+    def protected_view():
+        return 'should not reach here'
+
+    with app.test_request_context('/'):
+        from flask import session as _s
+        _s['user_email'] = 'free@example.com'
+        resp = protected_view()
+        assert resp.status_code in (301, 302)
+        assert 'expired=1' in resp.headers['Location'], (
+            f"V533 regression: free user not redirected to /pricing?expired=1: "
+            f"{resp.headers.get('Location')}"
+        )
+
+
+def test_v533_decorator_blocks_expired_pro_user(monkeypatch):
+    """Pro user with trial_end_date in the past → redirect to /pricing?expired=1."""
+    from subscriptions import subscription_required
+    from flask import Flask
+
+    class FakeUser:
+        plan = 'pro'
+        trial_end_date = datetime(2020, 1, 1)  # WAY in the past
+    monkeypatch.setattr('server.get_current_user_object', lambda: FakeUser())
+
+    app = Flask(__name__)
+    app.secret_key = 'test'
+
+    @subscription_required
+    def protected_view():
+        return 'should not reach here'
+
+    with app.test_request_context('/'):
+        from flask import session as _s
+        _s['user_email'] = 'expired@example.com'
+        resp = protected_view()
+        assert resp.status_code in (301, 302)
+        assert 'expired=1' in resp.headers['Location']
+
+
+def test_v533_decorator_allows_active_trial(monkeypatch):
+    """Free trial user with trial_end_date in the future → view runs."""
+    from subscriptions import subscription_required
+    from flask import Flask
+
+    class FakeUser:
+        plan = 'free_trial'
+        trial_end_date = datetime(2099, 1, 1)  # WAY in the future
+    monkeypatch.setattr('server.get_current_user_object', lambda: FakeUser())
+
+    app = Flask(__name__)
+    app.secret_key = 'test'
+
+    @subscription_required
+    def protected_view():
+        return 'OK'
+
+    with app.test_request_context('/'):
+        from flask import session as _s
+        _s['user_email'] = 'trial@example.com'
+        result = protected_view()
+        assert result == 'OK'

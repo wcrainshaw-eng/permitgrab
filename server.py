@@ -4317,32 +4317,11 @@ def login_required(view_func):
     return _wrapped
 
 
-def subscription_required(view_func):
-    """Require login AND an active Pro/Enterprise plan or unexpired trial."""
-    @_v458_wraps(view_func)
-    def _wrapped(*args, **kwargs):
-        if not session.get('user_email'):
-            from urllib.parse import quote as _q
-            nxt = _q(request.full_path or '/', safe='')
-            return redirect(f'/login?next={nxt}')
-        u = get_current_user_object()
-        if not u:
-            return redirect('/login')
-        # Pro/Enterprise → allowed
-        plan = (getattr(u, 'plan', None) or '').lower()
-        if plan in ('pro', 'professional', 'enterprise'):
-            # If trial_end_date set + expired, deny
-            ted = getattr(u, 'trial_end_date', None)
-            if ted and ted < datetime.utcnow():
-                return redirect('/pricing?expired=1')
-            return view_func(*args, **kwargs)
-        # Free/free_trial without active plan → check trial window
-        if plan in ('free_trial', 'trial'):
-            ted = getattr(u, 'trial_end_date', None)
-            if ted and ted > datetime.utcnow():
-                return view_func(*args, **kwargs)
-        return redirect('/pricing?expired=1')
-    return _wrapped
+# V533: subscription_required moved to subscriptions/decorators.py.
+# Re-exported here so existing `@subscription_required` decorators
+# in this file (and any `from server import subscription_required`
+# consumer) keep resolving.
+from subscriptions import subscription_required  # noqa: F401, E402
 
 
 # ===========================

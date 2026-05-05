@@ -21,11 +21,13 @@ Per the durable rules:
   tests/test_routes.py -q locally before pushing.
 """
 from .access import get_user_plan, is_pro, is_enterprise
+from .decorators import subscription_required
 from .tokens import generate_unsubscribe_token
 
 __all__ = [
     'get_user_plan',
     'is_pro',
     'is_enterprise',
+    'subscription_required',
     'generate_unsubscribe_token',
 ]
