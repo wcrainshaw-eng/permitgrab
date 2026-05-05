@@ -119,3 +119,73 @@ def test_sqlite_path_untouched(monkeypatch):
     sql = "ORDER BY filing_date DESC"
     out = db_engine._translate_sql(sql)
     assert out == sql, f'SQLite path must not translate; got {out!r}'
+
+
+# ---------------------------------------------------------------------
+# V532: bare ORDER BY <identifier> → append ASC NULLS FIRST
+# ---------------------------------------------------------------------
+
+def test_v532_bare_order_by_simple_identifier_at_eof():
+    """ORDER BY city → ORDER BY city ASC NULLS FIRST."""
+    out = _x("SELECT * FROM permits ORDER BY city")
+    assert 'ORDER BY city ASC NULLS FIRST' in out, (
+        f'V532 regression: bare ORDER BY did not get ASC NULLS FIRST: {out!r}'
+    )
+
+
+def test_v532_bare_order_by_followed_by_limit():
+    out = _x("SELECT * FROM permits ORDER BY id LIMIT 10")
+    assert 'ORDER BY id ASC NULLS FIRST LIMIT 10' in out
+
+
+def test_v532_bare_order_by_dotted_identifier():
+    """V532 must handle table.column form."""
+    out = _x("SELECT * FROM permits p ORDER BY p.filing_date LIMIT 5")
+    assert 'ORDER BY p.filing_date ASC NULLS FIRST' in out
+
+
+def test_v532_bare_order_by_followed_by_offset():
+    out = _x("SELECT * FROM permits ORDER BY name OFFSET 50")
+    assert 'ORDER BY name ASC NULLS FIRST OFFSET 50' in out
+
+
+def test_v532_does_not_translate_case_when():
+    """ORDER BY CASE WHEN x THEN y END must NOT become
+    `ORDER BY CASE ASC NULLS FIRST WHEN ...` (which would be a
+    syntax error). The next token after CASE is WHEN, not an
+    ORDER BY terminator, so the regex's lookahead fails → no match."""
+    out = _x("SELECT * FROM x ORDER BY CASE WHEN status='active' THEN 0 ELSE 1 END")
+    assert 'CASE ASC NULLS FIRST' not in out, (
+        f'V532 regression: CASE expression got translated as identifier: {out!r}'
+    )
+
+
+def test_v532_does_not_translate_function_call():
+    """ORDER BY COALESCE(a, b) must NOT match the bare-identifier
+    regex (the next char after COALESCE is `(`, not a terminator)."""
+    out = _x("ORDER BY COALESCE(filing_date, date) LIMIT 10")
+    assert 'COALESCE ASC NULLS FIRST' not in out
+
+
+def test_v532_does_not_translate_explicit_direction():
+    """V529 already handled `ORDER BY id ASC` → `ORDER BY id ASC NULLS FIRST`.
+    V532 must NOT double-translate `ORDER BY id ASC` into
+    `ORDER BY id ASC NULLS FIRST ASC NULLS FIRST` or similar."""
+    out = _x("ORDER BY id ASC LIMIT 10")
+    # Only one ASC NULLS FIRST (from V529)
+    assert out.count('ASC NULLS FIRST') == 1
+    # No ASC NULLS FIRST ASC double-up
+    assert 'ASC NULLS FIRST ASC' not in out
+
+
+def test_v532_does_not_translate_multi_column_bare():
+    """Multi-column bare ORDER BY (e.g. `ORDER BY a, b`) is V533+
+    work — not translated by V532. Documenting as known behavior."""
+    out = _x("ORDER BY city, state LIMIT 10")
+    # First column NOT translated because comma isn't in the
+    # lookahead terminator list (would interfere with multi-column
+    # parsing). Document this as known V533+ gap.
+    assert 'city ASC NULLS FIRST' not in out, (
+        'V532 should NOT translate multi-column bare ORDER BY '
+        '(causes wrong output without per-column handling)'
+    )

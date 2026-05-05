@@ -459,6 +459,24 @@ def _translate_sql(sql):
         flags=re.IGNORECASE,
     )
 
+    # V532: bare `ORDER BY <identifier>` (no ASC/DESC) — append
+    # `ASC NULLS FIRST` so SQLite's default-ASC-NULLS-FIRST behavior
+    # holds on Postgres. Per the V529 audit, ~10 callsites use this
+    # form (`ORDER BY city`, `ORDER BY id`, `ORDER BY name`, etc.).
+    # The regex requires the identifier to be followed by an ORDER
+    # BY terminator (end-of-string / `)` / `;` / LIMIT / OFFSET) —
+    # this safely avoids `ORDER BY CASE WHEN ...` (where the next
+    # token is WHEN, not a terminator) and `ORDER BY COALESCE(...)`
+    # (where the next char is `(`, not a terminator). Multi-column
+    # bare ORDER BY (`ORDER BY a, b`) is left untranslated — V533+
+    # work item; rare in this codebase.
+    translated = re.sub(
+        r'(\bORDER BY\s+)([a-zA-Z_][a-zA-Z0-9_.]*)(\s*)(?=$|\)|;|\bLIMIT\b|\bOFFSET\b|\n|\Z)',
+        r'\1\2 ASC NULLS FIRST\3',
+        translated,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+
     # SUBSTR → SUBSTRING (both actually work in Postgres, but be explicit)
     # Actually SUBSTR works in Postgres too, so skip this
 
