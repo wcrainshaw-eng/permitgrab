@@ -227,9 +227,15 @@ def admin_force_collect():
 
 
 @admin_bp.route('/api/admin/collector-health', methods=['GET'])
-def admin_collector_health():
+def admin_api_collector_health():
     """V527: Per-platform Pass/Degraded/Fail diagnosis for every active
     city, computed by collectors.<platform>.health_check().
+
+    NOTE: function name MUST stay distinct from the V15 HTML dashboard
+    handler at routes/admin.py:5884 (`admin_collector_health`) — Flask
+    blueprint registration silently overwrites on duplicate endpoint
+    names, which made the V527a /api/admin/collector-health 404 in
+    production until V527c renamed this to admin_api_collector_health.
 
     Distinct from /api/admin/city-health (V226) which powers the
     20-top-cities dashboard rollup. This endpoint inspects every

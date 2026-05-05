@@ -337,3 +337,33 @@ def test_collectors_package_directory_structure():
     actual = {f for f in os.listdir(pkg_dir) if f.endswith('.py')}
     missing = expected - actual
     assert not missing, f'V527 regression: missing platform modules: {missing}'
+
+
+def test_v527c_admin_endpoint_function_names_are_unique():
+    """V527c regression: routes/admin.py had TWO functions named
+    `admin_collector_health` — the V15 HTML dashboard at line ~5884
+    and the V527 JSON API endpoint I added at line ~229. Flask
+    blueprint silently overwrote my registration on duplicate
+    endpoint name, making /api/admin/collector-health 404 in
+    production until I renamed the API handler to
+    admin_api_collector_health.
+
+    This test scans routes/admin.py for any pair of `def <name>`
+    that share an identifier, since Flask's silent-overwrite is
+    too easy to re-introduce on the next route addition.
+    """
+    import re
+    src = open(os.path.join(
+        os.path.dirname(__file__), '..', 'routes', 'admin.py'
+    )).read()
+    seen = {}
+    for m in re.finditer(r'^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', src, re.M):
+        name = m.group(1)
+        line = src.count('\n', 0, m.start()) + 1
+        if name in seen:
+            raise AssertionError(
+                f"V527c regression: routes/admin.py has duplicate function "
+                f"name {name!r} at lines {seen[name]} and {line}. Flask blueprint "
+                f"silently overwrites on duplicate endpoint names — rename one."
+            )
+        seen[name] = line
