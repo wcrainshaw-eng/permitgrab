@@ -4379,42 +4379,11 @@ def update_user_by_email(email, updates):
     return False
 
 
-def get_user_plan(user):
-    """Returns one of: 'enterprise', 'pro', 'free', 'anonymous'.
-
-    V252 F1: split 'pro' into 'pro' vs 'enterprise' so Enterprise-only
-    features (property owners, webhooks, market reports) can gate
-    separately. Existing 'professional' Stripe label maps to 'pro'.
-    """
-    if not user:
-        return 'anonymous'
-
-    plan = (user.get('plan') if hasattr(user, 'get') else getattr(user, 'plan', '')) or ''
-    plan = plan.lower()
-
-    if plan == 'enterprise':
-        return 'enterprise'
-    if plan in ('pro', 'professional'):
-        return 'pro'
-
-    # Stripe subscription status — safe accessor
-    sub_status = (user.get('stripe_subscription_status')
-                  if hasattr(user, 'get')
-                  else getattr(user, 'stripe_subscription_status', None))
-    if sub_status == 'active':
-        return 'pro'
-
-    return 'free'
-
-
-def is_pro(user):
-    """Returns True if user has Pro-or-above access. Enterprise counts as Pro."""
-    return get_user_plan(user) in ('pro', 'enterprise')
-
-
-def is_enterprise(user):
-    """V252 F1: Enterprise-tier gate for webhook / owner-append / PDF reports."""
-    return get_user_plan(user) == 'enterprise'
+# V531: get_user_plan / is_pro / is_enterprise moved to
+# subscriptions/access.py. Re-exported here so existing in-server-py
+# callsites (line ~2399, the V327 context-processor at ~4564) and any
+# `from server import is_pro` consumer keep resolving.
+from subscriptions import get_user_plan, is_pro, is_enterprise  # noqa: F401, E402
 
 
 # V305 (CODE_V280 PR1): nav context now reads the logged-in user from
@@ -4763,9 +4732,9 @@ def analytics_track_page_view(response):
     return response
 
 
-def generate_unsubscribe_token():
-    """Generate a unique unsubscribe token."""
-    return secrets.token_urlsafe(32)
+# V531: generate_unsubscribe_token moved to subscriptions/tokens.py.
+# Re-exported here so existing callsites keep resolving.
+from subscriptions import generate_unsubscribe_token  # noqa: F401, E402
 
 
 SAVED_LEADS_FILE = os.path.join(DATA_DIR, 'saved_leads.json')
