@@ -1,26 +1,19 @@
-FROM python:3.11-slim
+# V508 attempt #3: use Microsoft's official Playwright Python image as
+# base. It ships Ubuntu 22.04 (jammy) with the correct system deps +
+# Chromium pre-installed, version-matched to the Playwright Python
+# package. This sidesteps every Debian package-rename headache that
+# bricked attempts #1 and #2 (ttf-unifont → fonts-unifont in bookworm,
+# libasound2 → libasound2t64 in bookworm/t64 transition, etc.).
+#
+# Image is ~1.5 GB (vs python:3.11-slim's ~150 MB) but Render Standard
+# plan handles it fine. The pre-installed Chromium saves ~3-5 min of
+# build time on every deploy that would otherwise re-fetch + apt-install.
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# V508: install Chromium for Playwright-based scraping (SBCO Accela
-# JS-SPA path). First attempt used `playwright install --with-deps
-# chromium` which failed because Playwright 1.45's bundled apt
-# dependency list still references `ttf-unifont` + `ttf-ubuntu-font-family`
-# (renamed to `fonts-unifont` + `fonts-ubuntu` in modern Debian).
-# Workaround: install the system deps explicitly with the correct
-# modern package names, then `playwright install chromium` (no
-# --with-deps so Playwright doesn't try to apt-install ttf-* itself).
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
-        libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libx11-6 \
-        libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
-        libgbm1 libpango-1.0-0 libcairo2 libasound2 \
-        fonts-liberation fonts-unifont fonts-ubuntu \
-    && rm -rf /var/lib/apt/lists/* \
-    && python -m playwright install chromium
 
 COPY . .
 
