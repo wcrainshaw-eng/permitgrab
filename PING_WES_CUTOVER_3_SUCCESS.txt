@@ -1,0 +1,86 @@
+# PING WES — CUTOVER ATTEMPT 3 SUCCEEDED + V526 SHIPPED
+
+## Cutover gates — all 5 cleared at 22:17 UTC
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| (a) HTTP 200 within 5 min | ✅ | First probe @ 22:17 |
+| (b) Pool stable, no PoolError | ✅ | errors_24h flat at 97 baseline; city pages 1.2-1.5s; force-collect 18s |
+| (c) last_collection_at advances post-flip | ✅ | 21:53:59 → 22:19:54 via bradenton force-collect; V525b ON CONFLICT path proven on Postgres |
+| (d) digest/status daemon_alive on Postgres | ✅ | daemon_alive:True, 4 subscribers, smtp_configured |
+| (e) ad-ready cities render real data | ✅ | chicago-il / miami-dade-county / phoenix-az all 200 with real contractor + permit content |
+
+Site is on Postgres. **End of the 8-hour outage marathon.** Three permanent
+architectural improvements banked: pool circuit breaker (V523), digest
+module (V524), cross-dialect SQL translation (V525/V525b).
+
+## Phase 1 steady-state parity (5 ad-ready cities)
+- austin-tx: 23,545 permits ✓
+- chicago-il: 16,786 permits ✓
+- phoenix-az: 12,872 permits ✓
+- miami-dade-county: 7,352 permits ✓
+- nashville (slug is `nashville`, not `nashville-tn`): 2,290 permits, last visited 2026-04-05 (30d stale — V526 territory, not cutover regression)
+
+V522 migration counts hold post-cutover. No data loss, no parity regression.
+
+## V526 shipped (commit c3b37eb)
+
+**Diagnosis pivot:** original hypothesis was Phase 3 memory bail. Actual
+root cause is more interesting — the V488 stale-first sort ranked
+cities by `MAX(permits.collected_at)`, which only advances when the
+source returns new permits. Idle-source cities (visited every cycle
+but no new permits in weeks) kept "ageing" under that metric and
+dominated the budget. Production proof: gainesville-fl ran 51×/24h,
+cary/clarksville/fulton/granger 36×/24h each; meanwhile 1,319 cities
+never visited in 21+ days.
+
+**Fix:** sort by `MAX(scraper_runs.run_started_at)` instead — that
+column advances on every visit attempt regardless of source output.
+True round-robin. NULL-last-run cities go first to bootstrap the
+rotation. Math: 75 × 6 cycles/day = 450/day → ~1,250 typed cities
+fully rotate in 2.8 days.
+
+4 regression tests pin the new behavior, including the EXACT production
+failure shape (visit-frequent-source-idle vs visit-stale-permits-fresh).
+File-level guard catches future drift back to MAX(collected_at).
+
+## Test suite is now
+- 4 V526 collector scheduling tests
+- 20 V525/V525b SQL translation tests
+- 3 V524 digest module tests
+- **27 passed in 0.07s**
+
+## Watch overnight
+- Render logs should show `[V526 ROUND-ROBIN] stalest 5 (by last_run): ...`
+  with cities you've never seen win the budget before.
+- Tomorrow's `unique_cities` count from the V521 audit query should
+  rise above 139. Even one cycle on V526 should help — by mid-day
+  tomorrow expect 200-300+ unique cities.
+- Tonight's 7AM ET digest should fire exactly once, write a single
+  digest_log row (V515 dedup test passes in production).
+
+## Pending tasks (chained per directive)
+1. ✅ Phase 1 steady-state parity — done
+2. ✅ Phase 2 V526 fleet-stale fix — shipped
+3. ⏸ Phase 3 Step 4c GSC redirect audit — task #35 created, awaiting your CSV
+4. ⏸ Phase 4 V527 collectors/ extraction — task #34 created, deferred per
+     your "full session of work, don't squeeze in tonight" directive
+
+## Architectural follow-ups (V527+, not blocking)
+- LIKE case-sensitivity drift (80 unwrapped callsites, correctness drift not crash)
+- 313 get_connection() callsites for explicit putconn pairing — only matters if pool monitor logs show drift
+- SQLAlchemy / dialect-aware ORM (pattern: every cutover finds the next layer of leakage; V522=pool, V525=translation, V526=scheduling, future=NULL ordering / int division / coercion. Hand-rolling means we ship one layer at a time forever.)
+
+## Session summary (commits shipped tonight)
+- V522, V522b/c/d — Postgres staging + cursor/migrator hotfixes
+- V523 — pool fix (5s circuit breaker + 60s monitor + GC safety net)
+- V524 — digest module extraction + 3 regression tests
+- V524b — load test harness
+- V525 — datetime/date Postgres translation + 15 tests
+- V525b — INSERT OR IGNORE/REPLACE + 3 callsite patches + 5 tests + full audit attestation
+- V526 — fleet-stale round-robin sort fix + 4 tests
+
+Loop wake-up scheduled for 25 min from now to monitor steady state.
+Self-pacing on the verify loop until you flag the next item.
+
+— Code at ~22:25 UTC 2026-05-05
