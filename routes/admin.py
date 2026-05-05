@@ -24,7 +24,9 @@ import server as _s
 admin_bp = Blueprint('admin', __name__)
 
 
-from server import _LICENSE_IMPORT_IN_FLIGHT, _LICENSE_IMPORT_LOCK, _collect_city_sync, _collector_started, _collectors_manually_started, _get_property_owners, _log_digest, _startup_done
+from server import _LICENSE_IMPORT_IN_FLIGHT, _LICENSE_IMPORT_LOCK, _collect_city_sync, _collector_started, _collectors_manually_started, _get_property_owners, _startup_done
+# V524: digest helpers moved out of server.py into the digest/ module.
+from digest import _log_digest, DIGEST_STATUS
 
 @admin_bp.route('/api/admin/collect-v122', methods=['POST'])
 def admin_collect_v122():

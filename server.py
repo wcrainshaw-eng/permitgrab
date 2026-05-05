@@ -42,16 +42,11 @@ from trade_configs import TRADE_REGISTRY, get_trade, get_all_trades, get_trade_s
 import analytics
 import db as permitdb  # V12.50: SQLite database layer (renamed to avoid Flask-SQLAlchemy collision)
 
-# V78: Global tracking for email digest daemon thread
-DIGEST_STATUS = {
-    'thread_started': None,
-    'last_heartbeat': None,
-    'last_digest_attempt': None,
-    'last_digest_result': None,
-    'last_digest_sent': 0,
-    'last_digest_failed': 0,
-    'thread_alive': False
-}
+# V524: DIGEST_STATUS moved to digest/scheduler.py. Re-exported here so
+# routes/admin.py's `from server import *` continues to find it (the
+# /api/admin/digest/status and /api/admin/diagnostics endpoints both
+# read it). This is glue, not new feature code — see the durable rule.
+from digest import DIGEST_STATUS  # noqa: F401  (re-export for `from server import *`)
 
 # V14.1: TRADE_MAPPING - SQL LIKE patterns for matching permits to trades
 # Used by city_trade_landing() to filter permits at database level
@@ -2436,17 +2431,11 @@ def _resolve_phone_for_profile(profile_id):
 
 
 
-def _log_digest(recipient, result, status):
-    """V158: Log digest send attempt to digest_log table."""
-    try:
-        conn = permitdb.get_connection()
-        conn.execute("""
-            INSERT INTO digest_log (recipient_email, permits_count, status, error_message)
-            VALUES (?, 0, ?, ?)
-        """, (recipient, status, str(result)[:500]))
-        conn.commit()
-    except Exception:
-        pass  # Table may not exist yet
+# V524: _log_digest moved to digest/dedup.py. Re-exported here so
+# routes/admin.py's explicit `from server import _log_digest` keeps
+# resolving (underscored names are skipped by `from server import *`,
+# so this needs to be an actual binding, not a re-export by stardust).
+from digest import _log_digest  # noqa: F401  (re-export for routes/admin.py)
 
 
 
@@ -8762,259 +8751,10 @@ def scheduled_collection():
 # V12.53: EMAIL SCHEDULER
 # ===========================
 
-def schedule_email_tasks():
-    """V12.53: Schedule all email tasks to run at specific times daily.
-
-    - Daily digest: 7 AM ET (12:00 UTC)
-    - Trial lifecycle check: 8 AM ET (13:00 UTC)
-    - Onboarding nudges: 9 AM ET (14:00 UTC)
-
-    V64: Added robust error logging, heartbeat, and crash recovery.
-    V78: Added DIGEST_STATUS tracking and fixed timing (5-min checks during 7 AM window).
-    """
-    global DIGEST_STATUS
-
-    # V78: Mark thread as started
-    DIGEST_STATUS['thread_started'] = datetime.now().isoformat()
-    DIGEST_STATUS['thread_alive'] = True
-
-    # V64: Wrap imports in try/except to catch missing dependencies
-    try:
-        import pytz
-        from email_alerts import send_daily_digest, check_trial_lifecycle, check_onboarding_nudges
-    except ImportError as e:
-        print(f"[{datetime.now()}] [CRITICAL] Email scheduler failed to import: {e}")
-        import traceback
-        traceback.print_exc()
-        DIGEST_STATUS['thread_alive'] = False
-        DIGEST_STATUS['last_digest_result'] = f'import_error: {e}'
-        return  # Don't silently die — exit with error logged
-
-    # V78: Auto-create subscribers.json if it doesn't exist
-    try:
-        from pathlib import Path
-        subscribers_path = Path("/var/data/subscribers.json")
-        if not subscribers_path.exists():
-            # Check if /var/data exists (Render persistent disk)
-            var_data = Path("/var/data")
-            if var_data.exists():
-                default_subscribers = [
-                    {
-                        "email": "wcrainshaw@gmail.com",
-                        "active": True,
-                        "digest_cities": ["atlanta"],
-                        "created_at": datetime.now().strftime("%Y-%m-%d")
-                    }
-                ]
-                subscribers_path.write_text(json.dumps(default_subscribers, indent=2))
-                print(f"[{datetime.now()}] V78: Created subscribers.json with default subscriber")
-            else:
-                print(f"[{datetime.now()}] V78: /var/data not found - running locally, skipping subscribers.json creation")
-        else:
-            print(f"[{datetime.now()}] V78: subscribers.json already exists")
-    except Exception as e:
-        print(f"[{datetime.now()}] V78: Could not create subscribers.json: {e}")
-
-    # V68: Wait 3 minutes for initial startup (increased from 2)
-    # V515: bumped to 4 min so a worker that respawns inside the 11:00 UTC
-    # digest window gives the prior worker's digest_log INSERT 60+ extra
-    # seconds to land before this worker's email_scheduler considers
-    # firing. Combined with the V515 digest_log dedup guard below, this
-    # eliminates the race window that produced the 2026-05-05 dup-fire.
-    print(f"[{datetime.now()}] V515: Email scheduler waiting 4 minutes for startup...")
-    time.sleep(240)
-
-    et = pytz.timezone('America/New_York')
-
-    # V78: Track if we've already run digest today to prevent duplicates
-    last_digest_date = None
-    # V229 addendum H1: Track lifecycle/onboarding runs too. Without these,
-    # the 5-min polling inside the 8:00-8:29 / 9:00-9:29 windows fired
-    # check_trial_lifecycle() and check_onboarding_nudges() up to 6 times
-    # per day, spamming trial users with duplicate emails.
-    last_lifecycle_date = None
-    last_onboarding_date = None
-
-    # V276: Deploy-restart dedup. The counters above are in-memory, so three
-    # deploys in one morning = three morning threads, each with
-    # last_digest_date=None, each independently firing send_daily_digest()
-    # once 7 AM ET hits. That's exactly what happened on 2026-04-24 (V271
-    # 6:15 AM, V272 6:43 AM, V273 7:44 AM → 3 duplicate digests per user).
-    # Cure: seed the counters from system_state rows that the success-path
-    # already writes (`digest_last_success`, plus the two new lifecycle
-    # keys below). If today's date already appears, the 7-9 AM gate skips.
-    try:
-        _bootstrap_today = datetime.now(et).date()
-        _conn = permitdb.get_connection()
-        _seed = {}
-        for row in _conn.execute(
-            "SELECT key, value FROM system_state WHERE key IN "
-            "('digest_last_success', 'lifecycle_last_success', 'onboarding_last_success')"
-        ).fetchall():
-            # Normalize sqlite3.Row / tuple / dict into (key, value)
-            if isinstance(row, dict):
-                _seed[row['key']] = row['value']
-            else:
-                _seed[row[0]] = row[1]
-        for key, date_var in (
-            ('digest_last_success', 'digest'),
-            ('lifecycle_last_success', 'lifecycle'),
-            ('onboarding_last_success', 'onboarding'),
-        ):
-            iso = _seed.get(key)
-            if not iso:
-                continue
-            try:
-                stored = datetime.fromisoformat(iso).date()
-            except ValueError:
-                continue
-            if stored == _bootstrap_today:
-                if date_var == 'digest':
-                    last_digest_date = _bootstrap_today
-                elif date_var == 'lifecycle':
-                    last_lifecycle_date = _bootstrap_today
-                elif date_var == 'onboarding':
-                    last_onboarding_date = _bootstrap_today
-        print(f"[{datetime.now()}] V276: digest dedup bootstrap — digest={last_digest_date}, "
-              f"lifecycle={last_lifecycle_date}, onboarding={last_onboarding_date}")
-    except Exception as e:
-        print(f"[{datetime.now()}] V276: dedup bootstrap skipped ({e}); counters stay None")
-
-    while True:
-        try:
-            now_utc = datetime.utcnow()
-            now_et = datetime.now(et)
-            today_date = now_et.date()
-
-            # V78: Update heartbeat timestamp
-            DIGEST_STATUS['last_heartbeat'] = datetime.now().isoformat()
-
-            # V64: Heartbeat every cycle so we can verify thread is alive in Render logs
-            print(f"[{datetime.now()}] V78: Email scheduler heartbeat: {now_et.strftime('%I:%M %p ET')} (thread_alive=True)")
-
-            # Check if it's time for daily tasks (7-9 AM ET window)
-            if 7 <= now_et.hour <= 9:
-                # Daily digest at 7 AM ET (run once per day)
-                # V515: digest_log dup-fire guard. 2026-05-05 sent two
-                # emails 27 min apart: Worker A fired at 11:02 UTC and
-                # wrote digest_log row 36, then died before some
-                # per-subscriber updates persisted. Worker B booted;
-                # V276 bootstrap should have re-seeded last_digest_date
-                # from system_state, but in some race path it didn't,
-                # so Worker B re-fired at 11:29. digest_log is durable
-                # and written in the same txn as system_state, so query
-                # it directly as the ground-truth guard — regardless of
-                # which worker we are or what bootstrap saw.
-                _digest_already_fired = False
-                if now_et.hour == 7 and last_digest_date != today_date:
-                    try:
-                        _dup_conn = permitdb.get_connection()
-                        _dup_row = _dup_conn.execute(
-                            "SELECT 1 FROM digest_log WHERE date(sent_at) = date('now') "
-                            "AND recipient_email = 'scheduled' AND status = 'sent' LIMIT 1"
-                        ).fetchone()
-                        if _dup_row:
-                            _digest_already_fired = True
-                            last_digest_date = today_date  # sync in-memory state
-                            print(f"[{datetime.now()}] V515: digest already fired today (digest_log row present) — skipping send")
-                        _dup_conn.close()
-                    except Exception as _dup_e:
-                        print(f"[{datetime.now()}] V515: digest_log dedup query failed (proceeding to fire): {_dup_e}")
-
-                if now_et.hour == 7 and last_digest_date != today_date and not _digest_already_fired:
-                    print(f"[{datetime.now()}] V78: Running daily digest...")
-                    DIGEST_STATUS['last_digest_attempt'] = datetime.now().isoformat()
-                    try:
-                        sent, failed = send_daily_digest()
-                        print(f"[{datetime.now()}] V78: Daily digest complete - {sent} sent, {failed} failed")
-                        DIGEST_STATUS['last_digest_result'] = 'success'
-                        DIGEST_STATUS['last_digest_sent'] = sent
-                        DIGEST_STATUS['last_digest_failed'] = failed
-                        last_digest_date = today_date  # Mark as done for today
-                        # V158: Log success to DB
-                        try:
-                            _conn = permitdb.get_connection()
-                            _conn.execute("INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('digest_last_success', ?, datetime('now'))", (datetime.now().isoformat(),))
-                            _conn.execute("INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('digest_last_sent_count', ?, datetime('now'))", (str(sent),))
-                            _conn.execute("INSERT INTO digest_log (recipient_email, permits_count, status) VALUES ('scheduled', ?, 'sent')", (sent,))
-                            _conn.commit()
-                        except Exception:
-                            pass
-                    except Exception as e:
-                        print(f"[{datetime.now()}] [ERROR] Daily digest failed: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        DIGEST_STATUS['last_digest_result'] = f'error: {e}'
-                        # V158: Log failure to DB
-                        try:
-                            _conn = permitdb.get_connection()
-                            _conn.execute("INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES ('digest_last_error', ?, datetime('now'))", (str(e)[:500],))
-                            _conn.execute("INSERT INTO digest_log (recipient_email, status, error_message) VALUES ('scheduled', 'failed', ?)", (str(e)[:500],))
-                            _conn.commit()
-                        except Exception:
-                            pass
-
-                # Trial lifecycle at 8 AM ET (V229 addendum H1: once-per-day guard)
-                if now_et.hour == 8 and last_lifecycle_date != today_date:
-                    print(f"[{datetime.now()}] V64: Checking trial lifecycle...")
-                    try:
-                        results = check_trial_lifecycle()
-                        print(f"[{datetime.now()}] V64: Trial lifecycle complete - {results}")
-                        last_lifecycle_date = today_date
-                        # V276: persist so deploy restarts skip re-running
-                        try:
-                            _conn = permitdb.get_connection()
-                            _conn.execute(
-                                "INSERT OR REPLACE INTO system_state (key, value, updated_at) "
-                                "VALUES ('lifecycle_last_success', ?, datetime('now'))",
-                                (datetime.now().isoformat(),)
-                            )
-                            _conn.commit()
-                        except Exception:
-                            pass
-                    except Exception as e:
-                        print(f"[{datetime.now()}] [ERROR] Trial lifecycle failed: {e}")
-                        import traceback
-                        traceback.print_exc()
-
-                # Onboarding nudges at 9 AM ET (V229 addendum H1: once-per-day guard)
-                if now_et.hour == 9 and last_onboarding_date != today_date:
-                    print(f"[{datetime.now()}] V64: Checking onboarding nudges...")
-                    try:
-                        sent = check_onboarding_nudges()
-                        print(f"[{datetime.now()}] V64: Onboarding nudges complete - {sent} sent")
-                        last_onboarding_date = today_date
-                        # V276: persist so deploy restarts skip re-running
-                        try:
-                            _conn = permitdb.get_connection()
-                            _conn.execute(
-                                "INSERT OR REPLACE INTO system_state (key, value, updated_at) "
-                                "VALUES ('onboarding_last_success', ?, datetime('now'))",
-                                (datetime.now().isoformat(),)
-                            )
-                            _conn.commit()
-                        except Exception:
-                            pass
-                    except Exception as e:
-                        print(f"[{datetime.now()}] [ERROR] Onboarding nudges failed: {e}")
-                        import traceback
-                        traceback.print_exc()
-
-        except Exception as e:
-            print(f"[{datetime.now()}] [ERROR] Email scheduler error: {e}")
-            import traceback
-            traceback.print_exc()
-            DIGEST_STATUS['last_digest_result'] = f'loop_error: {e}'
-            # V64: Wait 5 min on error before retrying, don't die
-            time.sleep(300)
-            continue
-
-        # V78: Check every 5 minutes during 7-9 AM ET window to not miss digest
-        # Check every 30 minutes outside that window to save resources
-        if 6 <= now_et.hour <= 9:
-            time.sleep(300)  # 5 minutes during morning window
-        else:
-            time.sleep(1800)  # 30 minutes otherwise
+# V524: schedule_email_tasks moved to digest/scheduler.py. The
+# scheduler is spawned by digest.start_thread() in start_collectors
+# below. This file no longer needs the implementation; routes/admin.py
+# and server.py both go through the digest/ package.
 
 
 def run_initial_collection():
@@ -9325,22 +9065,17 @@ def start_collectors():
     except Exception as e:
         print(f"[{datetime.now()}] V229 C5: enrichment daemon failed to start: {e}", flush=True)
 
-    # V475 corrective: V471 PR4 deleted three daemon threads from this
-    # function (scheduled_collection, enrichment_daemon, email_scheduler).
-    # The V473b corrective (commit 2c91a2a) restored the first two but
-    # forgot email_scheduler — so daily digests stopped firing on
-    # 2026-04-30 (yesterday's 11:01 UTC digest was the last one before
-    # the V471 PR4 nerf at 2026-04-29 21:21 UTC; today's 11 AM UTC
-    # window had no thread to run send_daily_digest()). Restoring the
-    # V93 spawn pattern: threading.Thread targeting schedule_email_tasks.
+    # V524: email scheduler now lives in digest/. start_thread() is
+    # idempotent and pins the 'email_scheduler' thread name (tests
+    # in tests/test_digest.py enforce). This block replaces the
+    # V475-corrective inline spawn that itself replaced the V471 PR4
+    # silent drop — both regressions are now pinned by tests.
     try:
-        email_thread = threading.Thread(
-            target=schedule_email_tasks, name='email_scheduler', daemon=True,
-        )
-        email_thread.start()
-        print(f"[{datetime.now()}] V475: email_scheduler thread started", flush=True)
+        from digest import start_thread as _start_digest_thread
+        _start_digest_thread()
+        print(f"[{datetime.now()}] V524: email_scheduler thread started via digest.start_thread()", flush=True)
     except Exception as e:
-        print(f"[{datetime.now()}] V475: email_scheduler failed to start: {e}", flush=True)
+        print(f"[{datetime.now()}] V524: email_scheduler failed to start: {e}", flush=True)
 
     # V507 WATCHDOG REWRITE: file-based heartbeat instead of SQLite query.
     #
