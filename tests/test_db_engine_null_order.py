@@ -21,6 +21,10 @@ os.environ.setdefault('DATABASE_URL', 'postgresql://localhost:5432/permitgrab_lo
 
 import db_engine  # noqa: E402
 
+# V527c: see test_db_engine_translate.py for why this module-level
+# attr-set is needed (USE_POSTGRES freezes at first import).
+db_engine.USE_POSTGRES = True
+
 
 def _x(sql):
     return db_engine._translate_sql(sql)

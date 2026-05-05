@@ -24,6 +24,16 @@ os.environ.setdefault("DATABASE_URL", "postgresql://localhost:5432/permitgrab_lo
 
 import db_engine  # noqa: E402
 
+# V527c: db_engine.USE_POSTGRES is set ONCE at module load. If another
+# test (test_smoke.py / test_imports.py) imported db_engine first
+# without DATABASE_URL set, USE_POSTGRES is frozen at False — making
+# every translation test below pass trivially against the SQLite
+# passthrough path. Force-flip the module attr at test-module load
+# so we're always exercising the Postgres branch. The per-test
+# monkeypatch in test_sqlite_path_untouched still works (monkeypatch
+# undoes itself at test teardown).
+db_engine.USE_POSTGRES = True
+
 
 def _x(sql):
     """Helper: run the translator and return the output."""

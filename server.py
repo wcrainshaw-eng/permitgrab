@@ -9033,37 +9033,18 @@ def start_collectors():
     collector_thread.start()
     print(f"[{datetime.now()}] V67: Scheduled collection thread started", flush=True)
 
-    # V229 C5: dedicated enrichment daemon. scheduled_collection runs
-    # enrich_batch per cycle (30-60 min apart). This second thread runs
-    # enrichment on its own 30-min cadence so the queue drains steadily
-    # even when a collection cycle is slow/stuck.
-    def _enrichment_daemon():
-        time.sleep(600)  # let collection warm up first
-        while True:
-            try:
-                from license_enrichment import is_import_running
-                if is_import_running():
-                    print(f"[{datetime.now()}] V242: enrichment daemon paused — license import in progress", flush=True)
-                    time.sleep(30)
-                    continue
-            except Exception:
-                pass
-            try:
-                from web_enrichment import enrich_batch
-                result = enrich_batch(limit=200)
-                print(f"[{datetime.now()}] [V229 C5] enrichment daemon: {result}", flush=True)
-            except Exception as e:
-                print(f"[{datetime.now()}] [V229 C5] enrichment daemon error: {e}", flush=True)
-            time.sleep(1800)
-
+    # V530: enrichment daemon now lives in enrichment/. start_thread()
+    # is idempotent and pins the 'enrichment_daemon' thread name (tests
+    # in tests/test_enrichment.py enforce). The 18-line _enrichment_daemon
+    # loop body that lived here moved to enrichment/scheduler.py
+    # unchanged — server.py shrinks one extraction at a time per the
+    # V524 (digest) template.
     try:
-        enrichment_thread = threading.Thread(
-            target=_enrichment_daemon, name='enrichment_daemon', daemon=True,
-        )
-        enrichment_thread.start()
-        print(f"[{datetime.now()}] V229 C5: enrichment daemon started", flush=True)
+        from enrichment import start_thread as _start_enrichment_thread
+        _start_enrichment_thread()
+        print(f"[{datetime.now()}] V530: enrichment_daemon thread started via enrichment.start_thread()", flush=True)
     except Exception as e:
-        print(f"[{datetime.now()}] V229 C5: enrichment daemon failed to start: {e}", flush=True)
+        print(f"[{datetime.now()}] V530: enrichment_daemon failed to start: {e}", flush=True)
 
     # V524: email scheduler now lives in digest/. start_thread() is
     # idempotent and pins the 'email_scheduler' thread name (tests
