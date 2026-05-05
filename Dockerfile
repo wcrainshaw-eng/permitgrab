@@ -5,13 +5,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# V508: install Chromium + system deps for Playwright-based scraping.
-# `--with-deps` resolves the Debian apt packages Chromium needs (libnss3,
-# libxkbcommon0, libdrm2, etc.) so we don't have to maintain that list
-# manually. Adds ~150 MB to image size and ~2 min to build, but unlocks
-# JS-SPA Accela CapDetail scraping (SBCO subscriber path).
-RUN python -m playwright install --with-deps chromium
-
+# V508: Playwright was added to requirements.txt for SBCO Accela JS-SPA
+# scraping but the `playwright install --with-deps chromium` build step
+# fails on python:3.11-slim (apt-get permission/cache issue during
+# image build). For now playwright is installed via pip but Chromium
+# itself is NOT installed — accela_playwright_collector falls back to
+# {_error: 'browser not installed'} when called. Re-attempt in a
+# follow-up PR with explicit apt-get install of system deps before
+# `playwright install chromium` (no --with-deps).
 COPY . .
 
 EXPOSE 5000
