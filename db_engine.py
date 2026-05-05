@@ -57,7 +57,13 @@ _bg_thread_names = {'scheduled_collection', 'email_scheduler', 'city_sync', 'dis
 
 
 def enable_pg_pool():
-    """V70: Manually enable Postgres pool. Call from admin endpoint only."""
+    """V70: Manually enable Postgres pool. Call from admin endpoint only.
+
+    V514 sizing: minconn=2, maxconn=25 per gunicorn worker. With
+    WEB_CONCURRENCY=2 → 50 web slots + ~5 daemon = 55 of Postgres
+    Pro-4gb's 100-conn ceiling. Adds a 60s pool-state logger so we
+    can spot leaks in production before they exhaust the pool.
+    """
     global _pg_pool, _pg_pool_enabled
     if _pg_pool is not None:
         print("[DB_ENGINE] V70: Pool already exists")
@@ -72,16 +78,47 @@ def enable_pg_pool():
             db_url = db_url.replace('postgres://', 'postgresql://', 1)
 
         _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,
+            minconn=2,
+            maxconn=25,
             dsn=db_url,
         )
         _pg_pool_enabled = True
-        print(f"[DB_ENGINE] V70: Postgres pool created (min=1, max=10)")
+        print(f"[DB_ENGINE] V514: Postgres pool created (min=2, max=25)")
+
+        # V514: Start the pool-state logger thread (one per process).
+        try:
+            t = threading.Thread(
+                target=_pool_monitor,
+                name='pg_pool_monitor',
+                daemon=True,
+            )
+            t.start()
+            print("[DB_ENGINE] V514: pool monitor thread started")
+        except Exception as me:
+            print(f"[DB_ENGINE] V514: pool monitor failed to start: {me}")
         return True
     except Exception as e:
         print(f"[DB_ENGINE] V70: Failed to create pool: {e}")
         return False
+
+
+def _pool_monitor():
+    """V514: log pool state every 60s so leaks surface before they
+    exhaust the pool. ThreadedConnectionPool exposes ._used (dict of
+    in-use conns) and ._pool (list of idle conns). Safe-readonly."""
+    while True:
+        try:
+            time.sleep(60)
+            p = _pg_pool
+            if p is None:
+                continue
+            in_use = len(getattr(p, '_used', {}) or {})
+            idle = len(getattr(p, '_pool', []) or [])
+            maxc = getattr(p, 'maxconn', '?')
+            sem_avail = _bg_conn_semaphore._value if hasattr(_bg_conn_semaphore, '_value') else '?'
+            print(f"[DB_ENGINE] V514 pool: in_use={in_use} idle={idle} max={maxc} bg_sem_avail={sem_avail}")
+        except Exception as e:
+            print(f"[DB_ENGINE] V514 pool monitor error: {e}")
 
 
 def _get_pg_pool():
@@ -126,11 +163,27 @@ class PgConnection:
         self._conn.rollback()
 
     def close(self):
+        if self._conn is None:
+            return
         pool = _get_pg_pool()
         pool.putconn(self._conn)
+        self._conn = None
         # V65: Release background semaphore if this was a background connection
         if self._is_background:
             _bg_conn_semaphore.release()
+            self._is_background = False
+
+    def __del__(self):
+        """V514 GC safety net: if a caller forgets to close(), at least
+        return the connection to the pool when this object is garbage-
+        collected. Not a substitute for try/finally pairing — slow
+        leaks still degrade the pool until GC catches up — but it
+        prevents a silent forever-leak from killing the pool."""
+        try:
+            if self._conn is not None:
+                self.close()
+        except Exception:
+            pass
 
     @property
     def rowcount(self):
@@ -329,24 +382,30 @@ def _translate_sql(sql):
 # Public API — drop-in replacement for get_connection()
 # --------------------------------------------------------------------------
 
-def get_connection(max_retries=10, retry_delay=1.0, background=None):
+def get_connection(timeout_s=5.0, background=None, **legacy_kwargs):
     """Get a database connection (Postgres pool or SQLite thread-local).
 
-    Returns a connection object that supports:
-        .execute(sql, params)
-        .commit()
-        .fetchone() / .fetchall() on cursor results
+    V514: replaces the V67 10-retry-30s exponential-backoff loop with a
+    5-second circuit breaker. A hung getconn() holds a gunicorn worker
+    slot — the longer we wait the worse the cascade gets. Better to
+    fail fast with a 503 and let the caller render a friendly error
+    than to chain-block every request behind a pool that's never
+    going to drain in time. Cuts cutover-failure blast radius from
+    full-site outage to single-request 503.
 
-    For Postgres, SQL is auto-translated from SQLite syntax.
-
-    V65: Added retry logic for pool exhaustion and rate-limiting for background threads.
-    V67: Increased retries to 10 with exponential backoff up to 30s max.
     V70: Raises RuntimeError if Postgres pool not enabled.
+    V65: Background threads share a 10-slot semaphore so daemon writes
+    can't starve API workers.
 
     Args:
-        max_retries: Number of times to retry on pool exhaustion (default 10, was 3)
-        retry_delay: Base seconds to wait between retries (default 1.0, was 0.5)
-        background: If True, use background semaphore. If None, auto-detect from thread name.
+        timeout_s: Max wait in seconds for a free pool slot before
+            raising PoolError. Default 5s. Pass timeout_s=0 to skip
+            wait entirely (fail immediately).
+        background: If True, use background semaphore. If None,
+            auto-detect from thread name.
+        **legacy_kwargs: ignored — accepted for back-compat with the
+            old `max_retries=` / `retry_delay=` signature so we don't
+            need to update every callsite in this PR.
     """
     if USE_POSTGRES:
         import psycopg2.pool
@@ -367,25 +426,20 @@ def get_connection(max_retries=10, retry_delay=1.0, background=None):
         try:
             pool = _get_pg_pool()
 
-            # V67: Retry logic with exponential backoff (up to 30s max wait per retry)
-            last_error = None
-            for attempt in range(max_retries):
+            # V514: 5s circuit breaker. Poll at 100ms while pool is
+            # exhausted; after timeout_s seconds, raise so the caller
+            # can render a 503 instead of holding the worker hostage.
+            start = time.monotonic()
+            while True:
                 try:
                     conn = pool.getconn()
                     return PgConnection(conn, is_background=background)
-                except psycopg2.pool.PoolError as e:
-                    last_error = e
-                    if attempt < max_retries - 1:
-                        # V67: Exponential backoff capped at 30 seconds
-                        wait_time = min(retry_delay * (2 ** attempt), 30)
-                        print(f"[DB_ENGINE] Pool exhausted, retry {attempt + 1}/{max_retries} in {wait_time:.1f}s...")
-                        time.sleep(wait_time)
-                    else:
-                        print(f"[DB_ENGINE] Pool exhausted after {max_retries} retries (~{sum(min(retry_delay * (2**i), 30) for i in range(max_retries-1)):.0f}s total wait)")
+                except psycopg2.pool.PoolError:
+                    elapsed = time.monotonic() - start
+                    if elapsed >= timeout_s:
+                        print(f"[DB_ENGINE] V514 pool exhausted after {elapsed:.1f}s — failing fast")
                         raise
-
-            # Should not reach here, but just in case
-            raise last_error
+                    time.sleep(0.1)
         except:
             # Release semaphore if we failed to get a connection
             if background:
@@ -393,6 +447,25 @@ def get_connection(max_retries=10, retry_delay=1.0, background=None):
             raise
     else:
         return _get_sqlite_conn()
+
+
+def put_connection(conn):
+    """V514: explicit putconn() helper for callsites that don't use the
+    `connection()` context manager. Pair every get_connection() with a
+    put_connection() in a finally block so a raised exception inside
+    the cursor work doesn't leak a pool slot.
+
+    Safe to call with a sqlite Connection — the SQLite path uses a
+    thread-local connection and does not need to be returned to a pool.
+    """
+    if conn is None:
+        return
+    if isinstance(conn, PgConnection):
+        try:
+            conn.close()
+        except Exception as e:
+            print(f"[DB_ENGINE] V514 put_connection error: {e}")
+    # SQLite path: thread-local connection, nothing to return.
 
 
 @contextmanager
