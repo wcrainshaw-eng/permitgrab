@@ -1,0 +1,75 @@
+# PING WES — V524 SHIPPED + V514 LOAD TEST PASSED — READY FOR RE-CUTOVER
+
+## V524 — digest extraction (commit f06ccc4)
+Pushed and deploying clean. Post-deploy verify on production:
+- `/api/admin/health`: status=healthy, daemon_running=True,
+  email_scheduler in live_thread_names ← the V475 contract holds.
+- `/api/admin/digest/status`: daemon_alive=True, subscriber_count=4,
+  smtp_configured=True, 10 recent_logs ← V524's `from digest import
+  DIGEST_STATUS, _log_digest` rewiring works.
+
+server.py shrank by 263 net lines (-289 +26). Three new files:
+digest/__init__.py, digest/scheduler.py, digest/dedup.py.
+Two new test files: tests/conftest.py, tests/test_digest.py with
+3 regression tests pinning V475 (thread-name contract), V515
+(digest_log dedup helper), V276 (system_state bootstrap helper).
+All 3 tests pass locally in 0.05s.
+
+## V514 / V523 — load test passed against real Postgres
+Local Postgres on :5432, db_engine.py pointed at it via DATABASE_URL,
+ran tests/load_test_pool_v514.py (committed alongside V524).
+
+**Scenario A — production-shape concurrency:**
+- 12 web threads (gunicorn `--threads 12` shape) + 3 daemon threads
+  (scheduled_collection / enrichment_daemon / email_scheduler) ×
+  100 iterations each = 1,500 queries.
+- 0 failures. 4.21s wall time.
+- Post-test pool quiescent: in_use=0 idle=2 max=25 (clean teardown
+  via put_connection()).
+
+**Scenario B — over-pressure burst (the V514 contract):**
+- 40 threads simultaneously requesting connections, each holding 6s
+  (40 > maxconn=25 → 15 must wait or fail).
+- 25 succeed immediately. 15 fail with PoolError.
+- **All 15 failures land at 5.00-5.10s** — the V514 circuit breaker.
+  The old V67 exponential retry would have hung them at ~30s.
+- max fail timing 5.10s, avg 5.04s. ✓
+- Pool teardown clean: in_use=0 idle=2 after the 6s holders release.
+
+The patched db_engine.py behaves exactly as the V514 spec promised:
+fast 503 instead of full-site hang.
+
+## RE-CUTOVER ATTEMPT 2 — READY
+1. V523 (pool fix) is in main commit 61e9171, deployed dormant.
+2. V524 (digest extraction) is in main commit f06ccc4, deployed live.
+3. Local load test passed end-to-end against a real Postgres
+   instance with the same psycopg2 driver Render uses.
+
+When you flip USE_POSTGRES=true on Render, expect:
+- ~3-min redeploy.
+- Render logs:
+  `[DB_ENGINE] V514: Postgres pool created (min=2, max=25)`
+  `[DB_ENGINE] V514: pool monitor thread started`
+  `[V524] email_scheduler thread started via digest.start_thread()`
+- Every 60s thereafter:
+  `[DB_ENGINE] V514 pool: in_use=N idle=M max=25 bg_sem_avail=K`
+
+Watch for ~5 min:
+- /api/admin/health stays 200, daemon_running=true.
+- pool monitor `in_use` plateaus well below 25 — sustained drift
+  toward maxconn would mean we have a real leak (V526+ callsite
+  refactor). The PgConnection.__del__ GC safety net should catch
+  most paths even pre-refactor.
+- If anything goes sideways, flip USE_POSTGRES=false → 3-min
+  redeploy → SQLite restored. Same 16:02 UTC playbook that worked
+  on the V522 cutover.
+
+## NOT BLOCKING THIS CUTOVER
+- V525 fleet-wide stale-cities scheduling (1,319 cities >21d stale,
+  Phase 3 budget bails on memory before reaching missed-CITY_REGISTRY
+  tail). Diagnosed today; tracked as task #33; separate work.
+- V526 callsite refactor (313 get_connection() callsites for
+  explicit putconn pairing). Will only matter if monitor logs show
+  pool drift — the GC safety net handles the common case.
+
+— Code at ~16:50 UTC 2026-05-05
