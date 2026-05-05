@@ -1017,49 +1017,14 @@ def atomic_write_json(filepath, data, indent=2):
 # ============================================================================
 
 def fetch_socrata(config, days_back):
-    """Fetch permits from a Socrata SODA API. V131: Paginates until exhausted."""
-    endpoint = config["endpoint"]
-    # V60: Removed V55 /query auto-append — was incorrectly appending /query to Socrata .json URLs causing 404s
-    date_field = config["date_field"]
-    page_size = config.get("limit", 2000)
-    MAX_PAGES = 10  # V131: Safety limit — max 10 pages (20,000 records)
-    MAX_RECORDS = 50000  # V131: Hard cap
-
-    # Calculate date filter
-    since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00")
-
-    where_clause = f"{date_field} > '{since_date}'"
-
-    # V12.7: Add city filter for county/state datasets
-    city_filter = config.get("city_filter")
-    if city_filter:
-        filter_field = city_filter["field"]
-        filter_value = city_filter["value"]
-        where_clause += f" AND upper({filter_field}) = upper('{filter_value}')"
-
-    # V31: Append extra where_filter if configured (e.g., permit type filtering)
-    extra_filter = config.get("where_filter")
-    if extra_filter:
-        where_clause += f" AND ({extra_filter})"
-
-    # V131: Paginate through all results
-    all_records = []
-    offset = 0
-    for page_num in range(MAX_PAGES):
-        params = {
-            "$limit": page_size,
-            "$offset": offset,
-            "$order": f"{date_field} DESC",
-            "$where": where_clause,
-        }
-        resp = SESSION.get(endpoint, params=params, timeout=API_TIMEOUT_SECONDS)
-        resp.raise_for_status()
-        page = resp.json()
-        all_records.extend(page)
-        if len(page) < page_size or len(all_records) >= MAX_RECORDS:
-            break  # Last page or safety limit
-        offset += page_size
-    return all_records
+    """V534: body moved to collectors.socrata.fetch. This back-compat
+    shim is preserved so callers using `from collector import
+    fetch_socrata` keep working. The actual implementation lives in
+    collectors/socrata.py; the platform-specific quirks (date filter,
+    pagination caps, $where syntax) are now collocated with the
+    platform module."""
+    from collectors.socrata import fetch
+    return fetch(config, days_back)
 
 
 def fetch_arcgis(config, days_back):
