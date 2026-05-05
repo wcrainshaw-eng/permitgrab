@@ -341,7 +341,10 @@ def test_collectors_package_directory_structure():
 
 def test_v535_collector_fetch_arcgis_is_back_compat_shim_to_collectors():
     """V535 contract: fetch_arcgis body moved to collectors/arcgis.py.
-    Same shape as V534 socrata.
+    Same shape as V534 socrata. Tests look for the CODE form of
+    distinctive markers (e.g. `"returnGeometry": "false"` as a
+    dict-param string, not just the bare word) so the shim's docstring
+    can mention them without tripping the test — V535b lesson learned.
     """
     repo_root = os.path.join(os.path.dirname(__file__), '..')
     collector_src = open(os.path.join(repo_root, 'collector.py')).read()
@@ -351,12 +354,15 @@ def test_v535_collector_fetch_arcgis_is_back_compat_shim_to_collectors():
     fa_idx = collector_src.find('\ndef fetch_arcgis(')
     next_def = collector_src.find('\ndef ', fa_idx + 1)
     fetch_arcgis_block = collector_src[fa_idx:next_def if next_def > 0 else None]
-    # The body's distinctive pagination + date-format auto-retry markers
-    # ('V126', 'returnGeometry', 'exceededTransferLimit') must NOT be
-    # in the collector.py block anymore — they live in collectors/arcgis.py.
-    assert 'returnGeometry' not in fetch_arcgis_block, (
+    # Code-form markers: actual ArcGIS body would have these as Python
+    # param dicts / function calls / variable assignments. Docstring
+    # mentions don't match.
+    assert '"returnGeometry": "false"' not in fetch_arcgis_block, (
         f'V535 regression: fetch_arcgis pagination logic still in collector.py:\n'
         f'{fetch_arcgis_block[:300]}'
+    )
+    assert 'MAX_PAGES = 10' not in fetch_arcgis_block, (
+        f'V535 regression: pagination loop still in collector.py'
     )
     assert 'from collectors.arcgis import fetch' in fetch_arcgis_block, (
         "V535 regression: collector.fetch_arcgis shim must call into "
@@ -364,7 +370,7 @@ def test_v535_collector_fetch_arcgis_is_back_compat_shim_to_collectors():
     )
 
     # Body lives in collectors/arcgis.py
-    assert 'returnGeometry' in arcgis_src
+    assert '"returnGeometry": "false"' in arcgis_src
     assert 'exceededTransferLimit' in arcgis_src
     assert 'MAX_PAGES = 10' in arcgis_src
 
