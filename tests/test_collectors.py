@@ -347,7 +347,7 @@ def test_v534_collector_fetch_socrata_is_back_compat_shim_to_collectors():
     File-level guard: ensure collector.py contains the shim and
     that collectors/socrata.py has the actual body.
     """
-    import os
+    import re as _re
     repo_root = os.path.join(os.path.dirname(__file__), '..')
     collector_src = open(os.path.join(repo_root, 'collector.py')).read()
     socrata_src = open(os.path.join(repo_root, 'collectors', 'socrata.py')).read()
@@ -357,20 +357,31 @@ def test_v534_collector_fetch_socrata_is_back_compat_shim_to_collectors():
         'V534 regression: collector.fetch_socrata removed entirely; '
         'callers using `from collector import fetch_socrata` will break.'
     )
-    # The body must NOT contain the long-form pagination logic anymore
-    assert 'MAX_PAGES = 10' not in collector_src, (
-        'V534 regression: fetch_socrata body still in collector.py — '
-        'should be in collectors/socrata.py per Phase B.'
+    # Extract the fetch_socrata function body specifically (between
+    # `^def fetch_socrata(` and the next `^def `). Must NOT contain
+    # the multi-page pagination logic anymore — that lives in
+    # collectors/socrata.py now. The narrow check skips collector.py's
+    # OTHER fetch_*() bodies (fetch_arcgis, fetch_carto, etc.) which
+    # also have their own MAX_PAGES=10 and stay in collector.py until
+    # later Phase-B passes.
+    fs_idx = collector_src.find('\ndef fetch_socrata(')
+    assert fs_idx >= 0, 'V534: def fetch_socrata not found in collector.py'
+    next_def_idx = collector_src.find('\ndef ', fs_idx + 1)
+    fetch_socrata_block = collector_src[fs_idx:next_def_idx if next_def_idx > 0 else None]
+    assert 'MAX_PAGES' not in fetch_socrata_block, (
+        f'V534 regression: fetch_socrata body still has pagination loop '
+        f'in collector.py — should live in collectors/socrata.py per '
+        f'Phase B. Block:\n{fetch_socrata_block[:300]}'
     )
-    # The body MUST be in collectors/socrata.py
+    assert 'from collectors.socrata import fetch' in fetch_socrata_block, (
+        "V534 regression: collector.fetch_socrata back-compat shim "
+        "must call into collectors.socrata.fetch."
+    )
+
+    # The actual body MUST be in collectors/socrata.py
     assert 'MAX_PAGES = 10' in socrata_src, (
         'V534 regression: fetch_socrata body not found in '
         'collectors/socrata.py.'
-    )
-    # The collector.py shim should delegate to collectors.socrata.fetch
-    assert 'from collectors.socrata import fetch' in collector_src, (
-        "V534 regression: collector.fetch_socrata back-compat shim "
-        "must call into collectors.socrata.fetch."
     )
 
 
