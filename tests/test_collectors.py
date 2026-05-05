@@ -339,6 +339,36 @@ def test_collectors_package_directory_structure():
     assert not missing, f'V527 regression: missing platform modules: {missing}'
 
 
+def test_v535_collector_fetch_arcgis_is_back_compat_shim_to_collectors():
+    """V535 contract: fetch_arcgis body moved to collectors/arcgis.py.
+    Same shape as V534 socrata.
+    """
+    repo_root = os.path.join(os.path.dirname(__file__), '..')
+    collector_src = open(os.path.join(repo_root, 'collector.py')).read()
+    arcgis_src = open(os.path.join(repo_root, 'collectors', 'arcgis.py')).read()
+
+    assert 'def fetch_arcgis' in collector_src
+    fa_idx = collector_src.find('\ndef fetch_arcgis(')
+    next_def = collector_src.find('\ndef ', fa_idx + 1)
+    fetch_arcgis_block = collector_src[fa_idx:next_def if next_def > 0 else None]
+    # The body's distinctive pagination + date-format auto-retry markers
+    # ('V126', 'returnGeometry', 'exceededTransferLimit') must NOT be
+    # in the collector.py block anymore — they live in collectors/arcgis.py.
+    assert 'returnGeometry' not in fetch_arcgis_block, (
+        f'V535 regression: fetch_arcgis pagination logic still in collector.py:\n'
+        f'{fetch_arcgis_block[:300]}'
+    )
+    assert 'from collectors.arcgis import fetch' in fetch_arcgis_block, (
+        "V535 regression: collector.fetch_arcgis shim must call into "
+        "collectors.arcgis.fetch."
+    )
+
+    # Body lives in collectors/arcgis.py
+    assert 'returnGeometry' in arcgis_src
+    assert 'exceededTransferLimit' in arcgis_src
+    assert 'MAX_PAGES = 10' in arcgis_src
+
+
 def test_v534_collector_fetch_socrata_is_back_compat_shim_to_collectors():
     """V534 contract: after moving the fetch_socrata body into
     collectors/socrata.py, collector.fetch_socrata MUST still be
