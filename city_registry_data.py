@@ -9953,6 +9953,14 @@ CITY_REGISTRY = {
             "status": "STATUS",
             "description": "DESCRIPTION",
             "estimated_cost": "JOBVALUE",
+            # V520 (V519 audit): source schema includes CONTRACTOR_NAME +
+            # OWNER_NAME + APPLICANT_NAME (probed 2026-05-05). Currently
+            # 0 / 2,911 permits have contractor_name in DB because the
+            # field wasn't mapped. No phone in source; DDG enrichment
+            # only.
+            "contractor_name": "CONTRACTOR_NAME",
+            "owner_name": "OWNER_NAME",
+            "contact_name": "APPLICANT_NAME",
         },
         "date_field": "APPLIED",
         "date_format": "date",
