@@ -5007,6 +5007,75 @@ def admin_cleanup_prod_cities():
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/api/admin/retag-permits', methods=['POST'])
+def admin_retag_permits():
+    """V511: Move every permit (and contractor_profile) row from one
+    source_city_key to another. Used when a misconfigured source ingested
+    data under the wrong slug (e.g. SBCO→SBC fix found 1,967 Santa Barbara
+    permits stored as San Bernardino).
+
+    Body: {"from_slug": "san-bernardino-county",
+           "to_slug": "santa-barbara-county-ca",
+           "dry_run": true}
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    body = request.get_json(silent=True) or {}
+    from_slug = body.get('from_slug')
+    to_slug = body.get('to_slug')
+    dry_run = bool(body.get('dry_run', True))
+    if not from_slug or not to_slug:
+        return jsonify({'error': 'from_slug and to_slug required'}), 400
+
+    conn = permitdb.get_connection()
+    try:
+        permits_n = conn.execute(
+            "SELECT COUNT(*) FROM permits WHERE source_city_key = ?",
+            (from_slug,)
+        ).fetchone()[0]
+        try:
+            profiles_n = conn.execute(
+                "SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key = ?",
+                (from_slug,)
+            ).fetchone()[0]
+        except Exception:
+            profiles_n = 0
+
+        if dry_run:
+            return jsonify({
+                'dry_run': True,
+                'from_slug': from_slug,
+                'to_slug': to_slug,
+                'permits_to_retag': permits_n,
+                'profiles_to_retag': profiles_n,
+            })
+
+        conn.execute(
+            "UPDATE permits SET source_city_key = ? WHERE source_city_key = ?",
+            (to_slug, from_slug)
+        )
+        try:
+            conn.execute(
+                "UPDATE contractor_profiles SET source_city_key = ? WHERE source_city_key = ?",
+                (to_slug, from_slug)
+            )
+        except Exception:
+            pass
+        conn.commit()
+        return jsonify({
+            'status': 'success',
+            'from_slug': from_slug,
+            'to_slug': to_slug,
+            'permits_retagged': permits_n,
+            'profiles_retagged': profiles_n,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 @admin_bp.route('/api/admin/v480/deactivate-stale-cities', methods=['POST'])
 def admin_v480_deactivate_stale_cities():
     """V480 P1-2: pause cities marked active that haven't published a permit
