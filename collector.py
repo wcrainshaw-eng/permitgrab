@@ -4217,9 +4217,13 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
                 continue
             if city_key in collected_keys:
                 continue
-            # Skip accela (requires browser automation)
-            if cfg.get('platform') == 'accela':
-                continue
+            # V513: previously skipped platform=accela here as "requires browser
+            # automation". That's stale — V162/V163 (2026-04-13) rewrote Accela
+            # to requests+BS4 (no Playwright). Leaving the skip in place meant
+            # ~41 Accela cities below Phase 2's top-75-stale never ran. Last
+            # successful collection on chandler/bradenton/brownsville/etc. was
+            # 2026-04-14 04:11 UTC — exactly when Phase 2's stale-first sort
+            # rotated them out of the top 75 for the first time post-rewrite.
             missed_cities.append((city_key, cfg))
 
         if missed_cities:
