@@ -5920,6 +5920,191 @@ def admin_run_daily_alerts():
         return jsonify({'error': str(e)}), 500
 
 
+# V521 (audit followup) — fleet-wide Accela contractor backfill via Playwright
+# ----------------------------------------------------------------------------
+# Status of the long-running backfill thread (only one at a time)
+_V521_STATE = {
+    'running': False,
+    'started_at': None,
+    'finished_at': None,
+    'cities_attempted': 0,
+    'cities_skipped': 0,
+    'cities_with_inserts': 0,
+    'total_permits_updated': 0,
+    'current_city': None,
+    'last_error': None,
+    'log': [],
+}
+
+
+@admin_bp.route('/api/admin/v521/accela-fleet-status', methods=['GET'])
+def admin_v521_accela_fleet_status():
+    """V521: status of the Accela fleet-wide Playwright contractor backfill."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    return jsonify(_V521_STATE)
+
+
+@admin_bp.route('/api/admin/v521/accela-fleet-backfill', methods=['POST'])
+def admin_v521_accela_fleet_backfill():
+    """V521: iterate every active CITY_REGISTRY entry with platform=accela
+    and call the V508 Playwright detail-batch backfill on permits with
+    missing contractor_name. Runs in a background thread; poll
+    /accela-fleet-status for progress.
+
+    Body (all optional):
+      {"limit_per_city": 25,        # max Playwright fetches per city
+       "max_cities": 200,            # cap on cities processed this run
+       "only_missing_contractor": true}
+
+    Per-city ETA ≈ 25 permits × ~3s Playwright = ~75s. 66 Accela cities
+    ≈ 80 min total. The HTTP call returns immediately."""
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    if _V521_STATE['running']:
+        return jsonify({
+            'status': 'already_running',
+            'started_at': _V521_STATE['started_at'],
+            'current_city': _V521_STATE['current_city'],
+            'cities_attempted': _V521_STATE['cities_attempted'],
+        }), 409
+
+    body = request.get_json(silent=True) or {}
+    limit_per_city = min(int(body.get('limit_per_city', 25)), 100)
+    max_cities = int(body.get('max_cities', 200))
+    only_missing = bool(body.get('only_missing_contractor', True))
+
+    import threading
+    from datetime import datetime as _dt
+
+    def _run():
+        _V521_STATE.update({
+            'running': True,
+            'started_at': _dt.utcnow().isoformat(),
+            'finished_at': None,
+            'cities_attempted': 0,
+            'cities_skipped': 0,
+            'cities_with_inserts': 0,
+            'total_permits_updated': 0,
+            'current_city': None,
+            'last_error': None,
+            'log': [],
+        })
+        try:
+            from city_registry_data import CITY_REGISTRY
+            from accela_playwright_collector import fetch_accela_details_batch
+        except Exception as e:
+            _V521_STATE['last_error'] = f'import: {e}'
+            _V521_STATE['running'] = False
+            _V521_STATE['finished_at'] = _dt.utcnow().isoformat()
+            return
+
+        accela_cities = []
+        for key, cfg in CITY_REGISTRY.items():
+            if cfg.get('platform') != 'accela':
+                continue
+            if not cfg.get('active', True):
+                continue
+            agency = cfg.get('agency_code') or cfg.get('_accela_city_key')
+            slug = cfg.get('slug') or key
+            if not agency:
+                continue
+            accela_cities.append({'key': key, 'slug': slug, 'agency': agency,
+                                  'name': cfg.get('name', key)})
+
+        accela_cities = accela_cities[:max_cities]
+        _V521_STATE['log'].append(
+            f"Iterating {len(accela_cities)} active Accela cities")
+
+        for city in accela_cities:
+            slug = city['slug']
+            agency = city['agency']
+            _V521_STATE['current_city'] = f"{slug} (/{agency}/)"
+            _V521_STATE['cities_attempted'] += 1
+
+            # Find permits with missing contractor on this slug
+            try:
+                _conn = permitdb.get_connection()
+                sql = (
+                    "SELECT permit_number FROM permits "
+                    "WHERE source_city_key = ? AND permit_number IS NOT NULL "
+                    "AND permit_number != ''"
+                )
+                if only_missing:
+                    sql += " AND (contractor_name IS NULL OR contractor_name = '')"
+                sql += " ORDER BY date DESC LIMIT ?"
+                rows = _conn.execute(sql, (slug, limit_per_city)).fetchall()
+                _conn.close()
+                permit_numbers = [
+                    r[0] if not isinstance(r, dict) else r['permit_number']
+                    for r in rows
+                ]
+            except Exception as _qe:
+                _V521_STATE['log'].append(f"  {slug}: query failed — {_qe}")
+                _V521_STATE['cities_skipped'] += 1
+                continue
+
+            if not permit_numbers:
+                _V521_STATE['log'].append(f"  {slug}: no missing-contractor permits, skip")
+                _V521_STATE['cities_skipped'] += 1
+                continue
+
+            # Playwright batch fetch
+            try:
+                results = fetch_accela_details_batch(
+                    agency, permit_numbers, max_permits=limit_per_city)
+            except Exception as _be:
+                _V521_STATE['log'].append(f"  {slug}: Playwright batch failed — {_be}")
+                _V521_STATE['last_error'] = f"{slug}: {_be}"
+                continue
+
+            # Persist contractor names
+            updated = 0
+            try:
+                _conn = permitdb.get_connection()
+                for pn, info in (results or {}).items():
+                    cn = (info or {}).get('contractor_name')
+                    if not cn:
+                        continue
+                    rc = _conn.execute(
+                        "UPDATE permits SET contractor_name = ? "
+                        "WHERE source_city_key = ? AND permit_number = ?",
+                        (cn, slug, pn),
+                    ).rowcount
+                    updated += (rc or 0)
+                _conn.commit()
+                _conn.close()
+            except Exception as _ue:
+                _V521_STATE['log'].append(f"  {slug}: update failed — {_ue}")
+                continue
+
+            _V521_STATE['total_permits_updated'] += updated
+            if updated > 0:
+                _V521_STATE['cities_with_inserts'] += 1
+            _V521_STATE['log'].append(
+                f"  {slug} (/{agency}/): processed={len(permit_numbers)} "
+                f"updated={updated}")
+            # cap log size
+            if len(_V521_STATE['log']) > 500:
+                _V521_STATE['log'] = _V521_STATE['log'][-500:]
+
+        _V521_STATE['running'] = False
+        _V521_STATE['finished_at'] = _dt.utcnow().isoformat()
+        _V521_STATE['current_city'] = None
+
+    t = threading.Thread(target=_run, name='v521-accela-fleet-backfill', daemon=True)
+    t.start()
+
+    return jsonify({
+        'status': 'started',
+        'message': 'Background fleet-wide Accela Playwright backfill running. Poll /api/admin/v521/accela-fleet-status for progress.',
+        'limit_per_city': limit_per_city,
+        'max_cities': max_cities,
+    })
+
+
 # V518 (V511 STRIPE_CONNECTION) — diagnostic + reconciliation endpoints
 # ---------------------------------------------------------------------
 
