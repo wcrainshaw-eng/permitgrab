@@ -757,11 +757,38 @@ def build_digest_html(user, permits, snapshot=None, is_pro=False, active_cities=
 
 def send_daily_digest_to_user(user):
     """Send daily digest to a single user.
-    V22: Your city permits + market snapshot."""
+    V22: Your city permits + market snapshot.
+    V517 (V510 OMNIBUS Part 4e): collapse parent-county/city duplicates
+    in the subscriber's digest_cities list before rendering, so a
+    subscriber who picked both miami-dade-county AND miami doesn't see
+    the same permits twice (and doesn't waste a slot on what's the
+    same metro)."""
     cities = json.loads(user.digest_cities or '[]')
 
     if not cities:
         return False, "no_cities"
+
+    # V517: parent-county / child-city dedup. When a subscriber
+    # selected the parent county, drop child cities whose data is
+    # already covered by the parent's source. (E.g., miami-dade-county
+    # data already includes miami records — duplicate signal.)
+    _PARENT_CHILD = {
+        'miami-dade-county': {'miami'},
+        'cook-county': {'chicago-il', 'chicago'},
+        'harris-county': {'houston-tx', 'houston'},
+        'maricopa': {'phoenix-az', 'phoenix', 'mesa-az', 'scottsdale-az'},
+        'cuyahoga': {'cleveland-oh'},
+        'travis-county': {'austin'},
+        'wake-county-nc': {'raleigh'},
+        'bexar-county': {'san-antonio-tx'},
+    }
+    selected = set(cities)
+    for parent, children in _PARENT_CHILD.items():
+        if parent in selected:
+            for ch in children:
+                selected.discard(ch)
+    if selected != set(cities):
+        cities = [c for c in cities if c in selected]
 
     # Use last_digest_sent_at to avoid sending duplicate permits.
     if hasattr(user, 'last_digest_sent_at') and user.last_digest_sent_at:

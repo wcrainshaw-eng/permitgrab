@@ -261,30 +261,37 @@ CITY_REGISTRY = {
         "endpoint": "https://data.austintexas.gov/resource/3syk-w9eu.json",
         "dataset_id": "3syk-w9eu",
         "description": "Issued Construction Permits",
+        # V517 (V510 OMNIBUS Part 4a): Austin's Socrata dataset DOES
+        # have contractor fields directly — V215 was wrong. Probed
+        # 2026-05-05 and the schema includes contractor_company_name,
+        # contractor_full_name, contractor_phone, contractor_trade,
+        # contractor_address1/2/city/zip. Phones inline, no enrichment
+        # needed. Existing 23,545 permits will reprocess on next
+        # profile-build cycle into ~3-8K profiles with phone coverage.
         "field_map": {
             "permit_number": "permit_number",
             "permit_type": "permit_type_desc",
             "work_type": "work_class",
             "address": "permit_location",
             "filing_date": "issue_date",
-            "status": "",
-            "estimated_cost": "",
+            "issue_date": "issue_date",
+            "status": "status_current",
+            "estimated_cost": "total_job_valuation",
             "description": "description",
+            "contractor_name": "contractor_company_name",
+            "contact_name": "contractor_full_name",
+            "contact_phone": "contractor_phone",
+            "trade_category": "contractor_trade",
+            "zip": "original_zip",
+            "city": "original_city",
+            "state": "original_state",
         },
         "date_field": "issue_date",
         "limit": 2000,
         "active": True,
-        # V215 T4: Austin Socrata (3syk-w9eu) has NO contractor/applicant/
-        # permittee/contact field in the public dataset — the permit record
-        # is structural only (permit_number, type, location, dates).
-        # Contractor identity lives behind the public-search UI at
-        # abc.austintexas.gov and requires a scraper to surface. That's a
-        # separate project; leaving field_map as-is rather than mapping
-        # ghost fields that would silently null.
         "notes": (
-            "V215: Source dataset has no contractor field. Contractor "
-            "enrichment for Austin requires scraping abc.austintexas.gov; "
-            "out of scope for Socrata-only collection."
+            "V517: contractor fields wired (V215's 'no contractor' note "
+            "was incorrect — schema has contractor_company_name + phone)."
         ),
     },
 
@@ -5887,7 +5894,18 @@ CITY_REGISTRY = {
         },
         "limit": 2000,
         "active": True,
-        "notes": "V35: Atlanta Accela portal. Agency code ATLANTA_GA, module=Building.",
+        # V517 (V510 OMNIBUS Part 4b): Atlanta has 5,165 permits with newest
+        # 2026-05-05 but contractor_name=='' on every row. Search-results
+        # page on /ATLANTA_GA/ is a Building+customglobalsearch view that
+        # doesn't expose contractor in the grid columns. Two paths to fix:
+        # (A) Playwright per-permit CapDetail fetch (V508 SBC pattern), or
+        # (B) ArcGIS-index + Accela-detail hybrid (V476 Tampa pattern) — but
+        # Atlanta has no ArcGIS permit index per V258. Path A is the only
+        # option and is a separate larger PR (Playwright integration into
+        # the daemon, not just the existing accela_playwright_collector
+        # module which is currently only wired to SBC backfill admin
+        # endpoints). Documented; deferred from V517.
+        "notes": "V517: contractor extraction blocked on Playwright integration; permits flow but profiles are 0.",
     },
 
     "dayton_oh": {
