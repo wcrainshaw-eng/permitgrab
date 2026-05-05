@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ meta_title }}</title>
 <meta name="description" content="{{ meta_description }}">
-<link rel="canonical" href="{{ canonical_url }}">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
 <meta name="robots" content="{{ robots_directive }}">
 
 <!-- Open Graph -->

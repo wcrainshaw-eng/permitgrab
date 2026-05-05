@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Browse All {{ total_cities }}+ Cities with Building Permits | PermitGrab</title>
 <meta name="description" content="Browse building permits across {{ total_cities }}+ cities in {{ total_states }} states. Find construction leads by city — real-time permit data for contractors nationwide.">
-<link rel="canonical" href="{{ canonical_url }}">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
 <meta property="og:title" content="Browse All Cities | PermitGrab">
 <meta property="og:description" content="Building permits and contractor leads in {{ total_cities }}+ cities across {{ total_states }} states.">
 <meta property="og:type" content="website">

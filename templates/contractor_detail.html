@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ contractor.display_name }} — {{ contractor.city }} Permit History | PermitGrab</title>
 <meta name="description" content="{{ contractor.display_name }} has pulled {{ contractor.total_permits }} permits in {{ contractor.city }}. See permit history, project values, and contact info on PermitGrab.">
-<link rel="canonical" href="{{ canonical_url }}">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
 <meta name="robots" content="noindex, follow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 {% include 'partials/analytics.html' %}

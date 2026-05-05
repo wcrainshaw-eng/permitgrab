@@ -9172,10 +9172,52 @@ def start_collectors():
     Spawning happens only on explicit call from the admin endpoint, which
     means worker re-fork (or V455 self-recycle) doesn't deadlock against
     `from server import *` in the blueprint modules.
+
+    V522 (V513 Step 2): cross-worker daemon-singleton guard via fcntl
+    flock on a persistent-disk lockfile. Until V522 the only thing
+    preventing two gunicorn workers from each spawning the daemon
+    threads was the in-memory `_collector_started` flag — which is
+    PER-PROCESS and therefore per-worker. Dockerfile pins --workers 1
+    today (V496), but if Render's auto WEB_CONCURRENCY ever wins (Pro
+    upgrade auto-set 2 vCPUs → WEB_CONCURRENCY=2) the flag would not
+    block the second worker. flock IS cross-process: only the worker
+    that wins acquires it; the other returns early and runs web-only.
+    The OS releases flock automatically on worker death, so the next
+    worker re-acquires.
     """
     global _collector_started
     if _collector_started:
         return
+
+    # V522 cross-process flock — see docstring above. Only one worker
+    # per Render instance gets the daemon. Holding the fd at module
+    # scope (`_v522_daemon_lock_fd`) keeps the lock alive for this
+    # worker's lifetime; on worker exit the kernel releases it.
+    try:
+        import fcntl as _fcntl
+        _lock_path = os.path.join(DATA_DIR, ".permitgrab.daemon.lock")
+        _lock_fd = os.open(_lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+        _fcntl.flock(_lock_fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        try:
+            os.write(_lock_fd, str(os.getpid()).encode())
+        except Exception:
+            pass
+        global _v522_daemon_lock_fd
+        _v522_daemon_lock_fd = _lock_fd  # keep open to hold the lock
+        print(f"[{datetime.now()}] V522: acquired daemon lock pid={os.getpid()}", flush=True)
+    except (BlockingIOError, OSError) as _lock_err:
+        print(f"[{datetime.now()}] V522: another worker holds daemon lock — this worker is web-only ({_lock_err})", flush=True)
+        # Mark started=True so admin-endpoint /start-collectors short-
+        # circuits cleanly here too. The worker that holds the lock is
+        # the one running daemons.
+        _collector_started = True
+        return
+    except Exception as _flock_imp_err:
+        # fcntl unavailable (Windows local dev) — fall through to
+        # in-memory guard. Production is Linux Docker so this path
+        # only exits for local dev.
+        print(f"[{datetime.now()}] V522: fcntl unavailable, falling back to in-memory _collector_started flag ({_flock_imp_err})", flush=True)
+
     _collector_started = True
 
     # V493: V481's WORKER_MODE early-return removed.

@@ -461,7 +461,21 @@ def init_db():
 
     V62: When DATABASE_URL is set, uses db_engine.init_schema() for Postgres DDL.
     V70: Skips Postgres init if pool not enabled — falls through to SQLite.
+    V522 (V513 Step 3 STAGING): if env USE_POSTGRES=true, auto-enable
+    the pool so the cutover is a single env-var flip + redeploy. The
+    pool stays opt-in (off by default) so this commit is a code-only
+    no-op until Wes flips the flag.
     """
+    # V522: env-driven auto-enable for the cutover
+    if _HAS_ENGINE and USE_POSTGRES and os.environ.get('USE_POSTGRES', '').lower() == 'true':
+        try:
+            from db_engine import enable_pg_pool, is_pg_pool_enabled
+            if not is_pg_pool_enabled():
+                ok = enable_pg_pool()
+                print(f"[DB] V522: USE_POSTGRES=true env var → enable_pg_pool() returned {ok}", flush=True)
+        except Exception as _e:
+            print(f"[DB] V522: pool auto-enable failed (will fall back to SQLite): {_e}", flush=True)
+
     # V62: Postgres path — use db_engine schema
     # V70: Skip if pool not enabled
     if _HAS_ENGINE and USE_POSTGRES:
