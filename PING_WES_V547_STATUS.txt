@@ -1,7 +1,33 @@
-PING WES — V547 MORNING PUSH STATUS
+PING WES — V547 MORNING PUSH STATUS  +  V547h SBCO P0
 
 ================================================================
-HEADLINE
+🚨 GABRIEL P0 — EMAIL HIM TODAY
+================================================================
+Tomorrow's 7 AM ET digest will SILENTLY SUPPRESS gabriel's entire
+email. Pre-V546c (deployed today ~13:00), V540 PR4 was fail-opening
+silently due to has_city_health_data() row.values() bug — gabriel
+got an empty-but-not-null SBCO digest this morning. Post-V546c, the
+filter correctly identifies SBCO as Degraded(low_profiles) and will
+return 'v540_safety_net_all_fail' tomorrow. He gets nothing.
+
+V547h investigation root-caused: SBCO field_map has NO contractor_name
+key, AND plain `accela` platform doesn't fetch CapDetail (only
+`accela_arcgis_hybrid` does, V476 Tampa pattern). 2,055 SBCO permits
+all have contractor_name='' — structurally non-deliverable until SBC
+gets either (a) ArcGIS feed migration or (b) a CapDetail-only fetcher.
+That's 2-4h of engineering, not in scope for today.
+
+ACTION: Email gabriel today with one of:
+  (a) "Source published incomplete data for SBC; investigating, will
+      have a fix in 1-2 weeks. In the meantime, want me to add LA or
+      Riverside to your subscription at no extra charge?"
+  (b) Refund his May charge.
+  (c) Wait 1-2 weeks, hope V547h-2 lands in time.
+
+Default = silent suppression = unacceptable for a paid pro_monthly.
+
+================================================================
+HEADLINE (orig.)
 ================================================================
 Pillar 1 ✅ GREEN. V547a hotfix shipped + active. Web has no daemon
 threads, memory dropped 743 → 418 MB. V544 sitemap is live with 35
