@@ -382,6 +382,15 @@ def test_v546_pr2_worker_mode_gate_in_start_collectors(client):
         'V546 PR2 regression: gate is not discriminating between '
         'unset (local dev) and explicit false (web service post-V546a)'
     )
+    # V547a: gate must ALSO auto-detect Render web services via
+    # RENDER_SERVICE_TYPE (auto-set by Render). Without this, Wes
+    # has to remember to set WORKER_MODE=false on every new web
+    # deploy — which he forgot once already.
+    assert 'RENDER_SERVICE_TYPE' in text, (
+        'V547a regression: gate no longer auto-detects Render web '
+        'services. WORKER_MODE-only gating means daemon spawn comes '
+        'back the next time someone deploys without setting it.'
+    )
 
 
 def test_v257_signup_renders_form_no_redirect(client):

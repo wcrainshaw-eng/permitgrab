@@ -8600,17 +8600,30 @@ def start_collectors():
     # is that worker existing for real this time. CLAUDE.md ARCHITECTURE
     # GROUND TRUTH is now updated to reflect this.
     #
-    # The gate is opt-in. If WORKER_MODE is unset (which is the default
-    # on local dev / single-process Docker), this returns False and
-    # daemons spawn here — preserving backward compat with any local
-    # or fallback deployments that never activate the worker service.
-    if WORKER_MODE is False and os.environ.get('WORKER_MODE', '').lower() in ('false', '0', 'no'):
-        # Explicit web-mode opt-out: the worker service is live and
-        # this is the web service. Skip daemon spawn entirely.
+    # The gate has two activation signals. EITHER triggers skip:
+    #
+    # 1. Explicit: WORKER_MODE=false on the env var (as Wes documented
+    #    in the V546a directive — for the web service post-worker-launch).
+    #
+    # 2. Auto-detect (V547a): RENDER_SERVICE_TYPE=web is set
+    #    AUTOMATICALLY by Render on every web service, with no manual
+    #    config required. If we're running on a Render web service AND
+    #    WORKER_MODE isn't EXPLICITLY true, skip the daemons. The worker
+    #    service has RENDER_SERVICE_TYPE=worker, so this branch never
+    #    fires there.
+    #
+    # Local dev has neither WORKER_MODE nor RENDER_SERVICE_TYPE set,
+    # so daemons spawn locally (preserved for single-process dev).
+    _wm_env = os.environ.get('WORKER_MODE', '').lower()
+    _rst_env = os.environ.get('RENDER_SERVICE_TYPE', '').lower()
+    _explicit_skip = _wm_env in ('false', '0', 'no')
+    _auto_skip = _rst_env == 'web' and _wm_env not in ('1', 'true', 'yes')
+    if _explicit_skip or _auto_skip:
+        _why = 'WORKER_MODE=false' if _explicit_skip else 'RENDER_SERVICE_TYPE=web (auto)'
         print(
-            f"[{datetime.now()}] V546 PR2: WORKER_MODE=false on this "
-            f"process — skipping daemon spawn (worker service handles "
-            f"collection)", flush=True,
+            f"[{datetime.now()}] V546 PR2 / V547a: {_why} — skipping "
+            f"daemon spawn (worker service handles collection)",
+            flush=True,
         )
         return
 
