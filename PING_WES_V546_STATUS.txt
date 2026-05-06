@@ -1,0 +1,177 @@
+PING WES — V546a STATUS + V546 PR2/PR2x SHIPPED + AUDITS
+
+================================================================
+HEADLINE
+================================================================
+V546a (you activated the worker) was paying for nothing. The web
+service was still spawning all 6 daemon threads because V493 had
+explicitly REMOVED the WORKER_MODE gate from start_collectors()
+when the worker didn't exist. Re-introduced it as V546 PR2 and
+shipped (commit 0db4e04, CI ✓).
+
+PLUS: while verifying, found a SECOND bug — V544's sitemap filter
+has been INACTIVE the entire time. The sitemap-cities.xml on prod
+has been returning 1,713 URLs instead of the 28-Pass V544 expected.
+Same V541b/V543 row.values() bug class hiding in
+city_health/curation.py:has_city_health_data() — V546c shipped
+(commit 3aec1b7, CI pending) to fix it.
+
+================================================================
+V546a VERIFICATION RESULTS
+================================================================
+
+WEB SERVICE (BEFORE V546 PR2):
+  thread_count: 11 + 6 daemon threads
+  Memory: 743 MB (target was 200-300 MB)
+  daemon_running=True (should be False)
+  → V546a paying for parallel daemon stacks, no isolation benefit
+
+WHY: server.py:8590-8602 had the V493 comment explicitly REMOVING
+the WORKER_MODE gate from start_collectors() because the worker
+didn't exist. Now that V546a created the worker for real, the
+gate needs to come back.
+
+V546 PR2 SHIPPED (commit 0db4e04, CI ✓ green):
+- Re-introduced the gate at start_collectors():
+    WORKER_MODE=true on worker → spawn (existing)
+    WORKER_MODE=false on web   → return early (NEW post-V546a)
+    WORKER_MODE unset (local)  → spawn (preserved for dev)
+- Discrimination is on env var (`('false','0','no')`), not just
+  the Python flag, so local dev's unset case keeps spawning
+  daemons. V493's lesson honored.
+- Regression test pins both the V546 PR2 marker and the env-var
+  discrimination string. Local CI shape: 144 passed.
+
+VERIFICATION POST-DEPLOY:
+- Render deploy still rolling out at PING-write time.
+- After deploy completes, web should show:
+    daemon_running=False
+    No threads named scheduled_collection / enrichment_daemon /
+      email_scheduler / health_scheduler / heartbeat_writer /
+      collection_watchdog
+    Memory ~200-300 MB
+- Worker should show those 6 threads alive.
+
+================================================================
+V546c — V544 SITEMAP FILTER WAS INACTIVE
+================================================================
+While verifying V546a, hit /sitemap-cities.xml. Got 1,713 URLs.
+Expected 28 (V544 PR3 contract). The filter wasn't activating.
+
+Root cause: city_health/curation.py:has_city_health_data():
+    cnt = row[0] if not hasattr(row, 'keys') else list(row.values())[0]
+
+sqlite3.Row has keys() but NOT values() (V541b/V543 bug class).
+list(row.values())[0] AttributeError'd → broad except returned
+False → "no city_health data, fail-open" → sitemap got the full
+fleet → V544's entire indexation contract was silently inactive.
+
+The existing test (test_has_city_health_data_returns_true_with_rows)
+doesn't trigger this because the default sqlite3 connection returns
+plain TUPLES, not sqlite3.Rows. Production sets
+conn.row_factory = sqlite3.Row, which is what hits the bug.
+
+V546c SHIPPED (commit 3aec1b7, CI pending):
+- Fix uses cross-dialect alias-based extraction:
+    SELECT COUNT(*) AS cnt FROM city_health
+    cnt = row['cnt'] | row[0] (try/except chain)
+- New regression test explicitly sets conn.row_factory =
+  sqlite3.Row to reproduce the production scenario. Without
+  that test, this bug class will keep finding new homes (THIRD
+  time in 24h: V541b → V543 → V546c).
+- Post-deploy: sitemap-cities.xml drops 1,713 → 28 URLs.
+
+================================================================
+V546 SMALL-FIX STACK PROGRESS (PRE V546a, ~10h window)
+================================================================
+Baseline (02:14 UTC): 562 starved on 736 active / 23.64% cov
+V546 fire 20 (12:57 UTC): 467 starved on 735 active / 36.46% cov
+
+Cumulative: -95 starved / +12.82pp coverage in 10.7h
+Avg pace: ~9 cities/hr (in-process, restart-driven)
+
+NOTABLE SIDE-EFFECT: Pass list grew 28 → 38 (per the
+health_scheduler row in digest_log this morning at 08:01 UTC:
+"pass=38 degraded=1210 fail=513"). Real, measurable result of the
+V546 small-fix stack alone — even before V546a + PR2 take effect.
+
+POST-V546a + PR2 + V546c targets (per your projections):
+- 30+ cities/hr lift rate (3-4x the in-process rate)
+- 24h: starved 467 → ~150-200
+- 48h: starved → ~50-100 (rest is genuine dead sources)
+- Pass list 38 → 50-100 by Friday
+
+================================================================
+GABRIEL DIGEST AUDIT — INCONCLUSIVE
+================================================================
+Today's digest fired at 11:01:09 UTC (one row in digest_log with
+recipient_email='scheduled', 4 permits, status=sent).
+
+I queried digest_log for safety_net_skip rows for today: 0 rows.
+
+Two interpretations:
+  (a) V540 PR4 filter ran cleanly (no cities filtered for any
+      subscriber) — implies gabriel got a digest with his 1
+      degraded city OR gabriel was processed but his 1 city
+      survived the filter.
+  (b) V540 PR4 filter didn't execute — implies gabriel got a
+      digest WITH san-bernardino-county data (good for him) OR
+      the digest never reached the filter step for him.
+
+Per-subscriber digest_log rows: only 1 row in last 2 days
+(wcrainshaw, manual_trigger from 2026-05-04). The scheduler
+appears to log once per BATCH (recipient_email='scheduled'),
+not once per subscriber.
+
+I cannot determine gabriel's outcome without running a
+log-grep on the worker process or adding per-subscriber
+logging. Recommendation: add structured per-subscriber
+logging in V547 so this audit is straightforward going forward.
+
+================================================================
+GSC INDEXATION STATUS
+================================================================
+Sitemap is live at https://permitgrab.com/sitemap.xml with the
+expected sub-sitemaps:
+  - sitemap-pages.xml
+  - sitemap-cities.xml (1,713 URLs PRE-V546c — drops to ~28
+    POST-deploy)
+  - sitemap-states.xml
+  - sitemap-trades.xml
+  - sitemap-blog.xml
+
+Until V546c lands and the next /sitemap-cities.xml fetch by
+Google returns 28 URLs, GSC won't see the V544 contract. The
+URL Inspection API check should wait until POST-V546c-deploy
++ a fresh Google sitemap-fetch to be meaningful.
+
+================================================================
+NEXT V547 RECOMMENDATIONS (highest leverage)
+================================================================
+A. Verify V546 PR2 + V546c deploys land cleanly:
+   - Web: daemon_running=False, no daemon threads, mem ~200MB
+   - Worker: 6 daemon threads alive, mem 600-1200MB during cycles
+   - /sitemap-cities.xml: 28 URLs
+
+B. Wait 1-2h for V546a coverage acceleration; if pace is genuinely
+   30+/hr, V547 priority becomes ALMOST-PASS upgrade work
+   (FL DBPR + TX TDLR imports — push Degraded near-misses to Pass).
+
+C. If pace is NOT 30+/hr, ship V546d concurrent fetches in worker
+   process (the actual PR3 from the V546 directive). Worker
+   isolation makes ThreadPoolExecutor safe now.
+
+D. Per-subscriber digest_log (so the gabriel-class audit is
+   trivial in future).
+
+================================================================
+DELIVERABLES
+================================================================
+V546 PR2  (0db4e04) — WORKER_MODE gate restored. CI ✓.
+V546c     (3aec1b7) — has_city_health_data row.values() fix. CI pending.
+PING_WES_V546_STATUS.txt — this file.
+
+V544 indexation contract goes from 0% effective → fully active
+once both deploys complete + Google's next sitemap fetch.
+
+— Captured 2026-05-06 ~13:15 UTC
