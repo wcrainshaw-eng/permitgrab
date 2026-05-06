@@ -8639,6 +8639,23 @@ def start_collectors():
     except Exception as e:
         print(f"[{datetime.now()}] V524: email_scheduler failed to start: {e}", flush=True)
 
+    # V540: city_health daily compute scheduler. Fires at 4 AM ET / 8
+    # UTC, BEFORE the 7 AM ET email digest, so the digest pipeline
+    # (V540 PR4) reads fresh city_health rows. Same V475 named-thread
+    # pattern as digest/enrichment — explicit thread named
+    # 'health_scheduler' so the V493 IRONCLAD watchdog + the
+    # /api/admin/debug/threads endpoint can enumerate it.
+    try:
+        from city_health import (
+            ensure_table as _ensure_city_health_table,
+            start_thread as _start_health_thread,
+        )
+        _ensure_city_health_table()
+        _start_health_thread()
+        print(f"[{datetime.now()}] V540: health_scheduler thread started via city_health.start_thread()", flush=True)
+    except Exception as e:
+        print(f"[{datetime.now()}] V540: health_scheduler failed to start: {e}", flush=True)
+
     # V507 WATCHDOG REWRITE: file-based heartbeat instead of SQLite query.
     #
     # Original V503 watchdog had a chicken-and-egg bug: it used
