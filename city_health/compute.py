@@ -50,7 +50,16 @@ REASON = {
     'no_phones': 'No contractor profiles have phone numbers yet',
     'stale_collection': 'Last successful collection > 7 days ago',
     'dead_source': 'Source feed dead — no successful collection in 21+ days',
-    'platform_fail': 'Platform-level health check returned fail',
+    'platform_fail': 'Platform-level health check returned fail (≥3 consecutive errors)',
+    # V546 PR4: split daemon-coverage starvation out of platform_fail. Per
+    # V545 audit, ~88% of "platform_fail" rows are actually visit-starved
+    # (last_run > the platform's freshness threshold) with zero recent
+    # errors at the source level — daemon hasn't reached them, NOT the
+    # source failing. Conflating them hid the V474→V526 chain bug.
+    'daemon_coverage_starvation': (
+        'Daemon has not visited within the per-platform freshness window '
+        'AND no source errors — the V474→V526 chain bug class'
+    ),
     'unknown_platform': 'Source platform not recognized (likely bulk-source recipient)',
     'never_visited': 'No scraper_runs row — city has never been collected',
     'compute_error': 'Internal error computing city health (see evidence)',
@@ -262,10 +271,36 @@ def compute_city_health(slug):
 
     plat_h = measurements.get('platform_health')
     if plat_h and plat_h.get('status') == 'fail':
+        # V546 PR4: split daemon-coverage starvation out of platform_fail.
+        # collectors/_base.py:health_check sets status='fail' for two
+        # very different reasons:
+        #   (a) consecutive_failures >= 3 — REAL platform errors
+        #   (b) visit_age_hours > _RECENT_VISIT_HOURS[platform] — daemon
+        #       hasn't visited recently enough; the SOURCE may be fine
+        # The V545 audit found that across the prod fleet, 88% of
+        # 'platform_fail' rows are case (b) with zero source errors in
+        # the last 24h. Conflating them as platform_fail hid the
+        # V474→V493→V496→V526 daemon-coverage starvation bug for weeks.
+        # consecutive_failures is the cleanest discriminator: case (a)
+        # requires >= 3, case (b) doesn't gate on it at all.
+        consec = int(plat_h.get('consecutive_failures') or 0)
+        if consec >= 3:
+            return CityHealth(
+                slug=slug, status=FAIL,
+                reason_code='platform_fail',
+                reason_detail=(
+                    f'{REASON["platform_fail"]} '
+                    f'({plat_h.get("reason", "no reason")})'
+                ),
+                evidence=measurements,
+            )
         return CityHealth(
             slug=slug, status=FAIL,
-            reason_code='platform_fail',
-            reason_detail=f'{REASON["platform_fail"]} ({plat_h.get("reason", "no reason")})',
+            reason_code='daemon_coverage_starvation',
+            reason_detail=(
+                f'{REASON["daemon_coverage_starvation"]} '
+                f'({plat_h.get("reason", "no reason")})'
+            ),
             evidence=measurements,
         )
 

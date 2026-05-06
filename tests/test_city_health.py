@@ -218,6 +218,81 @@ def test_city_health_fail_when_source_dead_21d():
     assert '30d ago' in ch.reason_detail
 
 
+def test_v546_split_platform_fail_when_consecutive_failures_real():
+    """V546 PR4: real platform errors (≥3 consecutive failures from
+    collectors._base.health_check) keep the platform_fail reason_code.
+
+    Pre-V546, ANY plat_h['status']=='fail' became platform_fail —
+    conflating real errors with daemon-coverage starvation. This
+    test pins the new contract: consec >= 3 AND fail status →
+    reason_code stays 'platform_fail'.
+    """
+    from city_health import compute_city_health, FAIL
+    from city_health import compute as _compute
+    fresh = (datetime.utcnow() - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = _setup_db([{
+        'slug': 'real-error-city',
+        'source_type': 'socrata',
+        'permits_count': 200,
+        'profiles_count': 200,
+        'with_phone_count': 50,
+        'last_run_at': fresh,
+    }])
+    fake_plat_h = {
+        'status': 'fail',
+        'reason': '5 consecutive failures — last error: HTTP 500',
+        'consecutive_failures': 5,
+        'last_run_status': 'error',
+    }
+    with patch('db.get_connection', return_value=conn), \
+         patch.object(_compute, '_platform_health', return_value=fake_plat_h):
+        ch = compute_city_health('real-error-city')
+    assert ch.status == FAIL, f'expected FAIL, got {ch.status}'
+    assert ch.reason_code == 'platform_fail', (
+        f'V546 PR4 regression: real errors ({fake_plat_h["consecutive_failures"]} '
+        f'consec) should map to platform_fail, got {ch.reason_code!r}'
+    )
+
+
+def test_v546_split_daemon_coverage_starvation_when_visit_age_only():
+    """V546 PR4: collectors._base.health_check returns status='fail' for
+    cities the daemon hasn't visited in time, but with no source errors.
+    This is the V474→V526 chain bug — ~88% of fleet 'platform_fail' rows
+    in V545's audit. The new reason_code 'daemon_coverage_starvation'
+    keeps these distinct from real source errors so future audits don't
+    mislead the same way.
+    """
+    from city_health import compute_city_health, FAIL
+    from city_health import compute as _compute
+    fresh = (datetime.utcnow() - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = _setup_db([{
+        'slug': 'starved-not-broken',
+        'source_type': 'socrata',
+        'permits_count': 200,
+        'profiles_count': 200,
+        'with_phone_count': 50,
+        'last_run_at': fresh,
+    }])
+    # The discriminator: status='fail' but consecutive_failures < 3.
+    # collectors/_base.py only hits the consec>=3 branch when there
+    # are real errors; the visit-age branch fires regardless of
+    # consec_failures, leaving it at 0 in normal operation.
+    fake_plat_h = {
+        'status': 'fail',
+        'reason': 'last visit was 41.2h ago (> 36h threshold for socrata)',
+        'consecutive_failures': 0,
+        'last_run_status': 'success',
+    }
+    with patch('db.get_connection', return_value=conn), \
+         patch.object(_compute, '_platform_health', return_value=fake_plat_h):
+        ch = compute_city_health('starved-not-broken')
+    assert ch.status == FAIL, f'expected FAIL, got {ch.status}'
+    assert ch.reason_code == 'daemon_coverage_starvation', (
+        f'V546 PR4 regression: visit-age starvation should map to '
+        f'daemon_coverage_starvation, got {ch.reason_code!r}'
+    )
+
+
 def test_city_health_fail_when_never_visited():
     """Active city with no scraper_runs row → Fail (never_visited)."""
     from city_health import compute_city_health, FAIL
