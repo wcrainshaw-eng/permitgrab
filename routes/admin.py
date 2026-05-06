@@ -736,6 +736,136 @@ def admin_daemon_coverage():
     return jsonify(body)
 
 
+@admin_bp.route('/api/admin/v547h/broken-extraction', methods=['GET'])
+def admin_v547h_broken_extraction():
+    """V547h: list cities where contractor extraction is broken — high
+    permit count + low profile count. Catches the SBCO/atlanta/
+    norfolk-va class where the daemon collects permits successfully
+    but contractor_name comes through empty (plain `accela` platform
+    that doesn't hit CapDetail) OR profile-build pipeline isn't
+    creating profile rows from valid contractor names.
+
+    Two distinct sub-classes surfaced:
+      A) field_map_miss: with_contractor=0 — config doesn't tell the
+         parser where to look. Fix: update field_map (V547h SBCO).
+      B) profile_build_fail: with_contractor>>0 but profiles<<. The
+         contractor extraction works, the profile-build refresh
+         doesn't. Fix: investigate refresh_contractor_profiles for
+         the affected slug.
+
+    Cause for V547h's regression-test generalization: the next time
+    a Pass city ends up with profiles=0 (which is what hid Gabriel's
+    SBCO outcome), this endpoint surfaces it immediately. Cron a
+    daily probe against this endpoint and alert if any Pass city
+    appears.
+
+    Query params:
+      - permits_min (default 500): only flag cities with more than
+        this many permits in DB
+      - profiles_max (default 50): only flag cities with fewer than
+        this many profiles
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    try:
+        permits_min = int(request.args.get('permits_min', 500))
+    except Exception:
+        permits_min = 500
+    try:
+        profiles_max = int(request.args.get('profiles_max', 50))
+    except Exception:
+        profiles_max = 50
+
+    try:
+        conn = permitdb.get_connection()
+        # V547h-CI: graceful-degrade when permits / contractor_profiles
+        # / city_health / prod_cities don't exist (fresh CI fixture).
+        # Same pattern as V546 PR5x for /api/admin/daemon-coverage.
+        for tbl in ('permits', 'contractor_profiles', 'prod_cities', 'city_health'):
+            try:
+                conn.execute(f"SELECT 1 FROM {tbl} LIMIT 1").fetchone()
+            except Exception:
+                return jsonify({
+                    'thresholds': {
+                        'permits_min': permits_min,
+                        'profiles_max': profiles_max,
+                    },
+                    'field_map_miss_count': 0,
+                    'profile_build_fail_count': 0,
+                    'field_map_miss': [],
+                    'profile_build_fail': [],
+                    'note': f'table {tbl!r} missing — empty CI fixture',
+                })
+        rows = conn.execute("""
+            SELECT p.source_city_key AS slug,
+                   COUNT(*) AS permits,
+                   COUNT(NULLIF(p.contractor_name, '')) AS with_contractor,
+                   COALESCE(
+                     (SELECT COUNT(*) FROM contractor_profiles cp
+                      WHERE cp.source_city_key = p.source_city_key),
+                     0
+                   ) AS profiles,
+                   (SELECT pc.source_type FROM prod_cities pc
+                    WHERE pc.city_slug = p.source_city_key
+                    LIMIT 1) AS source_type,
+                   (SELECT pc.status FROM prod_cities pc
+                    WHERE pc.city_slug = p.source_city_key
+                    LIMIT 1) AS pc_status,
+                   (SELECT ch.status FROM city_health ch
+                    WHERE ch.city_slug = p.source_city_key
+                    LIMIT 1) AS health_status
+              FROM permits p
+             WHERE p.source_city_key IS NOT NULL
+             GROUP BY p.source_city_key
+            HAVING COUNT(*) >= ?
+               AND COALESCE(
+                     (SELECT COUNT(*) FROM contractor_profiles cp
+                      WHERE cp.source_city_key = p.source_city_key),
+                     0
+                   ) < ?
+             ORDER BY COUNT(*) DESC
+             LIMIT 100
+        """, (permits_min, profiles_max)).fetchall()
+    except Exception as e:
+        return jsonify({'error': f'query failed: {e}'}), 500
+
+    field_map_miss = []
+    profile_build_fail = []
+    for r in rows:
+        slug = r['slug'] if hasattr(r, 'keys') else r[0]
+        permits = int(r['permits'] if hasattr(r, 'keys') else r[1])
+        with_c = int(r['with_contractor'] if hasattr(r, 'keys') else r[2])
+        profs = int(r['profiles'] if hasattr(r, 'keys') else r[3])
+        st = (r['source_type'] if hasattr(r, 'keys') else r[4]) or None
+        pc_st = (r['pc_status'] if hasattr(r, 'keys') else r[5]) or None
+        h_st = (r['health_status'] if hasattr(r, 'keys') else r[6]) or None
+        item = {
+            'slug': slug, 'permits': permits, 'with_contractor': with_c,
+            'profiles': profs, 'source_type': st,
+            'pc_status': pc_st, 'health_status': h_st,
+        }
+        # Discriminate: field_map_miss = no contractor names at all.
+        # profile_build_fail = contractor names present but profile
+        # rows weren't built.
+        if with_c == 0:
+            field_map_miss.append(item)
+        else:
+            profile_build_fail.append(item)
+
+    return jsonify({
+        'thresholds': {
+            'permits_min': permits_min,
+            'profiles_max': profiles_max,
+        },
+        'field_map_miss_count': len(field_map_miss),
+        'profile_build_fail_count': len(profile_build_fail),
+        'field_map_miss': field_map_miss,
+        'profile_build_fail': profile_build_fail,
+    })
+
+
 @admin_bp.route('/api/admin/v546/prune-inactive-cities', methods=['POST'])
 def admin_v546_prune_inactive_cities():
     """V546 PR6: prune the dead working set per V546 ground truth.

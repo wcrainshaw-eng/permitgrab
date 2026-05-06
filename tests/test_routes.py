@@ -357,6 +357,46 @@ def test_v546b5_daemon_coverage_endpoint_shape(client):
     ), 'V546 regression: starved_count != 72h_plus + never'
 
 
+def test_v547h_broken_extraction_endpoint_shape(client):
+    """V547h: /api/admin/v547h/broken-extraction surfaces the
+    SBCO-class profile-extraction bug fleet-wide. Pins the
+    response shape so the daily cron + future audit queries
+    don't break silently.
+
+    Two buckets returned:
+      field_map_miss     — with_contractor=0 (plain accela, no
+                           CapDetail extraction)
+      profile_build_fail — with_contractor>0 but profiles<<
+                           (refresh_contractor_profiles failed)
+    """
+    import os as _os
+    _prev = _os.environ.get('ADMIN_KEY')
+    _os.environ['ADMIN_KEY'] = 'test-v547h'
+    try:
+        r = client.get('/api/admin/v547h/broken-extraction')
+        assert r.status_code == 401
+        r = client.get('/api/admin/v547h/broken-extraction',
+                       headers={'X-Admin-Key': 'test-v547h'})
+    finally:
+        if _prev is None:
+            _os.environ.pop('ADMIN_KEY', None)
+        else:
+            _os.environ['ADMIN_KEY'] = _prev
+    assert r.status_code == 200, (
+        f'V547h regression: endpoint returned {r.status_code}: '
+        f'{r.data[:200]!r}'
+    )
+    body = r.get_json()
+    for k in ('thresholds', 'field_map_miss_count',
+              'profile_build_fail_count', 'field_map_miss',
+              'profile_build_fail'):
+        assert k in body, f'V547h regression: missing key {k!r}'
+    assert isinstance(body['field_map_miss'], list)
+    assert isinstance(body['profile_build_fail'], list)
+    assert body['field_map_miss_count'] == len(body['field_map_miss'])
+    assert body['profile_build_fail_count'] == len(body['profile_build_fail'])
+
+
 def test_v546_pr2_worker_mode_gate_in_start_collectors(client):
     """V546 PR2: start_collectors() must skip daemon spawn when
     WORKER_MODE is explicitly false on the web service. The worker
