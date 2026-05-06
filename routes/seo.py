@@ -298,6 +298,17 @@ def sitemap_cities():
 
     # V77: Add city URLs in new /permits/{state}/{city} format
     # These are the SEO-optimized URLs targeting "[city] building permits" keywords
+    # V540 PR3: filter to sellable (Pass) cities only. Fail/Degraded
+    # cities get noindex on direct URL via the soft-degrade path
+    # (routes/city_pages.py) — keeping them out of the sitemap
+    # accelerates Google's de-indexing of pages we can't deliver.
+    # Cold-start fail-open: if city_health hasn't been computed yet,
+    # filter_to_sellable returns the input list unchanged.
+    try:
+        from city_health import filter_to_sellable
+    except Exception:
+        filter_to_sellable = None  # noqa: N806
+
     try:
         conn = permitdb.get_connection()
         active_cities = conn.execute("""
@@ -308,8 +319,18 @@ def sitemap_cities():
               AND total_permits > 0
         """).fetchall()
 
+        # V540 PR3: pre-filter slugs through the curation gate. Build
+        # the slug set first; iterate only the sellable ones.
+        all_slugs = [c['city_slug'] for c in active_cities]
+        if filter_to_sellable is not None:
+            sellable_set = set(filter_to_sellable(all_slugs))
+        else:
+            sellable_set = set(all_slugs)
+
         for city_row in active_cities:
             city_slug = city_row['city_slug']
+            if city_slug not in sellable_set:
+                continue  # V540 PR3: drop non-sellable cities from sitemap
             state_abbrev = city_row['state']
             last_collection = city_row['last_collection']
 

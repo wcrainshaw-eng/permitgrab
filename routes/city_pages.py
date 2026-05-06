@@ -1228,6 +1228,20 @@ def state_city_landing(state_slug, city_slug):
     This is the primary city page route for SEO. Each city page targets
     "[city] building permits" keywords for contractors.
     """
+    # V540 PR3: soft-degrade Fail/Degraded cities. Don't 404 — that
+    # hurts SEO and brand. Set g.v540_limited_coverage so templates
+    # can render a "limited coverage" banner with a CTA to a sibling
+    # Pass city. Direct URL access (someone has the link bookmarked)
+    # still resolves; bookmarked Fail cities don't drop traffic into
+    # the 404 page. Pre-curation per V540 reframe — picker+sitemap
+    # already exclude these slugs, so soft-degrade is the
+    # defense-in-depth path.
+    try:
+        from city_health import is_sellable_city
+        g.v540_limited_coverage = (is_sellable_city(city_slug) is False)
+    except Exception:
+        g.v540_limited_coverage = False
+
     # V231 P1-9: state-slug aliases. STATE_CONFIG keys "New York" as
     # 'new-york-state' because the bare 'new-york' slug is reserved for
     # NYC in the 1-segment city route. But the 2-segment

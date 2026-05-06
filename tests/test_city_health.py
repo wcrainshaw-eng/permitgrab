@@ -15,6 +15,7 @@ slice — no Flask, no Render, no network.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from unittest.mock import patch
@@ -554,6 +555,170 @@ def test_v540_cache_keys_distinguish_filters():
     assert admin_mod._v540_cache_get(('pass', '', ''))['tag'] == 'PASS-only'
     assert admin_mod._v540_cache_get(('fail', '', ''))['tag'] == 'FAIL-only'
     assert admin_mod._v540_cache_get(('', '', 'socrata'))['tag'] == 'platform=socrata'
+
+
+# ---------------------------------------------------------------------
+# V540 PR3: pre-curation gates (is_sellable_city / get_sellable_cities)
+# ---------------------------------------------------------------------
+
+def test_is_sellable_city_returns_true_when_status_pass():
+    """The happy path: status='Pass' → sellable."""
+    from city_health import is_sellable_city
+    conn = _setup_db()
+    _seed_city_health_table(conn, [{'slug': 'pass-city', 'status': 'Pass'}])
+    with patch('db.get_connection', return_value=conn):
+        assert is_sellable_city('pass-city') is True
+
+
+def test_is_sellable_city_returns_false_for_degraded_and_fail():
+    """V540 PR3 contract: pre-curation gates must EXCLUDE Degraded
+    and Fail cities. Users see only Pass cities as sellable."""
+    from city_health import is_sellable_city
+    conn = _setup_db()
+    _seed_city_health_table(conn, [
+        {'slug': 'degraded-city', 'status': 'Degraded'},
+        {'slug': 'fail-city', 'status': 'Fail'},
+    ])
+    with patch('db.get_connection', return_value=conn):
+        assert is_sellable_city('degraded-city') is False
+        assert is_sellable_city('fail-city') is False
+
+
+def test_is_sellable_city_fails_open_when_table_empty():
+    """V540 PR3 fail-open contract: a fresh deploy with no city_health
+    rows yet must NOT hide every city. Until the daily cron fires,
+    treat all cities as sellable."""
+    from city_health import is_sellable_city
+    conn = _setup_db()  # creates schema, no rows
+    with patch('db.get_connection', return_value=conn):
+        assert is_sellable_city('any-slug') is True
+
+
+def test_is_sellable_city_returns_false_for_missing_slug_when_table_populated():
+    """If city_health HAS data but the slug isn't in it, the cron
+    didn't enumerate it (means the slug isn't 'active' in prod_cities).
+    Don't promote unknown slugs."""
+    from city_health import is_sellable_city
+    conn = _setup_db()
+    _seed_city_health_table(conn, [{'slug': 'known-city', 'status': 'Pass'}])
+    with patch('db.get_connection', return_value=conn):
+        assert is_sellable_city('unknown-slug') is False
+
+
+def test_is_sellable_city_returns_false_for_empty_or_none():
+    from city_health import is_sellable_city
+    assert is_sellable_city('') is False
+    assert is_sellable_city(None) is False
+
+
+def test_get_sellable_cities_returns_pass_set():
+    """Bulk filter helper: returns set of Pass slugs."""
+    from city_health import get_sellable_cities
+    conn = _setup_db()
+    _seed_city_health_table(conn, [
+        {'slug': 'p1', 'status': 'Pass'},
+        {'slug': 'p2', 'status': 'Pass'},
+        {'slug': 'd1', 'status': 'Degraded'},
+        {'slug': 'f1', 'status': 'Fail'},
+    ])
+    with patch('db.get_connection', return_value=conn):
+        sellable = get_sellable_cities()
+    assert sellable == {'p1', 'p2'}
+    assert isinstance(sellable, set)
+
+
+def test_filter_to_sellable_drops_degraded_and_fail():
+    from city_health import filter_to_sellable
+    conn = _setup_db()
+    _seed_city_health_table(conn, [
+        {'slug': 'good', 'status': 'Pass'},
+        {'slug': 'meh', 'status': 'Degraded'},
+        {'slug': 'bad', 'status': 'Fail'},
+    ])
+    with patch('db.get_connection', return_value=conn):
+        result = filter_to_sellable(['good', 'meh', 'bad', 'unknown'])
+    assert result == ['good']
+
+
+def test_filter_to_sellable_passes_through_when_table_empty():
+    """Cold-start fail-open: if no city_health data, all input slugs
+    pass through unchanged."""
+    from city_health import filter_to_sellable
+    conn = _setup_db()
+    with patch('db.get_connection', return_value=conn):
+        result = filter_to_sellable(['a', 'b', 'c'])
+    assert result == ['a', 'b', 'c']
+
+
+def test_has_city_health_data_returns_true_with_rows():
+    from city_health import has_city_health_data
+    conn = _setup_db()
+    _seed_city_health_table(conn, [{'slug': 'x', 'status': 'Pass'}])
+    with patch('db.get_connection', return_value=conn):
+        assert has_city_health_data() is True
+
+
+def test_has_city_health_data_returns_false_when_empty():
+    from city_health import has_city_health_data
+    conn = _setup_db()
+    with patch('db.get_connection', return_value=conn):
+        assert has_city_health_data() is False
+
+
+def test_v540_pr3_wired_into_server_helpers():
+    """File-level guard: server.py:get_popular_cities and
+    get_suggested_cities both call filter_to_sellable. If a future
+    refactor removes the call, this test catches the regression
+    before the picker stops pre-curating."""
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'server.py')).read()
+    # Both helpers must reference filter_to_sellable
+    assert 'filter_to_sellable' in src, (
+        'V540 PR3 regression: server.py no longer references filter_to_sellable. '
+        'The picker stopped pre-curating; users will see Fail cities again.'
+    )
+    # Specific markers — get_popular_cities + get_suggested_cities both wire it
+    pop_idx = src.find('def get_popular_cities(')
+    sug_idx = src.find('def get_suggested_cities(')
+    pop_block = src[pop_idx:src.find('\ndef ', pop_idx + 1)]
+    sug_block = src[sug_idx:src.find('\ndef ', sug_idx + 1)]
+    assert 'filter_to_sellable' in pop_block, (
+        'V540 PR3 regression: get_popular_cities does not pre-curate'
+    )
+    assert 'filter_to_sellable' in sug_block, (
+        'V540 PR3 regression: get_suggested_cities does not pre-curate'
+    )
+
+
+def test_v540_pr3_wired_into_sitemap():
+    """File-level guard: routes/seo.py:sitemap_cities filters to
+    sellable. Fail cities must NOT appear in /sitemap-cities.xml so
+    Google can de-index pages we can't deliver."""
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'routes', 'seo.py')).read()
+    smc_idx = src.find('def sitemap_cities(')
+    smc_block = src[smc_idx:src.find('\n@', smc_idx + 1) if src.find('\n@', smc_idx + 1) > 0 else None]
+    assert 'filter_to_sellable' in smc_block, (
+        'V540 PR3 regression: sitemap_cities does not filter to sellable; '
+        'Fail/Degraded cities will continue showing up in /sitemap-cities.xml'
+    )
+
+
+def test_v540_pr3_wired_into_city_page_soft_degrade():
+    """File-level guard: routes/city_pages.py:state_city_landing
+    sets g.v540_limited_coverage so templates can render the
+    'limited coverage' banner without 404-ing direct-URL hits to
+    Fail city slugs."""
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'routes', 'city_pages.py')).read()
+    scl_idx = src.find('def state_city_landing(')
+    next_def = src.find('\ndef ', scl_idx + 1)
+    scl_block = src[scl_idx:next_def if next_def > 0 else None][:2000]
+    assert 'g.v540_limited_coverage' in scl_block, (
+        'V540 PR3 regression: state_city_landing does not set the soft-degrade '
+        'flag. Direct URLs to Fail city slugs will render full content as if '
+        'they were sellable.'
+    )
 
 
 def test_v540_endpoint_dashboard_renamed_for_back_compat():

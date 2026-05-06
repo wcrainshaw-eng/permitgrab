@@ -34,6 +34,12 @@ from .compute import (
     compute_all_city_health,
     upsert_city_health,
 )
+from .curation import (
+    has_city_health_data,
+    is_sellable_city,
+    get_sellable_cities,
+    filter_to_sellable,
+)
 from .schema import ensure_table
 from .scheduler import health_daemon, start_thread
 
@@ -46,6 +52,10 @@ __all__ = [
     'compute_city_health',
     'compute_all_city_health',
     'upsert_city_health',
+    'has_city_health_data',
+    'is_sellable_city',
+    'get_sellable_cities',
+    'filter_to_sellable',
     'ensure_table',
     'health_daemon',
     'start_thread',

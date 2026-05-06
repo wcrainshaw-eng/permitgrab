@@ -3891,7 +3891,13 @@ def get_cities_with_data():
 
 
 def get_suggested_cities(searched_slug, limit=6):
-    """V12.9: Get similar city suggestions for 404 page using fuzzy matching."""
+    """V12.9: Get similar city suggestions for 404 page using fuzzy matching.
+
+    V540 PR3: filters out Degraded/Fail cities. The 404 page is user-
+    facing, so suggesting only sellable cities is the right pre-
+    curation gate. Falls open during cold-start (no city_health data
+    yet) — see city_health.is_sellable_city for the contract.
+    """
     all_cities = get_all_cities_info()
     active_cities = [c for c in all_cities if c.get('active', True)]
 
@@ -3916,17 +3922,32 @@ def get_suggested_cities(searched_slug, limit=6):
 
     # Sort by score, take top matches
     suggestions.sort(key=lambda x: -x[1])
-    return [s[0] for s in suggestions[:limit]]
+    sorted_cities = [s[0] for s in suggestions[:limit * 2]]
+
+    # V540 PR3: filter to sellable. Cold-start fail-open keeps this
+    # safe before the daily cron has fired.
+    try:
+        from city_health import filter_to_sellable
+        sellable_slugs = set(filter_to_sellable([c['slug'] for c in sorted_cities]))
+        sorted_cities = [c for c in sorted_cities if c['slug'] in sellable_slugs]
+    except Exception:
+        pass  # city_health module unavailable — return raw list
+
+    return sorted_cities[:limit]
 
 
 def get_popular_cities(limit=12):
-    """V12.51: Get popular cities for 404 page (SQL-backed)."""
+    """V12.51: Get popular cities for 404 page (SQL-backed).
+
+    V540 PR3: filters out Degraded/Fail cities. The 404 page promotes
+    cities to lost users — only sellable cities should appear there.
+    """
     conn = permitdb.get_connection()
     rows = conn.execute("""
         SELECT city, COUNT(*) as cnt FROM permits
         WHERE city IS NOT NULL AND city != ''
         GROUP BY city ORDER BY cnt DESC LIMIT ?
-    """, (limit * 2,)).fetchall()  # Fetch extra in case some aren't in city_lookup
+    """, (limit * 3,)).fetchall()  # Fetch extra to absorb the V540 filter
 
     all_cities = get_all_cities_info()
     city_lookup = {c['name']: c for c in all_cities}
@@ -3935,12 +3956,17 @@ def get_popular_cities(limit=12):
     for row in rows:
         name = row['city']
         if name in city_lookup:
-            city_info = city_lookup[name].copy()
-            popular.append(city_info)
-            if len(popular) >= limit:
-                break
+            popular.append(city_lookup[name].copy())
 
-    return popular
+    # V540 PR3: filter to sellable.
+    try:
+        from city_health import filter_to_sellable
+        sellable_slugs = set(filter_to_sellable([c['slug'] for c in popular]))
+        popular = [c for c in popular if c['slug'] in sellable_slugs]
+    except Exception:
+        pass
+
+    return popular[:limit]
 
 
 def render_city_not_found(searched_slug):
