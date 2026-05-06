@@ -3985,56 +3985,16 @@ def save_subscribers(subs):
 # All user operations now use PostgreSQL instead of JSON files
 
 
-def find_user_by_email(email):
-    """Find a user by email (case-insensitive). Returns User object or None."""
-    if not email:
-        return None
-    email_lower = email.lower().strip()
-    return User.query.filter(db.func.lower(User.email) == email_lower).first()
-
-
-def get_current_user():
-    """Get the currently logged-in user from session. Returns dict for backward compatibility."""
-    user_email = session.get('user_email')
-    if not user_email:
-        return None
-    user = find_user_by_email(user_email)
-    if user:
-        return user.to_dict()
-    return None
-
-
-def get_current_user_object():
-    """Get the currently logged-in user as User object (for database operations)."""
-    user_email = session.get('user_email')
-    if not user_email:
-        return None
-    return find_user_by_email(user_email)
-
-
-# V458 (CODE_V456): standardized auth gates. The auth system already
-# works (session['user_email'] + werkzeug password hashing + the User
-# SQLAlchemy model), but routes that gate on auth either reimplement
-# the check inline or do nothing. These two decorators give us one
-# consistent way to require login and to require a paying subscription.
-#
-# login_required(view) — redirect to /login when no user in session.
-# subscription_required(view) — redirect to /pricing?expired=1 when
-#   the user isn't on a Pro/Enterprise plan and isn't on an active
-#   trial. Includes login_required's behavior implicitly.
-from functools import wraps as _v458_wraps
-
-
-def login_required(view_func):
-    """Redirect anonymous visitors to /login?next=<original-url>."""
-    @_v458_wraps(view_func)
-    def _wrapped(*args, **kwargs):
-        if not session.get('user_email'):
-            from urllib.parse import quote as _q
-            nxt = _q(request.full_path or '/', safe='')
-            return redirect(f'/login?next={nxt}')
-        return view_func(*args, **kwargs)
-    return _wrapped
+# V538: find_user_by_email / get_current_user / get_current_user_object
+# moved to users/lookup.py. login_required moved to users/decorators.py.
+# Re-exported here so existing in-server-py callsites and any
+# `from server import login_required` consumer keep resolving.
+from users import (  # noqa: F401, E402
+    find_user_by_email,
+    get_current_user,
+    get_current_user_object,
+    login_required,
+)
 
 
 # V533: subscription_required moved to subscriptions/decorators.py.
@@ -4050,32 +4010,9 @@ from subscriptions import subscription_required  # noqa: F401, E402
 # These functions provide backward compatibility with code that expects
 # the old dict-based user storage while actually using the database.
 
-def load_users():
-    """Load all users from database as list of dicts (backward compatibility)."""
-    users = User.query.all()
-    return [u.to_dict() for u in users]
-
-
-def save_users(users):
-    """Save users to database (backward compatibility - DEPRECATED).
-    This is a no-op shim. Individual user updates should use db.session.commit().
-    Kept for backward compatibility with code that still calls this.
-    """
-    # No-op: database operations should be done directly
-    # Individual updates use db.session.commit()
-    pass
-
-
-def update_user_by_email(email, updates):
-    """Update a user's fields by email (V7 helper)."""
-    user = find_user_by_email(email)
-    if user:
-        for key, value in updates.items():
-            if hasattr(user, key):
-                setattr(user, key, value)
-        db.session.commit()
-        return True
-    return False
+# V538: load_users / save_users / update_user_by_email moved to
+# users/lookup.py. Re-exported here so existing callsites keep resolving.
+from users import load_users, save_users, update_user_by_email  # noqa: F401, E402
 
 
 # V531: get_user_plan / is_pro / is_enterprise moved to
