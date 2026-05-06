@@ -8,6 +8,7 @@ Per the durable rules:
 - Always run pytest tests/test_smoke.py + test_imports.py +
   test_routes.py locally before pushing.
 """
+from .address import normalize_address_for_lookup
 from .transforms import (
     reclassify_permit,
     generate_permit_description,
@@ -20,4 +21,5 @@ __all__ = [
     'generate_permit_description',
     'format_permit_address',
     'validate_permit_dates',
+    'normalize_address_for_lookup',
 ]

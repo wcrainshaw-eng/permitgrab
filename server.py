@@ -4411,33 +4411,9 @@ def load_signals():
     return []
 
 
-def normalize_address_for_lookup(address):
-    """Normalize an address for lookup (matches collector.py logic)."""
-    import re
-    if not address:
-        return ""
-    addr = address.lower().strip()
-    addr = re.sub(r'\s+', ' ', addr)
-    replacements = [
-        (r'\bstreet\b', 'st'),
-        (r'\bavenue\b', 'ave'),
-        (r'\bboulevard\b', 'blvd'),
-        (r'\bdrive\b', 'dr'),
-        (r'\broad\b', 'rd'),
-        (r'\blane\b', 'ln'),
-        (r'\bcourt\b', 'ct'),
-        (r'\bplace\b', 'pl'),
-        (r'\bapartment\b', 'apt'),
-        (r'\bsuite\b', 'ste'),
-        (r'\bnorth\b', 'n'),
-        (r'\bsouth\b', 's'),
-        (r'\beast\b', 'e'),
-        (r'\bwest\b', 'w'),
-    ]
-    for pattern, replacement in replacements:
-        addr = re.sub(pattern, replacement, addr)
-    addr = re.sub(r'[^\w\s#-]', '', addr)
-    return addr
+# V539: normalize_address_for_lookup moved to permit_processing/address.py.
+# Re-exported here so existing routes/api.py callsites resolve.
+from permit_processing import normalize_address_for_lookup  # noqa: F401, E402
 
 
 def load_saved_leads():

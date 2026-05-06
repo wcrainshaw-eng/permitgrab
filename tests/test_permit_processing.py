@@ -194,8 +194,50 @@ def test_permit_processing_re_exported_from_server():
     """server.py keeps re-exports so existing callsites resolve."""
     import server
     for name in ('reclassify_permit', 'generate_permit_description',
-                 'format_permit_address', 'validate_permit_dates'):
+                 'format_permit_address', 'validate_permit_dates',
+                 'normalize_address_for_lookup'):  # V539 added
         assert hasattr(server, name), (
-            f'V537 regression: server.py no longer re-exports {name!r}; '
+            f'V537/V539 regression: server.py no longer re-exports {name!r}; '
             f'existing callsites will NameError.'
         )
+
+
+# ---------------------------------------------------------------------
+# V539: normalize_address_for_lookup
+# ---------------------------------------------------------------------
+
+def test_normalize_address_lowercases_and_collapses_whitespace():
+    from permit_processing import normalize_address_for_lookup
+    assert normalize_address_for_lookup('  100  Main Street  ') == '100 main st'
+
+
+def test_normalize_address_expands_common_abbreviations():
+    """Long forms collapse to canonical short forms."""
+    from permit_processing import normalize_address_for_lookup
+    cases = [
+        ('100 Main Street', '100 main st'),
+        ('5 Oak Avenue', '5 oak ave'),
+        ('200 Washington Boulevard', '200 washington blvd'),
+        ('15 Hidden Drive', '15 hidden dr'),
+        ('22 Country Road', '22 country rd'),
+        ('8 Maple Lane', '8 maple ln'),
+        ('99 Court Place', '99 ct pl'),
+        ('45 Apartment 3', '45 apt 3'),
+        ('North 4th Street', 'n 4th st'),
+        ('South West Avenue', 's w ave'),
+    ]
+    for src, expected in cases:
+        got = normalize_address_for_lookup(src)
+        assert got == expected, f'{src!r} → {got!r}, expected {expected!r}'
+
+
+def test_normalize_address_handles_empty():
+    from permit_processing import normalize_address_for_lookup
+    assert normalize_address_for_lookup('') == ''
+    assert normalize_address_for_lookup(None) == ''
+
+
+def test_normalize_address_strips_punctuation_keeps_apt_marker():
+    """`#` and `-` survive; `,` `.` `;` get stripped."""
+    from permit_processing import normalize_address_for_lookup
+    assert normalize_address_for_lookup('100 Main St., Apt #3-A') == '100 main st apt #3-a'
