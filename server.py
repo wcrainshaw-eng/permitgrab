@@ -8587,19 +8587,32 @@ def start_collectors():
 
     _collector_started = True
 
-    # V493: V481's WORKER_MODE early-return removed.
+    # V546 PR2: re-introduce WORKER_MODE gate now that the
+    # permitgrab-worker Render service ACTUALLY EXISTS (V546a, deployed
+    # 2026-05-06). When WORKER_MODE=true is set on the worker process,
+    # this code path runs there and spawns the daemons. When
+    # WORKER_MODE=false (or unset on web), this gate returns early and
+    # the web stays HTTP-only.
     #
-    # DO NOT GATE THIS ON WORKER_MODE without first verifying that a
-    # permitgrab-worker service exists in the Render dashboard.
-    # render.yaml's declaration is aspirational only; the service was
-    # never created. V471 PR4 and V481 both made this mistake (see
-    # CLAUDE.md ARCHITECTURE GROUND TRUTH). V473b and V493 corrected.
+    # V481/V493 history: V481 added this gate before the worker service
+    # existed → daemons died silently → V493 ripped it out. The pattern
+    # was: "don't gate on WORKER_MODE until the worker exists." V546a
+    # is that worker existing for real this time. CLAUDE.md ARCHITECTURE
+    # GROUND TRUTH is now updated to reflect this.
     #
-    # V481's perf concern was real (12 gthread request handlers + 3
-    # daemons share one Python GIL on a single vCPU), but the right
-    # fix is to actually create the worker service — not to disable the
-    # daemons entirely on the only running process. Until the worker
-    # service exists, single-process is the only working state.
+    # The gate is opt-in. If WORKER_MODE is unset (which is the default
+    # on local dev / single-process Docker), this returns False and
+    # daemons spawn here — preserving backward compat with any local
+    # or fallback deployments that never activate the worker service.
+    if WORKER_MODE is False and os.environ.get('WORKER_MODE', '').lower() in ('false', '0', 'no'):
+        # Explicit web-mode opt-out: the worker service is live and
+        # this is the web service. Skip daemon spawn entirely.
+        print(
+            f"[{datetime.now()}] V546 PR2: WORKER_MODE=false on this "
+            f"process — skipping daemon spawn (worker service handles "
+            f"collection)", flush=True,
+        )
+        return
 
     os.makedirs(DATA_DIR, exist_ok=True)
 

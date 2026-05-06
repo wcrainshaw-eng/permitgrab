@@ -357,6 +357,33 @@ def test_v546b5_daemon_coverage_endpoint_shape(client):
     ), 'V546 regression: starved_count != 72h_plus + never'
 
 
+def test_v546_pr2_worker_mode_gate_in_start_collectors(client):
+    """V546 PR2: start_collectors() must skip daemon spawn when
+    WORKER_MODE is explicitly false on the web service. The worker
+    service (V546a, deployed 2026-05-06) handles all collection now.
+
+    Regression guard against re-removing the gate (V493 ripped it out
+    when the worker didn't exist; V546 PR2 puts it back now that V546a
+    has activated the actual Render Background Worker service).
+    """
+    import pathlib
+    src = pathlib.Path(__file__).parent.parent / 'server.py'
+    text = src.read_text()
+    assert 'V546 PR2' in text, (
+        'V546 PR2 regression: WORKER_MODE gate marker missing from '
+        'server.py — the V493 comment may have been left intact'
+    )
+    # The gate must explicitly check the env var, not just the
+    # WORKER_MODE Python flag (which can be False either by unset or
+    # by explicit false). Only EXPLICIT false on the env var should
+    # skip the daemon spawn — local dev (unset) preserves spawn for
+    # backward compat.
+    assert "in ('false', '0', 'no')" in text, (
+        'V546 PR2 regression: gate is not discriminating between '
+        'unset (local dev) and explicit false (web service post-V546a)'
+    )
+
+
 def test_v257_signup_renders_form_no_redirect(client):
     """V257 Fix 2: /signup must render a sign-up form with email input,
     NOT redirect to a random /permits/<city> page. Claim was the whole
