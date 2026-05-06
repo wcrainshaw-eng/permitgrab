@@ -630,21 +630,44 @@ def admin_daemon_coverage():
 
     try:
         conn = permitdb.get_connection()
-        # The V526 picker sorts by (last_run IS NULL) DESC, last_run ASC
-        # — match the same JOIN here so this metric mirrors what the
-        # daemon actually sees as 'stalest'.
-        rows = conn.execute("""
-            SELECT pc.city_slug,
-                   pc.source_type,
-                   ch.status AS health_status,
-                   (SELECT MAX(run_started_at) FROM scraper_runs
-                    WHERE city_slug = pc.city_slug) AS last_run
-              FROM prod_cities pc
-              LEFT JOIN city_health ch ON ch.city_slug = pc.city_slug
-             WHERE pc.status='active'
-               AND pc.source_type IS NOT NULL
-               AND pc.source_type != ''
-        """).fetchall()
+        # V546 PR5x: city_health is created by V540 PR1's migration at
+        # app startup, not by the CI test fixture, so the JOIN throws
+        # "no such table: city_health" in fresh DBs. Probe first and
+        # downgrade gracefully if it isn't present — the endpoint's
+        # primary metric (hours_since_last_run histogram) doesn't
+        # actually need city_health, only the optional starved_top's
+        # city_health_status column does.
+        try:
+            conn.execute("SELECT 1 FROM city_health LIMIT 1").fetchone()
+            _have_city_health = True
+        except Exception:
+            _have_city_health = False
+
+        if _have_city_health:
+            rows = conn.execute("""
+                SELECT pc.city_slug,
+                       pc.source_type,
+                       ch.status AS health_status,
+                       (SELECT MAX(run_started_at) FROM scraper_runs
+                        WHERE city_slug = pc.city_slug) AS last_run
+                  FROM prod_cities pc
+                  LEFT JOIN city_health ch ON ch.city_slug = pc.city_slug
+                 WHERE pc.status='active'
+                   AND pc.source_type IS NOT NULL
+                   AND pc.source_type != ''
+            """).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT pc.city_slug,
+                       pc.source_type,
+                       NULL AS health_status,
+                       (SELECT MAX(run_started_at) FROM scraper_runs
+                        WHERE city_slug = pc.city_slug) AS last_run
+                  FROM prod_cities pc
+                 WHERE pc.status='active'
+                   AND pc.source_type IS NOT NULL
+                   AND pc.source_type != ''
+            """).fetchall()
     except Exception as e:
         return jsonify({'error': f'query failed: {e}'}), 500
 
