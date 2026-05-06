@@ -1,0 +1,107 @@
+PING WES — V547b + V547i SHIPPED, 1h observation window starts NOW
+
+================================================================
+HEADLINE
+================================================================
+Both tracks deployed. Per the new
+feedback_observability_window_calibration rule (also saved this turn):
+throughput fixes use a 1h window, not 24h. Reverses the V547 deferral.
+
+V547i (commit 5208a1f): plain-Accela CapDetail deep-fetch — fixes
+SBCO + 42 other plain-`accela` cities by following each search-grid
+row's <a href> and parsing 'Licensed Professional:' from the detail
+HTML. SBCO config flipped `deep_fetch: True`. Will pick up the next
+worker cycle and start populating contractor_name + license + email
++ phone for the 2,055 SBCO permits.
+
+V547b (commit 6f33bf0): collector throughput crank — parallel
+pre-fetch via ThreadPoolExecutor(max_workers=20) with per-platform
+semaphores (socrata=10, arcgis=8, accela=4, ckan=10), MAX_CITIES_PER_CYCLE
+75 → 200, worker cycle cadence 30-min → 15-min. Target: 800
+city-visits/hour (200 × 4 cycles/hr).
+
+================================================================
+PRE-DEPLOY BASELINE
+================================================================
+Captured 2026-05-06T14:05:27Z (right before push):
+  platform_active_total = 736
+  coverage_pct_24h      = 37.36%
+  starved_count         = 461
+  Pass list             = 38 (per latest health_scheduler row)
+
+================================================================
+ACCEPTANCE CRITERIA (1h post-deploy)
+================================================================
+V547b GREEN if all of:
+  - starved_count drops 461 → <300 (≥150 cities/hour lift, target rate)
+  - worker memory holds < 1.5 GB
+  - 0 PoolError exceptions in worker logs
+  - errors_24h doesn't spike >20% (currently 58)
+  - daemon_coverage 0_6h bucket grows substantially
+
+V547b YELLOW (proceed but watch closely):
+  - starved drops 461 → 350-400 (hit but underperformed target)
+  - or memory peaks 1.5-1.9 GB
+
+V547b RED (rollback or dial back):
+  - memory crosses 1.9 GB on worker
+  - PoolError exceptions appear (Postgres pool exhaustion)
+  - errors_24h spikes >20% (>70)
+  → Dial max_workers from 20 to 12, redeploy. Observe 1h.
+
+V547i GREEN if:
+  - san-bernardino-county profiles > 50 (vs current 0)
+  - city_health.san-bernardino-county status flips
+    Degraded(low_profiles) → Pass (or stays Degraded with
+    profiles>0, depending on phone count threshold)
+  - Worker logs show "[V547i] SBC: deep-fetched N (M with contractor)"
+    lines on the next collection cycle that includes SBCO
+
+V547i RED:
+  - 0 contractors after first cycle that hits SBCO → CapDetail page
+    structure differs from V476 Tampa pattern; need different parser
+  - Detail-page fetch timing out repeatedly → SBC tenant rate-limiting
+
+================================================================
+WHAT'S DEFERRED
+================================================================
+V547j (Track C — slug-case normalization on subscribers.digest_cities):
+  Wes's wcrainshaw subscription has digest_cities=["Atlanta"]
+  (capitalized) which doesn't join to permits.source_city_key='atlanta'.
+  Small fix:
+    - one-shot UPDATE: lowercase + trim entries in subscribers.digest_cities
+      and saved_searches.city_slug
+    - add SQLAlchemy listener on SavedSearch model for write-time
+      normalization
+    - regression test: insert with city='ATLANTA', persisted='atlanta'
+  Scope is contained; can ship after V547b/i are observed clean.
+
+================================================================
+CURRENT MONITORING
+================================================================
+Monitor armed:
+  CI completion on V547b deploy (commit 6f33bf0)
+
+Manual check sequence at T+15min, T+30min, T+60min:
+  GET /api/admin/daemon-coverage
+  GET /api/admin/health (worker memory if exposed)
+  Watch starved_count + 0_6h bucket changes
+
+If V547b GREEN at T+60min, V547b acceptance achieved → continue.
+
+If V547i takes longer (worker has to deep-fetch 200 SBCO permits
+@ 1s rate-limit + 1-2s per fetch = ~5-7 min for the first batch),
+SBCO contractor count may not show until T+30-45min. Re-check at
+T+60min via:
+  curl /api/admin/query
+    SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key='san-bernardino-county'
+
+================================================================
+NEW DURABLE RULE (saved this turn)
+================================================================
+feedback_observability_window_calibration.md — 1h for throughput,
+24h for scheduling, post-deploy verification for schema/data. Stops
+the "we paid for the bandwidth, why aren't we using it?" Wes
+intervention pattern.
+
+— Captured 2026-05-06 ~14:10 UTC
