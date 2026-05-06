@@ -59,7 +59,15 @@ def _extract_form_fields(soup):
 
 
 def _parse_results_table(soup):
-    """Parse the ACA results grid table into a list of dicts."""
+    """Parse the ACA results grid table into a list of dicts.
+
+    V547i: also captures the first cell's `<a href>` as
+    `values['_detail_url']` (private key, prefix '_' so it's
+    skipped by field_map). The Record Number cell's anchor
+    points at CapDetail.aspx for the permit. The deep-fetch
+    path uses this to hit the detail page and extract
+    contractor info that's NOT in the search grid.
+    """
     grid = soup.find('table', id=re.compile(r'gdvPermitList'))
     if not grid:
         return [], 0
@@ -83,6 +91,15 @@ def _parse_results_table(soup):
             text = link.get_text(strip=True) if link else cell.get_text(strip=True)
             if text:
                 values[col_name] = text
+            # V547i: stash the first cell's anchor href as the
+            # CapDetail URL — typically the Record Number cell
+            # (column 1 or 2 depending on grid layout).
+            if link and '_detail_url' not in values:
+                href = link.get('href', '') or ''
+                # Skip javascript:... links — those are sort/filter
+                # actions, not navigation.
+                if href and not href.startswith('javascript:'):
+                    values['_detail_url'] = href
         # Skip empty/header-only rows — check for any permit number or address
         has_permit = values.get('Record Number') or values.get('Permit Number') or values.get('Record #') or values.get('Case Number')
         has_address = values.get('Address')
@@ -117,7 +134,8 @@ def _get_next_page_target(soup, current_page):
 
 
 def fetch_accela_portal(agency_code, days_back=30, module="Building",
-                        tab_name="Building", max_pages=25, portal_base_url=None):
+                        tab_name="Building", max_pages=25, portal_base_url=None,
+                        deep_fetch=False, max_details_per_run=200):
     """
     Fetch permits from an Accela Citizen Access portal.
 
@@ -253,8 +271,81 @@ def fetch_accela_portal(agency_code, days_back=30, module="Building",
             'expiration_date': _parse_aca_date(rec.get('Expiration Date', '')),
             'project_name': rec.get('Project Name', ''),
         }
+        # V547i: thread the captured detail-page href through so the
+        # deep-fetch step below can use it. Strip from the final
+        # output before returning.
+        if rec.get('_detail_url'):
+            permit['_detail_url'] = rec['_detail_url']
         if permit['permit_number']:
             permits.append(permit)
+
+    # V547i: optional CapDetail deep-fetch for cities whose Accela
+    # search grid has no contractor column (SBCO and 42 other plain-
+    # accela cities — see V547h_SBCO_AUDIT). Pattern follows V476
+    # accela_arcgis_hybrid: per-permit detail-page fetch + parse the
+    # 'Licensed Professional:' field via regex (parse_accela_licensed_
+    # professional). Capped at max_details_per_run to fit within the
+    # worker's per-cycle runtime budget (~200 fetches × 0.5s sleep
+    # + 1-2s response = ~5-7 min for the cap).
+    if deep_fetch and permits:
+        # Build base for relative-URL detail links. Each detail href
+        # in the grid is typically relative to /Cap/CapHome.aspx.
+        if portal_base_url:
+            detail_base = f"{portal_base_url.rstrip('/')}/Cap/"
+        else:
+            detail_base = f"https://aca-prod.accela.com/{agency_code}/Cap/"
+        deep_count = 0
+        with_contractor = 0
+        deep_sess = _build_session()
+        for permit in permits[:max_details_per_run]:
+            detail_url = permit.pop('_detail_url', None)
+            if not detail_url:
+                continue
+            # Resolve relative paths against the Cap/ base.
+            if detail_url.startswith('http'):
+                full_url = detail_url
+            elif detail_url.startswith('/'):
+                # Site-absolute path; combine with portal hostname.
+                if portal_base_url:
+                    host = portal_base_url.rstrip('/')
+                else:
+                    host = "https://aca-prod.accela.com"
+                full_url = host + detail_url
+            else:
+                full_url = detail_base + detail_url.lstrip('./')
+            try:
+                d_resp = deep_sess.get(full_url, timeout=30)
+                d_resp.raise_for_status()
+                parsed = parse_accela_licensed_professional(d_resp.text)
+                if parsed.get('contractor_name'):
+                    permit['contractor_name'] = parsed['contractor_name']
+                    with_contractor += 1
+                if parsed.get('license_number'):
+                    permit['license_number'] = parsed['license_number']
+                if parsed.get('email'):
+                    permit['contact_email'] = parsed['email']
+                if parsed.get('phone'):
+                    permit['contact_phone'] = parsed['phone']
+                if parsed.get('contact_name'):
+                    permit['contact_name'] = parsed['contact_name']
+            except Exception as e:
+                # Don't drop the permit if detail fetch fails — keep
+                # the grid data, just no contractor enrichment for
+                # this row.
+                print(f"  [V547i] {agency_code}: detail fetch failed "
+                      f"for {permit.get('permit_number')}: {e}", flush=True)
+            deep_count += 1
+            time.sleep(_RATE_LIMIT_SECONDS)
+        # Strip leftover _detail_url from permits beyond the cap.
+        for permit in permits[max_details_per_run:]:
+            permit.pop('_detail_url', None)
+        print(f"  [V547i] {agency_code}: deep-fetched {deep_count} "
+              f"({with_contractor} with contractor)", flush=True)
+    else:
+        # No deep-fetch — strip the private key so it doesn't leak
+        # downstream.
+        for permit in permits:
+            permit.pop('_detail_url', None)
 
     return permits
 
@@ -336,9 +427,17 @@ def fetch_accela(config, days_back=30):
         print(f"  [ACA] No agency code found in config")
         return []
 
+    # V547i: thread the deep_fetch flag from config through. Cities
+    # without an ArcGIS sister-feed (SBCO et al.) opt in here so the
+    # CapDetail per-permit deep-fetch lifts contractor info that's
+    # absent from the search grid.
+    deep_fetch = bool(config.get('deep_fetch'))
+    max_details = int(config.get('max_details_per_run', 200))
     return fetch_accela_portal(agency_code, days_back=days_back,
                                module=module, tab_name=tab_name,
-                               portal_base_url=portal_base_url)
+                               portal_base_url=portal_base_url,
+                               deep_fetch=deep_fetch,
+                               max_details_per_run=max_details)
 
 
 # ---------------------------------------------------------------------------

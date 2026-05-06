@@ -6454,12 +6454,22 @@ CITY_REGISTRY = {
             "status": "Status",
         },
         "limit": 2000,
+        # V547i: opt into the per-permit CapDetail deep-fetch. SBC's
+        # Accela ACA search grid has no contractor column (V547h
+        # finding). The deep_fetch flag tells fetch_accela_portal to
+        # follow each row's detail-page <a href> and parse the
+        # 'Licensed Professional:' field via the existing V476
+        # parse_accela_licensed_professional regex parser. Capped at
+        # max_details_per_run per cycle to fit the worker's runtime
+        # budget.
+        "deep_fetch": True,
+        "max_details_per_run": 200,
         "active": True,
         "status": "paused",
         # San Bernardino County tenant on aca-prod.accela.com is /SBC/, not /SBCO/.
         # /SBCO/ is Santa Barbara County. The old ezop.sbcounty.gov portal
         # redirects to /SBC/ via ezpermits.sbcounty.gov.
-        "notes": "San Bernardino County CA Accela portal. Agency code SBC, module=Building.",
+        "notes": "San Bernardino County CA Accela portal. Agency code SBC, module=Building. V547i deep_fetch enabled.",
     },
 
     "san_antonio_tx": {
