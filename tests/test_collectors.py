@@ -375,6 +375,51 @@ def test_v535_collector_fetch_arcgis_is_back_compat_shim_to_collectors():
     assert 'MAX_PAGES = 10' in arcgis_src
 
 
+def test_v543_health_check_handles_sqlite_row_factory():
+    """V543 regression: collectors._base.health_check used
+    list(row.values())[0] for the dict branch — fails on sqlite3.Row
+    (which has keys() but no values()). Same bug class as V541b's
+    fix to city_health.compute._measure_city. Pin: with sqlite3.Row
+    factory + chicago-shaped seed, health_check returns 'pass' (not
+    'fail'/'degraded' from silently-zero permits_24h).
+    """
+    import sqlite3
+    from datetime import datetime, timedelta
+    from unittest.mock import patch
+
+    conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
+    conn.executescript("""
+        CREATE TABLE prod_cities (city_slug TEXT, source_type TEXT, status TEXT, consecutive_failures INTEGER DEFAULT 0);
+        CREATE TABLE permits (id INTEGER PRIMARY KEY, permit_number TEXT, source_city_key TEXT, collected_at TEXT, date TEXT);
+        CREATE TABLE scraper_runs (id INTEGER PRIMARY KEY, city_slug TEXT, run_started_at TEXT, status TEXT, error_message TEXT);
+    """)
+    now_str = (datetime.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    conn.execute("INSERT INTO prod_cities VALUES ('chicago-il', 'socrata', 'active', 0)")
+    # 5 permits today (within 24h)
+    for i in range(5):
+        conn.execute("INSERT INTO permits (permit_number, source_city_key, collected_at, date) VALUES (?, ?, ?, ?)",
+                     (f'P{i}', 'chicago-il', now_str, today))
+    conn.execute("INSERT INTO scraper_runs (city_slug, run_started_at, status) VALUES (?, ?, 'success')",
+                 ('chicago-il', now_str))
+    conn.commit()
+
+    from collectors import socrata
+    with patch('db.get_connection', return_value=conn):
+        result = socrata.health_check('chicago-il')
+
+    assert result['status'] == 'pass', (
+        f'V543 regression: collectors.socrata.health_check returned {result} '
+        f'instead of pass on sqlite3.Row factory. Bug back in _row_value.'
+    )
+    assert result['permits_24h'] == 5, (
+        f'V543 regression: permits_24h not extracted from SELECT COUNT(*) AS cnt. '
+        f'Got {result["permits_24h"]}, expected 5.'
+    )
+    assert result['newest_permit_date'] == today
+
+
 def test_v534_collector_fetch_socrata_is_back_compat_shim_to_collectors():
     """V534 contract: after moving the fetch_socrata body into
     collectors/socrata.py, collector.fetch_socrata MUST still be

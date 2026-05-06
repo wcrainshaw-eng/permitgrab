@@ -152,30 +152,42 @@ def health_check(city_slug: str, platform: str) -> dict:
         pass
 
     # Permits in last 24h
+    # V543: aliased aggregates + cross-dialect _row_value pattern.
+    # Same bug class as V541b: list(row.values())[0] AttributeError'd
+    # silently on sqlite3.Row (which has keys() but NO values()),
+    # left permits_24h = 0 / newest_permit_date = None on every call.
+    def _row_value(row, key):
+        if row is None:
+            return None
+        try:
+            return row[key]
+        except (KeyError, IndexError, TypeError):
+            pass
+        try:
+            return row[0]
+        except Exception:
+            return None
+
     try:
         p24 = conn.execute(
-            "SELECT COUNT(*) FROM permits "
+            "SELECT COUNT(*) AS cnt FROM permits "
             "WHERE source_city_key = ? "
             "AND collected_at > datetime('now', '-1 day')",
             (city_slug,),
         ).fetchone()
-        if p24 is not None:
-            out['permits_24h'] = int(
-                p24[0] if not hasattr(p24, 'keys') else list(p24.values())[0]
-            )
+        v = _row_value(p24, 'cnt')
+        if v is not None:
+            out['permits_24h'] = int(v)
     except Exception:
         pass
 
     # Newest permit date for this slug
     try:
         nd = conn.execute(
-            "SELECT MAX(date) FROM permits WHERE source_city_key = ?",
+            "SELECT MAX(date) AS newest FROM permits WHERE source_city_key = ?",
             (city_slug,),
         ).fetchone()
-        if nd is not None:
-            out['newest_permit_date'] = (
-                nd[0] if not hasattr(nd, 'keys') else list(nd.values())[0]
-            )
+        out['newest_permit_date'] = _row_value(nd, 'newest')
     except Exception:
         pass
 
