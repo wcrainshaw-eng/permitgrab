@@ -882,6 +882,34 @@ def test_has_city_health_data_returns_false_when_empty():
         assert has_city_health_data() is False
 
 
+def test_v546c_has_city_health_data_handles_sqlite_row_factory():
+    """V546c regression: has_city_health_data() was using
+    `list(row.values())[0]` which AttributeError's on sqlite3.Row
+    (which has keys() but NOT values()). Production prod_cities DB
+    sets row_factory=sqlite3.Row, so this path triggered the broad
+    `except Exception: return False` and silently fail-opened the
+    V540 PR3 sitemap/picker filter — defeating V544's entire 28-Pass
+    indexation contract.
+
+    The default sqlite3 connection returns plain tuples (which DO
+    work in the buggy code path), so the prior tests at
+    `test_has_city_health_data_returns_true_with_rows` didn't catch
+    this. This test sets row_factory=sqlite3.Row to reproduce the
+    production scenario.
+    """
+    from city_health import has_city_health_data
+    conn = _setup_db()
+    conn.row_factory = sqlite3.Row  # trigger the prod code path
+    _seed_city_health_table(conn, [{'slug': 'x', 'status': 'Pass'}])
+    with patch('db.get_connection', return_value=conn):
+        assert has_city_health_data() is True, (
+            'V546c regression: has_city_health_data() returned False '
+            'with sqlite3.Row factory + populated table. The '
+            'list(row.values())[0] bug is back, V544 sitemap filter '
+            'will silently fail-open again.'
+        )
+
+
 def test_v540_pr3_wired_into_server_helpers():
     """File-level guard: server.py:get_popular_cities and
     get_suggested_cities both call filter_to_sellable. If a future

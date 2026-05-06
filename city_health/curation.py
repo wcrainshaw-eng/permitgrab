@@ -26,13 +26,32 @@ def has_city_health_data():
 
     Pre-curation gates fail-open until at least one row exists, so a
     fresh deploy doesn't hide every city before the daily cron runs.
+
+    V546c (2026-05-06): V541b/V543 row.values() bug class was hiding
+    here too. `list(row.values())[0]` AttributeError'd on sqlite3.Row
+    (which has keys() but NO values()), tripped the broad except, and
+    returned False — silently fail-opening V540 PR3 sitemap and picker
+    filters even when city_health was fully populated. Caught when the
+    V544-filtered sitemap-cities.xml was returning 1,713 URLs instead
+    of the expected 28 Pass cities. Fix is the same cross-dialect
+    `COUNT(*) AS cnt` + alias-based access used in compute.py and
+    collectors/_base.py.
     """
     try:
         conn = permitdb.get_connection()
-        row = conn.execute("SELECT COUNT(*) FROM city_health").fetchone()
+        row = conn.execute("SELECT COUNT(*) AS cnt FROM city_health").fetchone()
         if row is None:
             return False
-        cnt = row[0] if not hasattr(row, 'keys') else list(row.values())[0]
+        # Cross-dialect single-value extractor — sqlite3.Row supports
+        # both string and integer indexing; psycopg2 RealDictRow only
+        # supports string. Try string first, fall back to position 0.
+        try:
+            cnt = row['cnt']
+        except (KeyError, IndexError, TypeError):
+            try:
+                cnt = row[0]
+            except Exception:
+                return False
         return int(cnt or 0) > 0
     except Exception:
         # Table missing or DB unavailable — treat as "no data yet"
