@@ -319,6 +319,52 @@ def _v540_cache_put(key, body):
     _v540_response_cache[key] = (_v540_time.time(), body)
 
 
+@admin_bp.route('/api/admin/city-health/compute-now', methods=['POST'])
+def admin_city_health_compute_now():
+    """V541a: ad-hoc trigger for city_health.compute_all_city_health().
+
+    The V540 daily scheduler fires at 8 UTC, so the city_health table
+    is empty until the first cron run. This endpoint lets Wes (or
+    Code) force a compute on demand — useful for:
+      - First-time activation (V541 audit chain)
+      - After-deploy smoke when waiting overnight isn't acceptable
+      - Re-running after fixing a city's data so its status updates
+        before the next nightly cron
+
+    Returns the summary dict from compute_all_city_health():
+      {pass: N, degraded: N, fail: N, total: N, errored: N}
+    Plus 'duration_seconds' so admin can compare runs.
+
+    Admin-key gated. Bumps the response cache so stale 60s windows
+    don't hide the new computed state from immediate consumers.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    import time as _t
+    started = _t.time()
+    try:
+        from city_health import compute_all_city_health, ensure_table
+        ensure_table()  # idempotent; safe on fresh DBs
+        summary = compute_all_city_health()
+    except Exception as e:
+        return jsonify({'error': f'compute failed: {e}'}), 500
+    elapsed = _t.time() - started
+
+    # Bust the V540 PR2 endpoint cache so subsequent GETs see fresh state
+    try:
+        _v540_response_cache.clear()
+    except Exception:
+        pass
+
+    return jsonify({
+        **summary,
+        'duration_seconds': round(elapsed, 2),
+        'cache_busted': True,
+    })
+
+
 @admin_bp.route('/api/admin/city-health', methods=['GET'])
 def admin_city_health():
     """V540: canonical per-city Pass/Degraded/Fail health endpoint.

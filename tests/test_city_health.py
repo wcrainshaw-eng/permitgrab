@@ -794,6 +794,39 @@ def test_v540_pr4_digest_skip_handles_empty_input():
     assert filter_subscriber_cities_for_digest('a@b.com', []) == []
 
 
+# ---------------------------------------------------------------------
+# V541a: /api/admin/city-health/compute-now endpoint
+# ---------------------------------------------------------------------
+
+def test_v541a_compute_now_endpoint_registered():
+    """File-level guard: the on-demand compute endpoint exists at the
+    Wes-specified path, gated by admin key, and calls
+    compute_all_city_health()."""
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'routes', 'admin.py')).read()
+    assert "@admin_bp.route('/api/admin/city-health/compute-now', methods=['POST'])" in src, (
+        'V541a regression: /api/admin/city-health/compute-now route missing'
+    )
+    fn_idx = src.find('def admin_city_health_compute_now(')
+    assert fn_idx > 0, (
+        'V541a regression: admin_city_health_compute_now function not defined'
+    )
+    fn_block = src[fn_idx:src.find('\n@', fn_idx + 1)]
+    assert 'compute_all_city_health' in fn_block, (
+        'V541a regression: endpoint must call compute_all_city_health'
+    )
+    assert 'ensure_table' in fn_block, (
+        'V541a regression: endpoint must ensure_table before compute (handles fresh DB)'
+    )
+    assert 'check_admin_key' in fn_block, (
+        'V541a regression: endpoint must be admin-key gated'
+    )
+    assert '_v540_response_cache.clear' in fn_block, (
+        'V541a regression: endpoint must bust the V540 PR2 response cache so '
+        'subsequent GET /api/admin/city-health calls see the fresh state'
+    )
+
+
 def test_v540_pr4_wired_into_email_alerts():
     """File-level guard: email_alerts.send_daily_digest_to_user calls
     filter_subscriber_cities_for_digest. If a future refactor removes
