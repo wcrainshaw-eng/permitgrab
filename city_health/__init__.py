@@ -40,6 +40,7 @@ from .curation import (
     get_sellable_cities,
     filter_to_sellable,
 )
+from .digest_safety import filter_subscriber_cities_for_digest
 from .schema import ensure_table
 from .scheduler import health_daemon, start_thread
 
@@ -56,6 +57,7 @@ __all__ = [
     'is_sellable_city',
     'get_sellable_cities',
     'filter_to_sellable',
+    'filter_subscriber_cities_for_digest',
     'ensure_table',
     'health_daemon',
     'start_thread',

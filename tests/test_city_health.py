@@ -721,6 +721,104 @@ def test_v540_pr3_wired_into_city_page_soft_degrade():
     )
 
 
+# ---------------------------------------------------------------------
+# V540 PR4: defense-in-depth digest safety net
+# ---------------------------------------------------------------------
+
+def test_v540_pr4_digest_skip_drops_fail_city():
+    """V540 PR4 contract: when a subscriber's city is Fail at digest
+    time, drop THAT city for THIS digest. Pin: only Pass cities pass
+    through; Degraded + Fail are dropped."""
+    from city_health import filter_subscriber_cities_for_digest
+    conn = _setup_db()
+    _seed_city_health_table(conn, [
+        {'slug': 'good-city', 'status': 'Pass'},
+        {'slug': 'bad-city', 'status': 'Fail'},
+    ])
+    with patch('db.get_connection', return_value=conn):
+        kept = filter_subscriber_cities_for_digest('alice@example.com',
+                                                    ['good-city', 'bad-city'])
+    assert kept == ['good-city']
+
+
+def test_v540_pr4_digest_skip_logs_to_digest_log():
+    """Each dropped slug → digest_log row with status='safety_net_skip'.
+    Admin dashboard reads digest_log to surface the alert."""
+    from city_health import filter_subscriber_cities_for_digest
+    conn = _setup_db()
+    _seed_city_health_table(conn, [
+        {'slug': 'good-city', 'status': 'Pass'},
+        {'slug': 'bad-city', 'status': 'Fail'},
+    ])
+    with patch('db.get_connection', return_value=conn):
+        filter_subscriber_cities_for_digest('alice@example.com',
+                                             ['good-city', 'bad-city'])
+    rows = conn.execute(
+        "SELECT recipient_email, status, error_message FROM digest_log"
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == 'alice@example.com'
+    assert rows[0][1] == 'safety_net_skip'
+    assert "'bad-city'" in rows[0][2]
+
+
+def test_v540_pr4_digest_skip_returns_empty_when_all_fail():
+    """If ALL subscriber cities are Fail, return empty list. Caller
+    (email_alerts.send_daily_digest_to_user) interprets empty list
+    as 'skip the entire digest, don't email subscriber'."""
+    from city_health import filter_subscriber_cities_for_digest
+    conn = _setup_db()
+    _seed_city_health_table(conn, [
+        {'slug': 'a', 'status': 'Fail'},
+        {'slug': 'b', 'status': 'Fail'},
+    ])
+    with patch('db.get_connection', return_value=conn):
+        kept = filter_subscriber_cities_for_digest('alice@example.com', ['a', 'b'])
+    assert kept == []
+
+
+def test_v540_pr4_digest_skip_cold_start_fail_open():
+    """If city_health is empty (fresh deploy, scheduler hasn't fired),
+    pass through unchanged. Don't break digests just because the
+    safety net hasn't been computed yet."""
+    from city_health import filter_subscriber_cities_for_digest
+    conn = _setup_db()
+    with patch('db.get_connection', return_value=conn):
+        kept = filter_subscriber_cities_for_digest('alice@example.com',
+                                                    ['any-slug', 'another'])
+    assert kept == ['any-slug', 'another']
+
+
+def test_v540_pr4_digest_skip_handles_empty_input():
+    from city_health import filter_subscriber_cities_for_digest
+    assert filter_subscriber_cities_for_digest('a@b.com', []) == []
+
+
+def test_v540_pr4_wired_into_email_alerts():
+    """File-level guard: email_alerts.send_daily_digest_to_user calls
+    filter_subscriber_cities_for_digest. If a future refactor removes
+    the call, the safety net is silently disabled — this test catches
+    that."""
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'email_alerts.py')).read()
+    sdd_idx = src.find('def send_daily_digest_to_user(')
+    next_def = src.find('\ndef ', sdd_idx + 1)
+    block = src[sdd_idx:next_def if next_def > 0 else None]
+    assert 'filter_subscriber_cities_for_digest' in block, (
+        'V540 PR4 regression: email_alerts.send_daily_digest_to_user '
+        'no longer calls filter_subscriber_cities_for_digest. The '
+        'defense-in-depth safety net is bypassed; subscribers whose '
+        "city has flipped Fail since subscribe-time will receive "
+        'broken digests.'
+    )
+    assert "'v540_safety_net_all_fail'" in block, (
+        'V540 PR4 regression: send_daily_digest_to_user does not '
+        'short-circuit when all cities are Fail. The function should '
+        'return a v540_safety_net_all_fail status code so the caller '
+        'knows the digest was suppressed (not sent + failed).'
+    )
+
+
 def test_v540_endpoint_dashboard_renamed_for_back_compat():
     """V540 PR2 reconciliation: V226's dashboard rollup endpoint
     moved from /api/admin/city-health to /api/admin/city-health-dashboard.

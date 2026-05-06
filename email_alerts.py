@@ -790,6 +790,28 @@ def send_daily_digest_to_user(user):
     if selected != set(cities):
         cities = [c for c in cities if c in selected]
 
+    # V540 PR4: defense-in-depth safety net. Pre-curation (PR3) keeps
+    # users from PICKING a Fail city, but a city CAN flip Pass→Fail
+    # between subscribe-time and now. Filter at send time. Each dropped
+    # slug → digest_log row with status='safety_net_skip' so the admin
+    # dashboard surfaces the alert. Don't email the subscriber 'sorry'
+    # — the system contract in PR3 is that it works; if it doesn't,
+    # we eat it silently and self-notify.
+    try:
+        from city_health import filter_subscriber_cities_for_digest
+        cities = filter_subscriber_cities_for_digest(
+            getattr(user, 'email', None), cities,
+        )
+    except Exception as _v540_err:
+        print(
+            f'[V540 PR4] digest safety net error (proceeding without filter): {_v540_err}',
+            flush=True,
+        )
+    if not cities:
+        # All subscribed cities flipped Fail. Don't send. The
+        # safety_net_skip rows in digest_log already alert Wes.
+        return False, 'v540_safety_net_all_fail'
+
     # Use last_digest_sent_at to avoid sending duplicate permits.
     if hasattr(user, 'last_digest_sent_at') and user.last_digest_sent_at:
         if isinstance(user.last_digest_sent_at, str):
