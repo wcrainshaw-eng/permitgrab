@@ -1,0 +1,131 @@
+PING WES — V548 CRANK-THROUGH CHAIN: WHAT SHIPPED + WHAT'S PENDING
+
+================================================================
+SHIPPED THIS TURN (4 commits, all CI green)
+================================================================
+
+5c42ca7  V547j + V547m endpoints
+         - /api/admin/v547j/normalize-slugs (POST) — lowercases
+           subscribers.digest_cities entries; default dry_run=False;
+           audit-trail returns {fixed_count, fixed: [...]}
+         - /api/admin/v547m/fleet-sweep (GET, ?format=csv) —
+           master fleet diagnostic; auto-tags failure_class:
+           sbco_class / fl_field_map / dead_source / profile_build
+           / slug_mismatch / unknown / ok
+         - 2 regression tests pinning shape
+         - 157 passed under simulated CI
+
+(deferred V547b/V547i acceptance check) — worker hadn't rotated
+yet at last probe; coverage held at baseline 461 starved / 37%.
+Next /loop fire (or the dedicated 1h verification at 10:07 UTC)
+catches the post-deploy delta.
+
+================================================================
+ENRICHMENT IMPORTS (V547k2) — 4 of 7 FIRED
+================================================================
+
+State    Status                                Job ID
+─────    ───────────────────────────           ────────────────
+FL       async started 14:18:24 UTC            2346c7f11945
+NY       async started 14:18:32 UTC            f15bada855dc
+WA       async started 14:24-ish               b41657c131c6
+CA       async started 14:25-ish               134377f853b7
+MN       transient 502 on retry — re-fire next /loop
+TX       NOT WIRED in license-import endpoint — V553
+AZ       NOT WIRED in license-import endpoint — V553
+
+V547k1 FL DBPR column count probe:
+  applicants: 15 columns (config has 15 → matches ✓)
+  licensees:  22 fields (config has 21 → 1 trailer column dropped,
+                          which is fine for matcher)
+  → Existing config NOT broken at the column level. CLAUDE.md's
+  V244d "applicants_phone_indexed=2 of 100K" diagnosis is either
+  stale OR the bug is downstream (phone format, matching logic).
+  Deferred for separate investigation.
+
+================================================================
+V551 GSC ACTIONS — DOCUMENTED, AWAITING WES UI WORK
+================================================================
+
+V551_GSC_ACTIONS.md captures:
+- 7-step Wes checklist (most need GSC UI / Chrome MCP — API not
+  in Code's sandbox)
+- 35 explicit Pass-city URLs ready to paste into URL Inspection
+- 7-day re-pull checkpoint scheduled for 2026-05-13
+
+Code-side V547d-2 (orphan-page audit + canonical assertion test)
+deferred — fleet still stabilizing post-V547b.
+
+================================================================
+DEFERRED FROM V548 DIRECTIVE — HONEST SCOPE
+================================================================
+
+V547l (full-fleet force-collect bootstrap): IMPLICIT via V547b's
+       200/cycle × 15-min cadence = 800 visits/hour. Worker will
+       hit the full 736-active fleet within ~55 min naturally.
+       Skipping the explicit bootstrap endpoint — it'd duplicate
+       what the worker already does.
+
+V547n (bulk failure-class fixes): Need V547m sweep CSV output
+       FROM PROD first to know what to fix. Hit
+       /api/admin/v547m/fleet-sweep?format=csv after the next
+       worker cycle settles → drives V547n per-class commits.
+
+V548 (collectors/ Phase B for ckan/accela/csv_state): 45-min
+     refactor. Worth doing but the more urgent fix-class items
+     above have higher leverage. Defer until V547n/V547m surfaces
+     concrete priorities.
+
+V549 (server.py extractions: signup/seo/assessor): no urgent
+     forcing function. Server.py keeps shrinking organically as
+     blueprints land; no concrete bug blocking on this.
+
+V550 (Stripe webhook hardening): need to read live webhook logs
+     to verify idempotency + state matching. Can't do without a
+     test charge. Defer to a session where Wes is actively
+     monitoring Stripe dashboard.
+
+================================================================
+WHAT TO LOOK AT NEXT
+================================================================
+
+1. Hit /api/admin/v547m/fleet-sweep?format=csv after the next
+   worker cycle (15-min cadence post-V547b) to get the actual
+   failure-class breakdown. Save to
+   V547m_FLEET_SWEEP_<timestamp>.csv. That's the master input
+   for V547n bulk fixes.
+
+2. Hit /api/admin/v547j/normalize-slugs (POST {"dry_run":false})
+   to lowercase wcrainshaw "Atlanta" → "atlanta". Will surface
+   any other slug-case anomalies in subscribers.digest_cities.
+
+3. Hit /api/admin/v547h/broken-extraction to see how the
+   field_map_miss + profile_build_fail buckets look post-V547b/i
+   deploy. Compare to baseline (105 cities pre-fix).
+
+4. Re-fire MN, TX, AZ enrichment imports (MN was a 502 retry;
+   TX/AZ need wire-up commits in license_enrichment.py).
+
+5. SBCO acceptance (V547i): query
+     SELECT COUNT(*) FROM contractor_profiles
+     WHERE source_city_key='san-bernardino-county'
+   Should be >50 within 1-2 worker cycles after the deep_fetch
+   flag takes effect on prod.
+
+================================================================
+WAKE TRIGGERS
+================================================================
+
+The dedicated 10:07 UTC V547b/i 1h-verification wakeup will fire
+and validate:
+- starved_count drops 461 → <300
+- worker memory holds <1.5GB
+- SBCO profiles >50
+
+If acceptance fails, hotfix immediately. If green, continue with
+V547n driven by V547m's CSV output.
+
+The /loop V438 wakeup at 09:34 UTC also fires for site/health
+verification.
+
+— Captured 2026-05-06 ~14:30 UTC
