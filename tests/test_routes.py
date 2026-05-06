@@ -262,21 +262,33 @@ def test_v257_city_page_robots_meta_conditional(client):
 
 
 def test_v257_city_page_prod_rich_pages_are_indexed(client):
-    """V257 Fix 1 companion: in the city_landing_inner path, a city
-    with permit_count >= 20 must render 'index, follow' in its meta
-    robots. Guards against a well-meaning edit that flips the gate.
+    """V257 Fix 1 companion: city pages must still have a real
+    indexation gate driving robots_directive. Guards against a
+    well-meaning edit that drops the gate entirely.
 
-    Uses a grep on server.py source (not a live request) because CI
-    local DB is too sparse to reliably trigger the >=20 branch."""
+    V544 SUPERSESSION (2026-05-06): the original V257 substring assert
+    was for `permit_count < 20 → noindex`. V544 intentionally collapsed
+    that legacy V236 gate onto city_health.is_sellable_city so the
+    sitemap, page meta, and picker speak with one voice. The legacy
+    substring is gone by design, so this test now asserts the V544
+    contract instead — same intent (the gate exists and decides the
+    directive), updated source of truth.
+
+    Uses a grep on server.py source (not a live request) because CI's
+    local DB is too sparse to reliably trigger the index branch."""
     import pathlib
     src = pathlib.Path(__file__).parent.parent / 'server.py'
     text = src.read_text()
-    # The gate must still decide index vs noindex based on permit_count
-    # — the exact line that was in place before V257 claimed a broken state
-    assert 'robots_directive = "noindex, follow" if permit_count' in text \
-        or '"index, follow" if permit_count' in text \
-        or "robots_directive = 'noindex, follow' if permit_count" in text, \
-        'V257 regression: robots_directive no longer guards on permit_count'
+    # Post-V544: server.py uses city_health.is_sellable_city as the
+    # SINGLE source of truth for robots_directive on city pages.
+    assert 'from city_health import is_sellable_city' in text, (
+        'V257/V544 regression: server.py no longer imports '
+        'is_sellable_city — the indexation gate has been dropped'
+    )
+    assert '_v544_is_sellable' in text and 'robots_directive' in text, (
+        'V257/V544 regression: server.py no longer wires '
+        'robots_directive through the V544 unification block'
+    )
 
 
 def test_v257_signup_renders_form_no_redirect(client):
