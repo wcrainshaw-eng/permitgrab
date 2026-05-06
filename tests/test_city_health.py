@@ -19,6 +19,24 @@ import sqlite3
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+# Module-level `from server import app` mirrors the pattern in
+# tests/test_smoke.py — server.py + routes/admin.py have a circular
+# import that resolves only when server is loaded as the FIRST
+# importer in the chain. Moving the import inside a function (which
+# I tried first) tripped:
+#   ImportError: cannot import name 'admin_bp' from partially
+#   initialized module 'routes.admin' (most likely due to a circular
+#   import)
+# because the circular dance only resolves cleanly when the import
+# kicks off at module-load time, not lazily inside a test function.
+try:
+    from server import app as _server_app  # noqa: F401
+except Exception as _e:
+    # In environments without flask_login etc. the server import will
+    # fail. Endpoint tests will skip themselves; the compute/upsert
+    # tests above don't need server.
+    _server_app = None
+
 
 def _setup_db(scenarios=None):
     """Create an in-memory SQLite with the schema slice city_health
@@ -427,3 +445,137 @@ def test_start_thread_no_eager_compute_import():
     import city_health
     assert callable(city_health.start_thread)
     assert callable(city_health.compute_city_health)
+
+
+# ---------------------------------------------------------------------
+# V540 PR2: GET /api/admin/city-health endpoint
+# ---------------------------------------------------------------------
+
+def _seed_city_health_table(conn, rows):
+    """Insert city_health rows + matching prod_cities rows for the
+    platform JOIN. `rows` is list of dicts with keys: slug, status,
+    reason_code, reason_detail, source_type."""
+    for r in rows:
+        conn.execute(
+            "INSERT INTO city_health "
+            "(city_slug, status, reason_code, reason_detail, evidence_json, computed_at) "
+            "VALUES (?, ?, ?, ?, ?, datetime('now'))",
+            (r['slug'], r['status'], r.get('reason_code', ''),
+             r.get('reason_detail', ''), '{}'),
+        )
+        conn.execute(
+            "INSERT INTO prod_cities (city_slug, source_type, status) "
+            "VALUES (?, ?, 'active')",
+            (r['slug'], r.get('source_type', 'socrata')),
+        )
+    conn.commit()
+
+
+def _v540_endpoint_client(conn):
+    """Return (app, db_patch). Uses the module-level `from server import
+    app as _server_app` (loaded at import time per the circular-import
+    workaround above)."""
+    import os
+    import pytest
+    if _server_app is None:
+        pytest.skip('server.app failed to import (likely missing flask_login etc.)')
+    os.environ['ADMIN_KEY'] = 'test-admin-key'
+    _server_app.config['TESTING'] = True
+    return _server_app, patch('db.get_connection', return_value=conn)
+
+
+def test_v540_endpoint_function_registered_with_route():
+    """V540 PR2: file-level guard. The canonical /api/admin/city-health
+    endpoint should be wired to admin_city_health (not the V226
+    dashboard rollup, which is now admin_city_health_dashboard at
+    /api/admin/city-health-dashboard).
+    """
+    import os
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'routes', 'admin.py')).read()
+    assert "@admin_bp.route('/api/admin/city-health', methods=['GET'])\ndef admin_city_health(" in src, (
+        'V540 PR2 regression: /api/admin/city-health no longer routes to admin_city_health'
+    )
+    assert "@admin_bp.route('/api/admin/city-health-dashboard'" in src, (
+        'V540 PR2 regression: V226 dashboard rollup not renamed to /api/admin/city-health-dashboard'
+    )
+
+
+def test_v540_cache_helpers_get_put_and_ttl():
+    """Test the cache helpers directly without going through the full
+    Flask request lifecycle (which trips the server's before_request
+    schema migrations against the in-memory test DB)."""
+    if _server_app is None:
+        import pytest
+        pytest.skip('server not importable')
+    from routes.admin import _v540_cache_get, _v540_cache_put, _v540_response_cache
+    _v540_response_cache.clear()
+
+    key = ('pass', '', '')
+    assert _v540_cache_get(key) is None  # empty
+    body = {'count': 5, 'by_status': {'Pass': 5, 'Degraded': 0, 'Fail': 0}, 'cities': []}
+    _v540_cache_put(key, body)
+    assert _v540_cache_get(key) == body  # round trip
+
+
+def test_v540_cache_expires_after_ttl():
+    """The 60s TTL is enforced by _v540_cache_get returning None when
+    the cached entry is older than _V540_CACHE_TTL_SECONDS."""
+    if _server_app is None:
+        import pytest
+        pytest.skip('server not importable')
+    import routes.admin as admin_mod
+    admin_mod._v540_response_cache.clear()
+
+    key = ('expired', '', '')
+    body = {'count': 1}
+    # Manually inject an entry timestamped >60s ago.
+    admin_mod._v540_response_cache[key] = (
+        admin_mod._v540_time.time() - 90.0,  # 90s ago
+        body,
+    )
+    assert admin_mod._v540_cache_get(key) is None, (
+        'V540 PR2 regression: cache entries must expire after the TTL'
+    )
+
+
+def test_v540_cache_keys_distinguish_filters():
+    """Different (status, slug, platform) tuples must NOT share cache
+    entries — filtered responses are disjoint."""
+    if _server_app is None:
+        import pytest
+        pytest.skip('server not importable')
+    import routes.admin as admin_mod
+    admin_mod._v540_response_cache.clear()
+
+    admin_mod._v540_cache_put(('pass', '', ''), {'tag': 'PASS-only'})
+    admin_mod._v540_cache_put(('fail', '', ''), {'tag': 'FAIL-only'})
+    admin_mod._v540_cache_put(('', '', 'socrata'), {'tag': 'platform=socrata'})
+    assert admin_mod._v540_cache_get(('pass', '', ''))['tag'] == 'PASS-only'
+    assert admin_mod._v540_cache_get(('fail', '', ''))['tag'] == 'FAIL-only'
+    assert admin_mod._v540_cache_get(('', '', 'socrata'))['tag'] == 'platform=socrata'
+
+
+def test_v540_endpoint_dashboard_renamed_for_back_compat():
+    """V540 PR2 reconciliation: V226's dashboard rollup endpoint
+    moved from /api/admin/city-health to /api/admin/city-health-dashboard.
+    Both endpoint functions must exist + register without Flask
+    blueprint collision."""
+    if _server_app is None:
+        import pytest
+        pytest.skip('server not importable')
+    import routes.admin as admin_mod
+    assert hasattr(admin_mod, 'admin_city_health'), (
+        'V540 PR2: canonical endpoint admin_city_health missing'
+    )
+    assert hasattr(admin_mod, 'admin_city_health_dashboard'), (
+        'V540 PR2: renamed dashboard endpoint admin_city_health_dashboard missing'
+    )
+    # No Flask blueprint duplicate-name collision (V527c lesson)
+    src = open(__file__.replace('tests/test_city_health.py', 'routes/admin.py')).read()
+    import re
+    fn_names = [m.group(1) for m in re.finditer(r'^def\s+([a-zA-Z_][a-zA-Z0-9_]*)', src, re.M)]
+    duplicates = [n for n in fn_names if fn_names.count(n) > 1]
+    assert not duplicates, (
+        f'V527c regression: routes/admin.py has duplicate function names: {duplicates}'
+    )

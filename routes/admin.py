@@ -295,9 +295,145 @@ def admin_api_collector_health():
     })
 
 
+# V540 PR2: response cache for /api/admin/city-health. 60s TTL so the
+# signup-flow + sitemap consumers can poll without hammering the DB
+# during request bursts. Module-global is fine — single gunicorn
+# worker per the V496 Dockerfile config; no cross-process sharing
+# needed.
+import time as _v540_time
+_V540_CACHE_TTL_SECONDS = 60
+_v540_response_cache = {}  # key=(status, slug, platform) → (timestamp, body)
+
+
+def _v540_cache_get(key):
+    cached = _v540_response_cache.get(key)
+    if not cached:
+        return None
+    ts, body = cached
+    if _v540_time.time() - ts > _V540_CACHE_TTL_SECONDS:
+        return None
+    return body
+
+
+def _v540_cache_put(key, body):
+    _v540_response_cache[key] = (_v540_time.time(), body)
+
+
 @admin_bp.route('/api/admin/city-health', methods=['GET'])
 def admin_city_health():
-    """V226 T3: One-glance health status for every active top-cities entry.
+    """V540: canonical per-city Pass/Degraded/Fail health endpoint.
+
+    Reads from the city_health table (populated by the daily
+    health_scheduler thread, V540 PR1). The signup flow + sitemap
+    generator + Google Ads geo feed + blog auto-generation all
+    consult this endpoint to filter to deliverable cities only —
+    pre-curation per Wes's V540 directive.
+
+    Optional query params:
+      - status=pass|degraded|fail (case-insensitive)
+      - slug=foo,bar,baz
+      - platform=socrata|arcgis|accela|ckan
+        (filters by prod_cities.source_type, joined at query time)
+
+    Response shape (per V540 spec):
+      {
+        "count": <int>,
+        "by_status": {"Pass": <int>, "Degraded": <int>, "Fail": <int>},
+        "cities": [
+          {
+            "slug": <str>, "status": <str>, "reason_code": <str>,
+            "reason_detail": <str>, "computed_at": <iso>,
+            "platform": <str|null>
+          },
+          ...
+        ]
+      }
+
+    Cached for 60s per (status, slug, platform) tuple. Cache is in-
+    process; admin queries are infrequent enough that a per-process
+    cache is plenty.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    status_filter = (request.args.get('status') or '').strip().lower()
+    slug_filter = (request.args.get('slug') or '').strip()
+    platform_filter = (request.args.get('platform') or '').strip().lower()
+
+    cache_key = (status_filter, slug_filter, platform_filter)
+    cached = _v540_cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
+    try:
+        conn = permitdb.get_connection()
+        # JOIN to prod_cities to expose platform per row + filter on it.
+        sql = (
+            "SELECT ch.city_slug, ch.status, ch.reason_code, ch.reason_detail, "
+            "       ch.computed_at, pc.source_type "
+            "FROM city_health ch "
+            "LEFT JOIN prod_cities pc ON pc.city_slug = ch.city_slug"
+        )
+        params = []
+        clauses = []
+        if status_filter:
+            clauses.append("LOWER(ch.status) = ?")
+            params.append(status_filter)
+        if slug_filter:
+            slugs = [s.strip() for s in slug_filter.split(',') if s.strip()]
+            if slugs:
+                placeholders = ','.join(['?'] * len(slugs))
+                clauses.append(f"ch.city_slug IN ({placeholders})")
+                params.extend(slugs)
+        if platform_filter:
+            clauses.append("LOWER(pc.source_type) = ?")
+            params.append(platform_filter)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY ch.city_slug"
+        rows = conn.execute(sql, tuple(params)).fetchall()
+    except Exception as e:
+        return jsonify({'error': f'city_health query failed: {e}'}), 500
+
+    by_status = {'Pass': 0, 'Degraded': 0, 'Fail': 0}
+    cities = []
+    for r in rows:
+        slug = r[0] if not hasattr(r, 'keys') else r['city_slug']
+        status = r[1] if not hasattr(r, 'keys') else r['status']
+        reason_code = r[2] if not hasattr(r, 'keys') else r['reason_code']
+        reason_detail = r[3] if not hasattr(r, 'keys') else r['reason_detail']
+        computed_at = r[4] if not hasattr(r, 'keys') else r['computed_at']
+        platform = r[5] if not hasattr(r, 'keys') else r['source_type']
+        cities.append({
+            'slug': slug,
+            'status': status,
+            'reason_code': reason_code,
+            'reason_detail': reason_detail,
+            'computed_at': str(computed_at) if computed_at else None,
+            'platform': platform,
+        })
+        if status in by_status:
+            by_status[status] += 1
+
+    body = {
+        'count': len(cities),
+        'by_status': by_status,
+        'cities': cities,
+    }
+    _v540_cache_put(cache_key, body)
+    return jsonify(body)
+
+
+@admin_bp.route('/api/admin/city-health-dashboard', methods=['GET'])
+def admin_city_health_dashboard():
+    """V226 T3 / V540 PR2: One-glance health status for every active
+    top-cities entry. Renamed from /api/admin/city-health to make
+    room for V540's canonical Pass/Degraded/Fail per-city endpoint
+    at the original path. Same response shape as before — the admin
+    dashboard's server-side render (templates/admin_analytics.html)
+    consumes this path's data through the Python context, no
+    external HTTP consumer breaks.
 
     GREEN  = newest permit < 7d AND enrichment >= 40% (or no profiles)
     YELLOW = newest permit 7-21d OR enrichment 20-40%
