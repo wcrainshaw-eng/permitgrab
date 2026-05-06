@@ -6883,20 +6883,40 @@ def city_landing_inner(city_slug):
             if _v is None or _v == 'None':
                 _p[_k] = '—'
 
-    # V15: noindex for non-prod cities or empty cities
-    # If prod_cities table is active and this city isn't in it, treat as coming soon
-    if permitdb.prod_cities_table_exists() and not is_prod_city:
-        robots_directive = "noindex, follow"
-        is_coming_soon = True
+    # V544: unify the indexation gate on city_health.is_sellable_city.
+    # Pre-V544 we had three independent gates:
+    #   1. permit_count < 20  →  noindex     (V236 PR#6 thin-page rule)
+    #   2. not is_prod_city   →  noindex     (V15 coming-soon)
+    #   3. V540 pre-curation  →  picker/sitemap filter
+    # Google saw mixed signals — sitemap said 'index this' while the
+    # page-level meta said 'noindex'. V544 collapses them: only Pass
+    # cities (per V540 city_health) get index; everything else gets
+    # noindex with consistent signaling across sitemap + page header
+    # + curation gates.
+    #
+    # Cold-start fail-open: if city_health is empty (fresh deploy
+    # before the daily cron has run), is_sellable_city returns True
+    # for every slug. Picker + sitemap fall through to legacy lists.
+    # Once city_health has data, the gate activates uniformly.
+    try:
+        from city_health import is_sellable_city as _v544_is_sellable
+        _is_sellable = _v544_is_sellable(city_slug)
+    except Exception:
+        # city_health module unavailable for some reason — fall back
+        # to the V236 thin-page gate so Google still gets a signal.
+        _is_sellable = bool(permitdb.prod_cities_table_exists() and is_prod_city and permit_count >= 20)
+
+    if _is_sellable:
+        robots_directive = "index, follow"
+        is_coming_soon = False
     else:
-        # V12.5 → V236 PR#6: noindex thin pages. Pre-V236 only gated at
-        # 0 permits, but Google de-indexes programmatic pages with ≤20
-        # records worth of content. Lifting the bar to 20 keeps our
-        # index clean and concentrates crawl budget on pages that have
-        # enough data to rank for "<city> building permits" queries.
-        robots_directive = "noindex, follow" if permit_count < 20 else "index, follow"
-        # V12.11: Coming Soon flag for empty cities
-        is_coming_soon = permit_count == 0
+        robots_directive = "noindex, follow"
+        # V12.11: Coming Soon flag for empty cities (still useful for
+        # the city_paused.html template branch + downstream copy that
+        # checks this flag).
+        is_coming_soon = (permit_count == 0) or (
+            permitdb.prod_cities_table_exists() and not is_prod_city
+        )
 
     # V161: Trade breakdown — use prod_city_id if available
     if _prod_city_id:

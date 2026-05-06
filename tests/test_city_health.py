@@ -884,6 +884,98 @@ def test_v541a_compute_now_endpoint_registered():
     )
 
 
+def test_v544_noindex_gate_unified_on_is_sellable_city():
+    """V544 contract: server.py's city-page noindex gate uses
+    city_health.is_sellable_city as the SINGLE source of truth.
+    Pre-V544 the gate used `permit_count < 20` (V236 PR#6) which
+    sent Google mixed signals because the sitemap (filtered to Pass
+    by V540 PR3) and the page-level noindex were independent.
+
+    File-level guard: the city_trade_landing render path imports
+    is_sellable_city and uses it to decide robots_directive.
+    """
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'server.py')).read()
+
+    # The unified gate's distinctive markers must be present
+    assert 'V544: unify the indexation gate' in src, (
+        'V544 regression: server.py unification block missing'
+    )
+    assert 'from city_health import is_sellable_city' in src, (
+        'V544 regression: server.py does not import is_sellable_city '
+        'for the noindex gate'
+    )
+    assert '_v544_is_sellable' in src, (
+        'V544 regression: the local _v544_is_sellable variable is missing — '
+        'means the gate was reverted'
+    )
+    # The legacy V236 < 20 gate must be REMOVED as ACTIVE code (the
+    # V544 unification comment legitimately mentions it as history,
+    # so substring-match would false-positive). Look for the active
+    # conditional form: `if permit_count < 20:` or `permit_count < 20)`
+    # used as a control-flow expression — neither should remain.
+    import re as _re
+    active_lt20 = _re.search(
+        r'^[ \t]*(?:if[ \t]+|elif[ \t]+).*permit_count[ \t]*<[ \t]*20',
+        src, _re.MULTILINE,
+    )
+    assert active_lt20 is None, (
+        'V544 regression: an active `if permit_count < 20:` branch '
+        'still exists in server.py. V544 collapsed all three gates '
+        'onto is_sellable_city; the < 20 conditional is dead code now. '
+        f'Found at: {active_lt20.group(0)!r}'
+    )
+
+    # The state_city_landing path in routes/city_pages.py was a parallel
+    # V236-style gate (`permit_count >= 20 and is_active`) — V544 must
+    # unify it onto the same is_sellable_city signal as server.py.
+    cp_src = open(os.path.join(repo, 'routes', 'city_pages.py')).read()
+    assert 'from city_health import is_sellable_city' in cp_src, (
+        'V544 regression: routes/city_pages.py does not import '
+        'is_sellable_city for the city-landing noindex gate'
+    )
+    assert '_v544_is_sellable' in cp_src, (
+        'V544 regression: state_city_landing in routes/city_pages.py '
+        'is no longer wired to the V544 unification — the local '
+        '_v544_is_sellable variable is missing'
+    )
+
+
+def test_v544_sitemap_filter_still_calls_filter_to_sellable():
+    """V544 contract: routes/seo.py:sitemap_cities still applies the
+    V540 PR3 pre-curation filter. Cold-start fail-open contract:
+    when city_health is empty, all cities pass through; once Pass
+    cities exist, the sitemap shrinks to those.
+    """
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'routes', 'seo.py')).read()
+    smc_idx = src.find('def sitemap_cities(')
+    next_at = src.find('\n@', smc_idx + 1)
+    smc_block = src[smc_idx:next_at if next_at > 0 else None]
+    assert 'filter_to_sellable' in smc_block, (
+        'V544 regression: V540 PR3 sitemap filter removed; sitemap-cities.xml '
+        'will list every active city again (mixed signal vs page-level noindex).'
+    )
+
+
+def test_v544_v540_picker_still_filters():
+    """V540 PR3's picker filter (get_popular_cities, get_suggested_cities)
+    must remain wired to filter_to_sellable. V544 is INDEXATION
+    unification — not a regression of the picker."""
+    repo = os.path.join(os.path.dirname(__file__), '..')
+    src = open(os.path.join(repo, 'server.py')).read()
+    pop_idx = src.find('def get_popular_cities(')
+    sug_idx = src.find('def get_suggested_cities(')
+    pop_block = src[pop_idx:src.find('\ndef ', pop_idx + 1)]
+    sug_block = src[sug_idx:src.find('\ndef ', sug_idx + 1)]
+    assert 'filter_to_sellable' in pop_block, (
+        'V544 regression: get_popular_cities filter dropped'
+    )
+    assert 'filter_to_sellable' in sug_block, (
+        'V544 regression: get_suggested_cities filter dropped'
+    )
+
+
 def test_v540_pr4_wired_into_email_alerts():
     """File-level guard: email_alerts.send_daily_digest_to_user calls
     filter_subscriber_cities_for_digest. If a future refactor removes

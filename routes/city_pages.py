@@ -1733,8 +1733,19 @@ def state_city_landing(state_slug, city_slug):
         ],
     }
 
-    # Robots directive — V236 PR#6: thin-page suppression at <20 permits.
-    robots_directive = "index, follow" if permit_count >= 20 and is_active else "noindex, follow"
+    # V544: unify the indexation gate on city_health.is_sellable_city.
+    # Same contract as server.py:6886 — Pass cities (per V540 city_health)
+    # get index, everything else gets noindex. Cold-start fail-open: when
+    # city_health is empty, is_sellable_city returns True for every slug,
+    # which keeps Google from suddenly noindex-ing the fleet during a
+    # fresh deploy before the daily cron has populated city_health.
+    try:
+        from city_health import is_sellable_city as _v544_is_sellable
+        _is_sellable = _v544_is_sellable(city_slug)
+    except Exception:
+        # Fall back to the V236 thin-page gate if city_health is wedged.
+        _is_sellable = permit_count >= 20 and is_active
+    robots_directive = "index, follow" if _is_sellable else "noindex, follow"
 
     # Canonical URL — use the canonical state slug so /permits/new-york/..
     # and /permits/new-york-state/.. both point at the same canonical.
