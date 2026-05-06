@@ -3841,7 +3841,13 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
         except Exception as _rr_e:
             print(f"    [V488 IRONCLAD] stale-first sort skipped (non-fatal): {_rr_e}", flush=True)
 
-        MAX_CITIES_PER_CYCLE = 75
+        # V547b: bumped from 75 → 200 now that V546a put the daemon
+        # in its own 2GB worker process and V547b's pre-fetch
+        # parallelization (below) makes per-city wall-clock dominated
+        # by the slowest concurrent fetch, not the cumulative serial
+        # sum. 200 cities × 4 cycles/hr (worker.py 15-min cadence) =
+        # 800 city-visits/hour, target rate per V547b directive.
+        MAX_CITIES_PER_CYCLE = 200
         if len(individual_cities) > MAX_CITIES_PER_CYCLE:
             print(f"    [V166] Limiting to {MAX_CITIES_PER_CYCLE}/{len(individual_cities)} cities this cycle (stale-first)")
             individual_cities = individual_cities[:MAX_CITIES_PER_CYCLE]
@@ -3894,6 +3900,79 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
         _MEM_BAIL_MB = 1200
         _MEM_HARD_ABORT_MB = 1400
         _cycle_bailed = False
+
+        # V547b: parallel pre-fetch of all individual_cities raw
+        # responses. HTTP fetches are I/O-bound; running them in a
+        # ThreadPoolExecutor with per-platform semaphores brings the
+        # cycle's wall clock down from O(N × per-city-latency) to
+        # O(slowest-platform-budget). Per-platform semaphores respect
+        # rate limits — the same Socrata host shouldn't see >10
+        # concurrent calls; Accela tenants are touchier (cap 4).
+        # Upsert + DB writes still happen serially in the loop below
+        # so SQLite write contention is unchanged.
+        import concurrent.futures as _v547b_cf
+        from threading import BoundedSemaphore as _v547b_sem
+        _v547b_platform_sems = {
+            'socrata': _v547b_sem(10),
+            'arcgis': _v547b_sem(8),
+            'accela': _v547b_sem(4),
+            'accela_arcgis_hybrid': _v547b_sem(4),
+            'ckan': _v547b_sem(10),
+            'carto': _v547b_sem(4),
+            'csv_state': _v547b_sem(2),
+        }
+        _v547b_default_sem = _v547b_sem(4)
+        _v547b_raw_cache = {}
+
+        def _v547b_fetch_one(source_id, platform):
+            """Fetch one city's raw response under per-platform
+            semaphore. Returns (raw, status, err_msg)."""
+            sem = _v547b_platform_sems.get(platform, _v547b_default_sem)
+            with sem:
+                try:
+                    raw, status = _fetch_permits_with_timeout(source_id, days_back)
+                    return (raw, status, None)
+                except Exception as _fe:
+                    return ([], 'error', str(_fe)[:200])
+
+        # Build the prefetch worklist — skip cities already filtered
+        # out by circuit breaker / config-not-found / non-collectable.
+        _v547b_worklist = []
+        for _ic in individual_cities:
+            _sid = _ic.get('source_id')
+            _slug = _ic.get('slug')
+            if _slug in circuit_open or _sid in circuit_open:
+                continue
+            _cfg = _get_source_config(_sid) if _sid else None
+            if not _cfg or _cfg.get('_source_type') == 'bulk':
+                continue
+            _plat = _cfg.get('platform', '')
+            if not platform_matches(_plat) or should_skip_scraper(_plat):
+                continue
+            _v547b_worklist.append((_sid, _plat))
+
+        if _v547b_worklist:
+            print(f"    [V547b] Parallel pre-fetch: {len(_v547b_worklist)} cities, "
+                  f"max_workers=20, per-platform semaphores", flush=True)
+            _v547b_t0 = time.time()
+            with _v547b_cf.ThreadPoolExecutor(
+                max_workers=20, thread_name_prefix='v547b_fetch'
+            ) as _v547b_ex:
+                _v547b_futs = {
+                    _v547b_ex.submit(_v547b_fetch_one, _sid, _plat): _sid
+                    for _sid, _plat in _v547b_worklist
+                }
+                for _v547b_f in _v547b_cf.as_completed(_v547b_futs):
+                    _v547b_sid = _v547b_futs[_v547b_f]
+                    try:
+                        _v547b_raw_cache[_v547b_sid] = _v547b_f.result()
+                    except Exception as _ce:
+                        _v547b_raw_cache[_v547b_sid] = ([], 'error', str(_ce)[:200])
+            _v547b_dur = time.time() - _v547b_t0
+            print(f"    [V547b] Pre-fetch complete: {len(_v547b_raw_cache)} "
+                  f"results in {_v547b_dur:.1f}s "
+                  f"(serial would have been ~{len(_v547b_worklist) * 5:.0f}s)",
+                  flush=True)
 
         for city_info in individual_cities:
             source_id = city_info.get('source_id')
@@ -3952,7 +4031,15 @@ def _collect_all_inner(days_back=30, additive_mode=True, platform_filter=None, i
 
             try:
                 # V16: Individual city collection only (bulk already handled in Phase 1)
-                raw, fetch_status = _fetch_permits_with_timeout(source_id, days_back)
+                # V547b: read from the pre-fetch cache when available (the
+                # parallel ThreadPool above warmed it). Cache miss falls
+                # back to the original sync fetch — covers cities that
+                # didn't pass the pre-filter or got added late.
+                _cached = _v547b_raw_cache.get(source_id) if isinstance(_v547b_raw_cache, dict) else None
+                if _cached is not None:
+                    raw, fetch_status, _err = _cached
+                else:
+                    raw, fetch_status = _fetch_permits_with_timeout(source_id, days_back)
                 city_permits = []
 
                 for record in raw:

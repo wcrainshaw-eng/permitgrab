@@ -294,9 +294,15 @@ def scheduled_collection():
         # Force GC at end of every cycle
         gc.collect()
 
-        # Dynamic sleep: aim for 30-min cycle cadence
-        sleep_time = max(300, 1800 - elapsed_total)  # at least 5 minutes
-        print(f"[WORKER] Sleeping {sleep_time:.0f}s until next cycle", flush=True)
+        # V547b: dynamic sleep aims for 15-min cycle cadence (down
+        # from 30-min). With V547b's parallel pre-fetch, cycles take
+        # 30-90s wall-clock instead of 10+ min serial — a 15-min
+        # outer cadence × 200 cities/cycle = 800 visits/hour, the
+        # target rate. Hard floor of 60s so back-to-back failures
+        # don't busy-loop.
+        sleep_time = max(60, 900 - elapsed_total)
+        print(f"[WORKER] V547b: Sleeping {sleep_time:.0f}s until next cycle "
+              f"(15-min target cadence)", flush=True)
         time.sleep(sleep_time)
 
 
