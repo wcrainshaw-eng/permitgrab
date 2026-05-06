@@ -1,0 +1,95 @@
+PING WES — V546 SMALL-FIX STACK SHIPPED (2026-05-06 ~02:14 UTC)
+
+================================================================
+WHAT JUST SHIPPED (4 commits, all CI green)
+================================================================
+V544x  0aebc30  Update test_v257 to assert V544 contract not legacy V236
+V545   8938816  Source quality audit + V507/V509 reconciliation + digest forecast
+V546-1 c53a845  Step 1 ground truth: 562/736 starved >72h, mechanism diagnosed
+V546-5 b41d126  PR5: /api/admin/daemon-coverage observable
+V546-5x 984e240  PR5x: graceful-degrade when city_health table missing
+V546-4 481e44c  PR4: split daemon_coverage_starvation out of platform_fail
+V546-6 45c7c19  PR6: auto-prune for the dead working set
+
+Everything verified locally + in CI. /api/admin/daemon-coverage smoke-
+tested in production right now and matches V546 ground truth exactly:
+
+  platform_active_total: 736
+  coverage_pct_24h:      23.64%
+  starved_count:         562
+  buckets:
+    0_6h:   164  (22.28%)  ← the daemon's 'working set'
+    6_24h:   10  (1.36%)
+    24_72h:   0  (0.00%)   ← noteworthy: zero. binary visit pattern.
+    72h_plus: 528  (71.74%) ← the starved tail
+    never:    34  (4.62%)  ← slug-mismatch / NULL-endpoint orphans
+
+This is now the metric to watch. Per the new durable rule, we
+don't declare V546 'shipped' on test green alone — only when
+this 72h_plus bucket drains.
+
+================================================================
+THE 24_72h BUCKET BEING ZERO IS A NEW INSIGHT
+================================================================
+The daemon either reaches a city in <24h or doesn't reach it for
+>72h. Nothing in between. That's not random — it's a clean
+signature of the bail-mid-cycle starvation: cities are either in
+the 75-stalest set (visited multiple times in <24h) or starved
+out forever. Confirms the diagnosis from V546 ground truth.
+
+================================================================
+WHAT'S STILL PENDING
+================================================================
+V546a  YOU            Render dashboard → Create Background Worker
+                      service pointing at the existing render.yaml
+                      worker block. ~5 min of clicks. Cost ~$7/mo.
+                      Until this is done, V493's warning stands:
+                      do NOT gate the in-web-process daemon spawn
+                      on WORKER_MODE.
+
+V546-3 Code (BIG)     ThreadPoolExecutor with per-platform semaphores
+                      (Socrata 10, ArcGIS 8, Accela 4) + streaming
+                      inserts in collector._collect_all_inner. This
+                      is THE actual daemon-coverage fix — but it
+                      should ship INTO the worker process, not
+                      into the shared web+daemon. So it ships
+                      AFTER V546a.
+
+V546-2 Code (gate)    Re-introduce WORKER_MODE gate in server.py:8590
+                      so the web stops competing for memory once
+                      the worker is live. Also gated on V546a.
+
+V546-1 Code (worker)  worker.py review — already comprehensive after
+                      V473/V485/V488. Probably zero changes needed,
+                      but verify before V546a goes live.
+
+GABRIEL P0 (V545)     Still pending your call before 7 AM ET on
+                      gabriel@smartbuildpros.com. The V540 PR4
+                      safety net will silently suppress his digest
+                      tomorrow because his only city is Degraded.
+
+================================================================
+THE 1H VERIFICATION YOU ASKED FOR
+================================================================
+A 1h smoke window now would only verify the OBSERVABLE works (it
+does — confirmed above). The 24h verification window the durable
+rule mandates only starts after V546-3 ships, which is gated on
+V546a, which is your dashboard click.
+
+So the realistic shipping arc:
+  NOW           — small-fix stack (PR4/PR5/PR6) running in prod
+  +0h           — you create the Background Worker on Render
+  +0h to +1h    — V546-1 (worker review) + V546-2 (gate) + V546-3
+                  (concurrent fetches) ship into worker process
+  +1h to +25h   — 24h observability window via /api/admin/daemon-
+                  coverage. The 72h_plus bucket should drop from
+                  528 → <50 within 48h. If it doesn't, V547.
+
+================================================================
+NEXT WAKE TRIGGER
+================================================================
+Wake on V546a confirmation (you finish the Render dashboard step)
+OR on the 7 AM ET digest fire window (whichever comes first), so
+gabriel's outcome doesn't ship without your call.
+
+— Captured 2026-05-06 ~02:14 UTC, after PR4+PR5+PR6 deployed
