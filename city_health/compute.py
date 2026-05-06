@@ -85,7 +85,20 @@ class CityHealth:
 
 def _measure_city(slug):
     """Read the four threshold inputs from the DB. Returns a dict of
-    raw measurements that the rubric can compare against."""
+    raw measurements that the rubric can compare against.
+
+    V541b: every aggregate is aliased (`AS cnt` / `AS last_run`) so
+    callers can access by column name on both psycopg2 RealDictRow
+    AND sqlite3.Row. The previous version used
+    `list(row.values())[0]` for the dict-row branch — but sqlite3.Row
+    has `keys()` and supports string indexing, but does NOT have
+    `.values()`. That silently AttributeError'd into the `except
+    Exception: pass` and left every count/max at the default 0/None,
+    which made compute_city_health Fail every active city as
+    'never_visited' even though scraper_runs had 255+ rows. Caught
+    by V541 audit when chicago-il came back as Fail despite obviously
+    being healthy in production.
+    """
     out = {
         'permits_count': 0,
         'profiles_count': 0,
@@ -100,55 +113,77 @@ def _measure_city(slug):
         out['db_error'] = f'connection failed: {e}'
         return out
 
+    def _row_value(row, key):
+        """Cross-dialect single-value extractor.
+        - sqlite3.Row: supports both integer and string indexing
+        - psycopg2 RealDictRow: dict subclass, string indexing only
+        - sqlite3 default tuple: integer indexing only (no row_factory)
+
+        Try string key first (works on sqlite3.Row + RealDictRow);
+        fall back to positional (sqlite3 plain tuple). Plain-tuple
+        access by string raises TypeError, not KeyError, so that's
+        included in the except list."""
+        if row is None:
+            return None
+        try:
+            return row[key]
+        except (KeyError, IndexError, TypeError):
+            pass
+        try:
+            return row[0]
+        except Exception:
+            return None
+
     try:
         row = conn.execute(
             "SELECT source_type FROM prod_cities "
             "WHERE city_slug = ? AND status = 'active' LIMIT 1",
             (slug,),
         ).fetchone()
-        if row is not None:
-            out['platform'] = row[0] if not hasattr(row, 'keys') else row['source_type']
+        out['platform'] = _row_value(row, 'source_type')
     except Exception:
         pass
 
     try:
         row = conn.execute(
-            "SELECT COUNT(*) FROM permits WHERE source_city_key = ?",
+            "SELECT COUNT(*) AS cnt FROM permits WHERE source_city_key = ?",
             (slug,),
         ).fetchone()
-        if row is not None:
-            out['permits_count'] = int(row[0] if not hasattr(row, 'keys') else list(row.values())[0])
+        v = _row_value(row, 'cnt')
+        if v is not None:
+            out['permits_count'] = int(v)
     except Exception:
         pass
 
     try:
         row = conn.execute(
-            "SELECT COUNT(*) FROM contractor_profiles WHERE source_city_key = ?",
+            "SELECT COUNT(*) AS cnt FROM contractor_profiles WHERE source_city_key = ?",
             (slug,),
         ).fetchone()
-        if row is not None:
-            out['profiles_count'] = int(row[0] if not hasattr(row, 'keys') else list(row.values())[0])
+        v = _row_value(row, 'cnt')
+        if v is not None:
+            out['profiles_count'] = int(v)
     except Exception:
         pass
 
     try:
         row = conn.execute(
-            "SELECT COUNT(*) FROM contractor_profiles "
+            "SELECT COUNT(*) AS cnt FROM contractor_profiles "
             "WHERE source_city_key = ? AND phone IS NOT NULL AND phone != ''",
             (slug,),
         ).fetchone()
-        if row is not None:
-            out['with_phone_count'] = int(row[0] if not hasattr(row, 'keys') else list(row.values())[0])
+        v = _row_value(row, 'cnt')
+        if v is not None:
+            out['with_phone_count'] = int(v)
     except Exception:
         pass
 
     try:
         row = conn.execute(
-            "SELECT MAX(run_started_at) FROM scraper_runs WHERE city_slug = ?",
+            "SELECT MAX(run_started_at) AS last_run FROM scraper_runs WHERE city_slug = ?",
             (slug,),
         ).fetchone()
-        if row is not None:
-            out['last_collection_at'] = row[0] if not hasattr(row, 'keys') else list(row.values())[0]
+        out['last_collection_at'] = _row_value(row, 'last_run')
     except Exception:
         pass
 

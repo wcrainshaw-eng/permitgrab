@@ -798,6 +798,63 @@ def test_v540_pr4_digest_skip_handles_empty_input():
 # V541a: /api/admin/city-health/compute-now endpoint
 # ---------------------------------------------------------------------
 
+def test_v541b_measure_city_handles_sqlite_row_factory():
+    """V541b regression: _measure_city used `list(row.values())[0]`
+    in the dict-row branch, but sqlite3.Row has keys() and string
+    indexing yet NO .values() method. The query silently
+    AttributeError'd into `except Exception: pass`, leaving every
+    count at 0 and last_collection_at at None — which made every
+    active city Fail with reason='never_visited' regardless of its
+    real state. chicago-il had 255 scraper_runs entries + 16k
+    permits but compute returned permits_count=0 / last_run=None.
+
+    This test seeds an in-memory SQLite (which uses sqlite3.Row by
+    default in our get_connection wrapper) with chicago-shaped data
+    and asserts the rubric returns Pass — the only way Pass can
+    come back is if _measure_city correctly extracted the counts.
+    """
+    from city_health import compute_city_health, PASS
+    now_str = (datetime.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row  # mirror permitdb.get_connection
+    conn.executescript("""
+        CREATE TABLE prod_cities (city_slug TEXT, source_type TEXT, status TEXT);
+        CREATE TABLE permits (id INTEGER PRIMARY KEY, permit_number TEXT, source_city_key TEXT, collected_at TEXT);
+        CREATE TABLE contractor_profiles (id INTEGER PRIMARY KEY, source_city_key TEXT, phone TEXT);
+        CREATE TABLE scraper_runs (id INTEGER PRIMARY KEY, city_slug TEXT, run_started_at TEXT, status TEXT);
+        CREATE TABLE city_health (city_slug TEXT PRIMARY KEY, status TEXT NOT NULL,
+                                  reason_code TEXT, reason_detail TEXT,
+                                  evidence_json TEXT, computed_at TIMESTAMP);
+    """)
+    conn.execute("INSERT INTO prod_cities VALUES (?, 'socrata', 'active')", ('chicago-il',))
+    for i in range(150):  # >100 → satisfies low_permits threshold
+        conn.execute("INSERT INTO permits (permit_number, source_city_key) VALUES (?, ?)",
+                     (f'P{i}', 'chicago-il'))
+    for i in range(150):  # >100 → satisfies low_profiles threshold
+        phone = '555-1234' if i < 50 else None  # 50 phones → satisfies no_phones threshold
+        conn.execute("INSERT INTO contractor_profiles (source_city_key, phone) VALUES (?, ?)",
+                     ('chicago-il', phone))
+    conn.execute("INSERT INTO scraper_runs (city_slug, run_started_at, status) VALUES (?, ?, 'success')",
+                 ('chicago-il', now_str))
+    conn.commit()
+
+    with patch('db.get_connection', return_value=conn), \
+         patch('city_health.compute._platform_health', return_value={'status': 'pass'}):
+        ch = compute_city_health('chicago-il')
+
+    assert ch.status == PASS, (
+        f'V541b regression: chicago-il-shaped seed (150 permits, 150 profiles, '
+        f'50 with phone, fresh scraper_run) returned {ch.status}/{ch.reason_code} '
+        f'instead of Pass. Means _measure_city is silently dropping counts on '
+        f'sqlite3.Row again. evidence={ch.evidence}'
+    )
+    # The fields the bug hid must now be populated
+    assert ch.evidence['permits_count'] == 150
+    assert ch.evidence['profiles_count'] == 150
+    assert ch.evidence['with_phone_count'] == 50
+    assert ch.evidence['last_collection_at'] is not None
+
+
 def test_v541a_compute_now_endpoint_registered():
     """File-level guard: the on-demand compute endpoint exists at the
     Wes-specified path, gated by admin key, and calls
