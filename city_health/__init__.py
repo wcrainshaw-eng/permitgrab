@@ -43,6 +43,11 @@ from .curation import (
 from .digest_safety import filter_subscriber_cities_for_digest
 from .schema import ensure_table
 from .scheduler import health_daemon, start_thread
+from .auto_prune import (
+    find_prune_candidates,
+    prune_inactive_cities,
+    ensure_inactivity_log_table,
+)
 
 __all__ = [
     'CityHealth',
@@ -61,4 +66,7 @@ __all__ = [
     'ensure_table',
     'health_daemon',
     'start_thread',
+    'find_prune_candidates',
+    'prune_inactive_cities',
+    'ensure_inactivity_log_table',
 ]

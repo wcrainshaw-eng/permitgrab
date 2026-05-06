@@ -218,6 +218,148 @@ def test_city_health_fail_when_source_dead_21d():
     assert '30d ago' in ch.reason_detail
 
 
+def _setup_prune_db():
+    """Synthesize a prod_cities + permits + inactivity_log fixture
+    that exercises the V546 PR6 prune criteria. Schema mirrors what
+    the prod SQLite ships."""
+    conn = sqlite3.connect(':memory:')
+    conn.executescript("""
+        CREATE TABLE prod_cities (
+            city_slug TEXT PRIMARY KEY,
+            status TEXT,
+            pause_reason TEXT,
+            added_at TEXT,
+            last_successful_collection TEXT
+        );
+        CREATE TABLE permits (
+            id INTEGER PRIMARY KEY,
+            permit_number TEXT,
+            source_city_key TEXT
+        );
+    """)
+    return conn
+
+
+def test_v546_prune_dry_run_returns_candidates_without_mutating():
+    """V546 PR6: dry_run=True must NOT change any prod_cities row,
+    but must still return the candidates that would be paused. Wes
+    needs to review before flipping anything destructive."""
+    from city_health.auto_prune import prune_inactive_cities
+    conn = _setup_prune_db()
+    long_ago = (datetime.utcnow() - timedelta(days=120)).isoformat()
+    no_recent = (datetime.utcnow() - timedelta(days=60)).isoformat()
+    conn.execute(
+        "INSERT INTO prod_cities (city_slug, status, added_at, "
+        "last_successful_collection) VALUES (?, ?, ?, ?)",
+        ('dead-city', 'active', long_ago, no_recent),
+    )
+    conn.commit()
+    with patch('db.get_connection', return_value=conn):
+        result = prune_inactive_cities(dry_run=True)
+    assert result['dry_run'] is True
+    assert result['paused_count'] == 0, (
+        'V546 PR6 regression: dry_run mutated prod_cities'
+    )
+    assert len(result['candidates']) == 1, (
+        f'V546 PR6 regression: expected 1 candidate, got '
+        f'{len(result["candidates"])}'
+    )
+    assert result['candidates'][0]['city_slug'] == 'dead-city'
+    # Verify the row is still active in the DB
+    row = conn.execute(
+        "SELECT status FROM prod_cities WHERE city_slug='dead-city'"
+    ).fetchone()
+    assert row[0] == 'active', (
+        'V546 PR6 regression: dry_run flipped status anyway'
+    )
+
+
+def test_v546_prune_does_not_pause_recent_or_active_cities():
+    """V546 PR6: cities that fail ANY of the three criteria must NOT
+    be paused. Pin each negative-case to its own row so a regression
+    in any one branch is caught."""
+    from city_health.auto_prune import prune_inactive_cities
+    conn = _setup_prune_db()
+    long_ago = (datetime.utcnow() - timedelta(days=120)).isoformat()
+    just_added = (datetime.utcnow() - timedelta(days=30)).isoformat()
+    yesterday = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    no_recent = (datetime.utcnow() - timedelta(days=60)).isoformat()
+    # (a) fresh row — fails the >60d-old test
+    conn.execute(
+        "INSERT INTO prod_cities (city_slug, status, added_at, "
+        "last_successful_collection) VALUES (?, ?, ?, ?)",
+        ('fresh-row', 'active', just_added, no_recent),
+    )
+    # (b) recent collection — fails the no-collection-30d test
+    conn.execute(
+        "INSERT INTO prod_cities (city_slug, status, added_at, "
+        "last_successful_collection) VALUES (?, ?, ?, ?)",
+        ('collected-recently', 'active', long_ago, yesterday),
+    )
+    # (c) has permits — fails the zero-permits test
+    conn.execute(
+        "INSERT INTO prod_cities (city_slug, status, added_at, "
+        "last_successful_collection) VALUES (?, ?, ?, ?)",
+        ('has-permits', 'active', long_ago, no_recent),
+    )
+    conn.execute(
+        "INSERT INTO permits (permit_number, source_city_key) VALUES (?, ?)",
+        ('P-1', 'has-permits'),
+    )
+    conn.commit()
+    with patch('db.get_connection', return_value=conn):
+        result = prune_inactive_cities(dry_run=False)
+    assert result['paused_count'] == 0, (
+        f'V546 PR6 regression: paused {result["paused_count"]} '
+        f'cities that should not have been pruned'
+    )
+    rows = conn.execute(
+        "SELECT city_slug, status FROM prod_cities ORDER BY city_slug"
+    ).fetchall()
+    statuses = {r[0]: r[1] for r in rows}
+    for slug in ('fresh-row', 'collected-recently', 'has-permits'):
+        assert statuses[slug] == 'active', (
+            f'V546 PR6 regression: {slug} was incorrectly paused'
+        )
+
+
+def test_v546_prune_actually_pauses_dead_city_when_not_dry_run():
+    """V546 PR6: when dry_run=False, the dead city flips to paused +
+    an inactivity_log row is written. Reactivation is by manual
+    admin endpoint, not part of this PR."""
+    from city_health.auto_prune import prune_inactive_cities
+    conn = _setup_prune_db()
+    long_ago = (datetime.utcnow() - timedelta(days=120)).isoformat()
+    no_recent = (datetime.utcnow() - timedelta(days=60)).isoformat()
+    conn.execute(
+        "INSERT INTO prod_cities (city_slug, status, added_at, "
+        "last_successful_collection) VALUES (?, ?, ?, ?)",
+        ('dead-city', 'active', long_ago, no_recent),
+    )
+    conn.commit()
+    with patch('db.get_connection', return_value=conn):
+        result = prune_inactive_cities(dry_run=False)
+    assert result['paused_count'] == 1, (
+        f'V546 PR6 regression: expected 1 paused, got '
+        f'{result["paused_count"]}'
+    )
+    row = conn.execute(
+        "SELECT status, pause_reason FROM prod_cities "
+        "WHERE city_slug='dead-city'"
+    ).fetchone()
+    assert row[0] == 'paused'
+    assert row[1] == 'V546_auto_prune'
+    log = conn.execute(
+        "SELECT city_slug, reason, permit_count FROM inactivity_log "
+        "WHERE city_slug='dead-city'"
+    ).fetchone()
+    assert log is not None, (
+        'V546 PR6 regression: inactivity_log row not written'
+    )
+    assert log[0] == 'dead-city'
+    assert 'V546_auto_prune' in log[1]
+
+
 def test_v546_split_platform_fail_when_consecutive_failures_real():
     """V546 PR4: real platform errors (≥3 consecutive failures from
     collectors._base.health_check) keep the platform_fail reason_code.

@@ -736,6 +736,51 @@ def admin_daemon_coverage():
     return jsonify(body)
 
 
+@admin_bp.route('/api/admin/v546/prune-inactive-cities', methods=['POST'])
+def admin_v546_prune_inactive_cities():
+    """V546 PR6: prune the dead working set per V546 ground truth.
+
+    Body: {"dry_run": true}  (default, returns candidates without
+                             mutating; default-safe per the durable
+                             rule about destructive ops needing
+                             explicit confirmation)
+          {"dry_run": false} (actually flips status='paused' +
+                             writes inactivity_log rows)
+
+    Pause criteria (ALL three required):
+      1. zero successful collections in last 30 days
+      2. zero permits in DB for this slug
+      3. row added to prod_cities >60 days ago
+
+    Response:
+      {
+        "dry_run": <bool>,
+        "candidate_count": <int>,
+        "paused_count": <int>,
+        "candidates": [<list of {slug, permit_count, days_*}>],
+      }
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    data = request.get_json(silent=True) or {}
+    dry_run = bool(data.get('dry_run', True))
+
+    try:
+        from city_health import prune_inactive_cities
+        result = prune_inactive_cities(dry_run=dry_run)
+    except Exception as e:
+        return jsonify({'error': f'prune failed: {e}'}), 500
+
+    return jsonify({
+        'dry_run': result['dry_run'],
+        'candidate_count': len(result['candidates']),
+        'paused_count': result['paused_count'],
+        'candidates': result['candidates'],
+    })
+
+
 @admin_bp.route('/api/admin/enrich', methods=['POST'])
 def admin_enrich():
     """V226 T5: Force-enrich N profiles for a given city using
