@@ -291,6 +291,72 @@ def test_v257_city_page_prod_rich_pages_are_indexed(client):
     )
 
 
+def test_v546b5_daemon_coverage_endpoint_shape(client):
+    """V546 PR5: /api/admin/daemon-coverage exists, requires admin key,
+    returns the expected JSON shape with all 5 buckets summing to the
+    platform_active_total. This is the permanent observability layer
+    feedback_production_observability_required.md mandates — every
+    future daemon/coverage fix is verified through this endpoint, so
+    its shape contract has to stay stable.
+
+    Shape contract (V546 PR5):
+      computed_at: ISO timestamp
+      platform_active_total: int
+      buckets: {0_6h, 6_24h, 24_72h, 72h_plus, never} each {count, pct}
+      coverage_pct_24h: float (0_6h+6_24h)/total
+      starved_count: int (72h_plus + never)
+      by_platform: {<platform>: {<same buckets>}}
+      starved_top: list of up to 20 stalest cities
+    """
+    import os as _os
+    # check_admin_key denies all access (503) when ADMIN_KEY env var
+    # is unset — that's the V229 A4 contract. In CI/local, set a
+    # synthetic ADMIN_KEY so we can exercise both the unauth (401)
+    # and authed (200) branches.
+    _prev_key = _os.environ.get('ADMIN_KEY')
+    _os.environ['ADMIN_KEY'] = 'test-v546-key'
+    try:
+        # Without auth → 401
+        r_anon = client.get('/api/admin/daemon-coverage')
+        assert r_anon.status_code == 401, (
+            f'V546 regression: /api/admin/daemon-coverage allowed '
+            f'unauth access (got {r_anon.status_code})'
+        )
+        # With auth → 200 + valid JSON
+        r = client.get('/api/admin/daemon-coverage',
+                       headers={'X-Admin-Key': 'test-v546-key'})
+    finally:
+        if _prev_key is None:
+            _os.environ.pop('ADMIN_KEY', None)
+        else:
+            _os.environ['ADMIN_KEY'] = _prev_key
+    assert r.status_code == 200, (
+        f'V546 regression: /api/admin/daemon-coverage status '
+        f'{r.status_code}: {r.data[:200]!r}'
+    )
+    body = r.get_json()
+    assert body is not None, 'response was not JSON'
+    for k in ('computed_at', 'platform_active_total', 'buckets',
+              'coverage_pct_24h', 'starved_count', 'by_platform',
+              'starved_top'):
+        assert k in body, f'V546 regression: missing key {k!r} in response'
+    for b in ('0_6h', '6_24h', '24_72h', '72h_plus', 'never'):
+        assert b in body['buckets'], f'V546 regression: missing bucket {b!r}'
+        assert 'count' in body['buckets'][b]
+        assert 'pct' in body['buckets'][b]
+    # Bucket counts must sum to platform_active_total
+    bucket_sum = sum(body['buckets'][b]['count']
+                     for b in ('0_6h', '6_24h', '24_72h', '72h_plus', 'never'))
+    assert bucket_sum == body['platform_active_total'], (
+        f'V546 regression: bucket counts sum to {bucket_sum} but '
+        f'platform_active_total is {body["platform_active_total"]}'
+    )
+    # starved_count must equal 72h_plus + never
+    assert body['starved_count'] == (
+        body['buckets']['72h_plus']['count'] + body['buckets']['never']['count']
+    ), 'V546 regression: starved_count != 72h_plus + never'
+
+
 def test_v257_signup_renders_form_no_redirect(client):
     """V257 Fix 2: /signup must render a sign-up form with email input,
     NOT redirect to a random /permits/<city> page. Claim was the whole

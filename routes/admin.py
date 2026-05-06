@@ -570,6 +570,149 @@ def admin_city_health_dashboard():
     })
 
 
+_v546_coverage_cache = {'ts': 0, 'body': None}
+
+
+@admin_bp.route('/api/admin/daemon-coverage', methods=['GET'])
+def admin_daemon_coverage():
+    """V546 PR5: permanent observability for the V474→V526 daemon-coverage
+    starvation problem.
+
+    Returns hours_since_last_run as a histogram for every active
+    platform-typed city, plus a coverage_pct_24h scalar.
+
+    Why: V545 found the daemon was repeatedly bailing mid-cycle on
+    the 1,200 MB memory cap, leaving 562 of 736 platform cities
+    unvisited >72h, but the symptom showed up in city_health as
+    `platform_fail` — a misleading label. This endpoint surfaces
+    the underlying coverage metric directly so future regressions
+    are caught BEFORE they compound. Per the durable rule
+    feedback_production_observability_required.md, every future
+    daemon/coverage fix is verified via this endpoint, not via
+    test green alone.
+
+    Response:
+      {
+        "computed_at": <iso>,
+        "platform_active_total": <int>,
+        "buckets": {
+          "0_6h":   {"count": int, "pct": float},  // healthy
+          "6_24h":  {"count": int, "pct": float},  // acceptable
+          "24_72h": {"count": int, "pct": float},  // warning
+          "72h_plus": {"count": int, "pct": float}, // STARVED
+          "never":  {"count": int, "pct": float}   // never_visited (slug
+                                                      mismatch / NULL endpoint)
+        },
+        "coverage_pct_24h": <float>,  // (0_6h + 6_24h) / total
+        "starved_count":    <int>,    // 72h_plus + never
+        "by_platform": {
+          "socrata":  {<bucket counts>},
+          "arcgis":   {<bucket counts>},
+          ...
+        },
+        "starved_top": [               // up to 20 stalest cities
+          {"slug": <str>, "hours_since_last_run": <float|null>,
+           "platform": <str>, "city_health_status": <str>}, ...
+        ]
+      }
+
+    Cached 60s — daemon coverage doesn't change minute to minute, and
+    the GROUP BY is moderately expensive on 1,761 prod_cities.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+
+    import time as _t
+    now_t = _t.time()
+    if _v546_coverage_cache['body'] and now_t - _v546_coverage_cache['ts'] < 60:
+        return jsonify(_v546_coverage_cache['body'])
+
+    try:
+        conn = permitdb.get_connection()
+        # The V526 picker sorts by (last_run IS NULL) DESC, last_run ASC
+        # — match the same JOIN here so this metric mirrors what the
+        # daemon actually sees as 'stalest'.
+        rows = conn.execute("""
+            SELECT pc.city_slug,
+                   pc.source_type,
+                   ch.status AS health_status,
+                   (SELECT MAX(run_started_at) FROM scraper_runs
+                    WHERE city_slug = pc.city_slug) AS last_run
+              FROM prod_cities pc
+              LEFT JOIN city_health ch ON ch.city_slug = pc.city_slug
+             WHERE pc.status='active'
+               AND pc.source_type IS NOT NULL
+               AND pc.source_type != ''
+        """).fetchall()
+    except Exception as e:
+        return jsonify({'error': f'query failed: {e}'}), 500
+
+    from datetime import datetime as _dt
+    now_dt = _dt.utcnow()
+
+    def _bucket(hours):
+        if hours is None:
+            return 'never'
+        if hours <= 6:
+            return '0_6h'
+        if hours <= 24:
+            return '6_24h'
+        if hours <= 72:
+            return '24_72h'
+        return '72h_plus'
+
+    overall = {'0_6h': 0, '6_24h': 0, '24_72h': 0, '72h_plus': 0, 'never': 0}
+    by_plat = {}
+    starved = []
+
+    for r in rows:
+        slug = r['city_slug'] if hasattr(r, 'keys') else r[0]
+        plat = (r['source_type'] if hasattr(r, 'keys') else r[1]) or 'unknown'
+        health = r['health_status'] if hasattr(r, 'keys') else r[2]
+        last = r['last_run'] if hasattr(r, 'keys') else r[3]
+        hrs = None
+        if last:
+            try:
+                _iso = str(last).replace('T', ' ').split('.')[0]
+                hrs = (now_dt - _dt.fromisoformat(_iso)).total_seconds() / 3600.0
+            except Exception:
+                hrs = None
+        b = _bucket(hrs)
+        overall[b] += 1
+        by_plat.setdefault(plat, {'0_6h': 0, '6_24h': 0, '24_72h': 0,
+                                  '72h_plus': 0, 'never': 0})
+        by_plat[plat][b] += 1
+        if b in ('72h_plus', 'never'):
+            starved.append((slug, hrs, plat, health))
+
+    starved.sort(key=lambda x: -1 if x[1] is None else -x[1])
+    total = sum(overall.values()) or 1
+    body = {
+        'computed_at': now_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'platform_active_total': sum(overall.values()),
+        'buckets': {
+            k: {'count': v, 'pct': round(100.0 * v / total, 2)}
+            for k, v in overall.items()
+        },
+        'coverage_pct_24h': round(
+            100.0 * (overall['0_6h'] + overall['6_24h']) / total, 2
+        ),
+        'starved_count': overall['72h_plus'] + overall['never'],
+        'by_platform': by_plat,
+        'starved_top': [
+            {
+                'slug': s, 'hours_since_last_run': h, 'platform': p,
+                'city_health_status': hs,
+            }
+            for s, h, p, hs in starved[:20]
+        ],
+    }
+    _v546_coverage_cache['ts'] = now_t
+    _v546_coverage_cache['body'] = body
+    return jsonify(body)
+
+
 @admin_bp.route('/api/admin/enrich', methods=['POST'])
 def admin_enrich():
     """V226 T5: Force-enrich N profiles for a given city using
