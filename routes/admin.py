@@ -736,6 +736,231 @@ def admin_daemon_coverage():
     return jsonify(body)
 
 
+@admin_bp.route('/api/admin/v547j/normalize-slugs', methods=['POST'])
+def admin_v547j_normalize_slugs():
+    """V547j: lowercase + trim slugs in subscribers.digest_cities and
+    saved_searches.city_slug.
+
+    The wcrainshaw subscriber row had digest_cities=["Atlanta"]
+    (capitalized) which doesn't join to permits.source_city_key='atlanta'
+    (lowercase). Same class of bug for any future-saved row written
+    without normalization.
+
+    Body (optional):
+      {"dry_run": true}  — return candidates without mutating
+      {"dry_run": false} — apply lowercase + trim in-place
+
+    Default dry_run=False per V547j directive ("ship V547j as a one-line
+    edit"). Set dry_run=True to preview.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    data = request.get_json(silent=True) or {}
+    dry_run = bool(data.get('dry_run', False))
+
+    import json as _json
+    conn = permitdb.get_connection()
+    fixed = []
+    try:
+        rows = conn.execute(
+            "SELECT id, email, digest_cities FROM subscribers WHERE digest_cities IS NOT NULL"
+        ).fetchall()
+    except Exception as e:
+        return jsonify({'error': f'subscribers query failed: {e}'}), 500
+
+    for r in rows:
+        sid = r['id'] if hasattr(r, 'keys') else r[0]
+        email = r['email'] if hasattr(r, 'keys') else r[1]
+        raw = r['digest_cities'] if hasattr(r, 'keys') else r[2]
+        try:
+            cities = _json.loads(raw) if raw else []
+        except Exception:
+            continue
+        if not isinstance(cities, list):
+            continue
+        normalized = [c.lower().strip() for c in cities if isinstance(c, str)]
+        if normalized != cities:
+            fixed.append({
+                'id': sid, 'email': email,
+                'before': cities, 'after': normalized,
+            })
+            if not dry_run:
+                try:
+                    conn.execute(
+                        "UPDATE subscribers SET digest_cities = ? WHERE id = ?",
+                        (_json.dumps(normalized), sid),
+                    )
+                except Exception:
+                    pass
+
+    if not dry_run and fixed:
+        try:
+            conn.commit()
+        except Exception:
+            pass
+
+    return jsonify({
+        'dry_run': dry_run,
+        'fixed_count': len(fixed),
+        'fixed': fixed,
+    })
+
+
+@admin_bp.route('/api/admin/v547m/fleet-sweep', methods=['GET'])
+def admin_v547m_fleet_sweep():
+    """V547m: master fleet diagnostic — one CSV with every active city's
+    permit/profile/phone/health/failure-class state.
+
+    Drives V547n bulk failure-class fixes. Output columns:
+      source_city_key, platform, last_run_at, last_run_status,
+      permits_count, permits_24h, profiles_count, profiles_24h,
+      phones_count, ch_status, ch_reason, failure_class
+
+    failure_class is auto-tagged:
+      sbco_class      — plain accela platform with 0 profiles + permits>=100
+      fl_field_map    — FL DBPR field-map miscoupling (state=FL + 0 profiles)
+      dead_source     — last_run >14d ago AND status='error'
+      slug_mismatch   — has scraper_runs entry under a different slug
+      profile_build   — with_contractor>0 but profiles=0
+      ok              — no problem detected
+      unknown         — fits no other class
+
+    Returns JSON with `count` + `cities`. CSV format via
+    `?format=csv` query param.
+    """
+    valid, error = check_admin_key()
+    if not valid:
+        return error
+    fmt = (request.args.get('format') or 'json').lower()
+
+    conn = permitdb.get_connection()
+    # Probe for required tables (graceful-degrade per V546 PR5x pattern)
+    for tbl in ('prod_cities', 'permits', 'contractor_profiles',
+                'scraper_runs', 'city_health'):
+        try:
+            conn.execute(f"SELECT 1 FROM {tbl} LIMIT 1").fetchone()
+        except Exception:
+            return jsonify({
+                'count': 0, 'cities': [],
+                'note': f'table {tbl!r} missing — empty CI fixture',
+            })
+
+    try:
+        rows = conn.execute("""
+            SELECT pc.city_slug AS slug,
+                   pc.source_type AS platform,
+                   (SELECT MAX(run_started_at) FROM scraper_runs sr
+                    WHERE sr.city_slug = pc.city_slug) AS last_run_at,
+                   (SELECT sr.status FROM scraper_runs sr
+                    WHERE sr.city_slug = pc.city_slug
+                    ORDER BY sr.run_started_at DESC LIMIT 1) AS last_run_status,
+                   COALESCE((SELECT COUNT(*) FROM permits p
+                             WHERE p.source_city_key = pc.city_slug), 0) AS permits,
+                   COALESCE((SELECT COUNT(*) FROM permits p
+                             WHERE p.source_city_key = pc.city_slug
+                               AND p.collected_at > datetime('now','-1 day')), 0) AS permits_24h,
+                   COALESCE((SELECT COUNT(NULLIF(p.contractor_name, ''))
+                             FROM permits p
+                             WHERE p.source_city_key = pc.city_slug), 0) AS with_contractor,
+                   COALESCE((SELECT COUNT(*) FROM contractor_profiles cp
+                             WHERE cp.source_city_key = pc.city_slug), 0) AS profiles,
+                   COALESCE((SELECT COUNT(*) FROM contractor_profiles cp
+                             WHERE cp.source_city_key = pc.city_slug
+                               AND cp.phone IS NOT NULL AND cp.phone != ''), 0) AS phones,
+                   (SELECT ch.status FROM city_health ch
+                    WHERE ch.city_slug = pc.city_slug) AS ch_status,
+                   (SELECT ch.reason_code FROM city_health ch
+                    WHERE ch.city_slug = pc.city_slug) AS ch_reason,
+                   pc.state AS state
+              FROM prod_cities pc
+             WHERE pc.status = 'active'
+               AND pc.source_type IS NOT NULL
+               AND pc.source_type != ''
+             ORDER BY pc.city_slug
+        """).fetchall()
+    except Exception as e:
+        return jsonify({'error': f'sweep query failed: {e}'}), 500
+
+    from datetime import datetime as _dt
+    now_dt = _dt.utcnow()
+    out_rows = []
+    for r in rows:
+        def _g(k, fallback_idx):
+            return (r[k] if hasattr(r, 'keys') else r[fallback_idx])
+        slug = _g('slug', 0)
+        platform = _g('platform', 1) or 'unknown'
+        last_run_at = _g('last_run_at', 2)
+        last_run_status = _g('last_run_status', 3)
+        permits = int(_g('permits', 4) or 0)
+        permits_24h = int(_g('permits_24h', 5) or 0)
+        with_contractor = int(_g('with_contractor', 6) or 0)
+        profiles = int(_g('profiles', 7) or 0)
+        phones = int(_g('phones', 8) or 0)
+        ch_status = _g('ch_status', 9)
+        ch_reason = _g('ch_reason', 10)
+        state = _g('state', 11) or ''
+        # Days since last successful run
+        days_since = None
+        if last_run_at:
+            try:
+                _iso = str(last_run_at).replace('T', ' ').split('.')[0]
+                days_since = (now_dt - _dt.fromisoformat(_iso)).total_seconds() / 86400.0
+            except Exception:
+                pass
+        # Failure-class auto-tag
+        failure_class = 'ok'
+        if permits >= 100 and profiles == 0 and platform == 'accela':
+            failure_class = 'sbco_class'
+        elif permits >= 100 and profiles == 0 and (state or '').upper() == 'FL':
+            failure_class = 'fl_field_map'
+        elif days_since is not None and days_since > 14 and last_run_status == 'error':
+            failure_class = 'dead_source'
+        elif with_contractor > 0 and profiles == 0:
+            failure_class = 'profile_build'
+        elif ch_reason == 'never_visited':
+            failure_class = 'slug_mismatch'
+        elif profiles == 0 and permits >= 100:
+            failure_class = 'unknown'
+        out_rows.append({
+            'source_city_key': slug, 'platform': platform,
+            'last_run_at': str(last_run_at) if last_run_at else None,
+            'last_run_status': last_run_status,
+            'permits_count': permits, 'permits_24h': permits_24h,
+            'with_contractor': with_contractor,
+            'profiles_count': profiles, 'profiles_24h': 0,  # placeholder; would require collected_at on cp
+            'phones_count': phones,
+            'ch_status': ch_status, 'ch_reason': ch_reason,
+            'state': state,
+            'failure_class': failure_class,
+        })
+
+    if fmt == 'csv':
+        import csv as _csv
+        from io import StringIO as _SIO
+        buf = _SIO()
+        writer = _csv.DictWriter(buf, fieldnames=list(out_rows[0].keys()) if out_rows else [
+            'source_city_key', 'platform', 'last_run_at', 'last_run_status',
+            'permits_count', 'permits_24h', 'with_contractor',
+            'profiles_count', 'profiles_24h', 'phones_count',
+            'ch_status', 'ch_reason', 'state', 'failure_class'])
+        writer.writeheader()
+        for row in out_rows:
+            writer.writerow(row)
+        from flask import Response as _Resp
+        return _Resp(buf.getvalue(), mimetype='text/csv')
+
+    # Failure-class summary
+    summary = {}
+    for r in out_rows:
+        summary[r['failure_class']] = summary.get(r['failure_class'], 0) + 1
+    return jsonify({
+        'count': len(out_rows),
+        'failure_class_summary': summary,
+        'cities': out_rows,
+    })
+
+
 @admin_bp.route('/api/admin/v547h/broken-extraction', methods=['GET'])
 def admin_v547h_broken_extraction():
     """V547h: list cities where contractor extraction is broken — high

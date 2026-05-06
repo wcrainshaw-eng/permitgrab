@@ -395,6 +395,57 @@ def test_v547i_accela_hybrid_cities_have_url_field():
     )
 
 
+def test_v547j_normalize_slugs_dry_run_returns_candidates(client):
+    """V547j: dry_run=True must return candidates without mutating
+    subscribers.digest_cities. Endpoint shape pinned for cron audits."""
+    import os as _os
+    _prev = _os.environ.get('ADMIN_KEY')
+    _os.environ['ADMIN_KEY'] = 'test-v547j'
+    try:
+        r = client.post('/api/admin/v547j/normalize-slugs',
+                        headers={'X-Admin-Key': 'test-v547j',
+                                 'Content-Type': 'application/json'},
+                        data='{"dry_run": true}')
+    finally:
+        if _prev is None:
+            _os.environ.pop('ADMIN_KEY', None)
+        else:
+            _os.environ['ADMIN_KEY'] = _prev
+    assert r.status_code == 200, (
+        f'V547j regression: dry_run returned {r.status_code}: '
+        f'{r.data[:200]!r}'
+    )
+    body = r.get_json()
+    for k in ('dry_run', 'fixed_count', 'fixed'):
+        assert k in body, f'V547j regression: missing key {k!r}'
+    assert body['dry_run'] is True
+
+
+def test_v547m_fleet_sweep_endpoint_shape(client):
+    """V547m: /api/admin/v547m/fleet-sweep returns the fleet
+    diagnostic JSON or CSV. Pin shape for the daily cron and the
+    failure-class taxonomy used by V547n."""
+    import os as _os
+    _prev = _os.environ.get('ADMIN_KEY')
+    _os.environ['ADMIN_KEY'] = 'test-v547m'
+    try:
+        r = client.get('/api/admin/v547m/fleet-sweep',
+                       headers={'X-Admin-Key': 'test-v547m'})
+    finally:
+        if _prev is None:
+            _os.environ.pop('ADMIN_KEY', None)
+        else:
+            _os.environ['ADMIN_KEY'] = _prev
+    assert r.status_code == 200, (
+        f'V547m regression: {r.status_code}: {r.data[:200]!r}'
+    )
+    body = r.get_json()
+    # Either populated (real DB) or empty-with-note (CI fixture)
+    assert 'count' in body or 'note' in body, (
+        f'V547m regression: missing count/note: {body}'
+    )
+
+
 def test_v547h_broken_extraction_endpoint_shape(client):
     """V547h: /api/admin/v547h/broken-extraction surfaces the
     SBCO-class profile-extraction bug fleet-wide. Pins the
