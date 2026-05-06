@@ -1,0 +1,121 @@
+PING WES — V545 SOURCE AUDIT (2026-05-06 ~01:50 UTC)
+
+================================================================
+🚨 P0 — DECIDE BEFORE 7 AM ET
+================================================================
+gabriel@smartbuildpros.com is a PAID pro_monthly subscriber whose
+only digest_city is san-bernardino-county. SBC is Degraded
+(low_profiles: 2,056 permits, 0 profiles). V540 PR4 will silently
+suppress his entire digest at 7 AM ET. He gets nothing.
+
+Pick one before 7 AM:
+  (a) Upgrade SBC to Pass via V508 Playwright Accela path (~30-60 min)
+  (b) Email gabriel tonight; offer to add LA/Riverside as Pass alts
+  (c) Per-subscriber whitelist override of V540 PR4 (~20 min)
+  (d) Silent suppression (DEFAULT, WORST — paid customer gets nothing)
+
+Wes informational: your own digest_city is "Atlanta" (capitalized) which
+hits Fail status AND a slug-case mismatch — your digest will also be
+suppressed tomorrow. Not a customer issue, just a heads-up.
+
+================================================================
+TOP 3 SYSTEMATIC PATTERNS
+================================================================
+1. THE FAIL LABEL LIES. 509/572 Fail are reason_code='platform_fail'.
+   Last 24h Socrata runs: 979 no_new + 514 success + ZERO errors. The
+   rubric maps "visit_age > 36h" to platform_fail in city_health —
+   so platform_fail really means "daemon hasn't visited in 36h," NOT
+   "the platform is failing." 447 of 509 platform_fail cities are
+   Socrata. ~480 cities total are starved-not-broken.
+
+2. DAEMON COVERAGE IS THE BUG. 1,761 active rows, 736 platform-typed,
+   only 186 unique cities visited in 24h, 191 in 7d. Daemon ran 3,043
+   cycles in 24h ≈ 16 hits per visited city. Same set every day. V526
+   stale-first sort orders correctly but doesn't enforce coverage,
+   so the ~186 high-pri subset starves the other ~550.
+
+3. V507 EXTRACTION CLUSTER. atlanta (5,164/0), norfolk-va (10,229/0),
+   austin-tx (23,545/1), san-bernardino-county (2,056/0) — high-volume
+   permits, near-zero profiles. Same V315/V319/V320 trap: field_map
+   names a field the source isn't populating. ~30 min per fix.
+
+================================================================
+TOP 3 V507/V509 BROKEN-ADDITIONS BUCKETS
+================================================================
+1. STARVED-NOT-BROKEN (5 cities): atlanta, tampa-fl, frisco-tx,
+   round-rock, cedar-park. Last run 5-10d ago. V526 didn't fix
+   coverage starvation — these are casualties.
+
+2. EXTRACTION BROKEN (4 cities): atlanta, austin-tx, norfolk-va,
+   san-bernardino-county. 0-1 profiles per 2K-23K permits. Field_map
+   miscoupling. Each is a known V315/V319-class fix.
+
+3. NEVER RAN (2 cities): garland-tx, irving-tx. NULL source_endpoint
+   AND NULL source_id after V507 added them. V496 patch missed them.
+   Active rows in prod_cities but daemon's collect_single_city falls
+   through to 'not_found' on every cycle.
+
+PLUS one true source death: san-antonio-tx Accela COSA went dark
+2026-04-12 (24d, dead_source). 26K permits + 4,912 profiles already
+banked — retire the source, keep the data, migrate to TX TDLR-only.
+
+================================================================
+TOMORROW'S 7 AM ET DIGEST FORECAST
+================================================================
+HEALTHY: 1   main@onpointgb.com (free, miami-dade-county Pass)
+MIXED:   1   ethanmokoena1516@gmail.com (pro_monthly, miami + miami-dade-
+             county fire; atlanta + austin-tx + tampa-fl silent-dropped)
+ALL-FAIL: 2  gabriel@smartbuildpros.com (PAID — see P0 above)
+             wcrainshaw@gmail.com (informational)
+
+================================================================
+RECOMMENDED V546 — DAEMON COVERAGE ENFORCEMENT
+================================================================
+V546a (~50 lines): Modify pick_next_cities to guarantee every platform
+city is visited within its _RECENT_VISIT_HOURS window before any city
+is re-visited. This single fix could lift 480+ cities out of
+"platform_fail" misclassification and let the rubric see them
+correctly. The current 28 Pass list will likely grow to 50-80, NOT
+500 — most starved cities will land in low_profiles / low_permits
+once visited fresh.
+
+V546a unblocks V507's TX TDLR promise too: austin-tx/SA/houston were
+supposed to be enrichment-lifted, but if the daemon never reaches
+them within 36h, city_health flags them Fail regardless of profile
+or phone count.
+
+V546b (~20 lines): Field_map fixes for atlanta + austin-tx + norfolk-
+va + SBC. Standard 30-min-per-city pattern.
+
+V546c (~3 lines): Rename platform_fail → stale_visit when triggered
+by visit-age. Stops misleading future audits.
+
+V546d (~5 lines): V496-patch garland-tx + irving-tx + cedar-park +
+frisco-tx + round-rock NULL source_endpoint orphans.
+
+V546e (~5 lines): Retire san-antonio-tx Accela source.
+
+================================================================
+ANSWER TO YOUR BIGGER QUESTION
+================================================================
+"Are we shipping bad data or measuring it wrong?" → Both, but more
+measuring-it-wrong. The 28 Pass cities are genuine and sellable.
+The 509 platform_fail are 88% mislabeled visit-starvation, not
+source failure. The data we have is real; the rubric is right in
+spirit; the bug is in how the daemon distributes its visits and
+how the rubric labels the consequence.
+
+V544 (already shipped) makes the indexation contract coherent on
+the current 28. V546a will likely 2-3x that count without any
+NEW source work — just better coverage of sources we already have.
+
+================================================================
+DELIVERABLES
+================================================================
+- V545_SOURCE_AUDIT.md (this audit, full data tables)
+- PING_WES_V545_AUDIT.txt (this file)
+
+V544 + V544x already shipped (CI green on commit 0aebc30).
+V545 is audit-only, no code changes.
+
+— Computed 2026-05-06 ~01:50 UTC
