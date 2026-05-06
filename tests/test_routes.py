@@ -357,6 +357,44 @@ def test_v546b5_daemon_coverage_endpoint_shape(client):
     ), 'V546 regression: starved_count != 72h_plus + never'
 
 
+def test_v547i_accela_hybrid_cities_have_url_field():
+    """V547i defensive: every CITY_REGISTRY entry on platform
+    `accela_arcgis_hybrid` MUST configure a `url_field` (or rely on
+    the default 'URL') AND have an ArcGIS-format endpoint, since
+    fetch_accela_arcgis_hybrid auto-injects contractor_name from
+    CapDetail. If a future config sets platform=accela_arcgis_hybrid
+    with the wrong endpoint type (Accela ACA URL instead of ArcGIS
+    FeatureServer query URL), the hybrid fetcher will return [] and
+    contractor extraction silently fails — exactly the SBCO bug
+    class V547h surfaced.
+
+    Test asserts each accela_arcgis_hybrid entry has an endpoint
+    that smells like ArcGIS REST (contains 'arcgis' OR
+    'FeatureServer'/'MapServer'). Doesn't validate the live feed.
+    """
+    try:
+        from city_registry_data import CITY_REGISTRY
+    except Exception as e:
+        # If CITY_REGISTRY can't import in test env, skip. Local
+        # CI does import it via test_imports, so a failure to import
+        # here would already have failed elsewhere.
+        import pytest as _pt
+        _pt.skip(f'CITY_REGISTRY import failed in test env: {e}')
+    misconfigured = []
+    for key, cfg in CITY_REGISTRY.items():
+        if not isinstance(cfg, dict):
+            continue
+        if cfg.get('platform') != 'accela_arcgis_hybrid':
+            continue
+        ep = (cfg.get('endpoint') or '').lower()
+        if 'arcgis' not in ep and 'featureserver' not in ep and 'mapserver' not in ep:
+            misconfigured.append((key, cfg.get('endpoint')))
+    assert not misconfigured, (
+        f'V547i regression: accela_arcgis_hybrid cities with non-ArcGIS '
+        f'endpoint (the SBCO bug class). {misconfigured}'
+    )
+
+
 def test_v547h_broken_extraction_endpoint_shape(client):
     """V547h: /api/admin/v547h/broken-extraction surfaces the
     SBCO-class profile-extraction bug fleet-wide. Pins the
