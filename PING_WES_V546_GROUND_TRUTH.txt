@@ -1,0 +1,122 @@
+PING WES — V546 STEP 1 GROUND TRUTH (2026-05-06 ~01:58 UTC)
+
+================================================================
+WHAT THE PRODUCTION DAEMON IS ACTUALLY DOING
+================================================================
+Observed via SSH into Render (PID 8 = gunicorn worker), live polls
+of /api/admin/health, /api/admin/debug/threads, and direct DB queries.
+No assumptions.
+
+CORRECTION TO YOUR MENTAL MODEL:
+- You said "Pro plan, 2GB + 2 workers."
+- ps shows: gunicorn --workers 1 --threads 12. ONE worker.
+- The permitgrab-worker Background Worker is declared in render.yaml
+  but was never created in the Render dashboard. Confirmed by
+  CLAUDE.md ARCHITECTURE GROUND TRUTH and by ps.
+- So: ONE process hosting BOTH the web AND the daemon. Same 2GB
+  shared budget. Same 502-risk pattern that V450/V453 documented.
+
+THE STARVATION NUMBERS:
+- 1,761 active prod_cities, 736 platform-typed.
+- 174 visited in last 24h. 562 (76%) starved >72h. 34 never run.
+- 3,038 individual scraper_runs in 24h spread across 174 cities =
+  17.5 redundant visits per visited city per day. Same set winning.
+- collections_last_24h: 169 completed-batches.
+- cycle_stale_minutes: 730+ and growing — the last full SCHEDULED
+  cycle completed 12 hours ago. Individual collections fire but no
+  full cycle finishes. Direct evidence of the memory bail.
+
+THE EXACT MECHANISM (collector.py):
+- Line 3823: V526 ORDER BY (last_run IS NULL) DESC, last_run ASC.
+- Line 3844: MAX_CITIES_PER_CYCLE = 75 (hard cap).
+- Line 3894: _MEM_BAIL_MB = 1200, _MEM_HARD_ABORT_MB = 1400.
+- Line 3921: per-iteration check breaks the loop when RSS >= 1200MB.
+- Cycle picks 75 stalest, iterates serially, RSS climbs 200-500MB
+  per heavy city, bails after 10-30 cities. Cities 11-75 never
+  get visited. They re-rank stalest next cycle. Same 75 win again.
+- VmPeak captured: 2.34 GB. Worker has already breached the 2GB
+  ceiling at some point in this deploy's lifetime.
+
+ERRORS ARE NOT THE PROBLEM:
+- 92 errors in 24h, all concentrated on 5 cities (greenville 30,
+  pittsburgh 24, boston 21, murfreesboro 15, baltimore 2). Sources
+  are healthy at scale: socrata 0/1,489 errors, accela 0/718,
+  carto 0/21. The daemon isn't running ON enough cities, not
+  failing on the cities it runs.
+
+================================================================
+ARCHITECTURE DECISION — OPTION C (your dashboard activates it)
+================================================================
+A (ThreadPool inside existing daemon): NO. Concurrency without
+   process isolation makes the 2GB ceiling worse, not better.
+   20 concurrent fetches × heavy NYC permit set = 2-3GB peak.
+   We're already at 2.34GB peak in serial mode.
+
+B (Per-platform queues): NO. Same memory contention; just
+   reorganizes the bottleneck. Defer to V548.
+
+C (Activate permitgrab-worker on Render): YES. The render.yaml
+   declaration already exists, worker.py already exists. You
+   click "Create Background Worker" in the Render dashboard,
+   point at the existing config. Daemon moves to its own
+   process with its own 2GB. Web stops competing. Cost ~$7/mo.
+
+   This is the ONLY option that closes the V474→V493→V496→V526
+   chain at the architectural level instead of patching the
+   picker again.
+
+================================================================
+V546 PLAN — 1 WES ACTION + 6 SMALL CODE PRs
+================================================================
+V546a (YOU, ~5 min): Render dashboard → Create new Background
+       Worker called permitgrab-worker → point at this repo's
+       render.yaml worker block → deploy. Confirm process appears
+       in dashboard.
+
+V546b1: Worker entry-point hardening (worker.py boots all 6 daemon
+        threads via start_collectors()). Regression test.
+V546b2: WORKER_MODE env-var gate. When set, web process skips
+        start_collectors(). When unset, current in-web behavior
+        (so this is safe to ship before V546a runs).
+V546b3: ThreadPoolExecutor + per-platform semaphores in
+        _collect_all_inner. Streaming inserts. Per-city peak
+        target <100MB. Raise MAX_CITIES_PER_CYCLE to 250.
+V546b4: Add daemon_coverage_starvation reason_code in
+        city_health/compute.py. Stops the platform_fail mislabel.
+V546b5: GET /api/admin/daemon-coverage endpoint with
+        hours_since_last_run histogram (0-6h / 6-24h / 24-72h /
+        72h+). Permanent observability layer.
+V546b6: Nightly auto-prune cron — flip prod_cities to inactive
+        when 0 successful collections in 30d AND 0 permits in DB
+        AND wired >60 days ago. Logs to inactivity_log.
+
+V546 verification (Step 7): /api/admin/daemon-coverage every 6h
+for 24h. The 72h+ bucket should drain from 562 → <50 within
+48h of V546a. If it doesn't, V547. Do NOT declare victory on
+test green alone — that's the V474→V526 lesson and is now a
+durable memory rule (feedback_production_observability_required.md).
+
+================================================================
+DELIVERABLES
+================================================================
+- V546_DAEMON_GROUND_TRUTH.md (this audit, full data)
+- PING_WES_V546_GROUND_TRUTH.txt (this file)
+- New durable memory rule:
+  feedback_production_observability_required.md
+
+================================================================
+WHAT'S NEEDED FROM YOU
+================================================================
+1) Sign off on Option C (worker service activation).
+2) When ready, click-create the Background Worker in Render
+   dashboard. Once it's live, V546b1-b6 ship in order.
+3) Confirm the V545 P0 plan for gabriel@smartbuildpros.com
+   before 7 AM ET — that's still pending and unrelated to V546's
+   timeline.
+
+I'll start drafting V546b1 + V546b2 (worker entry point + WORKER_MODE
+gate) in parallel so they're ready to ship the moment V546a is live.
+The remaining 7-min observation window is still running and I'll fold
+any new findings in when it completes.
+
+— Captured 2026-05-06 ~01:58 UTC
