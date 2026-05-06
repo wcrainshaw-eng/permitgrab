@@ -1,0 +1,150 @@
+# PING WES — V542 GSC INDEXATION DIAGNOSIS — partial (GSC API access blocked)
+
+## What I shipped this turn
+
+V541a (commit 2e3db77): /api/admin/city-health/compute-now ad-hoc trigger endpoint.
+V541b (commit 89e154b): fix _measure_city silent AttributeError on sqlite3.Row.
+The V540 PR1 compute path was returning permits_count=0 for every
+city because list(row.values())[0] AttributeError'd silently in the
+sqlite3.Row branch (sqlite3.Row has keys() but NOT values()). The
+fix added a cross-dialect _row_value(row, key) helper + aliased
+every aggregate (`COUNT(*) AS cnt`, `MAX(...) AS last_run`).
+
+## V541 inventory (post-V541b — caveat: deploy may still be settling)
+
+First compute_all_city_health() return:
+  pass=0, degraded=1025, fail=736, total=1761
+
+Reason-code breakdown:
+  Degraded: unknown_platform = 1025 (NULL source_type bulk-source recipients)
+  Fail:     never_visited    = 736 (no scraper_runs row matching the slug)
+
+Critical: pass=0 even after V541b. Two possibilities:
+1. V541b hadn't deployed yet when I last fired compute_now (returned
+   identical result + 0.68s duration, suspicious of cached state).
+2. V541b is live but production is hitting the SQLite path (not
+   Postgres) for compute. db_engine.py wraps psycopg2 in PgConnection
+   → PgCursor → DictRow which IS a dict subclass with .values(), so
+   the bug shouldn't hit on Postgres. But maybe the daemon thread
+   gets a thread-local sqlite connection somewhere.
+
+Either way: the 0-Pass result needs investigation in V543 before the
+pre-curation contract can deliver value. The picker / sitemap / digest
+gates are currently fail-open (correctly, per design) until city_health
+has data.
+
+## V542 GSC indexation — what I CAN ship now (codebase-only)
+
+### noindex audit (Wes flagged ~2,619 URLs)
+Codebase grep found 16 noindex emissions:
+
+LEGITIMATE (keep — auth/admin/error):
+- templates/forgot_password.html, login.html, signup.html
+- templates/my_dashboard.html, saved_searches.html, success.html
+- templates/404.html, admin_analytics.html
+
+CONDITIONAL (live gates):
+- server.py:6886-6897 — `noindex, follow` if permit_count < 20.
+  This is the HOT path. Most of the 2,619 GSC noindex hits.
+- server.py:6592, 6646, 6750 — three city_paused.html paths
+  (non-prod cities, stale-data cities, empty-city early-exit).
+- templates/contractor_detail.html — every contractor page
+  is `noindex, follow` always (likely the V236 thin-page gate).
+
+Recommended V542a (after V541b 0-Pass mystery is resolved):
+- Replace the `permit_count < 20` gate with city_health.is_sellable_city.
+  Pass cities → index; everything else → noindex. Aligns with V540
+  pre-curation contract.
+- Once aligned, contractor_detail.html on Pass cities can be
+  selectively de-noindex'd (more SEO surface area).
+
+### canonical spot-check (5 URLs)
+4/5 healthy:
+  /permits/chicago-il        → canonical /permits/illinois/chicago-il (✓ V485 pattern)
+  /permits/miami-dade-county → canonical /permits/florida/miami-dade-county (✓)
+  /permits/phoenix-az        → canonical /permits/arizona/phoenix-az (✓)
+  /permits/austin-tx         → canonical /permits/texas/austin-tx (✓)
+
+1/5 anomaly:
+  /permits/nashville         → canonical /permits/nashville-tn
+                              (NOT state/city format; carries
+                               'noindex, follow' so SEO impact bounded;
+                               worth investigating — slug-routing edge case)
+
+### sitemap.xml health
+- /sitemap.xml index lists 5 child sitemaps (pages, cities, states,
+  trades, blog).
+- /sitemap-cities.xml: 1753 URLs (1708 city-format /permits/{state}/{city}
+  + 45 state-format /permits/{state}).
+- All lastmod = 2026-05-06 (today). Generated freshly.
+- V540 PR3 sitemap filter active but currently fail-open because
+  city_health is 0-Pass. Once V541b 0-Pass mystery resolves and
+  Pass cities materialize, the filter will drop Fail/Degraded URLs
+  from the sitemap. Currently it's listing all 1708 active cities
+  even though most are Degraded/Fail — Google still sees the
+  individual page-level noindex.
+
+### Mismatch worth flagging
+- noindex page tag = `permit_count < 20` (V236 / 6886-6897)
+- Sitemap inclusion = `prod_cities.status='active' AND total_permits>0`
+- V540 pre-curation gate = city_health.status='Pass'
+
+These are THREE different gates. Google sees:
+1. Sitemap says "index this URL"
+2. Page header says "noindex"
+3. Curation says... mostly fail-open right now
+
+V543 priority recommendation: unify on city_health.is_sellable_city
+across all three gates so the signals are coherent.
+
+## V542 — what I CAN'T ship without GSC API access
+
+Per CLAUDE.md "Code's sandbox proxy blocks outbound HTTPS" and no
+Chrome MCP available in this session:
+
+BLOCKED on Wes:
+1. GSC bucket counts (Indexed / Discovered-not-indexed / Crawled-not-
+   indexed / Excluded by noindex / Page with redirect / Server error /
+   Soft 404 / 404 / Blocked-by-robots / Duplicate without user-canonical /
+   Duplicate Google-chose-different-canonical / Alternate proper-canonical).
+   Need: GSC bulk CSV export OR Chrome MCP.
+
+2. URL Inspection API submissions (top 50 Pass + top 20 blog).
+   Need: GSC API auth in this environment.
+
+3. PageSpeed/Core Web Vitals data.
+   Need: PageSpeed Insights API or Lighthouse-as-a-service.
+
+4. Internal linking audit by ACTUAL crawl.
+   Could implement via curl + parse but slow against 1708 URLs;
+   probably better to use a tool like screamingfrog if available.
+
+## Recommended chain order
+
+V543 (highest leverage, codebase-only, unblocks V542 follow-on):
+  Investigate why V541b compute returns 0 Pass on Postgres production.
+  Either deploy lag (re-fire after 5+ min from V541b push) OR a
+  threaded-connection issue where compute hits SQLite while admin
+  query hits Postgres. Resolution-time: <30 min.
+
+V544 (after V543 resolves Pass count):
+  Unify noindex + sitemap + curation on city_health.is_sellable_city.
+  Replace V236 permit_count<20 gate with curation gate. Pre-curation
+  contract becomes the SINGLE source of truth for "what gets indexed".
+
+V545 (waiting on Wes):
+  GSC CSV drop. Unblocks bucket-count audit + URL inspection
+  submissions.
+
+V546+ (per V542 Wes spec):
+  Soft 404 fix, Server error 5xx audit, Discovered-not-indexed
+  content depth.
+
+## Status
+
+V541 audit done (with caveats above). V542 partial (codebase-only
+parts shipped via this PING; GSC API parts blocked on tooling/CSV).
+Continuous arc continues: chaining into V543 (investigate 0-Pass
+mystery on production).
+
+— Code at ~01:10 UTC 2026-05-06
