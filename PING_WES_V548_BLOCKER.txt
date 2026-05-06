@@ -1,0 +1,115 @@
+PING WES — REAL BLOCKER: WORKER IS NOT COLLECTING
+
+================================================================
+SYMPTOM
+================================================================
+Captured 2026-05-06 ~14:35 UTC (post-V547b/i deploy):
+
+  GET /api/admin/daemon-coverage:
+    starved_count = 461 (unchanged from 461 baseline)
+    coverage_pct_24h = 36.28% (DOWN 1.08pp from 37.36% baseline —
+                              cities aged out of 0_6h naturally
+                              with no new visits)
+    Buckets: 0_6h=93 (was 178), 6_24h=174 (was 84) — confirms
+             pure aging, no fresh visits
+
+  Direct DB query:
+    SELECT COUNT(DISTINCT city_slug) FROM scraper_runs
+    WHERE run_started_at > datetime('now','-1 hour')
+    → 0
+
+  san-bernardino-county profiles: 0 (V547i ineffective — no
+                                    cycle reached SBCO)
+
+================================================================
+WHAT THIS MEANS
+================================================================
+The worker process has NOT collected ANY cities in the last hour.
+Either:
+
+(a) Worker service is DOWN (crashed on V547b deploy boot? Failed
+    health check?). Render auto-restart not kicking in.
+
+(b) Worker is RUNNING but failing silently on every cycle
+    (e.g., import error in collector.py with V547b's
+    concurrent.futures / threading.BoundedSemaphore additions).
+
+(c) Worker is RUNNING and collecting, but writes are landing in
+    a DIFFERENT scraper_runs table (separate DB connection that's
+    not the shared SQLite/Postgres).
+
+(d) Worker is RUNNING but has been blocked on a single long
+    request for the entire hour (one of the new ThreadPool workers
+    hung on a slow source).
+
+================================================================
+WHAT I CAN'T DO FROM CODE'S SANDBOX
+================================================================
+- SSH directly into permitgrab-worker service (its srv-ID isn't
+  exposed; only the web's srv-d6s1tvsr85hc73em9ch0)
+- Read worker logs via Render API (no token in this sandbox)
+- Restart the worker service
+
+================================================================
+WHAT WES NEEDS TO DO IN RENDER DASHBOARD (~5 min)
+================================================================
+
+1. https://dashboard.render.com → permitgrab-worker service
+2. Status: is it Live, Failed, or Deploying?
+   - If Failed: check Events tab for the error
+   - If Deploying: wait 1-2 min for it to settle
+   - If Live: click Logs tab
+3. Logs (last 50 lines): look for:
+   - Python ImportError / SyntaxError on V547b additions
+     (concurrent.futures, BoundedSemaphore)
+   - "Permit refresh complete (+N stamped)" lines from
+     worker.py:scheduled_collection — should fire every ~15 min
+   - "[V547b] Parallel pre-fetch: N cities" lines — should fire
+     when a cycle starts
+   - V485 wal_checkpoint heartbeat lines every 5 min
+   - Crashes / tracebacks
+4. If worker is silently stuck (no log activity for >30 min):
+     - Click "Manual Deploy" to force-restart with the latest commit
+     - OR set FORCE_REDEPLOY=1 env var to push a redeploy
+
+================================================================
+CODE-SIDE HOTFIX OPTIONS IF WORKER WON'T BOOT
+================================================================
+
+Hotfix A (V547b1): if collector.py's V547b additions crash on
+import in worker, defer-import:
+  Move `import concurrent.futures` and the `BoundedSemaphore`
+  references into the function body that actually uses them
+  (currently inside _collect_all_inner). Already are inside the
+  function body — confirmed. So import-time crash unlikely.
+
+Hotfix B (V547b2): if ThreadPoolExecutor fails at runtime (e.g.,
+psutil/memory error, gthread compatibility issue), wrap the
+parallel pre-fetch in try/except that falls back to the legacy
+serial fetch:
+  try:
+    # V547b parallel pre-fetch ...
+  except Exception as _v547b_err:
+    print(f"[V547b] disabled, falling back to serial: {_v547b_err}")
+    _v547b_raw_cache = {}
+
+Hotfix C (V547b-revert): worst case — revert the V547b commit
+6f33bf0 by setting MAX_CITIES_PER_CYCLE back to 75 and removing
+the threadpool block. Worker reverts to in-process daemon's
+9 cities/hr pace, gabriel still suppressed, but at least daemon
+is live.
+
+================================================================
+INTERIM (UNTIL WES CHECKS WORKER)
+================================================================
+
+I'm armed with:
+- /loop V438 fire at 09:34 UTC (next probe)
+- 10:07 UTC dedicated V547b/i 1h verification
+
+I'll re-check at each fire. If worker still 0 visits at 10:07 UTC,
+that's 90+ min of silent stuck — escalate further. Per CLAUDE.md
+"DON'T STOP ON DEPLOY-ROLLOVER 502s" + "real blocker bar is high":
+this IS the real blocker bar.
+
+— Captured 2026-05-06 ~14:35 UTC
